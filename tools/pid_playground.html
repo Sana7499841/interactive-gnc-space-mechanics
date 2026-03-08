@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PID Controller Playground | Interactive GNC & Space Mechanics</title>
+  <link rel="stylesheet" href="../styles.css" />
+
+  <!-- MathJax -->
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --formula-ink:#ffffff;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --pill:#dbeafe;
+      --soft:#eef2ff;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --ok:#ecfeff;
+      --ok-line:#0f8b8d;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+      --radius-lg:20px;
+      --radius-md:16px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:26px 34px 34px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.28rem);
+      line-height:1.65;
+      max-width:1100px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.08fr 0.92fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{
+      display:grid;
+      gap:22px;
+    }
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,
+    .card li{
+      font-size:1.04rem;
+      line-height:1.7;
+      color:var(--muted);
+    }
+
+    .card ul{
+      margin:10px 0 0 22px;
+      padding:0;
+    }
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:var(--formula-ink);
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .split-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+
+    .tabs{
+      display:flex;
+      gap:12px;
+      margin:4px 0 18px;
+      flex-wrap:wrap;
+    }
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      transition:transform 0.15s ease, opacity 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      color:#fff;
+    }
+
+    .tab-btn:hover{ transform:translateY(-1px); }
+
+    .mode-panel{ display:none; }
+    .mode-panel.active{ display:block; }
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    .hint{
+      font-size:0.94rem;
+      color:#6b7280;
+      margin-top:6px;
+    }
+
+    input,
+    select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+    }
+
+    .field{
+      margin-bottom:16px;
+    }
+
+    .button-row{
+      display:flex;
+      gap:12px;
+      margin-top:8px;
+      flex-wrap:wrap;
+    }
+
+    .cta{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.08rem;
+      font-weight:800;
+      cursor:pointer;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      flex:1 1 220px;
+      min-height:56px;
+    }
+
+    .ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.02rem;
+      font-weight:800;
+      cursor:pointer;
+      color:#1f2937;
+      background:#e5e7eb;
+      flex:1 1 160px;
+      min-height:56px;
+    }
+
+    .results-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+      margin-top:14px;
+    }
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:108px;
+    }
+
+    .result-box h4{
+      margin:0 0 8px;
+      font-size:0.98rem;
+      color:#475569;
+      line-height:1.35;
+    }
+
+    .result-box .value{
+      font-size:1.15rem;
+      font-weight:800;
+      color:#111827;
+      line-height:1.35;
+    }
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--ok-line);
+      background:var(--ok);
+    }
+
+    .callout.warn{
+      border-left-color:var(--warn-line);
+      background:var(--warn);
+    }
+
+    .callout h3{
+      margin-top:0;
+      margin-bottom:8px;
+      font-size:1.15rem;
+    }
+
+    .callout p{
+      margin:0;
+    }
+
+    .plot-card{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:18px;
+      margin-top:16px;
+    }
+
+    .plot-title{
+      font-weight:800;
+      font-size:1.05rem;
+      margin:0 0 10px;
+      color:#111827;
+    }
+
+    canvas{
+      width:100%;
+      height:300px;
+      display:block;
+      border-radius:16px;
+      background:#ffffff;
+      border:1px solid #e2e8f0;
+    }
+
+    .legend{
+      display:flex;
+      gap:18px;
+      flex-wrap:wrap;
+      margin-top:10px;
+      font-size:0.96rem;
+      color:#475569;
+    }
+
+    .legend span{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .swatch{
+      width:16px;
+      height:3px;
+      border-radius:999px;
+      display:inline-block;
+    }
+
+    .note-box{
+      border-radius:20px;
+      padding:20px 22px;
+      border-left:5px solid #7c3aed;
+      background:#f8fafc;
+      color:#475569;
+      margin-top:18px;
+    }
+
+    .status-chip{
+      display:inline-block;
+      font-size:0.95rem;
+      font-weight:800;
+      padding:8px 14px;
+      border-radius:999px;
+      background:#e5e7eb;
+      color:#1f2937;
+      margin-top:4px;
+    }
+
+    .status-chip.good{
+      background:#dcfce7;
+      color:#166534;
+    }
+
+    .status-chip.warn{
+      background:#fef3c7;
+      color:#92400e;
+    }
+
+    .status-chip.bad{
+      background:#fee2e2;
+      color:#991b1b;
+    }
+
+    @media (max-width: 1100px){
+      .grid-2{
+        grid-template-columns:1fr;
+      }
+    }
+
+    @media (max-width: 720px){
+      .page-wrap{
+        width:min(100% - 24px, 1380px);
+      }
+
+      .tool-hero{
+        padding:22px 20px 26px;
+        border-radius:24px;
+      }
+
+      .card{
+        padding:22px 18px 24px;
+      }
+
+      .split-2,
+      .results-grid{
+        grid-template-columns:1fr;
+      }
+
+      canvas{
+        height:260px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-wrap">
+
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 5 · Control Systems</div>
+      <h1>PID Controller Playground</h1>
+      <p>
+        Explore how proportional, integral, and derivative gains shape the response of a feedback-controlled system.
+        This interactive module lets you tune \(K_p\), \(K_i\), and \(K_d\), simulate a closed-loop step response,
+        and observe how control choices affect rise time, overshoot, settling behaviour, steady-state error, and control effort.
+      </p>
+    </section>
+
+    <section class="grid-2">
+
+      <!-- LEFT COLUMN -->
+      <div class="stack">
+
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            A PID controller generates a control signal from the difference between a desired reference and the
+            measured output. The proportional term reacts to the present error, the integral term accumulates
+            past error, and the derivative term reacts to how quickly the error is changing.
+          </p>
+
+          <div class="formula-box">
+            \[
+              u(t)=K_p e(t)+K_i\int_0^t e(\tau)\,d\tau + K_d \frac{de(t)}{dt}
+            \]
+          </div>
+
+          <p>
+            In this playground, the controller acts on a simple second-order plant. The page simulates the closed-loop
+            response to a step command and reports the key performance measures used in introductory control analysis.
+          </p>
+
+          <ul>
+            <li>Rise time</li>
+            <li>Peak overshoot</li>
+            <li>Settling time</li>
+            <li>Steady-state error</li>
+            <li>Peak control signal magnitude</li>
+            <li>Basic stability indication</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Core control theory</h2>
+
+          <h3>Closed-loop idea</h3>
+          <p>
+            A reference signal \(r(t)\) is compared with the system output \(y(t)\). Their difference,
+            \(e(t)=r(t)-y(t)\), drives the controller. The controller then applies an input \(u(t)\) to the plant.
+            The goal is to reduce the error and make the output follow the reference.
+          </p>
+
+          <div class="formula-box">
+            \[
+              e(t)=r(t)-y(t)
+            \]
+          </div>
+
+          <h3>Plant model used in this tool</h3>
+          <p>
+            The plant is modeled as a standard second-order system:
+          </p>
+
+          <div class="formula-box">
+            \[
+              \ddot y + 2\zeta\omega_n \dot y + \omega_n^2 y = \omega_n^2 u
+            \]
+          </div>
+
+          <p>
+            where \(\omega_n\) is the natural frequency and \(\zeta\) is the damping ratio. This makes the page
+            useful for learning because it clearly shows how controller gains interact with plant dynamics.
+          </p>
+
+          <h3>What each gain does</h3>
+          <ul>
+            <li><strong>Proportional gain \(K_p\):</strong> increases responsiveness but can also increase overshoot.</li>
+            <li><strong>Integral gain \(K_i\):</strong> reduces or eliminates steady-state error, but too much may cause oscillation.</li>
+            <li><strong>Derivative gain \(K_d\):</strong> adds damping and can reduce overshoot by reacting to the trend of the error.</li>
+          </ul>
+
+          <div class="note-box">
+            Good tuning is always a trade-off. A controller can be made faster, but excessive gains may create oscillation,
+            instability, or unnecessarily large control effort.
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Interpretation guide</h2>
+          <p>
+            The response plots and metrics should be read together. A fast rise time is attractive, but if it comes with
+            high overshoot or strong oscillations, the controller may not be desirable in practice. Likewise, removing
+            steady-state error using the integral term is useful, but aggressive integral action can cause sluggish recovery
+            or instability.
+          </p>
+
+          <ul>
+            <li>If \(K_p\) is too small, the response is slow and weak.</li>
+            <li>If \(K_p\) is too large, the system may overshoot or oscillate.</li>
+            <li>If \(K_i\) is too small, steady-state error may remain.</li>
+            <li>If \(K_i\) is too large, the output may hunt around the target.</li>
+            <li>If \(K_d\) is increased moderately, oscillation often decreases.</li>
+            <li>If \(K_d\) is too large, the control action can become noisy or overly aggressive.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Why this tool matters</h2>
+          <p>
+            PID control is one of the most widely used feedback strategies in engineering because it is simple,
+            intuitive, and effective across many applications. In aerospace systems, PID-style loops appear in
+            attitude control, reaction-wheel regulation, gimbal control, flight stabilization, and actuator command shaping.
+          </p>
+          <p>
+            This tool connects controller gains to directly visible dynamic behaviour. That makes it valuable for learning
+            how stability, responsiveness, damping, and control effort compete with one another in real design work.
+          </p>
+        </article>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="stack">
+
+        <article class="card">
+          <h2>Interactive calculator</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="basic">Basic PID Inputs</button>
+            <button type="button" class="tab-btn" data-mode="plant">Plant Parameters</button>
+          </div>
+
+          <div id="mode-basic" class="mode-panel active">
+            <div class="split-2">
+              <div class="field">
+                <label for="refInput">Reference input \(r\)</label>
+                <input type="number" id="refInput" value="1" step="0.1" />
+              </div>
+              <div class="field">
+                <label for="simDuration">Simulation duration (s)</label>
+                <input type="number" id="simDuration" value="10" step="0.5" min="1" />
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="kp">Proportional gain \(K_p\)</label>
+                <input type="number" id="kp" value="3.5" step="0.1" />
+              </div>
+              <div class="field">
+                <label for="ki">Integral gain \(K_i\)</label>
+                <input type="number" id="ki" value="1.2" step="0.1" />
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="kd">Derivative gain \(K_d\)</label>
+                <input type="number" id="kd" value="1.0" step="0.1" />
+              </div>
+              <div class="field">
+                <label for="dt">Time step \( \Delta t \) (s)</label>
+                <input type="number" id="dt" value="0.01" step="0.005" min="0.001" />
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-plant" class="mode-panel">
+            <div class="split-2">
+              <div class="field">
+                <label for="wn">Natural frequency \( \omega_n \) (rad/s)</label>
+                <input type="number" id="wn" value="2.0" step="0.1" min="0.1" />
+              </div>
+              <div class="field">
+                <label for="zeta">Damping ratio \( \zeta \)</label>
+                <input type="number" id="zeta" value="0.35" step="0.05" min="0" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="preset">Quick tuning preset</label>
+              <select id="preset">
+                <option value="custom">Custom</option>
+                <option value="slow">Slow / conservative</option>
+                <option value="balanced">Balanced</option>
+                <option value="aggressive">Aggressive</option>
+                <option value="underdamped">Underdamped example</option>
+              </select>
+              <div class="hint">Choose a preset to load sample gains and plant parameters.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="runBtn">Run Simulation</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box">
+              <h4>Rise time</h4>
+              <div class="value" id="riseTime">—</div>
+            </div>
+
+            <div class="result-box">
+              <h4>Peak overshoot</h4>
+              <div class="value" id="overshoot">—</div>
+            </div>
+
+            <div class="result-box">
+              <h4>Settling time (2%)</h4>
+              <div class="value" id="settlingTime">—</div>
+            </div>
+
+            <div class="result-box">
+              <h4>Steady-state error</h4>
+              <div class="value" id="ssError">—</div>
+            </div>
+
+            <div class="result-box">
+              <h4>Peak control signal</h4>
+              <div class="value" id="peakControl">—</div>
+            </div>
+
+            <div class="result-box">
+              <h4>Final output</h4>
+              <div class="value" id="finalOutput">—</div>
+            </div>
+          </div>
+
+          <div class="callout" id="statusBox">
+            <h3>Stability indicator</h3>
+            <span class="status-chip" id="stabilityChip">Not evaluated yet</span>
+            <p id="statusText" style="margin-top:10px;">
+              Run the simulation to see whether the selected gains appear well-behaved for this plant model.
+            </p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Step response</div>
+            <canvas id="responseCanvas" width="700" height="300"></canvas>
+            <div class="legend">
+              <span><i class="swatch" style="background:#2563eb;"></i> Output \(y(t)\)</span>
+              <span><i class="swatch" style="background:#ef4444;"></i> Reference \(r(t)\)</span>
+            </div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Control signal</div>
+            <canvas id="controlCanvas" width="700" height="300"></canvas>
+            <div class="legend">
+              <span><i class="swatch" style="background:#0f8b8d;"></i> Controller output \(u(t)\)</span>
+            </div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Error history</div>
+            <canvas id="errorCanvas" width="700" height="300"></canvas>
+            <div class="legend">
+              <span><i class="swatch" style="background:#7c3aed;"></i> Error \(e(t)\)</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This playground assumes:</h3>
+            <ul>
+              <li>Linear second-order plant dynamics</li>
+              <li>Ideal measurements with no sensor noise</li>
+              <li>No actuator saturation or rate limits</li>
+              <li>No time delay or computation lag</li>
+              <li>A simple numerical integration scheme for learning purposes</li>
+            </ul>
+            <p>
+              That makes it useful for teaching intuition, controller tuning practice, and first-order
+              comparison of gain settings, but not as a full flight-control design tool.
+            </p>
+          </div>
+        </article>
+
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const defaults = {
+      refInput: 1,
+      simDuration: 10,
+      kp: 3.5,
+      ki: 1.2,
+      kd: 1.0,
+      dt: 0.01,
+      wn: 2.0,
+      zeta: 0.35,
+      preset: "custom"
+    };
+
+    const presetMap = {
+      slow:      { kp: 1.6, ki: 0.25, kd: 0.35, wn: 1.6, zeta: 0.55 },
+      balanced:  { kp: 3.5, ki: 1.2,  kd: 1.0,  wn: 2.0, zeta: 0.35 },
+      aggressive:{ kp: 7.0, ki: 2.8,  kd: 1.1,  wn: 2.3, zeta: 0.22 },
+      underdamped:{ kp: 4.8, ki: 0.8, kd: 0.2,  wn: 2.0, zeta: 0.12 }
+    };
+
+    const ids = [
+      "refInput","simDuration","kp","ki","kd","dt","wn","zeta","preset"
+    ];
+
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    const riseTimeEl = document.getElementById("riseTime");
+    const overshootEl = document.getElementById("overshoot");
+    const settlingTimeEl = document.getElementById("settlingTime");
+    const ssErrorEl = document.getElementById("ssError");
+    const peakControlEl = document.getElementById("peakControl");
+    const finalOutputEl = document.getElementById("finalOutput");
+    const stabilityChip = document.getElementById("stabilityChip");
+    const statusText = document.getElementById("statusText");
+    const statusBox = document.getElementById("statusBox");
+
+    const responseCanvas = document.getElementById("responseCanvas");
+    const controlCanvas = document.getElementById("controlCanvas");
+    const errorCanvas = document.getElementById("errorCanvas");
+
+    const tabButtons = document.querySelectorAll(".tab-btn");
+    const modePanels = document.querySelectorAll(".mode-panel");
+
+    tabButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        tabButtons.forEach(b => b.classList.remove("active"));
+        modePanels.forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.preset.addEventListener("change", () => {
+      const key = el.preset.value;
+      if (key === "custom") return;
+      const p = presetMap[key];
+      el.kp.value = p.kp;
+      el.ki.value = p.ki;
+      el.kd.value = p.kd;
+      el.wn.value = p.wn;
+      el.zeta.value = p.zeta;
+      runSimulation();
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      for (const [key, value] of Object.entries(defaults)) {
+        el[key].value = value;
+      }
+      runSimulation();
+    });
+
+    document.getElementById("runBtn").addEventListener("click", runSimulation);
+
+    function getInputs() {
+      return {
+        r: parseFloat(el.refInput.value),
+        duration: parseFloat(el.simDuration.value),
+        kp: parseFloat(el.kp.value),
+        ki: parseFloat(el.ki.value),
+        kd: parseFloat(el.kd.value),
+        dt: parseFloat(el.dt.value),
+        wn: parseFloat(el.wn.value),
+        zeta: parseFloat(el.zeta.value)
+      };
+    }
+
+    function simulatePID(params) {
+      let { r, duration, kp, ki, kd, dt, wn, zeta } = params;
+
+      if (!isFinite(r) || !isFinite(duration) || !isFinite(kp) || !isFinite(ki) ||
+          !isFinite(kd) || !isFinite(dt) || !isFinite(wn) || !isFinite(zeta) ||
+          duration <= 0 || dt <= 0 || wn <= 0 || zeta < 0) {
+        return null;
+      }
+
+      const n = Math.max(2, Math.floor(duration / dt) + 1);
+      const t = new Array(n);
+      const y = new Array(n);
+      const u = new Array(n);
+      const eArr = new Array(n);
+
+      let pos = 0;     // y
+      let vel = 0;     // ydot
+      let integral = 0;
+      let prevError = r - pos;
+
+      let diverged = false;
+
+      for (let i = 0; i < n; i++) {
+        const time = i * dt;
+        const error = r - pos;
+        const derivative = (error - prevError) / dt;
+        integral += error * dt;
+
+        const control = kp * error + ki * integral + kd * derivative;
+
+        // Plant:
+        // y'' + 2*zeta*wn*y' + wn^2*y = wn^2*u
+        const acc = (wn * wn) * (control - pos) - 2 * zeta * wn * vel;
+
+        vel += acc * dt;
+        pos += vel * dt;
+
+        t[i] = time;
+        y[i] = pos;
+        u[i] = control;
+        eArr[i] = error;
+
+        prevError = error;
+
+        if (!Number.isFinite(pos) || !Number.isFinite(vel) || Math.abs(pos) > 1e6 || Math.abs(control) > 1e6) {
+          diverged = true;
+          for (let j = i + 1; j < n; j++) {
+            t[j] = j * dt;
+            y[j] = pos;
+            u[j] = control;
+            eArr[j] = error;
+          }
+          break;
+        }
+      }
+
+      return { t, y, u, e: eArr, r, diverged };
+    }
+
+    function computeMetrics(data) {
+      const { t, y, u, e, r, diverged } = data;
+      const n = t.length;
+      const finalY = y[n - 1];
+      const peakY = Math.max(...y.map(v => Number.isFinite(v) ? v : -Infinity));
+      const peakU = Math.max(...u.map(v => Math.abs(v)));
+
+      let riseTime = null;
+      const low = 0.1 * r;
+      const high = 0.9 * r;
+      let crossedLow = false;
+
+      if (r > 0) {
+        for (let i = 0; i < n; i++) {
+          if (!crossedLow && y[i] >= low) {
+            crossedLow = true;
+          }
+          if (crossedLow && y[i] >= high) {
+            riseTime = t[i];
+            break;
+          }
+        }
+      }
+
+      let overshoot = null;
+      if (r !== 0) {
+        overshoot = ((peakY - r) / Math.abs(r)) * 100;
+        if (overshoot < 0) overshoot = 0;
+      }
+
+      let settlingTime = null;
+      const band = Math.abs(r) * 0.02 || 0.02;
+      for (let i = 0; i < n; i++) {
+        let settled = true;
+        for (let j = i; j < n; j++) {
+          if (Math.abs(y[j] - r) > band) {
+            settled = false;
+            break;
+          }
+        }
+        if (settled) {
+          settlingTime = t[i];
+          break;
+        }
+      }
+
+      const ssError = Math.abs(r - finalY);
+
+      let stability = "good";
+      let stabilityText = "The simulated response appears bounded and reasonably well-behaved for the chosen gains.";
+      let chipText = "Stable / well-behaved";
+
+      const oscillationMeasure = estimateOscillation(y, r);
+      if (diverged || !Number.isFinite(finalY) || Math.abs(finalY) > Math.abs(r) * 20 + 10) {
+        stability = "bad";
+        chipText = "Unstable / diverging";
+        stabilityText = "The response grows excessively or fails to remain bounded. Reduce the gains, especially proportional or integral action, or increase damping.";
+      } else if ((overshoot !== null && overshoot > 35) || oscillationMeasure > 10 || ssError > Math.max(0.15 * Math.abs(r), 0.08)) {
+        stability = "warn";
+        chipText = "Marginal / oscillatory";
+        stabilityText = "The response is bounded but shows noticeable oscillation, high overshoot, or significant residual error. The tuning may be usable for demonstration, but it is not especially clean.";
+      }
+
+      return {
+        riseTime,
+        overshoot,
+        settlingTime,
+        ssError,
+        peakU,
+        finalY,
+        stability,
+        chipText,
+        stabilityText
+      };
+    }
+
+    function estimateOscillation(y, ref) {
+      let count = 0;
+      let prevSign = null;
+      for (let i = 1; i < y.length; i++) {
+        const err = ref - y[i];
+        const sign = Math.sign(err);
+        if (sign !== 0 && prevSign !== null && sign !== prevSign) count++;
+        if (sign !== 0) prevSign = sign;
+      }
+      return count;
+    }
+
+    function fmt(v, digits = 3, suffix = "") {
+      if (v === null || v === undefined || !Number.isFinite(v)) return "—";
+      return `${v.toFixed(digits)}${suffix}`;
+    }
+
+    function updateOutputs(metrics) {
+      riseTimeEl.textContent = metrics.riseTime === null ? "Not reached" : fmt(metrics.riseTime, 3, " s");
+      overshootEl.textContent = fmt(metrics.overshoot, 2, " %");
+      settlingTimeEl.textContent = metrics.settlingTime === null ? "Not settled" : fmt(metrics.settlingTime, 3, " s");
+      ssErrorEl.textContent = fmt(metrics.ssError, 4);
+      peakControlEl.textContent = fmt(metrics.peakU, 4);
+      finalOutputEl.textContent = fmt(metrics.finalY, 4);
+
+      stabilityChip.textContent = metrics.chipText;
+      stabilityChip.className = "status-chip " + metrics.stability;
+      statusText.textContent = metrics.stabilityText;
+
+      statusBox.classList.remove("warn");
+      if (metrics.stability === "warn") {
+        statusBox.classList.add("warn");
+      } else if (metrics.stability === "bad") {
+        statusBox.classList.add("warn");
+      }
+    }
+
+    function drawLineChart(canvas, xData, lines, options = {}) {
+      const ctx = canvas.getContext("2d");
+      const W = canvas.width;
+      const H = canvas.height;
+      const pad = { left: 54, right: 18, top: 18, bottom: 38 };
+
+      ctx.clearRect(0, 0, W, H);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, W, H);
+
+      const allY = [];
+      lines.forEach(line => line.data.forEach(v => { if (Number.isFinite(v)) allY.push(v); }));
+      if (!allY.length || !xData.length) return;
+
+      let xMin = Math.min(...xData);
+      let xMax = Math.max(...xData);
+      if (xMax === xMin) xMax = xMin + 1;
+
+      let yMin = Math.min(...allY);
+      let yMax = Math.max(...allY);
+
+      if (options.forceIncludeZero) {
+        yMin = Math.min(yMin, 0);
+        yMax = Math.max(yMax, 0);
+      }
+
+      if (yMax === yMin) {
+        yMax += 1;
+        yMin -= 1;
+      }
+
+      const yPad = 0.08 * (yMax - yMin);
+      yMax += yPad;
+      yMin -= yPad;
+
+      function xPix(x) {
+        return pad.left + ((x - xMin) / (xMax - xMin)) * (W - pad.left - pad.right);
+      }
+      function yPix(y) {
+        return H - pad.bottom - ((y - yMin) / (yMax - yMin)) * (H - pad.top - pad.bottom);
+      }
+
+      // Grid
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const vTicks = 5;
+      const hTicks = 6;
+
+      for (let i = 0; i <= vTicks; i++) {
+        const y = pad.top + (i / vTicks) * (H - pad.top - pad.bottom);
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(W - pad.right, y);
+      }
+      for (let i = 0; i <= hTicks; i++) {
+        const x = pad.left + (i / hTicks) * (W - pad.left - pad.right);
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, H - pad.bottom);
+      }
+      ctx.stroke();
+
+      // Axes
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, pad.top);
+      ctx.lineTo(pad.left, H - pad.bottom);
+      ctx.lineTo(W - pad.right, H - pad.bottom);
+      ctx.stroke();
+
+      // Ticks labels
+      ctx.fillStyle = "#475569";
+      ctx.font = "12px Georgia, serif";
+      ctx.textAlign = "center";
+
+      for (let i = 0; i <= hTicks; i++) {
+        const xVal = xMin + (i / hTicks) * (xMax - xMin);
+        const x = pad.left + (i / hTicks) * (W - pad.left - pad.right);
+        ctx.fillText(xVal.toFixed(1), x, H - 14);
+      }
+
+      ctx.textAlign = "right";
+      for (let i = 0; i <= vTicks; i++) {
+        const frac = i / vTicks;
+        const yVal = yMax - frac * (yMax - yMin);
+        const y = pad.top + frac * (H - pad.top - pad.bottom);
+        ctx.fillText(yVal.toFixed(2), pad.left - 8, y + 4);
+      }
+
+      // Plot lines
+      lines.forEach(line => {
+        ctx.strokeStyle = line.color;
+        ctx.lineWidth = line.width || 2.5;
+        if (line.dashed) ctx.setLineDash([8, 5]);
+        else ctx.setLineDash([]);
+
+        ctx.beginPath();
+        let started = false;
+        for (let i = 0; i < xData.length; i++) {
+          const xv = xData[i];
+          const yv = line.data[i];
+          if (!Number.isFinite(yv)) continue;
+          const xp = xPix(xv);
+          const yp = yPix(yv);
+          if (!started) {
+            ctx.moveTo(xp, yp);
+            started = true;
+          } else {
+            ctx.lineTo(xp, yp);
+          }
+        }
+        ctx.stroke();
+      });
+
+      ctx.setLineDash([]);
+    }
+
+    function runSimulation() {
+      const params = getInputs();
+      const data = simulatePID(params);
+
+      if (!data) {
+        alert("Please enter valid positive values for the plant and simulation parameters.");
+        return;
+      }
+
+      const metrics = computeMetrics(data);
+      updateOutputs(metrics);
+
+      const refLine = new Array(data.t.length).fill(data.r);
+
+      drawLineChart(responseCanvas, data.t, [
+        { data: data.y, color: "#2563eb", width: 2.7 },
+        { data: refLine, color: "#ef4444", width: 2.2, dashed: true }
+      ], { forceIncludeZero: true });
+
+      drawLineChart(controlCanvas, data.t, [
+        { data: data.u, color: "#0f8b8d", width: 2.6 }
+      ], { forceIncludeZero: true });
+
+      drawLineChart(errorCanvas, data.t, [
+        { data: data.e, color: "#7c3aed", width: 2.6 }
+      ], { forceIncludeZero: true });
+    }
+
+    runSimulation();
+  </script>
+  <footer class="site-footer">
+  <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+</footer>
+</body>
+</html>

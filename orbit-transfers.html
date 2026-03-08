@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>3.4 Orbit Transfers | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <header class="notes-hero">
+    <h1>3.4 Orbit Transfers</h1>
+    <p class="notes-tagline">
+      Key maneuver strategies and \( \Delta v \)-computation concepts for changing orbital size, shape, plane, and mission timing
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html" class="active">Theory Notes</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="notes-intro-card">
+      <h2>3.4 Orbit Transfers</h2>
+      <p>
+        Orbit transfer maneuvers are the practical tools used to move a spacecraft from one orbit to another.
+        In the ideal two-body model, the spacecraft follows a fixed Keplerian trajectory between burns, while propulsion
+        events introduce deliberate changes in velocity. These changes are represented as impulsive
+        \( \Delta v \) inputs, meaning the spacecraft velocity changes almost instantaneously while the position remains
+        essentially unchanged during the burn.
+      </p>
+      <p>
+        Transfer design links together orbital energy, orbit geometry, velocity-vector direction, and timing.
+        Some maneuvers mainly change the size of the orbit, some rotate the orbital plane, and others combine several
+        objectives at once. In nearly all cases, the first design quantity of interest is the total velocity cost,
+      </p>
+
+      <div class="math-block">
+        \[
+        \Delta v_{\text{total}}=\sum_i \left|\Delta v_i\right|
+        \]
+      </div>
+
+      <p>
+        because minimizing total \( \Delta v \) usually means minimizing propellant consumption.
+        These notes are a revision map: short enough to revise from, but conceptually rich enough to show
+        why each maneuver works.
+      </p>
+
+      <div class="callout">
+        <strong>Core transfer questions:</strong>
+        <ul>
+          <li>How much must the spacecraft velocity change?</li>
+          <li>In what direction must the velocity vector change?</li>
+          <li>Where on the orbit should the burn be applied?</li>
+          <li>Is the design trying to minimize fuel, time, or both?</li>
+        </ul>
+      </div>
+    </section>
+
+    <nav class="subtopic-nav" aria-label="Orbit transfer sections">
+      <a href="#overview">Overview</a>
+      <a href="#hohmann">3.4.1 Hohmann</a>
+      <a href="#bielliptic">3.4.2 Bi-Elliptic</a>
+      <a href="#planechange">3.4.3 Plane Change</a>
+      <a href="#general">3.4.4 General Impulsive</a>
+      <a href="#interplanetary">3.4.5 Interplanetary</a>
+      <a href="#summary">Summary</a>
+    </nav>
+
+    <article class="notes-content">
+      <section id="overview">
+        <h3>Transfer Foundations</h3>
+        <p>
+          Orbit transfers can alter one or more orbital properties:
+        </p>
+
+        <div class="callout">
+          <ul>
+            <li><strong>Orbital energy</strong> &rarr; changes orbit size through the semi-major axis</li>
+            <li><strong>Orbit geometry</strong> &rarr; changes eccentricity or periapsis structure</li>
+            <li><strong>Orbital orientation</strong> &rarr; changes inclination or node direction</li>
+            <li><strong>Orbital timing</strong> &rarr; changes phase along the orbit</li>
+          </ul>
+        </div>
+
+        <p>
+          The standard analytical assumption is the <strong>impulsive maneuver model</strong>. Under this model,
+          the burn duration is very small compared with the orbital period, so the position is unchanged during the burn
+          while the velocity changes instantly:
+        </p>
+
+        <div class="math-block">
+          \[
+          \vec{v}_{after}=\vec{v}_{before}+\Delta \vec{v}
+          \]
+        </div>
+
+        <p>
+          where \( \Delta \vec{v} \) is the applied velocity increment. This approximation is ideal for conceptual
+          transfer analysis because it lets us study maneuvers through clean geometry and energy relations.
+        </p>
+
+        <p>
+          The second foundational relation is the <strong>vis-viva equation</strong>, which gives the orbital speed at any
+          point on a Keplerian orbit:
+        </p>
+
+        <div class="math-block">
+          \[
+          v=\sqrt{\mu\left(\frac{2}{r}-\frac{1}{a}\right)}
+          \]
+        </div>
+
+        <p>
+          Here \( \mu \) is the gravitational parameter of the central body, \( r \) is the current orbital radius,
+          and \( a \) is the semi-major axis. This equation is used repeatedly because almost every transfer problem
+          compares the velocity demanded by one orbit with the velocity demanded by another orbit at the same location.
+        </p>
+
+        <h4>Main Classes of Orbit Transfers</h4>
+        <div class="callout">
+          <ul>
+            <li><strong>Hohmann transfer</strong> &mdash; efficient two-impulse transfer between coplanar circular orbits</li>
+            <li><strong>Bi-elliptic transfer</strong> &mdash; three-impulse strategy for very large orbit-radius changes</li>
+            <li><strong>Plane-change maneuver</strong> &mdash; rotates the orbital plane</li>
+            <li><strong>General impulsive maneuver</strong> &mdash; arbitrary velocity-vector change</li>
+            <li><strong>Interplanetary transfer</strong> &mdash; heliocentric transfer with planetary departure and arrival logic</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="hohmann">
+        <h3>3.4.1 Hohmann Transfer</h3>
+        <p>
+          The <strong>Hohmann transfer</strong> is the classical minimum-energy two-impulse maneuver between two
+          <strong>coplanar circular orbits</strong>. It is the standard reference maneuver in orbital mechanics because
+          it captures the essential logic of transfer design:
+        </p>
+
+        <div class="callout">
+          <ol>
+            <li>Apply one burn to leave the initial orbit</li>
+            <li>Coast naturally on a transfer ellipse</li>
+            <li>Apply a second burn to match the final orbit</li>
+          </ol>
+        </div>
+
+        <h4>Transfer Geometry</h4>
+        <p>
+          Let the initial circular orbit radius be \( r_1 \) and the final circular orbit radius be \( r_2 \).
+          The transfer orbit is an ellipse tangent to both circular orbits. Its semi-major axis is
+        </p>
+
+        <div class="math-block">
+          \[
+          a_t=\frac{r_1+r_2}{2}
+          \]
+        </div>
+
+        <p>
+          If \( r_2 &gt; r_1 \), the spacecraft starts at the periapsis of the transfer ellipse and arrives at apoapsis
+          at the destination orbit. If \( r_2 &lt; r_1 \), the same geometry applies in reverse.
+        </p>
+
+        <figure class="callout">
+          <figcaption><strong>Figure idea &mdash; Hohmann transfer geometry</strong></figcaption>
+          <pre>
+        Final Circular Orbit (r₂)
+             ___________
+          *             *
+        /                 \
+       /                   \
+Initial Orbit *-------------*
+              Δv₁         Δv₂
+          </pre>
+          <p>
+            The transfer ellipse touches the inner and outer circular orbits tangentially. The first burn injects onto
+            the ellipse, and the second burn circularizes at the target radius.
+          </p>
+        </figure>
+
+        <h4>First Burn &mdash; Injection</h4>
+        <p>
+          The circular speed at the initial orbit is
+        </p>
+
+        <div class="math-block">
+          \[
+          v_1=\sqrt{\frac{\mu}{r_1}}
+          \]
+        </div>
+
+        <p>
+          The speed required on the transfer ellipse at periapsis is
+        </p>
+
+        <div class="math-block">
+          \[
+          v_{t1}=\sqrt{\mu\left(\frac{2}{r_1}-\frac{1}{a_t}\right)}
+          \]
+        </div>
+
+        <p>
+          Therefore the first burn is
+        </p>
+
+        <div class="math-block">
+          \[
+          \Delta v_1=v_{t1}-v_1
+          \]
+        </div>
+
+        <h4>Second Burn &mdash; Circularization</h4>
+        <p>
+          At the destination radius \( r_2 \), the spacecraft reaches apoapsis of the transfer ellipse. The transfer-orbit
+          speed there is
+        </p>
+
+        <div class="math-block">
+          \[
+          v_{t2}=\sqrt{\mu\left(\frac{2}{r_2}-\frac{1}{a_t}\right)}
+          \]
+        </div>
+
+        <p>
+          The circular speed for the final orbit is
+        </p>
+
+        <div class="math-block">
+          \[
+          v_2=\sqrt{\frac{\mu}{r_2}}
+          \]
+        </div>
+
+        <p>
+          The circularization burn is therefore
+        </p>
+
+        <div class="math-block">
+          \[
+          \Delta v_2=v_2-v_{t2}
+          \]
+        </div>
+
+        <h4>Total Cost and Transfer Time</h4>
+        <p>
+          The total maneuver cost is
+        </p>
+
+        <div class="math-block">
+          \[
+          \Delta v_{\text{total}}=\left|\Delta v_1\right|+\left|\Delta v_2\right|
+          \]
+        </div>
+
+        <p>
+          Since the spacecraft travels only half of the transfer ellipse, the transfer time is
+        </p>
+
+        <div class="math-block">
+          \[
+          t_{\text{transfer}}=\pi\sqrt{\frac{a_t^3}{\mu}}
+          \]
+        </div>
+
+        <p>
+          This shows why the Hohmann transfer is fuel-efficient but not usually time-optimal. It uses the minimum-energy
+          connecting ellipse, which tends to give a longer travel time than a higher-energy, faster transfer.
+        </p>
+
+        <h4>Phasing Orbits</h4>
+        <p>
+          Many missions require not only the correct orbit, but also the correct <strong>arrival phase</strong>.
+          A spacecraft may need to meet a target at a specific angular location. In that case, a
+          <strong>phasing orbit</strong> is used before or after the transfer.
+        </p>
+
+        <p>
+          The orbital period is
+        </p>
+
+        <div class="math-block">
+          \[
+          T=2\pi\sqrt{\frac{a^3}{\mu}}
+          \]
+        </div>
+
+        <p>
+          By adjusting the semi-major axis slightly, the period changes, and the spacecraft gains or loses phase angle
+          relative to the target. Phasing orbits are central in rendezvous, docking, and formation flying.
+        </p>
+      </section>
+
+      <section id="bielliptic">
+        <h3>3.4.2 Bi-Elliptic Transfer</h3>
+        <p>
+          The <strong>bi-elliptic transfer</strong> is a three-impulse maneuver that uses two transfer ellipses.
+          It is especially important because it teaches a deep lesson in orbital mechanics:
+          the fewest burns do not always give the lowest total \( \Delta v \).
+        </p>
+
+        <h4>Maneuver Sequence</h4>
+        <div class="callout">
+          <ol>
+            <li><strong>Burn 1 \( \Delta v_1 \)</strong> &mdash; raise apoapsis to a large intermediate radius \( r_b \)</li>
+            <li><strong>Burn 2 \( \Delta v_2 \)</strong> &mdash; at the distant apoapsis, change the periapsis to the target orbit radius</li>
+            <li><strong>Burn 3 \( \Delta v_3 \)</strong> &mdash; circularize at the final orbit</li>
+          </ol>
+        </div>
+
+        <figure class="callout">
+          <figcaption><strong>Figure idea &mdash; Bi-elliptic transfer</strong></figcaption>
+          <pre>
+Initial Orbit
+     *
+      \
+       \
+        *------ High Apogee (r_b)
+       / \
+      /   \
+     *-----*  Final Orbit
+    Δv₁   Δv₂  Δv₃
+          </pre>
+        </figure>
+
+        <h4>Geometry of Apogee-Raising</h4>
+        <p>
+          Let the initial orbit radius be \( r_1 \), the final orbit radius be \( r_2 \), and the intermediate
+          apoapsis radius be \( r_b \). The two transfer ellipses have semi-major axes
+        </p>
+
+        <div class="math-block">
+          \[
+          a_1=\frac{r_1+r_b}{2}
+          \qquad
+          a_2=\frac{r_2+r_b}{2}
+          \]
+        </div>
+
+        <p>
+          The spacecraft first moves outward to the distant apoapsis, performs the major geometry change where the speed
+          is low, and then returns inward or outward to the final circular orbit.
+        </p>
+
+        <h4>When Is It More Efficient?</h4>
+        <p>
+          A bi-elliptic transfer can outperform a Hohmann transfer when the orbit-radius ratio becomes large. The classic
+          threshold is
+        </p>
+
+        <div class="math-block">
+          \[
+          \frac{r_2}{r_1}>11.94
+          \]
+        </div>
+
+        <p>
+          The reason is physical rather than purely algebraic: orbital velocity is much smaller at large radius. A major
+          change in orbit shape becomes cheaper when performed at a distant apoapsis.
+        </p>
+
+        <div class="callout">
+          <strong>Key insight:</strong> Expensive geometric changes should be performed where the spacecraft moves slowly.
+          In a bi-elliptic transfer, that means the distant apoapsis.
+        </div>
+      </section>
+
+      <section id="planechange">
+        <h3>3.4.3 Plane-Change Maneuvers</h3>
+        <p>
+          Plane-change maneuvers rotate the orbital plane rather than mainly changing the orbit size.
+          They are used to modify:
+        </p>
+
+        <div class="callout">
+          <ul>
+            <li><strong>Inclination \( i \)</strong> &mdash; tilt of the orbit relative to the reference plane</li>
+            <li><strong>Right Ascension of the Ascending Node \( \Omega \)</strong> &mdash; orientation of the line of nodes in inertial space</li>
+          </ul>
+        </div>
+
+        <p>
+          These maneuvers are usually expensive because they require rotating the velocity vector while the spacecraft is
+          already moving at high speed.
+        </p>
+
+        <h4>Pure Plane Change</h4>
+        <p>
+          If the spacecraft speed magnitude stays constant and only the direction changes by \( \Delta i \), then
+          the required impulse is
+        </p>
+
+        <div class="math-block">
+          \[
+          \Delta v = 2v\sin\left(\frac{\Delta i}{2}\right)
+          \]
+        </div>
+
+        <figure class="callout">
+          <figcaption><strong>Figure idea &mdash; Pure plane change</strong></figcaption>
+          <pre>
+v₁ ---->
+
+           Δi
+            \
+             \
+              ----> v₂
+          </pre>
+          <p>
+            The maneuver cost comes from rotating one velocity vector into another. Even when the speed magnitude is unchanged,
+            the vector difference can be large.
+          </p>
+        </figure>
+
+        <p>
+          This explains why plane changes in low Earth orbit are costly: orbital speeds are on the order of
+          \( 7\text{–}8 \,\text{km/s} \), so even modest angular changes demand significant \( \Delta v \).
+        </p>
+
+        <h4>Inclination and RAAN Change</h4>
+        <p>
+          Inclination change tilts the orbit relative to the equator. RAAN change rotates the entire orbital plane
+          about Earth’s spin axis. Both are fundamentally changes in the orientation of the angular momentum vector.
+        </p>
+
+        <p>
+          In practice, RAAN is often changed indirectly through launch timing or natural precession rather than by large
+          impulsive burns, because direct RAAN changes can be extremely expensive.
+        </p>
+
+        <h4>Combined Plane Change + Hohmann</h4>
+        <p>
+          A standard fuel-saving strategy is to combine a plane change with another transfer burn rather than performing
+          it separately. The best location is usually where the orbital speed is smallest, typically near apoapsis.
+        </p>
+
+        <p>
+          If the pre-burn and post-burn speeds are \( v_1 \) and \( v_2 \), and the angle between them is \( \Delta i \),
+          then the combined burn magnitude is
+        </p>
+
+        <div class="math-block">
+          \[
+          \Delta v=\sqrt{v_1^2+v_2^2-2v_1v_2\cos(\Delta i)}
+          \]
+        </div>
+
+        <p>
+          This is usually cheaper than doing a separate pure plane-change maneuver followed by an independent circularization
+          or transfer burn.
+        </p>
+      </section>
+
+      <section id="general">
+        <h3>3.4.4 General Impulsive Maneuvers</h3>
+        <p>
+          Not all maneuvers fit textbook categories such as Hohmann or plane change. Real missions often require arbitrary
+          changes in orbit size, shape, phase, and plane. In that case, the burn is treated in full vector form.
+        </p>
+
+        <div class="math-block">
+          \[
+          \vec{v}_{new}=\vec{v}_{old}+\Delta \vec{v}
+          \]
+        </div>
+
+        <h4>\( \Delta v \) Vector Geometry</h4>
+        <p>
+          If a spacecraft must change from velocity vector \( \vec{v}_1 \) to \( \vec{v}_2 \), then the required burn
+          magnitude is the vector difference
+        </p>
+
+        <div class="math-block">
+          \[
+          \Delta v = \left|\vec{v}_2-\vec{v}_1\right|
+          \]
+        </div>
+
+        <p>
+          which in scalar form becomes
+        </p>
+
+        <div class="math-block">
+          \[
+          \Delta v=\sqrt{v_1^2+v_2^2-2v_1v_2\cos\theta}
+          \]
+        </div>
+
+        <p>
+          where \( \theta \) is the angle between the two velocity vectors.
+        </p>
+
+        <h4>Radial, Tangential, and Normal Components</h4>
+        <p>
+          A general burn is often decomposed in the local orbital frame:
+        </p>
+
+        <div class="math-block">
+          \[
+          \Delta\vec{v}=\Delta v_r\hat{r}+\Delta v_t\hat{t}+\Delta v_n\hat{n}
+          \]
+        </div>
+
+        <div class="callout">
+          <ul>
+            <li><strong>Radial component</strong> &mdash; mainly changes orbit shape and eccentricity behavior</li>
+            <li><strong>Tangential component</strong> &mdash; mainly changes orbital energy and semi-major axis</li>
+            <li><strong>Normal component</strong> &mdash; mainly rotates the orbital plane</li>
+          </ul>
+        </div>
+
+        <figure class="callout">
+          <figcaption><strong>Figure idea &mdash; General impulsive burn in the local orbital frame</strong></figcaption>
+          <p>
+            Draw a spacecraft on an orbit and mark the local radial \( \hat r \), tangential \( \hat t \), and normal
+            \( \hat n \) directions. Then show a single \( \Delta \vec v \) vector resolved into these three components.
+          </p>
+        </figure>
+
+        <h4>Patched-Conic Approximation (High Level)</h4>
+        <p>
+          For interplanetary missions, the spacecraft is influenced by more than one gravitational body. A powerful
+          first-order design method is the <strong>patched-conic approximation</strong>, which divides the trajectory into
+          regions in which one body dominates gravity.
+        </p>
+
+        <figure class="callout">
+          <figcaption><strong>Patched-conic idea</strong></figcaption>
+          <pre>
+Earth SOI  →  Sun-centered transfer  →  Mars SOI
+          </pre>
+        </figure>
+
+        <p>
+          Each region is treated as its own two-body problem. The orbit arcs are then "patched" together at the sphere-of-
+          influence boundaries by matching position and velocity consistently.
+        </p>
+
+        <h4>Maneuver Optimization Concept</h4>
+        <p>
+          In real mission design, the "best" transfer is rarely defined by \( \Delta v \) alone.
+          Trajectory optimization may target:
+        </p>
+
+        <div class="callout">
+          <ul>
+            <li>minimum total \( \Delta v \)</li>
+            <li>minimum flight time</li>
+            <li>arrival under specific geometry constraints</li>
+            <li>launch-window compatibility</li>
+            <li>operational simplicity or robustness</li>
+          </ul>
+        </div>
+
+        <p>
+          This is why transfer design is best understood as a <strong>trade space</strong>, not a single formula.
+        </p>
+      </section>
+
+      <section id="interplanetary">
+        <h3>3.4.5 Interplanetary Transfers</h3>
+        <p>
+          Interplanetary transfers extend orbit-transfer logic to motion around the Sun.
+          These missions combine:
+        </p>
+
+        <div class="callout">
+          <ul>
+            <li>departure from the home planet</li>
+            <li>heliocentric coast arc</li>
+            <li>arrival and capture at the destination planet</li>
+          </ul>
+        </div>
+
+        <p>
+          In first-order mission design, the heliocentric transfer is often modeled as a conic section connecting two
+          planetary orbits.
+        </p>
+
+        <h4>Lambert’s Problem (Concept)</h4>
+        <p>
+          Lambert’s problem asks:
+        </p>
+
+        <div class="callout">
+          <strong>Given two positions in space and a time of flight, what orbit connects them?</strong>
+        </div>
+
+        <p>
+          Inputs:
+        </p>
+
+        <div class="math-block">
+          \[
+          \vec r_1,\quad \vec r_2,\quad \Delta t
+          \]
+        </div>
+
+        <p>
+          Output:
+        </p>
+
+        <div class="callout">
+          <p>the required transfer orbit and associated departure velocity.</p>
+        </div>
+
+        <p>
+          Lambert’s problem is central in rendezvous analysis, interplanetary targeting, and mission trajectory design.
+          Conceptually, it links <em>where</em>, <em>when</em>, and <em>how fast</em>.
+        </p>
+
+        <h4>Transfer Windows</h4>
+        <p>
+          Planetary alignment determines when low-energy transfers are possible. Even if a transfer orbit exists, the
+          destination planet must arrive at the intercept point at the same time as the spacecraft. This creates specific
+          launch windows.
+        </p>
+
+        <p>
+          The repetition of launch opportunities is related to the synodic period:
+        </p>
+
+        <div class="math-block">
+          \[
+          T_{\text{syn}}=\frac{2\pi}{|n_1-n_2|}
+          \]
+        </div>
+
+        <p>
+          where \( n_1 \) and \( n_2 \) are the orbital angular rates of the two planets. For Earth&ndash;Mars transfers,
+          favorable windows recur roughly every 26 months.
+        </p>
+
+        <h4>Energy-Efficient Interplanetary Trajectories</h4>
+        <p>
+          The simplest energy-efficient interplanetary path is a heliocentric Hohmann transfer, but many advanced designs
+          exploit additional dynamics:
+        </p>
+
+        <div class="callout">
+          <ul>
+            <li><strong>Gravity assists</strong> &mdash; use planetary flybys to change heliocentric energy and direction</li>
+            <li><strong>Low-thrust spirals</strong> &mdash; continuous propulsion over long durations</li>
+            <li><strong>Weak-stability-boundary trajectories</strong> &mdash; very low-energy transfers in multi-body environments</li>
+            <li><strong>Ballistic capture ideas</strong> &mdash; exploit natural dynamics to reduce capture cost</li>
+          </ul>
+        </div>
+
+        <h4>Hyperbolic Excess Energy</h4>
+        <p>
+          Interplanetary launch energy is often expressed through
+        </p>
+
+        <div class="math-block">
+          \[
+          C_3=v_\infty^2
+          \]
+        </div>
+
+        <p>
+          where \( v_\infty \) is the hyperbolic excess velocity relative to the departure planet.
+          Lower \( C_3 \) means a lower-energy departure requirement.
+        </p>
+
+        <figure class="callout">
+          <figcaption><strong>Figure idea &mdash; Interplanetary transfer map</strong></figcaption>
+          <p>
+            Show the Sun at the center, Earth orbit and Mars orbit as circles, an elliptical heliocentric transfer arc
+            tangent to both, and small spheres of influence around Earth and Mars to indicate departure and arrival regions.
+          </p>
+        </figure>
+      </section>
+
+      <section id="summary">
+        <h3>Quick Revision Map</h3>
+        <div class="callout">
+          <h4>Transfer Types</h4>
+          <ul>
+            <li><strong>Hohmann transfer</strong> &mdash; two impulses, best first model for efficient circular-orbit changes</li>
+            <li><strong>Bi-elliptic transfer</strong> &mdash; three impulses, useful for very large radius changes</li>
+            <li><strong>Plane change</strong> &mdash; rotates the orbit plane, expensive at high speed</li>
+            <li><strong>General impulsive maneuver</strong> &mdash; vector-based burn design with radial, tangential, and normal components</li>
+            <li><strong>Interplanetary transfer</strong> &mdash; heliocentric transfer shaped by Lambert targeting and launch windows</li>
+          </ul>
+        </div>
+
+        <div class="callout">
+          <h4>Key Equations</h4>
+          <p><strong>Impulsive burn model</strong></p>
+          <div class="math-block">
+            \[
+            \vec{v}_{after}=\vec{v}_{before}+\Delta \vec{v}
+            \]
+          </div>
+
+          <p><strong>Vis-viva equation</strong></p>
+          <div class="math-block">
+            \[
+            v=\sqrt{\mu\left(\frac{2}{r}-\frac{1}{a}\right)}
+            \]
+          </div>
+
+          <p><strong>Hohmann transfer semi-major axis</strong></p>
+          <div class="math-block">
+            \[
+            a_t=\frac{r_1+r_2}{2}
+            \]
+          </div>
+
+          <p><strong>Hohmann transfer time</strong></p>
+          <div class="math-block">
+            \[
+            t_{\text{transfer}}=\pi\sqrt{\frac{a_t^3}{\mu}}
+            \]
+          </div>
+
+          <p><strong>Pure plane-change cost</strong></p>
+          <div class="math-block">
+            \[
+            \Delta v = 2v\sin\left(\frac{\Delta i}{2}\right)
+            \]
+          </div>
+
+          <p><strong>General velocity-vector change</strong></p>
+          <div class="math-block">
+            \[
+            \Delta v=\sqrt{v_1^2+v_2^2-2v_1v_2\cos\theta}
+            \]
+          </div>
+
+          <p><strong>Synodic period</strong></p>
+          <div class="math-block">
+            \[
+            T_{\text{syn}}=\frac{2\pi}{|n_1-n_2|}
+            \]
+          </div>
+        </div>
+
+        <p>
+          The unifying idea behind all orbit transfers is simple:
+          a burn changes the velocity vector, and the changed velocity produces a new conic orbit.
+          Every practical transfer problem is therefore a controlled interaction between geometry, energy, timing, and
+          optimization.
+        </p>
+      </section>
+
+      <nav class="notes-prev-next">
+        <a href="orbit-perturbations.html">&larr; 3.3 Orbit Perturbations</a>
+      </nav>
+
+    
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Domain D.6 — Flexible Spacecraft Dynamics | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match Advanced Domains style) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain D.5 structure) -->
+  <header class="notes-hero">
+    <h1>Domain D — Attitude Dynamics &amp; Control (Advanced)</h1>
+    <p class="notes-tagline">
+      Nonlinear rotational dynamics, maneuvering, momentum management, robust control, and stability methods.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–F)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Top intro card (match D.5 pattern) -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–F)</a>
+      </p>
+
+      <h1>Domain D.6 — Flexible Spacecraft Dynamics</h1>
+      <p>
+        Modern spacecraft rarely behave as “perfect rigid bodies.” Even if the bus is stiff, many missions carry large, lightweight attachments
+        that can bend, twist, or oscillate. These flexible structures are not small rigid masses; they are distributed elastic systems with their
+        own vibration modes.
+      </p>
+
+      <p>
+        So when the spacecraft rotates, accelerates, or rejects disturbances, the flexible structure responds dynamically — and pushes back on the rigid body.
+        This makes the spacecraft an inherently <strong>coupled rigid–flexible system</strong>, where attitude motion excites vibration, vibration contaminates sensing,
+        and control laws can unintentionally destabilize modes unless flexibility is handled explicitly.
+      </p>
+
+      <div class="callout">
+        <h3>Core idea</h3>
+        <p>
+          Flexible spacecraft dynamics sits at the boundary between structural dynamics and attitude control.
+          The true plant is not “rigid body + small perturbation” — it is a <strong>coupled control–structure interaction</strong> problem.
+        </p>
+      </div>
+
+      <ul>
+        <li>Understand why flexible appendages create low-frequency modes close to ADCS bandwidth.</li>
+        <li>See how modal expansion turns a distributed PDE into coupled mode ODEs.</li>
+        <li>Learn why truncation is necessary — and why it can cause spillover.</li>
+        <li>Connect flexibility to filters, architecture (collocation), and flight validation workflow.</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation (match D.5 jump bar) -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#d6-overview">Overview</a> &middot;
+        <a href="#d6-1">1. Why flexibility matters</a> &middot;
+        <a href="#d6-2">2. Coupled rigid + elastic modes</a> &middot;
+        <a href="#d6-3">3. Distributed structure + modal expansion</a> &middot;
+        <a href="#d6-4">4. Structural vibration modes</a> &middot;
+        <a href="#d6-5">5. Solar array dynamics</a> &middot;
+        <a href="#d6-6">6. Structural–Control Interaction</a> &middot;
+        <a href="#d6-7">7. Modal truncation</a> &middot;
+        <a href="#d6-61">D.6.1 Balanced reduction</a> &middot;
+        <a href="#d6-8">8. Control spillover</a> &middot;
+        <a href="#d6-62">D.6.2 Spillover mechanisms</a> &middot;
+        <a href="#d6-9">9. Stability degradation</a> &middot;
+        <a href="#d6-10">10. Collocated vs non-collocated</a> &middot;
+        <a href="#d6-11">11. Toroidal + membrane structures</a> &middot;
+        <a href="#d6-12">12. What ADCS designers do</a> &middot;
+        <a href="#d6-63">D.6.3 Filters used in flight</a> &middot;
+        <a href="#d6-13">13. Simple coupled example</a> &middot;
+        <a href="#d6-14">14. Figure placeholders</a> &middot;
+        <a href="#d6-64">D.6.4 Test/validation workflow</a> &middot;
+        <a href="#d6-15">15. Why this is truly advanced</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+
+      <!-- Overview -->
+      <section id="d6-overview">
+        <h2>Structural Coupling Between Attitude Motion and Flexible Structures</h2>
+
+        <p>
+          Even if the bus is stiff, many missions carry large, lightweight attachments that can bend, twist, or oscillate:
+        </p>
+
+        <ul>
+          <li>Solar array wings (dominant flexible elements on many satellites)</li>
+          <li>Antenna booms and reflectors</li>
+          <li>Instrument masts / telescope supports</li>
+          <li>Deployable trusses and appendages</li>
+          <li>Membrane-based structures (sails, membrane antennas, tensioned reflectors)</li>
+          <li>Inflatable or ring/toroidal frames used to hold membranes or reflectors</li>
+        </ul>
+
+        <p>
+          These components are not small rigid masses; they are distributed elastic structures with their own vibration modes.
+          So when the spacecraft rotates, accelerates, or rejects disturbances, the flexible structure responds dynamically —
+          and pushes back on the rigid body.
+        </p>
+
+        <div class="callout">
+          <p><strong>This makes the spacecraft an inherently coupled rigid–flexible system, where:</strong></p>
+          <ul>
+            <li>✅ attitude motion excites structural vibration</li>
+            <li>✅ structural vibration contaminates attitude sensing and feedback</li>
+            <li>✅ the controller can unintentionally destabilize flexible modes</li>
+            <li>✅ stability margins degrade unless flexibility is explicitly handled</li>
+          </ul>
+        </div>
+
+        <p>
+          Flexible spacecraft dynamics therefore sits right at the boundary between structural dynamics (Chapter 8 style modeling)
+          and attitude control (Chapter 9 style closed-loop design).
+        </p>
+      </section>
+
+      <!-- 1 -->
+      <section id="d6-1">
+        <h2>1) Why Flexibility Matters in Spacecraft</h2>
+
+        <p>
+          Space hardware is designed under extreme mass pressure. To reduce launch cost, spacecraft appendages are built to be:
+        </p>
+        <ul>
+          <li>thin</li>
+          <li>long</li>
+          <li>lightweight</li>
+          <li>low damping</li>
+        </ul>
+
+        <p>
+          That combination produces low stiffness and low natural frequencies.
+        </p>
+
+        <h3>Typical scale of the problem</h3>
+
+        <div class="table-wrap">
+          <table class="notes-table">
+            <thead>
+              <tr>
+                <th>Flexible element</th>
+                <th>Typical length</th>
+                <th>Typical dominant frequency</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Solar array wing</td>
+                <td>10–25 m</td>
+                <td>0.05–0.3 Hz</td>
+              </tr>
+              <tr>
+                <td>Boom / mast</td>
+                <td>5–15 m</td>
+                <td>0.1–1 Hz</td>
+              </tr>
+              <tr>
+                <td>Large telescope mast</td>
+                <td>20–60 m</td>
+                <td>0.01–0.1 Hz</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Now compare that to attitude control: many ADCS loops operate with bandwidths that can be uncomfortably close to these frequencies.
+          Result: control torques that look smooth for a rigid bus can act like repeated “kicks” to flexible appendages — exciting vibration
+          that the controller did not intend.
+        </p>
+      </section>
+
+      <!-- 2 -->
+      <section id="d6-2">
+        <h2>2) The Core Idea: Rigid Body + Elastic Modes Are Dynamically Coupled</h2>
+
+        <p>A flexible spacecraft can be thought of as two interacting subsystems:</p>
+
+        <h3>(A) Rigid-body attitude motion (spacecraft bus)</h3>
+        <ul>
+          <li>attitude angles / quaternions</li>
+          <li>angular rate</li>
+          <li>inertia tensor</li>
+        </ul>
+
+        <h3>(B) Structural deformation (appendages)</h3>
+        <ul>
+          <li>bending and torsion deflection</li>
+          <li>membrane deflection (if present)</li>
+          <li>modal coordinates (generalized deformation amplitudes)</li>
+        </ul>
+
+        <p>
+          A common modeling strategy is to collect the coordinates into one vector:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf{q} =
+            \begin{bmatrix}
+              \boldsymbol{\theta}\\
+              \boldsymbol{\eta}
+            \end{bmatrix}
+          \]
+        </p>
+
+        <ul>
+          <li>$\boldsymbol{\theta}$: rigid-body attitude coordinates (or small-angle attitude error states)</li>
+          <li>$\boldsymbol{\eta}$: flexible modal coordinates (amplitudes of structural modes)</li>
+        </ul>
+
+        <p>A compact coupled form is:</p>
+        <p class="math-block">
+          \[
+            \mathbf{M}\,\ddot{\mathbf{q}} + \mathbf{D}\,\dot{\mathbf{q}} + \mathbf{K}\,\mathbf{q} = \mathbf{B}\,\mathbf{u}
+          \]
+        </p>
+
+        <ul>
+          <li>$\mathbf{M}$ includes rigid inertia + modal mass terms</li>
+          <li>$\mathbf{D}$ captures structural damping (usually small)</li>
+          <li>$\mathbf{K}$ captures structural stiffness</li>
+          <li>$\mathbf{u}$ is the control torque / actuator input</li>
+          <li>Off-diagonal terms represent rigid–flex coupling</li>
+        </ul>
+
+        <h3>Physical meaning of coupling</h3>
+        <p>When the spacecraft rotates:</p>
+        <ol>
+          <li>appendages feel inertial loads (like a cantilever being “shaken”)</li>
+          <li>deformation begins</li>
+          <li>that deformation creates reaction torques and forces on the bus</li>
+          <li>bus attitude dynamics is altered</li>
+        </ol>
+
+        <p>
+          So the controller is never “controlling only attitude” — it is controlling attitude through a flexible plant.
+        </p>
+      </section>
+
+      <!-- 3 -->
+      <section id="d6-3">
+        <h2>3) Flexible Structures Behave Like Distributed Systems</h2>
+
+        <p>
+          Flexible appendages (especially arrays and booms) are best approximated as beams. For a beam-like appendage,
+          the bending dynamics are governed by the Euler–Bernoulli form:
+        </p>
+
+        <p class="math-block">
+          \[
+            EI\,\frac{\partial^4 y(x,t)}{\partial x^4} + \rho A\,\frac{\partial^2 y(x,t)}{\partial t^2} = f(x,t)
+          \]
+        </p>
+
+        <ul>
+          <li>$E$: Young’s modulus</li>
+          <li>$I$: second moment of area</li>
+          <li>$\rho A$: distributed mass per length</li>
+          <li>$y(x,t)$: deflection</li>
+          <li>$f(x,t)$: forcing (including inertial forcing from attitude acceleration)</li>
+        </ul>
+
+        <p>
+          Instead of solving the full PDE directly, spacecraft GNC commonly uses modal expansion:
+        </p>
+
+        <p class="math-block">
+          \[
+            y(x,t) = \sum_{i=1}^{\infty} \phi_i(x)\,q_i(t)
+          \]
+        </p>
+
+        <ul>
+          <li>$\phi_i(x)$ are spatial mode shapes</li>
+          <li>$q_i(t)$ are modal amplitudes</li>
+        </ul>
+
+        <p>Each mode behaves like a lightly-damped oscillator:</p>
+        <p class="math-block">
+          \[
+            \ddot{q}_i + 2\zeta_i\omega_i \dot{q}_i + \omega_i^2 q_i = f_i(t)
+          \]
+        </p>
+      </section>
+
+      <!-- 4 -->
+      <section id="d6-4">
+        <h2>4) Structural Vibration Modes You Actually See On Spacecraft</h2>
+
+        <p>Space structures typically exhibit:</p>
+        <ul>
+          <li><strong>bending modes</strong> (most dominant in arrays and masts)</li>
+          <li><strong>torsional modes</strong> (important for booms / asymmetric arrays)</li>
+          <li><strong>bending–torsion coupling</strong> (common when geometry is not symmetric)</li>
+          <li><strong>membrane modes</strong> (if the structure is tension-dominated)</li>
+        </ul>
+
+        <p>
+          For beams, modal frequencies rise quickly with mode index (roughly $i^2$ scaling). So the first mode often dominates
+          the motion that ADCS “feels.”
+        </p>
+      </section>
+
+      <!-- 5 -->
+      <section id="d6-5">
+        <h2>5) Solar Array Dynamics: The Most Common Flexible Problem</h2>
+
+        <p>
+          Solar arrays are large, thin, and low-damped. They often behave like cantilevered plates/beams attached to the bus.
+        </p>
+
+        <h3>Why the first bending mode dominates</h3>
+        <ul>
+          <li>it has the largest motion amplitude</li>
+          <li>it is closest to the control bandwidth</li>
+          <li>it is easiest to excite during slews or disturbance rejection</li>
+        </ul>
+
+        <p>Even if higher modes exist, the first mode often drives:</p>
+        <ul>
+          <li>pointing jitter</li>
+          <li>attitude error oscillations</li>
+          <li>star tracker blur / line-of-sight instability</li>
+        </ul>
+      </section>
+
+      <!-- 6 -->
+      <section id="d6-6">
+        <h2>6) Structural–Control Interaction (SCI)</h2>
+
+        <p><strong>This is the heart of Domain D.6.</strong></p>
+
+        <h3>What happens during a maneuver</h3>
+        <ol>
+          <li>ADCS commands a torque (wheels or thrusters)</li>
+          <li>bus angular acceleration changes</li>
+          <li>appendages experience inertial forcing</li>
+          <li>flexible modes begin oscillating</li>
+          <li>those oscillations generate reaction torques back into the bus</li>
+          <li>sensors observe a mixture of rigid motion + vibration</li>
+          <li>controller responds — possibly injecting more energy into the modes</li>
+        </ol>
+
+        <p>That closed chain is control–structure interaction.</p>
+
+        <h3>Why SCI is dangerous</h3>
+        <p>Because the controller can:</p>
+        <ul>
+          <li>accidentally amplify a structural mode</li>
+          <li>chase vibration in sensors as if it were attitude error</li>
+          <li>create limit cycles or unstable oscillation if phase margins collapse</li>
+        </ul>
+
+        <p>
+          This is why “rigid-body-only control design” can fail badly on real flexible spacecraft.
+        </p>
+      </section>
+
+      <!-- 7 -->
+      <section id="d6-7">
+        <h2>7) Modal Truncation: Necessary, But Risky</h2>
+
+        <p>In theory the structure has infinite modes. In practice we keep only $N$ modes:</p>
+
+        <p class="math-block">
+          \[
+            y(x,t) \approx \sum_{i=1}^{N} \phi_i(x)\,q_i(t)
+          \]
+        </p>
+
+        <p>Typically $N=3$ to $10$, depending on mission needs.</p>
+
+        <h3>Why truncation is used</h3>
+        <ul>
+          <li>keeps state dimension manageable</li>
+          <li>captures dominant dynamics</li>
+          <li>reduces computation for control analysis and simulation</li>
+        </ul>
+
+        <h3>Why truncation is risky</h3>
+        <p>If the neglected modes are:</p>
+        <ul>
+          <li>lightly damped</li>
+          <li>close to the control bandwidth</li>
+          <li>strongly excited by actuator placement</li>
+        </ul>
+
+        <p>
+          …then the controller may excite dynamics it does not “know exist.” That leads to spillover.
+        </p>
+      </section>
+
+      <!-- D.6.1 -->
+      <section id="d6-61">
+        <h2>D.6.1 Modal truncation vs balanced reduction (what controllers prefer)</h2>
+
+        <p>
+          Truncation is the simplest reduced-order model: keep the first few flexible modes and drop the rest. It is common because
+          it preserves the most visible low-frequency dynamics.
+        </p>
+
+        <div class="callout">
+          <p>
+            <strong>But controllers often prefer “balanced” reductions for design work</strong> because they preserve the input–output
+            behavior seen by the control loop more faithfully (especially when modes are weakly observable/controllable).
+          </p>
+        </div>
+
+        <h3>Modal truncation (keep first modes)</h3>
+        <ul>
+          <li><strong>Pros:</strong> physically interpretable; easy to build from FEM + modal test; preserves dominant low-frequency resonance</li>
+          <li><strong>Cons:</strong> can distort high-frequency I/O behavior; neglected dynamics can still be excited (spillover)</li>
+        </ul>
+
+        <h3>Balanced reduction (balanced truncation / Hankel-based)</h3>
+        <ul>
+          <li><strong>Idea:</strong> transform states so that controllability and observability are “balanced,” then discard states with small Hankel singular values</li>
+          <li><strong>Pros:</strong> preserves closed-loop relevant I/O dynamics; often yields better robustness margins for control synthesis</li>
+          <li><strong>Cons:</strong> less physically interpretable; must be done on a linear state-space plant; still needs validation against the full model</li>
+        </ul>
+
+        <p>
+          Practical takeaway: use modal truncation for physics intuition + simulation traceability, and use balanced-style reductions
+          (or frequency-weighted fitting) when doing loop-shaping / robust synthesis where I/O fidelity matters most.
+        </p>
+      </section>
+
+      <!-- 8 -->
+      <section id="d6-8">
+        <h2>8) Control Spillover: When the Controller Excites the Modes You Didn’t Model</h2>
+
+        <p>
+          Control spillover happens when a controller designed for a reduced-order flexible model injects energy into unmodeled higher modes.
+          It typically occurs when:
+        </p>
+
+        <p class="math-block">
+          \[
+            \omega_{\text{control}} \ \text{approaches or exceeds}\ \omega_{\text{unmodeled}}
+          \]
+        </p>
+
+        <p>Consequences include:</p>
+        <ul>
+          <li>unexpected oscillations</li>
+          <li>unexplained jitter in flight</li>
+          <li>loss of damping at higher frequencies</li>
+          <li>reduced stability margins</li>
+          <li>in worst cases: instability</li>
+        </ul>
+
+        <p>
+          Spillover is one of the main reasons flexible spacecraft controllers often include:
+          structural filters, bandwidth limits, conservative gain selection, and collocation-aware architecture.
+        </p>
+      </section>
+
+      <!-- D.6.2 -->
+      <section id="d6-62">
+        <h2>D.6.2 Spillover mechanisms (control spillover vs observation spillover)</h2>
+
+        <p>
+          “Spillover” is not one single failure mode. In flexible spacecraft, you typically see two distinct mechanisms:
+        </p>
+
+        <h3>1) Control spillover (actuation-driven)</h3>
+        <ul>
+          <li><strong>Cause:</strong> commanded torques excite unmodeled structural modes through actuator–structure coupling</li>
+          <li><strong>Symptom:</strong> persistent oscillations after slews; higher-frequency jitter not predicted by the reduced model</li>
+          <li><strong>Why it happens:</strong> the reduced plant does not include the resonance, so the controller does not shape gain/phase around it</li>
+        </ul>
+
+        <h3>2) Observation spillover (sensor-driven)</h3>
+        <ul>
+          <li><strong>Cause:</strong> sensors measure vibration components (LOS deflection, gyro vibration pickup) that are not represented in the estimator/controller model</li>
+          <li><strong>Symptom:</strong> controller “chases” vibration as if it were attitude error; noisy control; limit cycles</li>
+          <li><strong>Why it happens:</strong> feedback is driven by contaminated measurements; even small vibration amplitudes can create large apparent error</li>
+        </ul>
+
+        <div class="callout">
+          <p>
+            <strong>Key difference:</strong> control spillover is created by the actuator path (input → structure),
+            while observation spillover is created by the measurement path (structure → sensor → feedback).
+            In practice, both can exist at once, which is why filtering + bandwidth separation + validation are treated as a package.
+          </p>
+        </div>
+      </section>
+
+      <!-- 9 -->
+      <section id="d6-9">
+        <h2>9) Stability Degradation Due to Flexibility</h2>
+
+        <p>Flexibility harms attitude control stability through multiple mechanisms:</p>
+
+        <h3>(1) Additional resonant poles</h3>
+        <p>
+          Flexible modes add lightly-damped resonances to the plant. This increases phase lag around resonance frequencies.
+        </p>
+
+        <h3>(2) Sensor contamination</h3>
+        <p>Sensors (gyros, star trackers) measure signals affected by vibration:</p>
+        <ul>
+          <li>angular rate includes flexible contributions</li>
+          <li>line-of-sight measurement includes structural deflection</li>
+        </ul>
+
+        <h3>(3) Actuator–structure coupling</h3>
+        <p>
+          Actuation torque can couple efficiently into specific modes depending on geometry.
+        </p>
+
+        <h3>(4) Reduced phase margin</h3>
+        <p>
+          Flexible poles and zeros reshape the open-loop response, reducing gain/phase margins.
+        </p>
+
+        <p>
+          Net effect: a controller that is stable for a rigid body may become marginal or unstable for a flexible spacecraft.
+        </p>
+      </section>
+
+      <!-- 10 -->
+      <section id="d6-10">
+        <h2>10) Collocated vs Non-Collocated Control</h2>
+
+        <p>Sensor/actuator placement changes everything.</p>
+
+        <h3>Collocated</h3>
+        <p>Sensor and actuator are effectively at the same location and along the same channel.</p>
+        <p><strong>Typical advantages</strong></p>
+        <ul>
+          <li>more “passive-like” behavior</li>
+          <li>predictable pole–zero patterns</li>
+          <li>better stability robustness</li>
+          <li>easier to damp dominant structural modes</li>
+        </ul>
+
+        <h3>Non-collocated</h3>
+        <p>Actuator and sensor are separated spatially.</p>
+        <p><strong>Typical risks</strong></p>
+        <ul>
+          <li>nonminimum phase zeros</li>
+          <li>extra phase lag</li>
+          <li>limited achievable bandwidth</li>
+          <li>higher sensitivity to modeling errors</li>
+        </ul>
+
+        <p>
+          This is why large flexible space structures often prefer collocated architectures when possible.
+        </p>
+      </section>
+
+      <!-- 11 -->
+      <section id="d6-11">
+        <h2>11) Toroidal + Membrane Structures (Deployables, Inflatable Rings)</h2>
+
+        <p>Some advanced spacecraft structures use:</p>
+        <ul>
+          <li>ring/toroidal frames</li>
+          <li>pretensioned membranes inside the frame</li>
+        </ul>
+
+        <p>These systems can show:</p>
+        <ul>
+          <li>ring bending</li>
+          <li>ring torsion</li>
+          <li>membrane wave dynamics</li>
+          <li>strong coupling between frame and membrane motion</li>
+        </ul>
+
+        <p>Membrane behavior is typically tension-dominated and resembles wave propagation:</p>
+        <p class="math-block">
+          \[
+            \frac{\partial^2 z}{\partial t^2} = \frac{T}{\rho}\,\frac{\partial^2 z}{\partial x^2}
+          \]
+        </p>
+
+        <p>
+          Key intuition: higher tension → higher modal frequencies → better structural stiffness, but also potentially higher stored energy.
+        </p>
+      </section>
+
+      <!-- 12 -->
+      <section id="d6-12">
+        <h2>12) What ADCS Designers Actually Do About Flexibility</h2>
+
+        <p>
+          Flexible dynamics is not just “mode shapes and equations.” It directly drives control architecture choices.
+        </p>
+
+        <h3>Common mitigation strategies</h3>
+
+        <h4>Bandwidth separation</h4>
+        <p>Keep control bandwidth well below first flexible mode:</p>
+        <p class="math-block">
+          \[
+            \omega_{\text{control}} < \omega_{\text{first flexible}}
+          \]
+        </p>
+
+        <h4>Notch filters</h4>
+        <p>Prevent gain from exciting a known resonant mode.</p>
+
+        <h4>Structural filtering</h4>
+        <p>Low-pass filtering + compensation to reduce vibration feedback.</p>
+
+        <h4>Active damping / vibration suppression</h4>
+        <p>Add damping injection in modal channels when sensors/actuators allow it.</p>
+
+        <h4>Careful sensor placement</h4>
+        <p>Avoid placing sensors at vibration antinodes (large motion locations).</p>
+      </section>
+
+      <!-- D.6.3 -->
+      <section id="d6-63">
+        <h2>D.6.3 Filters used in flight (notch, low-pass, washout, rate feedback)</h2>
+
+        <p>
+          Real spacecraft typically use filtering as a deliberate part of the control architecture, not as an afterthought.
+          The goal is to shape the loop so that flexible resonances are not amplified and vibration does not masquerade as attitude error.
+        </p>
+
+        <h3>Notch filters (targeted resonance avoidance)</h3>
+        <ul>
+          <li><strong>Use:</strong> suppress gain at a known flexible resonance (e.g., first array bending mode)</li>
+          <li><strong>Effect:</strong> reduces excitation + reduces sensor-driven “chasing” at that frequency</li>
+          <li><strong>Risk:</strong> if frequency shifts with temperature/configuration, notch misplacement can reduce margins</li>
+        </ul>
+
+        <h3>Low-pass filters (bandwidth separation enforcement)</h3>
+        <ul>
+          <li><strong>Use:</strong> limit control bandwidth below flexible modes</li>
+          <li><strong>Effect:</strong> reduces high-frequency torque content that excites appendages</li>
+          <li><strong>Trade:</strong> slower response / longer settling time</li>
+        </ul>
+
+        <h3>Washout / high-pass filters (reject slow drift while ignoring vibration)</h3>
+        <ul>
+          <li><strong>Use:</strong> pass mid-frequency attitude information but block very low-frequency bias/drift (or vice versa depending on architecture)</li>
+          <li><strong>Effect:</strong> helps avoid integrator wind-up and prevents “DC” bias from coupling into torque commands</li>
+          <li><strong>Note:</strong> naming varies across organizations; the principle is frequency-selective feedback shaping</li>
+        </ul>
+
+        <h3>Rate feedback (damping injection)</h3>
+        <ul>
+          <li><strong>Use:</strong> add damping to rigid-body dynamics and reduce oscillatory response</li>
+          <li><strong>Effect:</strong> improves stability and reduces overshoot; can help mitigate interaction with lightly-damped modes</li>
+          <li><strong>Risk:</strong> if rate measurement is vibration-contaminated, observation spillover can increase</li>
+        </ul>
+
+        <div class="callout">
+          <p>
+            Practical takeaway: filters are chosen together with sensor placement, estimator bandwidth, and actuator limits.
+            “Fixing” flexibility is not one knob—it’s a coordinated design.
+          </p>
+        </div>
+      </section>
+
+      <!-- 13 -->
+      <section id="d6-13">
+        <h2>13) A Simple Coupled Example Model (Bus + One Flexible Mode)</h2>
+
+        <p>A minimal but useful conceptual model is:</p>
+
+        <h3>Rigid body</h3>
+        <p class="math-block">
+          \[
+            J\,\ddot{\theta} = u
+          \]
+        </p>
+
+        <h3>Flexible mode</h3>
+        <p class="math-block">
+          \[
+            \ddot{\eta} + 2\zeta\omega \dot{\eta} + \omega^2 \eta = -\alpha\,\ddot{\theta}
+          \]
+        </p>
+
+        <p><strong>Interpretation:</strong></p>
+        <ul>
+          <li>bus acceleration acts as a forcing term on the appendage</li>
+          <li>appendage vibration can feed back into measured attitude response</li>
+        </ul>
+
+        <p>This is enough to explain:</p>
+        <ul>
+          <li>why slews excite vibration</li>
+          <li>why settling time increases</li>
+          <li>why control tuning becomes harder</li>
+        </ul>
+      </section>
+
+      <!-- 14 -->
+      <section id="d6-14">
+        <h2>14) Diagram Placeholders (D6 Figures)</h2>
+
+        <p>
+          Below are placeholders for the diagrams you listed. You can replace the placeholder blocks with SVGs (recommended),
+          images, or inline diagrams later.
+        </p>
+
+        <div class="callout">
+          <p><strong>Figures (placeholders)</strong></p>
+          <ul>
+            <li><strong>Figure D6-1</strong> — Rigid bus + flexible appendage schematic <span class="muted">[Placeholder — insert SVG/PNG here]</span></li>
+            <li><strong>Figure D6-2</strong> — Modal concept (mode shapes + modal coordinates) <span class="muted">[Placeholder — insert SVG/PNG here]</span></li>
+            <li><strong>Figure D6-3</strong> — Control–structure interaction loop <span class="muted">[Placeholder — insert SVG/PNG here]</span></li>
+            <li><strong>Figure D6-4</strong> — Spillover illustration (frequency response sketch) <span class="muted">[Placeholder — insert SVG/PNG here]</span></li>
+            <li><strong>Figure D6-5</strong> — Collocated vs non-collocated comparison <span class="muted">[Placeholder — insert SVG/PNG here]</span></li>
+          </ul>
+        </div>
+
+        <p class="muted">
+          If you want, I can write clean inline SVGs for these five figures so they render sharply and match your site theme.
+        </p>
+      </section>
+
+      <!-- D.6.4 -->
+      <section id="d6-64">
+        <h2>D.6.4 Test/validation workflow (modal test → ID → Monte Carlo → HIL)</h2>
+
+        <p>
+          Flexible spacecraft control is validated as a pipeline, because the risk is not just “bad performance,” but hidden instability.
+          A typical workflow is:
+        </p>
+
+        <ol>
+          <li>
+            <strong>Modal test</strong>
+            <ul>
+              <li>Measure dominant flexible mode frequencies, damping ratios, and mode shapes (ground test / component test / integrated test)</li>
+              <li>Identify configuration dependence (temperature, deployment angle, preload, on-orbit boundary conditions)</li>
+            </ul>
+          </li>
+
+          <li>
+            <strong>System identification (ID) / model update</strong>
+            <ul>
+              <li>Fit/update reduced-order flexible models so I/O behavior matches measured data</li>
+              <li>Capture uncertainty bounds: frequency shifts, damping uncertainty, coupling strength uncertainty</li>
+            </ul>
+          </li>
+
+          <li>
+            <strong>Monte Carlo robustness campaign</strong>
+            <ul>
+              <li>Vary flexible frequencies, damping, inertia, actuator delays, sensor noise/bias, and disturbance spectra</li>
+              <li>Check stability margins, jitter metrics, settling time, and saturation statistics across the population</li>
+            </ul>
+          </li>
+
+          <li>
+            <strong>Hardware-in-the-loop (HIL) / real-time simulation</strong>
+            <ul>
+              <li>Run flight software with real sensors/actuator electronics (or high-fidelity emulators)</li>
+              <li>Validate timing, quantization, delays, mode excitation under realistic commanding, and safe-mode behavior</li>
+            </ul>
+          </li>
+        </ol>
+
+        <div class="callout">
+          <p>
+            The point is to prove: (i) the controller does not excite modes you missed, (ii) the estimator does not chase vibration,
+            and (iii) stability margins stay acceptable under uncertainty and hardware limits.
+          </p>
+        </div>
+      </section>
+
+      <!-- 15 -->
+      <section id="d6-15">
+        <h2>15) Why This Domain Is “Truly Advanced”</h2>
+
+        <p>
+          Because it forces you to think like a spacecraft controls engineer, not a textbook student:
+        </p>
+
+        <ul>
+          <li>You are not controlling a rigid body anymore. You are controlling a structure that can store elastic energy and return it later.</li>
+          <li>You must decide how many modes are enough, and what happens if you miss one.</li>
+          <li>You must design for stability even with uncertainty in frequencies, damping, and coupling.</li>
+        </ul>
+
+        <p>
+          That is spacecraft-grade engineering.
+        </p>
+      </section>
+
+    </article>
+
+    <!-- Bottom navigation card (match D.5 pattern) -->
+    <section class="next-domain-card">
+      <h2>Continue in Domain D</h2>
+      <p>
+        <a href="domain-d5-robust-attitude-control.html">
+          &larr; Previous: Domain D.5 — Robust Attitude Control
+        </a>
+      </p>
+      <p>
+        <a href="domain-d7-nonlinear-control-design.html">
+          Next: Domain D.7 Nonlinear Control Design &rarr;
+        </a>
+      </p>
+      <p>
+        <a href="notes.html#domain-d-overview">&larr; Back to Domain D overview</a>
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

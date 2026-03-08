@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Domain A.3 – Rigid-Body Kinematics (Advanced Attitude Coordinates)</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+  <!-- Green hero header + navigation (same style as Domain A.2) -->
+  <header class="notes-hero">
+    <h1>Domain A.3 &mdash; Rigid-Body Kinematics</h1>
+    <p class="notes-tagline">
+      Advanced attitude coordinates and deterministic attitude estimation from vector measurements.
+    </p>
+
+   <nav class="notes-nav">
+     <a href="index.html">Home</a>
+     <a href="problems.html">Problem Bank</a>
+     <a href="tools.html">Tools</a>
+     <a href="notes.html">Theory Notes</a>
+     <a href="notes.html#advanced-domains" class="active">Advanced Domains (A&ndash;E)</a>
+        <a href="references.html" class="pill">References</a>
+     <a href="about.html">About</a>
+   </nav>
+
+  </header>
+
+  <main class="page-main">
+    <section class="notes-intro-card">
+        <p><a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A&ndash;E)</a></p>
+
+      <h1>Domain A.3: Rigid-Body Kinematics (Advanced Attitude Coordinates)</h1>
+      <p>
+        This domain builds on A.1&ndash;A.2 (vector kinematics and Newton&ndash;Euler equations).
+        The main goals are:
+      </p>
+      <ul>
+        <li>To understand how to parametrise large 3-D rotations.</li>
+        <li>To learn how to estimate attitude from vector sensor measurements.</li>
+      </ul>
+    </section>
+
+    <!-- 1. Attitude coordinates -->
+    <section id="a3-attitude-big-picture">
+      <h2>1. Attitude Coordinates &mdash; Big Picture</h2>
+      <p>
+        Attitude coordinates (or attitude parameters) are sets of numbers that specify the orientation
+        of one rigid body frame with respect to another. They play the same role for <em>orientation</em>
+        that Cartesian, polar, or spherical coordinates play for <em>position</em>.
+      </p>
+      <p>
+        However, there is an important geometric difference:
+      </p>
+      <ul>
+        <li>A position vector can have arbitrarily large magnitude.</li>
+        <li>
+          The relative orientation between two frames differs by at most a half-turn (180&deg;).
+          If you keep rotating past 180&deg;, the attitude starts to &ldquo;return&rdquo; toward the original
+          orientation.
+        </li>
+      </ul>
+      <p>
+        This finite nature of orientation is important for control design, especially when spacecraft
+        can tumble through large angles.
+      </p>
+
+      <h3>Key facts</h3>
+      <ul>
+        <li>At least three numbers are required to describe the relative orientation of two frames.</li>
+        <li>
+          Any minimal 3-parameter set (Euler angles, CRPs, MRPs, etc.) has at least one geometric
+          singularity: orientations where the parameters are undefined or not unique.
+        </li>
+        <li>
+          Near such singularities, the corresponding kinematic differential equations become
+          ill-conditioned or singular.
+        </li>
+        <li>
+          Singularities can be avoided by using redundant coordinates (four or more parameters),
+          such as quaternions, that are globally defined.
+        </li>
+      </ul>
+    </section>
+
+    <!-- 2. Principal rotation and axis-angle -->
+    <section id="a3-principal-rotation">
+      <h2>2. Euler&rsquo;s Principal Rotation and Axis&ndash;Angle &harr; DCM</h2>
+
+      <h3>2.1 Euler&rsquo;s principal rotation theorem</h3>
+      <p>
+        Any rigid body (or frame) can be moved from one orientation to another by a single rotation
+        of angle \(\Phi\) about a unit vector \(\hat{\mathbf{e}}\) (the principal axis):
+      </p>
+      <ul>
+        <li>The axis \(\hat{\mathbf{e}}\) is fixed in both the initial and final frames.</li>
+        <li>
+          The pair \((\hat{\mathbf{e}}, \Phi)\) is not unique:
+          \((\hat{\mathbf{e}}, \Phi)\) and \((-\hat{\mathbf{e}}, -\Phi)\)
+          describe the same physical rotation.
+        </li>
+        <li>
+          Angles that differ by \(360^\circ\) are equivalent. In practice, we usually take
+          \(|\Phi| \le 180^\circ\).
+        </li>
+      </ul>
+      <p>
+        This motivates the axis&ndash;angle representation.
+      </p>
+
+      <h3>2.2 Principal rotation &rarr; Direction cosine matrix</h3>
+      <p>
+        Let the rotation from frame \(N\) to frame \(B\)
+        be a principal rotation of angle \(\Phi\) about the unit axis
+        \(\hat{\mathbf{e}} = [\,e_1\; e_2\; e_3\,]^T\). The corresponding DCM
+        \(C = [C_{ij}]\) can be written in compact Rodrigues form:
+      </p>
+      <p class="math-block">
+        \[
+        C = \cos\Phi\,I_3 + (1-\cos\Phi)\,\hat{\mathbf{e}}\,\hat{\mathbf{e}}^T
+            - \sin\Phi\,[\hat{\mathbf{e}}]_\times ,
+        \]
+      </p>
+      <p>
+        where \([\hat{\mathbf{e}}]_\times\) is the skew-symmetric cross-product matrix of
+        \(\hat{\mathbf{e}}\).
+      </p>
+
+      <h3>2.3 Direction cosine matrix &rarr; principal rotation</h3>
+      <p>
+        Given a proper orthogonal matrix \(C\), the principal angle and axis
+        are recovered from
+      </p>
+      <p class="math-block">
+        \[
+        \cos\Phi = \tfrac{1}{2}(\mathrm{tr}\,C - 1),
+        \qquad
+        \hat{\mathbf{e}} =
+        \frac{1}{2\sin\Phi}
+        \begin{bmatrix}
+          C_{23} - C_{32} \\
+          C_{31} - C_{13} \\
+          C_{12} - C_{21}
+        \end{bmatrix},
+        \]
+      </p>
+      <p>
+        valid whenever \(\sin\Phi \ne 0\) (i.e. away from exactly \(0^\circ\) or
+        \(180^\circ\)). Any attitude parameter set built from \((\hat{\mathbf{e}}, \Phi)\) can
+        therefore be connected directly to the DCM.
+      </p>
+    </section>
+
+    <!-- 3. Classical Rodrigues Parameters -->
+    <section id="a3-crp">
+      <h2>3. Classical Rodrigues Parameters (CRPs)</h2>
+      <p>
+        The classical Rodrigues parameters (also called the Gibbs vector) condense the 4-parameter
+        quaternion into a minimal 3-vector:
+      </p>
+      <p class="math-block">
+        \[
+        \mathbf{q} = \hat{\mathbf{e}} \,\tan\!\left(\frac{\Phi}{2}\right).
+        \]
+      </p>
+
+      <h3>3.1 Relation to quaternions and DCM</h3>
+      <p>
+        Let the unit quaternion be
+        \(\beta = [\,\beta_0\;\; \beta_v^T\,]^T\), with \(\beta_v \in \mathbb{R}^3\).
+        Then
+      </p>
+      <p class="math-block">
+        \[
+        \mathbf{q} = \frac{\beta_v}{\beta_0},
+        \]
+      </p>
+      <p>
+        and conversely
+      </p>
+      <p class="math-block">
+        \[
+        \beta_0 = \frac{1}{1 + \mathbf{q}^T \mathbf{q}}, \qquad
+        \beta_v = \frac{\mathbf{q}}{1 + \mathbf{q}^T \mathbf{q}}.
+        \]
+      </p>
+      <p>
+        In terms of \(\mathbf{q}\), the DCM can be written as
+      </p>
+      <p class="math-block">
+        \[
+        C(\mathbf{q}) =
+        \frac{1}{1 + \mathbf{q}^T \mathbf{q}}
+        \Big[(1 - \mathbf{q}^T \mathbf{q})\,I_3 + 2\,\mathbf{q}\mathbf{q}^T + 2[\mathbf{q}]_\times\Big].
+        \]
+      </p>
+      <p>
+        A convenient way to extract \(\mathbf{q}\) from a known rotation matrix
+        \(C\) (away from \(\Phi = 180^\circ\)) is
+      </p>
+      <p class="math-block">
+        \[
+        \mathbf{q} =
+        \frac{1}{1 + \mathrm{tr}\,C}
+        \begin{bmatrix}
+          C_{23} - C_{32} \\
+          C_{31} - C_{13} \\
+          C_{12} - C_{21}
+        \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        Note that \(C(\mathbf{q})^T = C(-\mathbf{q})\), so changing the sign of
+        \(\mathbf{q}\) simply swaps &ldquo;frame 1 relative to frame 2&rdquo; and vice versa.
+      </p>
+
+      <h3>3.2 CRP kinematic differential equation</h3>
+      <p>
+        Let \(\boldsymbol{\omega}_B = [\,\omega_1,\; \omega_2,\; \omega_3\,]^T\) be the
+        angular velocity expressed in the body frame. The CRPs evolve according to
+      </p>
+      <p class="math-block">
+        \[
+        \dot{\mathbf{q}} = \tfrac{1}{2}\big(I_3 + [\mathbf{q}]_\times + \mathbf{q}\mathbf{q}^T\big)
+        \boldsymbol{\omega}_B.
+        \]
+      </p>
+      <p><strong>Characteristics</strong></p>
+      <ul>
+        <li>Only polynomial terms; no trigonometric functions.</li>
+        <li>
+          Valid for all rotations except as \(|\Phi| \to 180^\circ\), where
+          both \(\|\mathbf{q}\|\) and \(\|\dot{\mathbf{q}}\|\) grow
+          without bound.
+        </li>
+      </ul>
+      <p>
+        The inverse relation is
+      </p>
+      <p class="math-block">
+        \[
+        \boldsymbol{\omega}_B =
+        \frac{2}{1 + \mathbf{q}^T \mathbf{q}}\,(I_3 - [\mathbf{q}]_\times)\,\dot{\mathbf{q}}.
+        \]
+      </p>
+    </section>
+
+    <!-- 4. Cayley transform -->
+    <section id="a3-cayley">
+      <h2>4. Cayley Transform &mdash; Matrix View</h2>
+      <p>
+        The Cayley transform provides a compact mapping between a proper orthogonal matrix
+        \(C\) and a skew-symmetric matrix \(Q\):
+      </p>
+      <p class="math-block">
+        \[
+        C = (I - Q)(I + Q)^{-1}, \qquad
+        Q = (I - C)(I + C)^{-1}.
+        \]
+      </p>
+      <p>
+        In 3-D, choosing \(Q = [\mathbf{q}]_\times\) reproduces the CRP parametrisation.
+        For higher-dimensional rotation matrices, the same transform defines higher-dimensional
+        &ldquo;Rodrigues-type&rdquo; parameters.
+      </p>
+      <h3>Geometric view</h3>
+      <ul>
+        <li>\(Q\) plays the role of an orientation vector in matrix form.</li>
+        <li>
+          The kinematic equation for \(C\) can be written in terms of a
+          corresponding &ldquo;angular-velocity&rdquo; cross-product matrix, similar to the usual
+          DCM kinematics.
+        </li>
+      </ul>
+    </section>
+
+    <!-- 5. MRPs -->
+    <section id="a3-mrp">
+      <h2>5. Modified Rodrigues Parameters (MRPs)</h2>
+      <p>
+        The Modified Rodrigues Parameters (MRPs) use a different angle scaling:
+      </p>
+      <p class="math-block">
+        \[
+        \boldsymbol{\sigma} = \hat{\mathbf{e}} \,\tan\!\left(\frac{\Phi}{4}\right).
+        \]
+      </p>
+
+      <h3>5.1 Relation to quaternions and principal rotation</h3>
+      <p>
+        With the same unit quaternion
+        \(\beta = [\beta_0,\; \beta_v^T]^T\),
+      </p>
+      <p class="math-block">
+        \[
+        \boldsymbol{\sigma} = \frac{\beta_v}{1 + \beta_0},
+        \]
+      </p>
+      <p>
+        and the inverse relations are
+      </p>
+      <p class="math-block">
+        \[
+        \beta_0 = \frac{1 - \boldsymbol{\sigma}^T\boldsymbol{\sigma}}
+                       {1 + \boldsymbol{\sigma}^T\boldsymbol{\sigma}}, \qquad
+        \beta_v = \frac{2\boldsymbol{\sigma}}
+                       {1 + \boldsymbol{\sigma}^T\boldsymbol{\sigma}}.
+        \]
+      </p>
+      <p>
+        In terms of the principal rotation,
+      </p>
+      <p class="math-block">
+        \[
+        \boldsymbol{\sigma} = \hat{\mathbf{e}} \,\tan\!\left(\frac{\Phi}{4}\right).
+        \]
+      </p>
+      <p>
+        Hence MRPs are nonsingular for all rotations with
+        \(|\Phi| &lt; 360^\circ\), twice the nonsingular range of CRPs.
+      </p>
+
+      <p><strong>From this relation:</strong></p>
+      <ul>
+        <li>\(\|\boldsymbol{\sigma}\| &lt; 1\) corresponds to \(|\Phi| &lt; 180^\circ\).</li>
+        <li>\(\|\boldsymbol{\sigma}\| = 1\) corresponds to a 180&deg; rotation.</li>
+        <li>\(\|\boldsymbol{\sigma}\| &gt; 1\) corresponds to rotations larger than 180&deg; (but less than 360&deg;).</li>
+      </ul>
+
+      <h3>5.2 Original vs shadow MRPs and switching</h3>
+      <p>
+        Because MRPs can be obtained by stereographic projection of the quaternion unit hypersphere,
+        two distinct MRP sets represent the same attitude:
+      </p>
+      <ul>
+        <li>the original vector \(\boldsymbol{\sigma}\),</li>
+        <li>a shadow vector \(\boldsymbol{\sigma}_S\) obtained from the quaternion with opposite sign.</li>
+      </ul>
+      <p>
+        A convenient mapping is
+      </p>
+      <p class="math-block">
+        \[
+        \boldsymbol{\sigma}_S = -\frac{\boldsymbol{\sigma}}
+                                   {\boldsymbol{\sigma}^T\boldsymbol{\sigma}}.
+        \]
+      </p>
+      <p><strong>Practical strategy</strong></p>
+      <ul>
+        <li>Use the original set as long as \(\|\boldsymbol{\sigma}\| \le 1\).</li>
+        <li>If \(\|\boldsymbol{\sigma}\|\) grows beyond 1, switch to \(\boldsymbol{\sigma}_S\).</li>
+        <li>On the switching surface \(\|\boldsymbol{\sigma}\| = 1\), the mapping simplifies to \(\boldsymbol{\sigma}_S = -\boldsymbol{\sigma}\).</li>
+      </ul>
+      <p>
+        This original&ndash;shadow pair yields a minimal, nonsingular, bounded representation suitable for
+        large-angle spacecraft manoeuvres. The norm is always bounded by 1, and the chosen vector
+        always corresponds to the shortest principal rotation between the current and reference
+        frames.
+      </p>
+
+      <h3>5.3 MRP&ndash;DCM and kinematics (summary)</h3>
+      <p>
+        The DCM can be written in terms of MRPs either in components or in compact vector form. One
+        convenient compact expression is
+      </p>
+      <p class="math-block">
+        \[
+        C(\boldsymbol{\sigma}) = I_3 +
+        \frac{8[\boldsymbol{\sigma}]_\times^2
+              - 4(1 - \sigma^2)[\boldsymbol{\sigma}]_\times}
+             {(1 + \sigma^2)^2},
+        \qquad \sigma^2 = \boldsymbol{\sigma}^T\boldsymbol{\sigma}.
+        \]
+      </p>
+      <p>
+        The kinematic differential equation has a structure similar to the CRP case:
+      </p>
+      <p class="math-block">
+        \[
+        \dot{\boldsymbol{\sigma}} =
+        \tfrac{1}{4}\big[(1 - \sigma^2)I_3
+                         + 2[\boldsymbol{\sigma}]_\times
+                         + 2\boldsymbol{\sigma}\boldsymbol{\sigma}^T\big]\boldsymbol{\omega}_B
+        = \tfrac{1}{4} B(\boldsymbol{\sigma})\,\boldsymbol{\omega}_B.
+        \]
+      </p>
+      <p>
+        The inverse mapping, expressing angular velocity in terms of \(\dot{\boldsymbol{\sigma}}\),
+        uses the same matrix \(B(\boldsymbol{\sigma})\) with a scalar factor that remains
+        well behaved except at the 360&deg; singularity.
+      </p>
+      <p>
+        Overall, MRPs preserve the polynomial, no-trig form of the CRP kinematics while offering a
+        larger nonsingular range.
+      </p>
+    </section>
+
+    <!-- 6. SOPs -->
+    <section id="a3-sop">
+      <h2>6. General Stereographic Orientation Parameters (SOPs)</h2>
+      <p>
+        CRPs and MRPs are special cases of stereographic orientation parameters (SOPs).
+      </p>
+      <ul>
+        <li>Start from the 4-D unit quaternion constraint sphere.</li>
+        <li>Project points on this sphere onto a 3-D hyperplane that is one unit away from a chosen projection point.</li>
+      </ul>
+      <h3>Types</h3>
+      <ul>
+        <li>
+          <strong>Symmetric SOPs</strong>: the projection plane is perpendicular to the quaternion
+          scalar axis \(\beta_0\). Singularities occur at a fixed rotation
+          angle, independent of axis (CRPs and MRPs belong here).
+        </li>
+        <li>
+          <strong>Asymmetric SOPs</strong>: more general projection geometry; singularities can
+          depend on both rotation axis and angle.
+        </li>
+      </ul>
+      <p>
+        In general, different quaternions can project to the same SOP vector (non-uniqueness).
+        These coordinates are particularly useful when the spacecraft must remain within a specified
+        cone about a reference direction; they appear in constrained pointing control laws.
+      </p>
+    </section>
+
+    <!-- 7. Higher-order parameters and others -->
+    <section id="a3-other-coords">
+      <h2>7. Higher-Order Rodrigues Parameters and Other Coordinates</h2>
+      <p>
+        Additional attitude coordinates used in the literature include:
+      </p>
+      <h3>7.1 Higher-Order Rodrigues Parameters (HORPs)</h3>
+      <p>
+        HORPs extend the Cayley transform so that a rotation matrix is expressed through a
+        skew-symmetric matrix \([X]\) raised to higher powers. The associated
+        attitude vector
+      </p>
+      <p class="math-block">
+        \[
+        \mathbf{x} = \hat{\mathbf{e}} \,\tan\!\left(\frac{\Phi}{2m}\right)
+        \]
+      </p>
+      <p>
+        depends on an integer \(m\):
+      </p>
+      <ul>
+        <li>\(m = 1\) &rarr; classical Rodrigues vector (CRPs).</li>
+        <li>\(m = 2\) &rarr; MRPs.</li>
+      </ul>
+      <p>Shadow sets can again be used to avoid singularities.</p>
+
+      <h3>7.2 \((w, z)\) coordinates</h3>
+      <p>
+        A complex variable \(w\) encodes the heading of a chosen body axis,
+        and a scalar \(z\) describes spin about that axis. These coordinates
+        are very useful for under-actuated, axially symmetric spacecraft.
+      </p>
+
+      <h3>7.3 Cayley&ndash;Klein parameters</h3>
+      <p>
+        Cayley&ndash;Klein parameters are a pair of complex numbers closely related to quaternions,
+        providing a nonsingular, once-redundant complex representation:
+      </p>
+      <p class="math-block">
+        \[
+        \alpha = \beta_0 + i\beta_3,\qquad
+        \beta = -\beta_2 + i\beta_1,\\
+        \gamma = \beta_2 + i\beta_1,\qquad
+        \delta = \beta_0 - i\beta_3.
+        \]
+      </p>
+      <p>
+        The inverse relations are
+      </p>
+      <p class="math-block">
+        \[
+        \beta_0 = \tfrac{1}{2}(\alpha + \delta), \qquad
+        \beta_1 = -\tfrac{i}{2}(\beta + \gamma),\\
+        \beta_2 = -\tfrac{1}{2}(\beta - \gamma), \qquad
+        \beta_3 = -\tfrac{i}{2}(\alpha - \delta).
+        \]
+      </p>
+      <p>
+        For these notes you can treat HORPs, \((w, z)\) coordinates, and
+        Cayley&ndash;Klein parameters as advanced reading. Day-to-day spacecraft GNC work can be done
+        comfortably with DCMs, quaternions, CRPs, and MRPs.
+      </p>
+    </section>
+
+    <!-- 8. Choosing coordinates -->
+    <section id="a3-choice">
+      <h2>8. Choosing Attitude Coordinates in Practice</h2>
+      <p>
+        The best attitude representation depends on the physical system and the expected motion
+        range.
+      </p>
+
+      <h3>8.1 Mechanisms with gimbals / joints</h3>
+      <ul>
+        <li>
+          Hardware usually fixes the parametrisation, e.g. a 3-gimbal mount corresponds to a specific
+          Euler sequence (3-1-3, 3-2-1, etc.).
+        </li>
+        <li>
+          You must avoid configurations where two gimbal axes line up (gimbal lock) or collide
+          mechanically.
+        </li>
+      </ul>
+
+      <h3>8.2 Free-flying vehicles (aircraft, missiles, spacecraft)</h3>
+      <ul>
+        <li>
+          For small excursions around a nominal attitude, most coordinate sets work reasonably well.
+        </li>
+        <li>
+          Aircraft conventionally use yaw&ndash;pitch&ndash;roll Euler angles near straight-and-level
+          flight.
+        </li>
+        <li>
+          Choose frames so that the nominal attitude is as far as possible from any coordinate
+          singularity.
+        </li>
+      </ul>
+
+      <h3>8.3 Large rotations / tumbling motion</h3>
+      <ul>
+        <li>
+          Prefer quaternions or MRPs:
+          <ul>
+            <li>Quaternions are globally nonsingular but redundant (4 parameters + unit-norm constraint).</li>
+            <li>
+              MRPs are minimal (3 parameters) and remain well behaved up to \(360^\circ\), using
+              original/shadow switching to avoid the lone singularity.
+            </li>
+          </ul>
+        </li>
+      </ul>
+
+      <h3>8.4 Navigation and control design</h3>
+      <p><strong>Important considerations:</strong></p>
+      <ul>
+        <li>How nonlinear the coordinate dynamics are.</li>
+        <li>Whether the parameter norm is bounded.</li>
+        <li>Ease of gain tuning and handling actuator saturation.</li>
+      </ul>
+      <p>
+        MRPs with shadow-set switching are especially attractive for feedback control of spacecraft:
+        they linearise nicely for small angles and keep the attitude error vector bounded.
+      </p>
+    </section>
+
+    <!-- 9. Deterministic attitude estimation -->
+    <section id="a3-estimation">
+      <h2>9. Deterministic Attitude Estimation from Vector Measurements</h2>
+      <p>
+        So far we have focused on describing orientation. In practice we must <em>estimate</em>
+        attitude from sensor data.
+      </p>
+
+      <h3>9.1 Common attitude sensors</h3>
+      <ul>
+        <li>Sun sensors &rarr; unit vector toward the Sun.</li>
+        <li>Magnetometers &rarr; magnetic field direction.</li>
+        <li>Star trackers &rarr; line-of-sight to known stars.</li>
+      </ul>
+      <p>
+        At a given time:
+      </p>
+      <ul>
+        <li>Each sensor provides a unit vector in the body frame, \(v_k^B\).</li>
+        <li>
+          Using orbital geometry and environmental models, we can compute the corresponding inertial
+          vectors, \(v_k^N\).
+        </li>
+      </ul>
+      <p>
+        A single unit vector constrains only two rotational degrees of freedom (rotation about that
+        axis is unobservable), so we need at least two non-collinear vectors. With two or more
+        vectors we usually formulate a least-squares problem.
+      </p>
+
+      <h3>9.2 Wahba&rsquo;s problem (conceptual form)</h3>
+      <p>
+        Given a set of vector pairs \((v_k^B, v_k^N)\) with non-negative
+        weights \(w_k\), find the DCM
+        \(C_{BN}\) that minimises
+      </p>
+      <p class="math-block">
+        \[
+        J(C_{BN}) = \tfrac{1}{2}\sum_k w_k \,\|v_k^B - C_{BN} v_k^N\|^2.
+        \]
+      </p>
+      <p>
+        Every classical deterministic attitude estimator is essentially a different way of solving
+        this problem.
+      </p>
+
+      <h3>9.3 TRIAD method</h3>
+      <p>
+        The TRIAD method uses exactly two vector measurements.
+      </p>
+      <h4>Steps</h4>
+      <ol>
+        <li>Choose the most accurate inertial/body vector as \(\hat{\mathbf{t}}_1\).</li>
+        <li>
+          Construct
+          \[
+          \hat{\mathbf{t}}_2 =
+          \frac{\hat{\mathbf{t}}_1 \times \hat{\mathbf{t}}_1'}
+               {\|\hat{\mathbf{t}}_1 \times \hat{\mathbf{t}}_1'\|},
+          \]
+          where \(\hat{\mathbf{t}}_1\) and \(\hat{\mathbf{t}}_1'\) are the two
+          measured directions.
+        </li>
+        <li>
+          Let \(\hat{\mathbf{t}}_3 = \hat{\mathbf{t}}_1 \times \hat{\mathbf{t}}_2\).
+        </li>
+      </ol>
+      <p>
+        Form the body and inertial triad matrices
+      </p>
+      <p class="math-block">
+        \[
+        [B_T] = [\,\hat{\mathbf{t}}_1^B\; \hat{\mathbf{t}}_2^B\; \hat{\mathbf{t}}_3^B\,], \qquad
+        [N_T] = [\,\hat{\mathbf{t}}_1^N\; \hat{\mathbf{t}}_2^N\; \hat{\mathbf{t}}_3^N\,].
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p class="math-block">
+        \[
+        C_{BN} = [B_T][N_T]^T.
+        \]
+      </p>
+      <p><strong>Interpretation</strong></p>
+      <p>
+        TRIAD builds an intermediate orthonormal frame
+        \(T = \{\mathbf{t}_1, \mathbf{t}_2, \mathbf{t}_3\}\) in both inertial and body coordinates; the
+        DCM \(C_{BN}\) maps the inertial triad to the body triad.
+      </p>
+      <p><strong>Pros</strong>: closed-form, very simple to implement.</p>
+      <p><strong>Cons</strong>: effectively uses only &ldquo;1.5&rdquo; vectors and cannot process more than two measurements at once.</p>
+
+      <h3>9.4 Davenport&rsquo;s q-method</h3>
+      <p>
+        Davenport&rsquo;s q-method rewrites Wahba&rsquo;s cost function in terms of a quaternion.
+        It builds a symmetric \(4\times 4\) matrix \(K\)
+        from the weighted vector pairs. The optimal attitude quaternion is the eigenvector
+        corresponding to the largest eigenvalue of \(K\). From this quaternion
+        you can compute the DCM, CRPs, MRPs, etc.
+      </p>
+
+      <h3>9.5 QUEST (Quaternion Estimator)</h3>
+      <p>
+        Define
+      </p>
+      <p class="math-block">
+        \[
+        B = \sum_{k=1}^N w_k\,v_k^B (v_k^N)^T,\qquad
+        S = B + B^T,\qquad
+        \sigma = \mathrm{tr}(B),\\
+        Z =
+        \begin{bmatrix}
+          B_{23} - B_{32} \\
+          B_{31} - B_{13} \\
+          B_{12} - B_{21}
+        \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        Construct the symmetric K-matrix
+      </p>
+      <p class="math-block">
+        \[
+        K =
+        \begin{bmatrix}
+          \sigma & Z^T \\
+          Z & S - \sigma I_3
+        \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        The optimal quaternion \(\beta\) satisfies
+      </p>
+      <p class="math-block">
+        \[
+        K\beta = \lambda_{\max}\,\beta,
+        \]
+      </p>
+      <p>
+        where \(\lambda_{\max}\) is the largest eigenvalue.
+      </p>
+      <p>
+        Shuster&rsquo;s QUEST algorithm is an efficient implementation of Davenport&rsquo;s method:
+      </p>
+      <ul>
+        <li>It reduces the problem to a scalar nonlinear equation for the maximal eigenvalue;</li>
+        <li>Once that scalar is found, the optimal quaternion is reconstructed algebraically.</li>
+      </ul>
+      <p><strong>Pros</strong></p>
+      <ul>
+        <li>Retains Davenport&rsquo;s optimality (solves Wahba&rsquo;s problem exactly).</li>
+        <li>Much lower computational load; widely used in spacecraft avionics.</li>
+      </ul>
+      <p><strong>Caution</strong></p>
+      <p>
+        If you represent the result in CRPs, the solution can approach the 180&deg; singularity; this
+        is usually handled by choosing a different body frame or switching to MRPs when needed.
+      </p>
+
+      <h3>9.6 OLAE &mdash; Optimal Linear Attitude Estimator</h3>
+      <p>
+        The OLAE algorithm uses the Cayley transform to express the attitude in CRPs and then
+        linearises the measurement equations. Using the Cayley form \(C(\mathbf{q})\),
+        the vector residual for each measurement can be written as
+      </p>
+      <p class="math-block">
+        \[
+        \mathbf{d}_i = [\tilde{\mathbf{s}}_i]\,\mathbf{q}.
+        \]
+      </p>
+      <p>
+        Stack all measurements:
+      </p>
+      <p class="math-block">
+        \[
+        \mathbf{d} =
+        \begin{bmatrix}
+          \mathbf{d}_1 \\ \vdots \\ \mathbf{d}_N
+        \end{bmatrix},\qquad
+        S =
+        \begin{bmatrix}
+          \mathbf{s}_1 \\ \vdots \\ \mathbf{s}_N
+        \end{bmatrix},\qquad
+        W = \mathrm{diag}(w_1 I_3, \dots, w_N I_3).
+        \]
+      </p>
+      <p>
+        Then the optimal CRP vector is the weighted least-squares solution
+      </p>
+      <p class="math-block">
+        \[
+        \mathbf{q} = (S^T W S)^{-1} S^T W \mathbf{d}.
+        \]
+      </p>
+      <p><strong>Key idea</strong></p>
+      <ul>
+        <li>
+          For each vector pair, use the Cayley form \(C(\mathbf{q})\) to rewrite the
+          Wahba residuals in the linear form \(S\mathbf{q} = \mathbf{d}\), where
+          \(S\) and \(\mathbf{d}\) depend on the weighted
+          measurements.
+        </li>
+        <li>Solve directly for \(\mathbf{q}\) via a \(3\times 3\) matrix inversion.</li>
+      </ul>
+      <p><strong>Pros</strong></p>
+      <ul>
+        <li>Purely linear; well suited to modern hardware that is very fast at matrix operations.</li>
+        <li>Accepts any number of measurements and weights.</li>
+        <li>Requires inversion of only a \(3\times 3\) matrix.</li>
+      </ul>
+      <p>
+        As with other CRP-based schemes, care is needed near the 180&deg; singularity; in practice
+        one can change frames or map the solution into MRPs with shadow-set switching.
+      </p>
+    </section>
+
+    <section class="notes-intro-card">
+  <h2>Next in Domain A</h2>
+  <p>
+        <a href="a4-rigid-body-dynamics.html">
+          Domain A.4 &mdash; Rigid-Body Dynamics &rarr;
+        
+        </a>
+  </p>
+  <p>
+    <a href="domain-a-newtonian.html">
+      &larr; Back to Domain A.2 &mdash; Newtonian Mechanics
+    </a>
+  </p>
+
+  <p>
+    <a href="notes.html#domain-a-overview">
+      &larr; Back to Domain A overview
+    </a>
+  </p>
+
+</section>
+
+
+  </main>
+  <footer class="site-footer">
+    <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

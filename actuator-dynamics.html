@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>2.4 Actuator Dynamics | Interactive GNC & Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+  <!-- Green hero header + navigation (same style as other Theory Notes pages) -->
+  <header class="notes-hero">
+    <h1>Actuator Dynamics</h1>
+    <p class="notes-tagline">
+      How reaction wheels, CMGs, thrusters, and magnetorquers generate torque.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html" class="active">Theory Notes</a>
+        <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- 2.4 overview -->
+    <section class="notes-section-card">
+      <h2>2.4 Actuator Dynamics</h2>
+      <p>
+        Spacecraft attitude actuators convert electrical, mechanical, or chemical energy into
+        control torque. Together with the sensors and control algorithms, they form the
+        “muscles” of the attitude control system. This section summarises the main actuator
+        types, how they generate torque, and the limits that matter for modelling and design.
+      </p>
+      <p>
+        The four most common actuator families are:
+      </p>
+      <ul>
+        <li><strong>Reaction wheels</strong> for fine pointing and momentum storage.</li>
+        <li><strong>Control moment gyros (CMGs)</strong> for large, fast slews.</li>
+        <li><strong>Thrusters</strong> for impulsive or continuous torque and orbit manoeuvres.</li>
+        <li><strong>Magnetorquers</strong> for low-cost torque in low Earth orbit (LEO).</li>
+      </ul>
+      <p>
+        We conclude with generic actuator limits and simple first-order models that can be used
+        in simulations and control design.
+      </p>
+    </section>
+
+    <!-- 2.4.1 Reaction Wheels -->
+    <section class="notes-section-card">
+      <h3>2.4.1 Reaction Wheels</h3>
+      <p>
+        Reaction wheels are motor-driven flywheels mounted inside the spacecraft. When the motor
+        accelerates or decelerates the wheel, an equal and opposite torque is applied to the
+        spacecraft body, changing its angular velocity.
+      </p>
+
+      <h4>Wheel torque generation</h4>
+      <p>
+        Let $I_w$ be the wheel’s polar moment of inertia and $\omega_w$ its spin rate. The wheel
+        angular momentum is
+      </p>
+      <p>
+        \[
+          h_w = I_w \omega_w.
+        \]
+      </p>
+      <p>
+        A motor torque $\tau_m$ produces the wheel acceleration
+      </p>
+      <p>
+        \[
+          \dot{\omega}_w = \frac{\tau_m - \tau_{\text{friction}}}{I_w},
+        \]
+      </p>
+      <p>
+        where $\tau_{\text{friction}}$ captures bearing friction and cogging losses. By
+        conservation of angular momentum, the spacecraft body experiences an opposite torque
+      </p>
+      <p>
+        \[
+          \tau_{\text{body}} = -\tau_m.
+        \]
+      </p>
+      <p>
+        Arrays of three or four wheels, oriented along different axes, are used to generate
+        arbitrary control torques in the body frame.
+      </p>
+
+      <h4>Momentum storage, saturation, and desaturation</h4>
+      <p>
+        Because persistent disturbance torques are balanced by wheel torques, the wheel speeds
+        slowly drift away from their nominal values. The total stored wheel momentum
+      </p>
+      <p>
+        \[
+          \mathbf{H}_w = \sum_k I_{w,k}\,\omega_{w,k}\,\hat{\mathbf{e}}_k
+        \]
+      </p>
+      <p>
+        eventually approaches the design limit set by maximum allowable wheel speed. This is
+        called <em>momentum saturation</em>. Once saturated, the wheels can no longer provide
+        additional control torque in some directions.
+      </p>
+      <p>
+        To avoid this, the spacecraft periodically performs <strong>desaturation</strong>
+        (or “momentum dumping”) by using an external actuator such as thrusters or
+        magnetorquers to apply torque while commanding the wheels back toward lower speeds.
+      </p>
+    </section>
+
+    <!-- 2.4.2 CMGs -->
+    <section class="notes-section-card">
+      <h3>2.4.2 Control Moment Gyros (CMGs)</h3>
+      <p>
+        Control Moment Gyros use the gyroscopic coupling of a spinning rotor to generate large
+        control torques. Compared with reaction wheels, CMGs can deliver much higher torque
+        for a given electrical power, making them attractive for agile Earth-observation or
+        crewed-vehicle attitude control.
+      </p>
+
+      <h4>Gyroscopic torque generation</h4>
+      <p>
+        A CMG consists of a rotor spinning with constant angular momentum
+        $\mathbf{h} = h\,\hat{\mathbf{s}}$ mounted in a gimbal. When the gimbal rotates at rate
+        $\dot{\gamma}$ about the axis $\hat{\mathbf{g}}$, the rotor spin axis changes direction
+        and the spacecraft experiences the gyroscopic torque
+      </p>
+      <p>
+        \[
+          \boldsymbol{\tau}_{\text{CMG}}
+            = \dot{\mathbf{h}}
+            = \boldsymbol{\Omega}_g \times \mathbf{h}
+            = h\,\dot{\gamma}\,\hat{\mathbf{g}} \times \hat{\mathbf{s}}.
+        \]
+      </p>
+      <p>
+        For a CMG cluster, this relationship is often written in matrix form
+      </p>
+      <p>
+        \[
+          \boldsymbol{\tau} = \mathbf{A}(\boldsymbol{\gamma})\,\dot{\boldsymbol{\gamma}},
+        \]
+      </p>
+      <p>
+        where $\boldsymbol{\gamma}$ collects all gimbal angles and $\mathbf{A}$ is the
+        <em>CMG steering matrix</em>.
+      </p>
+
+      <h4>Singularities and steering laws</h4>
+      <p>
+        When the steering matrix $\mathbf{A}$ loses rank, some torque directions cannot be
+        produced no matter how the gimbals move. These configurations are called
+        <strong>singularities</strong>. Near a singularity, very large gimbal rates are required
+        to generate modest torques, which may violate hardware limits.
+      </p>
+      <p>
+        Practical CMG control uses <em>singularity-robust steering laws</em>, which:
+      </p>
+      <ul>
+        <li>Command gimbal motions that track the desired torque while</li>
+        <li>Internally redistributing momentum (“null motion”) to avoid singular directions.</li>
+      </ul>
+      <p>
+        Detailed steering law design is beyond the scope of these notes, but the existence of
+        singularities is crucial when selecting CMGs for a mission.
+      </p>
+    </section>
+
+    <!-- 2.4.3 Thrusters -->
+    <section class="notes-section-card">
+      <h3>2.4.3 Thrusters</h3>
+      <p>
+        Chemical or cold-gas thrusters provide impulsive forces used for both orbit control
+        and attitude control. They are particularly useful for:
+      </p>
+      <ul>
+        <li>Initial acquisition and detumbling after launch.</li>
+        <li>Large attitude slews or momentum dumps.</li>
+        <li>Missions without continuous-duty momentum-exchange devices.</li>
+      </ul>
+
+      <h4>Torque from off-center forces</h4>
+      <p>
+        A thruster producing force $\mathbf{F} = F\,\hat{\mathbf{d}}$ at position
+        $\mathbf{r}$ relative to the spacecraft center of mass generates the torque
+      </p>
+      <p>
+        \[
+          \boldsymbol{\tau} = \mathbf{r} \times \mathbf{F}.
+        \]
+      </p>
+      <p>
+        Attitude thrusters are arranged in <em>pairs</em> or <em>quads</em> so that net
+        translation is cancelled while rotation about a desired axis is produced.
+      </p>
+
+      <h4>Pulse-width modulation and minimum impulse bit</h4>
+      <p>
+        Most thrusters are either fully on or fully off. Fine control is achieved by firing
+        short pulses and varying their duration or repetition rate. The smallest achievable
+        change in angular momentum is the <strong>minimum impulse bit</strong> (MIB),
+      </p>
+      <p>
+        \[
+          \Delta H_{\min} \approx F\,\Delta t\,r,
+        \]
+      </p>
+      <p>
+        where $\Delta t$ is the minimum valve open time. If the required control torque is
+        smaller than implied by the MIB, the controller must use deadbands or dithering,
+        which limits pointing precision.
+      </p>
+
+      <h4>Dynamic and modelling considerations</h4>
+      <p>
+        Key non-idealities include:
+      </p>
+      <ul>
+        <li>Valve opening delays and rise times.</li>
+        <li>Uncertainties in thrust magnitude and direction.</li>
+        <li>Mass depletion, which slowly shifts the centre of mass and inertia matrix.</li>
+      </ul>
+      <p>
+        In simulations, thrusters are often modelled as ideal impulses plus small
+        stochastic errors to capture these effects.
+      </p>
+    </section>
+
+    <!-- 2.4.4 Magnetorquers -->
+    <section class="notes-section-card">
+      <h3>2.4.4 Magnetorquers</h3>
+      <p>
+        Magnetorquers are current-carrying coils or rods that generate a magnetic dipole
+        moment. In low Earth orbit they interact with Earth’s magnetic field to produce
+        control torque without consuming propellant, making them popular for small satellites.
+      </p>
+
+      <h4>Magnetic dipole and torque</h4>
+      <p>
+        A coil with $N$ turns, area $A$, and current $I$ has magnetic dipole moment
+      </p>
+      <p>
+        \[
+          \mathbf{m} = N\,I\,A\,\hat{\mathbf{n}},
+        \]
+      </p>
+      <p>
+        where $\hat{\mathbf{n}}$ is the coil normal. In the geomagnetic field
+        $\mathbf{B}$ the torque is
+      </p>
+      <p>
+        \[
+          \boldsymbol{\tau} = \mathbf{m} \times \mathbf{B}.
+        \]
+      </p>
+      <p>
+        Because this torque is always perpendicular to $\mathbf{B}$, there is no control
+        authority along the field direction. The system is therefore under-actuated at
+        any instant and attitude control relies on the time-varying orientation of
+        $\mathbf{B}$ along the orbit.
+      </p>
+
+      <h4>Orbit dependence and limitations</h4>
+      <p>
+        The magnitude of $\mathbf{B}$ is strongest at low altitudes and high latitudes.
+        As the orbit altitude increases, magnetic torques weaken rapidly and eventually
+        become negligible. Additional limitations include:
+      </p>
+      <ul>
+        <li>Limited torque authority compared with wheels or thrusters.</li>
+        <li>Coupling between attitude and orbit: local field direction changes along the orbit.</li>
+        <li>Saturation in dipole ($m_{\max}$) due to current and voltage limits.</li>
+      </ul>
+      <p>
+        Despite these constraints, magnetorquers are excellent for detumbling, wheel
+        desaturation, and coarse Earth-pointing for small LEO spacecraft.
+      </p>
+    </section>
+
+    <!-- 2.4.5 Actuator Limits & Models -->
+    <section class="notes-section-card">
+      <h3>2.4.5 Actuator Limits &amp; Simple Dynamic Models</h3>
+      <p>
+        Regardless of the technology, all actuators must obey physical limits. Good control
+        design includes these limits explicitly in simulation models.
+      </p>
+
+      <h4>Torque and rate saturation</h4>
+      <p>
+        Each actuator has a maximum deliverable torque $\tau_{\max}$ and often a maximum
+        rate of change. We can represent these as
+      </p>
+      <p>
+        \[
+          \|\boldsymbol{\tau}\| \le \tau_{\max}, \qquad
+          \|\dot{\boldsymbol{\tau}}\| \le \dot{\tau}_{\max}.
+        \]
+      </p>
+      <p>
+        Saturation can cause integrator wind-up and loss of stability if not handled
+        carefully in the controller.
+      </p>
+
+      <h4>Dead zones and thresholds</h4>
+      <p>
+        Many actuators exhibit regions where small commands produce no response:
+      </p>
+      <ul>
+        <li>Static friction in reaction wheels.</li>
+        <li>Minimum impulse bit for thrusters.</li>
+        <li>Finite resolution of current drivers for magnetorquers.</li>
+      </ul>
+      <p>
+        These effects are often modelled with dead-zone or quantisation blocks in
+        the control loop.
+      </p>
+
+      <h4>First-order actuator dynamics</h4>
+      <p>
+        A simple way to capture actuator lag is with a first-order model:
+      </p>
+      <p>
+        \[
+          \dot{u}(t) = -\frac{1}{\tau_a} u(t) + \frac{1}{\tau_a} u_{\text{cmd}}(t),
+        \]
+      </p>
+      <p>
+        where $u_{\text{cmd}}$ is the commanded torque or gimbal rate, $u$ is the actual
+        delivered value, and $\tau_a$ is the actuator time constant. More detailed models
+        can be added for specific hardware (e.g. flexible wheel mounts or valve dynamics).
+      </p>
+
+      <h4>Coupling with spacecraft dynamics</h4>
+      <p>
+        Actuator dynamics are not independent of the spacecraft:
+      </p>
+      <ul>
+        <li>Reaction wheels and CMGs add internal angular momentum, altering the effective
+            inertia seen in some manoeuvres.</li>
+        <li>Thruster firings change both attitude and orbit and slowly modify the mass
+            properties.</li>
+        <li>Magnetorquer effectiveness depends on the current orbit and local magnetic field.</li>
+      </ul>
+      <p>
+        High-fidelity simulations for mission design therefore model the combined,
+        coupled dynamics of the spacecraft and its actuators rather than treating
+        actuators as ideal torque sources.
+      </p>
+    </section>
+
+    <!-- Bottom navigation -->
+    <nav class="notes-prev-next">
+      <a href="environmental-torques.html">&larr; Back to 2.3 Environmental Torques</a>
+    
+    </nav>
+  </main>
+
+  <footer class="site-footer">
+   <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

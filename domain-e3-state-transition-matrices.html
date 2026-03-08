@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Domain E.3 — State Transition Matrices (STM) | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match other domain pages) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain E.2 style) -->
+  <header class="notes-hero">
+    <h1>Domain E — Special Topics &amp; Applied Space Tools</h1>
+    <p class="notes-tagline">
+      Practical orbit modeling bridges: linearization/STM foundations, uncertainty propagation, and estimation-ready sensitivity tools.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–E)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Intro card -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–E)</a>
+      </p>
+
+      <h1>Domain E.3 — State Transition Matrices, Linearized Dynamics, and Uncertainty Propagation</h1>
+      <p>
+        <strong>A local-linear framework for prediction, estimation, and sensitivity analysis in dynamical systems.</strong>
+        This section explains how we go from nonlinear motion to linear error dynamics, then use the STM to propagate
+        covariance and diagnose sensitivity/observability in SSA and orbit determination.
+      </p>
+
+      <ul>
+        <li>Linearize nonlinear dynamics about a reference trajectory.</li>
+        <li>Define and propagate the State Transition Matrix (STM).</li>
+        <li>Propagate covariance consistently and interpret uncertainty growth directions.</li>
+        <li>Extend the framework to parameter sensitivity for estimation and model validation.</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#e3-motivation">1. Motivation</a> &middot;
+        <a href="#e3-linearized">2. Linearized dynamics</a> &middot;
+        <a href="#e3-stm">3. STM definition &amp; propagation</a> &middot;
+        <a href="#e3-covariance">4. Covariance propagation</a> &middot;
+        <a href="#e3-sensitivity">5. Sensitivity analysis</a> &middot;
+        <a href="#e3-filtering">6. Estimation links</a> &middot;
+        <a href="#e3-takeaways">Key takeaways</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+      <!-- 1. Motivation -->
+      <section id="e3-motivation">
+        <h2>1. Motivation and Context</h2>
+
+        <p>
+          In real aerospace and space-domain applications, system dynamics are inherently <strong>nonlinear</strong>,
+          often high-dimensional, and influenced by uncertain environmental effects. Nonlinear equations of motion
+          describe how the state evolves, but many operational questions are really about how <strong>errors and uncertainty</strong>
+          evolve around that motion.
+        </p>
+
+        <p>Instead, engineers and analysts routinely ask:</p>
+        <ul>
+          <li>How do small errors in the initial state evolve as the system propagates?</li>
+          <li>How does uncertainty in the state or model grow, rotate, or contract over time?</li>
+          <li>Which states or parameters dominate prediction error and estimation performance?</li>
+        </ul>
+
+        <p>These questions are fundamental to:</p>
+        <ul>
+          <li><strong>Space Situational Awareness (SSA)</strong> and conjunction assessment</li>
+          <li><strong>Orbit determination</strong> and tracking</li>
+          <li><strong>Filtering and sensor fusion</strong> (e.g., Kalman filtering)</li>
+          <li><strong>Model validation</strong>, tuning, and consistency checking</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Core idea</h3>
+          <p>
+            The STM framework does not replace nonlinear propagation. It <strong>wraps</strong> nonlinear propagation with
+            a locally-linear model of error evolution, enabling consistent uncertainty prediction and estimation.
+          </p>
+        </div>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">
+            Figure placeholder: Nonlinear trajectory $\mathbf{x}_0(t)$ with nearby perturbed trajectories and evolving error ellipsoid.
+          </div>
+          <figcaption>
+            We propagate a nominal trajectory, then propagate how nearby trajectories diverge using linearized dynamics and the STM.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 2. Linearized dynamics -->
+      <section id="e3-linearized">
+        <h2>2. Linearized Dynamics</h2>
+
+        <h3>2.1 Nonlinear state model</h3>
+        <p>
+          Consider a general nonlinear dynamical system:
+        </p>
+        <p class="math-block">
+          \[
+            \dot{\mathbf{x}}(t)=\mathbf{f}(\mathbf{x}(t),t)
+          \]
+        </p>
+
+        <p>
+          where $\mathbf{x}(t)\in\mathbb{R}^n$ is the system state. In astrodynamics/SSA, $\mathbf{x}$ often contains
+          position and velocity, but may also include augmented parameters (e.g., drag scale, ballistic coefficient, SRP coefficient),
+          clock biases, or other estimation states.
+        </p>
+
+        <h3>2.2 Perturbation about a reference trajectory</h3>
+        <p>
+          Let $\mathbf{x}_0(t)$ be a nominal (reference) trajectory obtained from propagation, filtering, or catalog data.
+          Define a small deviation:
+        </p>
+        <p class="math-block">
+          \[
+            \delta\mathbf{x}(t)=\mathbf{x}(t)-\mathbf{x}_0(t)
+          \]
+        </p>
+
+        <p>
+          A first-order Taylor expansion of $\mathbf{f}(\cdot)$ about $\mathbf{x}_0(t)$ yields the <strong>variational equation</strong>:
+        </p>
+        <p class="math-block">
+          \[
+            \delta\dot{\mathbf{x}}(t)=\mathbf{A}(t)\,\delta\mathbf{x}(t)
+          \]
+        </p>
+
+        <p>where the Jacobian matrix is</p>
+        <p class="math-block">
+          \[
+            \mathbf{A}(t)=\left.\frac{\partial\mathbf{f}}{\partial\mathbf{x}}\right|_{\mathbf{x}_0(t)}.
+          \]
+        </p>
+
+        <h3>2.3 Interpretation and validity</h3>
+        <ul>
+          <li><strong>Local</strong> approximation: valid for small deviations around the nominal trajectory.</li>
+          <li><strong>Time-varying</strong> in most orbital problems (since $\mathbf{A}(t)$ changes along the orbit).</li>
+          <li><strong>Operational meaning:</strong> this linear system describes how errors evolve, not how the state evolves.</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Quick intuition</h3>
+          <p>
+            If $\mathbf{A}(t)$ couples position into velocity (and vice versa), you should expect uncertainty to rotate and stretch.
+            Orbital geometry often makes along-track components grow faster than radial or cross-track.
+          </p>
+        </div>
+      </section>
+
+      <!-- 3. STM -->
+      <section id="e3-stm">
+        <h2>3. State Transition Matrix (STM)</h2>
+
+        <h3>3.1 Definition</h3>
+        <p>
+          The State Transition Matrix (STM) $\boldsymbol{\Phi}(t,t_0)$ maps an initial perturbation at time $t_0$
+          to the perturbation at time $t$:
+        </p>
+
+        <p class="math-block">
+          \[
+            \delta\mathbf{x}(t)=\boldsymbol{\Phi}(t,t_0)\,\delta\mathbf{x}(t_0).
+          \]
+        </p>
+
+        <p>Formally, the STM is the sensitivity of the flow with respect to the initial state:</p>
+        <p class="math-block">
+          \[
+            \boldsymbol{\Phi}(t,t_0)=\frac{\partial\mathbf{x}(t)}{\partial\mathbf{x}(t_0)}.
+          \]
+        </p>
+
+        <h3>3.2 Governing equation</h3>
+        <p>
+          The STM satisfies the matrix differential equation:
+        </p>
+        <p class="math-block">
+          \[
+            \dot{\boldsymbol{\Phi}}(t,t_0)=\mathbf{A}(t)\,\boldsymbol{\Phi}(t,t_0),
+            \qquad \boldsymbol{\Phi}(t_0,t_0)=\mathbf{I}.
+          \]
+        </p>
+
+        <p>
+          In practice, you propagate the nominal state $\mathbf{x}_0(t)$ and the STM in the same numerical integration loop.
+          This keeps trajectory dynamics and error dynamics consistent.
+        </p>
+
+        <h3>3.3 Useful properties (operational view)</h3>
+        <ul>
+          <li><strong>Identity:</strong> $\boldsymbol{\Phi}(t_0,t_0)=\mathbf{I}$</li>
+          <li><strong>Composition:</strong> $\boldsymbol{\Phi}(t_2,t_0)=\boldsymbol{\Phi}(t_2,t_1)\boldsymbol{\Phi}(t_1,t_0)$</li>
+          <li><strong>Columns interpretation:</strong> column $i$ shows how a unit error in state component $i$ at $t_0$ affects all components at $t$.</li>
+        </ul>
+
+        <h3>3.4 Discrete-time STM (between measurement epochs)</h3>
+        <p>
+          Many estimation pipelines operate at discrete epochs $t_k$. Define:
+        </p>
+        <p class="math-block">
+          \[
+            \boldsymbol{\Phi}_k \equiv \boldsymbol{\Phi}(t_{k+1},t_k),
+            \qquad \delta\mathbf{x}_{k+1}=\boldsymbol{\Phi}_k\,\delta\mathbf{x}_k.
+          \]
+        </p>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">
+            Figure placeholder: Discrete epochs $t_k$ with STM blocks $\Phi_k$ transporting uncertainty between measurement updates.
+          </div>
+          <figcaption>
+            In filtering, the STM is the deterministic “transport map” that moves uncertainty from one measurement time to the next.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 4. Covariance -->
+      <section id="e3-covariance">
+        <h2>4. Covariance Propagation</h2>
+
+        <h3>4.1 Covariance as uncertainty geometry</h3>
+        <p>
+          The estimation error covariance $\mathbf{P}(t)$ encodes both uncertainty magnitude and correlation:
+        </p>
+        <p class="math-block">
+          \[
+            \mathbf{P}(t)=\mathbb{E}\left[\delta\mathbf{x}(t)\,\delta\mathbf{x}^T(t)\right].
+          \]
+        </p>
+
+        <p>
+          Geometrically, $\mathbf{P}$ defines an uncertainty ellipsoid. The STM tells you how that ellipsoid
+          is <strong>transported</strong> and <strong>distorted</strong> by the dynamics.
+        </p>
+
+        <h3>4.2 Deterministic covariance propagation (no process noise)</h3>
+        <p>
+          If the model is assumed perfect between $t_0$ and $t$:
+        </p>
+        <p class="math-block">
+          \[
+            \mathbf{P}(t)=\boldsymbol{\Phi}(t,t_0)\,\mathbf{P}(t_0)\,\boldsymbol{\Phi}^T(t,t_0).
+          \]
+        </p>
+
+        <p class="muted">
+          This is the core “shape transport” equation: it rotates and stretches uncertainty according to local dynamics.
+        </p>
+
+        <h3>4.3 With process noise (model imperfections)</h3>
+        <p>
+          Real systems experience unmodeled accelerations (drag variability, SRP mismatch, maneuvers, thrust leaks, etc.).
+          A common continuous-time model is:
+        </p>
+        <p class="math-block">
+          \[
+            \dot{\mathbf{P}}=\mathbf{A}\mathbf{P}+\mathbf{P}\mathbf{A}^T+\mathbf{Q},
+          \]
+        </p>
+
+        <p>
+          where $\mathbf{Q}$ is process noise covariance injecting uncertainty into the system to prevent overconfidence.
+          A practical discrete-time form is:
+        </p>
+        <p class="math-block">
+          \[
+            \mathbf{P}_{k+1}^{-}=\boldsymbol{\Phi}_k\,\mathbf{P}_{k}^{+}\,\boldsymbol{\Phi}_k^T+\mathbf{Q}_k.
+          \]
+        </p>
+
+        <h3>4.4 Interpretation (what you expect to see)</h3>
+        <ul>
+          <li><strong>Directional growth:</strong> uncertainty does not “just increase” — it grows along directions imposed by dynamics.</li>
+          <li><strong>Along-track dominance:</strong> common in LEO because small errors in mean motion / drag accumulate strongly in-track.</li>
+          <li><strong>Model weakness diagnosis:</strong> rapidly growing $\mathbf{P}$ often signals missing physics, not merely poor measurements.</li>
+        </ul>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">
+            Figure placeholder: Uncertainty ellipsoid stretching primarily along-track over time (radial/cross-track smaller).
+          </div>
+          <figcaption>
+            Typical LEO behavior: uncertainty growth becomes anisotropic; along-track often dominates as time since last update increases.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 5. Sensitivity -->
+      <section id="e3-sensitivity">
+        <h2>5. Sensitivity Analysis</h2>
+
+        <h3>5.1 Sensitivity to initial conditions</h3>
+        <p>
+          The STM is itself the sensitivity of the state at time $t$ to the initial state at $t_0$:
+        </p>
+        <p class="math-block">
+          \[
+            \boldsymbol{\Phi}(t,t_0)=\frac{\partial\mathbf{x}(t)}{\partial\mathbf{x}(t_0)}.
+          \]
+        </p>
+
+        <p>
+          Large entries indicate directions where small initial errors amplify rapidly. In operations, this tells you:
+          where you need better measurements, and which components will “blow up” if you go too long without updates.
+        </p>
+
+        <h3>5.2 Sensitivity to model parameters</h3>
+        <p>
+          Many orbit errors are driven by uncertain parameters (e.g., drag scale, ballistic coefficient, SRP coefficient).
+          Let $\boldsymbol{\theta}$ be a parameter vector and define:
+        </p>
+        <p class="math-block">
+          \[
+            \mathbf{S}(t)=\frac{\partial\mathbf{x}(t)}{\partial\boldsymbol{\theta}}.
+          \]
+        </p>
+
+        <p>
+          Parameter sensitivity evolves as:
+        </p>
+        <p class="math-block">
+          \[
+            \dot{\mathbf{S}}=\mathbf{A}(t)\mathbf{S}+\frac{\partial\mathbf{f}}{\partial\boldsymbol{\theta}}.
+          \]
+        </p>
+
+        <h3>5.3 Why sensitivity is an SSA “superpower”</h3>
+        <ul>
+          <li><strong>Error attribution:</strong> determine whether prediction error is dominated by initial state uncertainty or parameter mismatch.</li>
+          <li><strong>Observability intuition:</strong> if sensitivity columns are small or linearly dependent, the parameter is hard to estimate reliably.</li>
+          <li><strong>Sensor/tasking guidance:</strong> plan measurements when sensitivity to a parameter becomes strong (e.g., drag sensitivity during decay).</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Covariance impact of unestimated parameters (conceptual)</h3>
+          <p>
+            If parameters are uncertain but not explicitly estimated, their uncertainty still “leaks” into state uncertainty.
+            Sensitivity provides the mapping from parameter uncertainty to state uncertainty.
+          </p>
+        </div>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">
+            Figure placeholder: Sensitivity columns becoming large during a decay phase (improved drag/BC observability).
+          </div>
+          <figcaption>
+            Drag-related parameters become more observable when the dynamics excite them (e.g., during decay or strong solar activity).
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 6. Filtering -->
+      <section id="e3-filtering">
+        <h2>6. Relationship to Estimation and Filtering</h2>
+
+        <p>STM-consistent propagation underpins:</p>
+        <ul>
+          <li><strong>Extended Kalman Filters (EKF):</strong> time update uses $\boldsymbol{\Phi}$ and $\mathbf{Q}$</li>
+          <li><strong>Batch least-squares OD:</strong> uses STM/sensitivity to build normal equations and compute covariance</li>
+          <li><strong>Smoothing:</strong> relates errors across multiple epochs using chained STMs</li>
+          <li><strong>Consistency checks:</strong> residual growth should align with predicted covariance if the model is valid</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Consistency principle</h3>
+          <p>
+            If you propagate the state with a nonlinear model but propagate uncertainty with a mismatched or incorrect
+            linearization, the filter becomes internally inconsistent and confidence bounds lose physical meaning.
+          </p>
+        </div>
+      </section>
+
+      <!-- Takeaways -->
+      <section id="e3-takeaways">
+        <h2>Key Takeaways</h2>
+
+        <ul>
+          <li><strong>Linearized dynamics</strong> describe how small errors evolve locally around a nominal trajectory.</li>
+          <li>The <strong>STM</strong> maps perturbations forward in time: $\delta\mathbf{x}(t)=\boldsymbol{\Phi}(t,t_0)\delta\mathbf{x}(t_0)$.</li>
+          <li><strong>Covariance propagation</strong> uses the STM to transport and distort uncertainty ellipsoids (plus process noise when needed).</li>
+          <li><strong>Sensitivity analysis</strong> identifies dominant error sources and whether parameters are observable/estimable.</li>
+          <li>These tools <strong>augment</strong> nonlinear propagation with uncertainty structure and estimation readiness.</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Conceptual summary</h3>
+          <p>
+            <strong>The STM does not predict the trajectory — it predicts how errors behave around it.</strong>
+            That distinction is the foundation of uncertainty-aware orbit prediction and modern OD/SSA pipelines.
+          </p>
+        </div>
+      </section>
+    </article>
+
+    <!-- Bottom navigation card (match your other domain pages) -->
+    <section class="next-domain-card">
+      <h2>Next in Domain E</h2>
+      <p>
+        <a href="domain-e2_sgp4_tle_propagation.html">
+          &larr; Previous: Domain E.2 — SGP4 &amp; TLE-Based Propagation
+        </a>
+      </p>
+      <p>
+        <a href="domain-e4-numerical-integration.html">
+          Next: Domain E.4 — Numerical Integration Methods &rarr;
+        </a>
+      </p>
+      </p>
+        <a href="notes.html#domain-e-overview">&larr; Back to Domain E overview</a>
+      </p>
+   
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>
+

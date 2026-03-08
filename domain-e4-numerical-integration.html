@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Domain E.4 — Numerical Integration Methods | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match other domain pages) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain E style) -->
+  <header class="notes-hero">
+    <h1>Domain E — Special Topics &amp; Applied Space Tools</h1>
+    <p class="notes-tagline">
+      From linearization and uncertainty transport to practical solvers: how we propagate orbits and attitudes reliably in real systems.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–E)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Intro card -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–E)</a>
+      </p>
+
+      <h1>Domain E.4 — Numerical Integration Methods</h1>
+      <p>
+        <strong>Fixed-step vs adaptive solvers, error control, and stability — with orbit and attitude propagation use-cases.</strong>
+        Numerical integration is the computational “engine room” of spacecraft dynamics. Even with perfect physics,
+        an integrator can introduce drift, instability, or false confidence if the method and step-size strategy are mismatched
+        to the problem.
+      </p>
+
+      <ul>
+        <li>Understand what integration methods approximate and where numerical error comes from.</li>
+        <li>Compare fixed-step and adaptive (variable-step) approaches for different mission contexts.</li>
+        <li>Learn practical error-control logic (tolerances, embedded estimates, step-size updates).</li>
+        <li>Connect stability to real orbital/attitude problems (stiffness, long-horizon propagation, maneuvers).</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#e4-motivation">1. Motivation</a> &middot;
+        <a href="#e4-taylor">2. Taylor view of integration</a> &middot;
+        <a href="#e4-fixed-vs-adaptive">3. Fixed-step vs adaptive</a> &middot;
+        <a href="#e4-error-control">4. Error control</a> &middot;
+        <a href="#e4-stability">5. Stability &amp; stiffness</a> &middot;
+        <a href="#e4-orbit">6. Orbit propagation use-cases</a> &middot;
+        <a href="#e4-attitude">7. Attitude propagation use-cases</a> &middot;
+        <a href="#e4-implementation">8. Implementation checklist</a> &middot;
+        <a href="#e4-takeaways">Key takeaways</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+      <!-- 1. Motivation -->
+      <section id="e4-motivation">
+        <h2>1. Motivation: Why Numerical Integration Deserves Its Own Domain</h2>
+
+        <p>
+          Most aerospace dynamics can be expressed as an initial-value problem:
+        </p>
+        <p class="math-block">
+          \[
+            \dot{\mathbf{x}}(t) = \mathbf{f}(\mathbf{x}(t), t), \qquad \mathbf{x}(t_0)=\mathbf{x}_0
+          \]
+        </p>
+
+        <p>
+          In orbit and attitude analysis, the “true” solution is rarely available in closed form once we add realistic effects:
+          non-spherical gravity, atmospheric drag variability, solar radiation pressure, third-body perturbations,
+          environmental torques, actuator dynamics, and guidance/control logic.
+        </p>
+
+        <p>
+          A numerical integrator replaces the continuous flow with a discrete update map:
+        </p>
+        <p class="math-block">
+          \[
+            \mathbf{x}_{k+1} \approx \mathcal{G}_h(\mathbf{x}_k, t_k)
+          \]
+        </p>
+
+        <p>
+          This is not just “computing the solution” — it defines how errors enter and evolve. Over long horizons
+          (catalog propagation, covariance growth, multi-day attitude prediction), the integrator’s stability and error
+          behavior can dominate outcomes.
+        </p>
+
+        <div class="callout">
+          <h3>Operational framing</h3>
+          <p>
+            In SSA and OD pipelines, it is common to propagate a nominal trajectory and a linearized model (STM/covariance).
+            If the integrator produces hidden drift or instability, the predicted uncertainty can become meaningless.
+            A good solver strategy is part of model credibility.
+          </p>
+        </div>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">
+            Figure placeholder: Discrete stepping along a continuous trajectory — small local errors accumulating into long-horizon drift.
+          </div>
+          <figcaption>
+            Numerical integration replaces continuous-time motion with discrete steps. The method and step-size strategy determine
+            how local errors accumulate and whether long-horizon behavior remains physically credible.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 2. Taylor series view -->
+      <section id="e4-taylor">
+        <h2>2. A Taylor-Series View: What Integrators Approximate</h2>
+
+        <p>
+          Most integration schemes can be understood as structured approximations to a Taylor expansion:
+        </p>
+        <p class="math-block">
+          \[
+            \mathbf{x}(t+h) = \mathbf{x}(t) + \dot{\mathbf{x}}(t)h + \frac{1}{2}\ddot{\mathbf{x}}(t)h^2 + \cdots
+          \]
+        </p>
+
+        <p>
+          Because higher derivatives are expensive or unavailable, integrators estimate the needed curvature information
+          using function evaluations of $\mathbf{f}(\mathbf{x},t)$ at one or more points. Truncating the series introduces
+          truncation error; finite-precision arithmetic introduces round-off error. The art is to balance both while preserving stability.
+        </p>
+
+        <h3>2.1 Local vs global error (concept)</h3>
+        <ul>
+          <li>
+            <strong>Local truncation error (LTE):</strong> error introduced by a single step assuming the input state is exact.
+            For an order-$p$ method, LTE typically scales like $O(h^{p+1})$.
+          </li>
+          <li>
+            <strong>Global error:</strong> accumulated effect over many steps (often scaling like $O(h^p)$ in smooth cases).
+          </li>
+        </ul>
+
+        <div class="callout">
+          <h3>Why “higher order” is not automatically better</h3>
+          <p>
+            Increasing order often reduces truncation error for a given step size, but may increase per-step cost, sensitivity
+            to stiffness, or implementation complexity (especially for multistep methods and event-driven dynamics).
+            Stability and robustness frequently matter more than theoretical order.
+          </p>
+        </div>
+      </section>
+
+      <!-- 3. Fixed-step vs adaptive -->
+      <section id="e4-fixed-vs-adaptive">
+        <h2>3. Fixed-Step vs Adaptive Solvers</h2>
+
+        <h3>3.1 Fixed-step integration</h3>
+        <p>
+          A fixed-step solver uses a constant step size $h$:
+        </p>
+        <p class="math-block">
+          \[
+            t_{k+1} = t_k + h,\qquad \mathbf{x}_{k+1} = \mathbf{x}_k + h\,\Phi(\mathbf{x}_k,t_k)
+          \]
+        </p>
+
+        <p>
+          Classic examples include Euler methods, fixed-step Runge–Kutta (e.g., RK4), and fixed-step multistep predictor–corrector schemes.
+        </p>
+
+        <h4>Strengths</h4>
+        <ul>
+          <li><strong>Deterministic compute load:</strong> predictable runtime and timing (critical for real-time GNC).</li>
+          <li><strong>Reproducible results:</strong> easier verification, regression testing, and certification workflows.</li>
+          <li><strong>Simpler integration with events:</strong> discrete logic (mode switching, actuator saturation) is often easier to manage.</li>
+        </ul>
+
+        <h4>Risks</h4>
+        <ul>
+          <li><strong>Overkill or under-resolution:</strong> one $h$ rarely matches all dynamical regimes.</li>
+          <li><strong>Long-horizon drift:</strong> truncation error accumulates steadily if $h$ is not tuned.</li>
+          <li><strong>Stability-limited steps:</strong> some problems force $h$ small for stability, not accuracy.</li>
+        </ul>
+
+        <h3>3.2 Adaptive (variable-step) integration</h3>
+        <p>
+          Adaptive solvers adjust the step size to keep estimated local error within user-specified tolerances.
+          The solver selects $h$ based on the local behavior of the dynamics: smaller steps where the solution changes rapidly,
+          larger steps where the state evolves smoothly.
+        </p>
+
+        <h4>Typical adaptive loop (concept)</h4>
+        <ol>
+          <li>Propose a step size $h$.</li>
+          <li>Compute an update and an internal error estimate.</li>
+          <li>If the error is acceptable, accept the step and possibly increase $h$.</li>
+          <li>If not, reject the step and decrease $h$.</li>
+        </ol>
+
+        <h4>Strengths</h4>
+        <ul>
+          <li><strong>Efficiency across regimes:</strong> coasting vs perigee vs maneuver phases handled naturally.</li>
+          <li><strong>User specifies accuracy goal:</strong> tolerances define “how accurate,” solver decides “how small $h$.”</li>
+        </ul>
+
+        <h4>Trade-offs</h4>
+        <ul>
+          <li><strong>Nonuniform runtime:</strong> computational cost depends on events and system behavior.</li>
+          <li><strong>Complex interactions with discontinuities:</strong> impulses, switching, and saturation can trigger repeated step rejections.</li>
+          <li><strong>Harder determinism:</strong> floating-point and tolerance settings can change accept/reject patterns.</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Rule-of-thumb selection</h3>
+          <p>
+            <strong>Real-time flight code:</strong> fixed-step (predictable).<br/>
+            <strong>Offline high-fidelity analysis / OD batch runs:</strong> adaptive (error-controlled).<br/>
+            <strong>Long-term Hamiltonian-like orbital studies:</strong> consider structure-preserving methods (when relevant).
+          </p>
+        </div>
+      </section>
+
+      <!-- 4. Error control -->
+      <section id="e4-error-control">
+        <h2>4. Error Control, Estimation, and the “Total Error” Trade</h2>
+
+        <h3>4.1 Two major numerical error sources</h3>
+        <ul>
+          <li>
+            <strong>Truncation error:</strong> from approximating a continuous-time evolution using a finite-order method.
+            Generally decreases as $h$ decreases.
+          </li>
+          <li>
+            <strong>Round-off error:</strong> from finite precision arithmetic (and subtractive cancellation).
+            Can increase as $h$ decreases because more steps (and operations) are performed.
+          </li>
+        </ul>
+
+        <h3>4.2 Total numerical error and diminishing returns</h3>
+        <p>
+          In many computations, decreasing $h$ reduces truncation error but increases the number of operations and the chance
+          of accumulating round-off effects. This creates a practical “sweet spot” where total error is minimized.
+        </p>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">
+            Figure placeholder: Total error vs step size showing truncation error decreasing with smaller $h$ and round-off increasing.
+          </div>
+          <figcaption>
+            Conceptual trade: smaller steps reduce truncation error but can amplify round-off accumulation and cancellation.
+            Adaptive solvers navigate this trade implicitly; fixed-step solvers require careful tuning.
+          </figcaption>
+        </figure>
+
+        <h3>4.3 Embedded error estimates (adaptive solvers)</h3>
+        <p>
+          A common strategy is to compute two approximations of different order over the same step:
+          a higher-order estimate $\mathbf{x}^{(p)}_{k+1}$ and a lower-order estimate $\mathbf{x}^{(p-1)}_{k+1}$.
+          Their difference acts as a proxy for local error:
+        </p>
+        <p class="math-block">
+          \[
+            \mathbf{e}_{k+1} \approx \mathbf{x}^{(p)}_{k+1} - \mathbf{x}^{(p-1)}_{k+1}
+          \]
+        </p>
+
+        <h3>4.4 Practical tolerance model: absolute + relative</h3>
+        <p>
+          In engineering solvers, error is often scaled componentwise using absolute and relative tolerances:
+        </p>
+        <p class="math-block">
+          \[
+            \text{scale}_i = \text{atol}_i + \text{rtol}\,\max(|x_{k,i}|, |x_{k+1,i}|)
+          \]
+        </p>
+        <p class="math-block">
+          \[
+            \varepsilon = \sqrt{\frac{1}{n}\sum_{i=1}^n \left(\frac{e_i}{\text{scale}_i}\right)^2}
+          \]
+        </p>
+
+        <p>
+          A step is accepted if $\varepsilon \le 1$. This prevents tiny state components from being ignored (absolute tolerance)
+          while avoiding over-penalizing large state magnitudes (relative tolerance).
+        </p>
+
+        <h3>4.5 Step-size update logic (typical)</h3>
+        <p>
+          If a method has local error scaling $\|\mathbf{e}\| \sim h^{p+1}$, a standard update form is:
+        </p>
+        <p class="math-block">
+          \[
+            h_{\text{new}} = h \cdot \eta \left(\frac{1}{\varepsilon}\right)^{\frac{1}{p+1}}
+          \]
+        </p>
+        <p>
+          where $\eta \in (0,1)$ is a safety factor. Implementations typically clamp the growth/shrink ratio to avoid
+          aggressive oscillations in step size.
+        </p>
+
+        <div class="callout">
+          <h3>What “good error control” looks like</h3>
+          <p>
+            A robust adaptive solver does not merely “keep error small.” It avoids step thrashing,
+            behaves predictably near discontinuities, and respects problem-specific constraints
+            (e.g., quaternion normalization, event timing, measurement epochs).
+          </p>
+        </div>
+
+        <h3>4.6 Beyond numerical error: model, data, and human errors</h3>
+        <p>
+          Even a perfect integrator cannot fix a wrong model. In practice, total analysis error often includes:
+          <strong>model/formulation mismatch</strong> (missing physics), <strong>data uncertainty</strong> (noisy measurements),
+          and <strong>blunders</strong> (setup mistakes, unit errors, wrong frames). Numerical methods should be tested with
+          sanity checks and independent validation whenever possible.
+        </p>
+      </section>
+
+      <!-- 5. Stability -->
+      <section id="e4-stability">
+        <h2>5. Stability, Stiffness, and Why Some Methods “Explode”</h2>
+
+        <h3>5.1 Stability idea (error amplification)</h3>
+        <p>
+          Numerical stability describes whether small perturbations (from truncation/round-off/initial uncertainty)
+          remain bounded under repeated stepping. A method may be accurate locally yet unstable globally if the step size
+          violates its stability constraints.
+        </p>
+
+        <h3>5.2 The test-equation lens</h3>
+        <p>
+          A standard way to reason about stability is the linear test equation:
+        </p>
+        <p class="math-block">
+          \[
+            \dot{y} = \lambda y
+          \]
+        </p>
+        <p>
+          A numerical method produces an update $y_{k+1}=R(z)\,y_k$ where $z=\lambda h$ and $R(z)$ is the method’s
+          amplification factor. Stability requires $|R(z)|\le 1$ over the relevant $z$ region.
+        </p>
+
+        <h3>5.3 Practical meaning for space dynamics</h3>
+        <ul>
+          <li><strong>Long-horizon propagation:</strong> mild instability can become catastrophic over thousands of steps.</li>
+          <li><strong>Multistep methods:</strong> can exhibit parasitic modes (spurious oscillations) if started poorly or pushed beyond stable regions.</li>
+          <li><strong>Attitude dynamics:</strong> fast angular rates + coupling can impose a stability-driven maximum step size.</li>
+        </ul>
+
+        <h3>5.4 Stiffness (when stability dominates accuracy)</h3>
+        <p>
+          A system is often called <em>stiff</em> when stable integration demands a very small $h$ even though the state
+          varies slowly on the timescale of interest. Stiffness is common when:
+        </p>
+        <ul>
+          <li>there are widely separated time constants (fast and slow dynamics together),</li>
+          <li>strong damping or tight control loops coexist with slow orbital motion,</li>
+          <li>discrete events introduce sharp transitions.</li>
+        </ul>
+
+        <div class="callout">
+          <h3>GNC relevance</h3>
+          <p>
+            In controlled attitude systems, actuator dynamics or high-gain control laws can introduce stiffness.
+            In such cases, explicit methods may require tiny steps; implicit or semi-implicit approaches can improve robustness
+            (at the cost of solving algebraic equations each step).
+          </p>
+        </div>
+      </section>
+
+      <!-- 6. Orbit use-cases -->
+      <section id="e4-orbit">
+        <h2>6. Orbit Propagation Use-Cases (What Solver Strategy Fits Which Task?)</h2>
+
+        <h3>6.1 Short-arc, high-accuracy propagation</h3>
+        <p>
+          Typical tasks: orbit determination, conjunction assessment over hours to days, maneuver reconstruction, reentry prediction.
+        </p>
+        <ul>
+          <li><strong>Priority:</strong> controlled local error + reliability near dynamic changes (e.g., perigee, drag variations).</li>
+          <li><strong>Common choice:</strong> adaptive methods with error control, with careful handling of events and measurement epochs.</li>
+          <li><strong>Practice:</strong> align step boundaries with measurement times so the filter/OD update uses clean propagation segments.</li>
+        </ul>
+
+        <h3>6.2 Long-horizon catalog propagation</h3>
+        <p>
+          Typical tasks: SSA catalog maintenance, revisit analysis, scenario simulation over weeks to months.
+        </p>
+        <ul>
+          <li><strong>Priority:</strong> stability and bounded drift (not just small LTE).</li>
+          <li><strong>Common choice:</strong> stable fixed-step integrators tuned to the dominant dynamics, plus periodic correction/updates.</li>
+          <li><strong>Reality check:</strong> modeling error (drag/SRP) often dominates beyond a certain horizon — over-solving numerically won’t help.</li>
+        </ul>
+
+        <h3>6.3 Perigee passages, drag, and “hard spots”</h3>
+        <p>
+          Orbits with strong perturbation gradients (e.g., LEO with drag, eccentric orbits near perigee) tend to benefit from:
+        </p>
+        <ul>
+          <li>adaptive step reduction near “high-curvature” phases,</li>
+          <li>event-aware stepping near atmosphere model switches or shadow boundaries,</li>
+          <li>consistent integration of augmented states (e.g., drag scale or ballistic coefficient) if estimated.</li>
+        </ul>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">
+            Figure placeholder: Step size shrinking near perigee / dense atmosphere, growing during apogee/coast phases.
+          </div>
+          <figcaption>
+            Adaptive solvers naturally allocate computation where dynamics are “hard,” and relax during quiet phases —
+            but must be managed carefully around discontinuities and measurement epochs.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 7. Attitude use-cases -->
+      <section id="e4-attitude">
+        <h2>7. Attitude Propagation Use-Cases (Kinematics + Dynamics Constraints)</h2>
+
+        <h3>7.1 Why attitude integration is numerically delicate</h3>
+        <p>
+          Attitude propagation couples:
+        </p>
+        <ul>
+          <li><strong>Kinematics:</strong> how attitude parameters evolve (e.g., quaternions, DCM, MRPs),</li>
+          <li><strong>Dynamics:</strong> how angular velocity evolves under torques and inertia coupling.</li>
+        </ul>
+
+        <p>
+          Kinematics often contain constraints (e.g., unit quaternion norm). A solver can be locally accurate yet drift away from
+          these constraints over time unless normalization or constraint-preserving updates are used.
+        </p>
+
+        <h3>7.2 Fixed-step in real-time attitude propagation</h3>
+        <ul>
+          <li><strong>Why common:</strong> deterministic timing for onboard control loops (e.g., 50–200 Hz).</li>
+          <li><strong>Key requirement:</strong> manage quaternion norm drift (renormalize or use structure-aware updates).</li>
+          <li><strong>Step choice:</strong> often set by control bandwidth or sensor update rate, not purely by numerical accuracy.</li>
+        </ul>
+
+        <h3>7.3 Adaptive solvers for offline attitude analysis</h3>
+        <ul>
+          <li><strong>Why useful:</strong> long simulations with maneuvers, varying torques, or flexible appendage coupling.</li>
+          <li><strong>What to watch:</strong> step rejection loops near saturation or switching, and consistent handling of torque discontinuities.</li>
+        </ul>
+
+        <h3>7.4 Constraint handling (practical)</h3>
+        <p>
+          For quaternions $\mathbf{q}$, a common practical safeguard is to renormalize:
+        </p>
+        <p class="math-block">
+          \[
+            \mathbf{q} \leftarrow \frac{\mathbf{q}}{\|\mathbf{q}\|}
+          \]
+        </p>
+        <p>
+          after each accepted step (or at a controlled cadence). This does not replace good integration practice,
+          but it prevents gradual accumulation from breaking a fundamental representation constraint.
+        </p>
+
+        <div class="callout">
+          <h3>Engineering instinct</h3>
+          <p>
+            If you see attitude energy or angular momentum drifting in a torque-free case,
+            suspect the integrator/step size before you suspect the physics.
+            Always validate against “known invariants” cases.
+          </p>
+        </div>
+      </section>
+
+      <!-- 8. Implementation checklist -->
+      <section id="e4-implementation">
+        <h2>8. Implementation Checklist (How to Make Your Integrator Behave)</h2>
+
+        <h3>8.1 Choose a solver strategy based on mission context</h3>
+        <ul>
+          <li><strong>Flight / real-time sim:</strong> fixed-step, predictable work per step, robust event handling.</li>
+          <li><strong>Offline OD / analysis:</strong> adaptive with tolerances, step control, and verification checks.</li>
+          <li><strong>Long-horizon studies:</strong> prioritize stability and physical credibility; don’t over-optimize local LTE.</li>
+        </ul>
+
+        <h3>8.2 Use sanity checks (cheap but powerful)</h3>
+        <ul>
+          <li><strong>Two-step test:</strong> run with $h$ and $h/2$; check convergence behavior and scaling.</li>
+          <li><strong>Known solutions:</strong> compare to simple cases (two-body orbit, torque-free rigid body) where invariants exist.</li>
+          <li><strong>Conservation tests:</strong> energy/angular momentum (when applicable) should behave consistently.</li>
+        </ul>
+
+        <h3>8.3 Avoid common numerical pitfalls</h3>
+        <ul>
+          <li><strong>Subtractive cancellation:</strong> avoid subtracting nearly equal numbers in sensitive computations.</li>
+          <li><strong>Mixed units/frames:</strong> ensure consistent units and coordinate frames across $\mathbf{f}(\cdot)$ and outputs.</li>
+          <li><strong>Event discontinuities:</strong> align step endpoints with known event times (maneuvers, measurement epochs, eclipses).</li>
+          <li><strong>Coupled propagation:</strong> if you propagate STM/covariance, keep it solver-consistent with the nominal state propagation.</li>
+        </ul>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">
+            Figure placeholder: Integrator loop with (1) propose step, (2) compute update + error estimate, (3) accept/reject, (4) enforce constraints, (5) log outputs.
+          </div>
+          <figcaption>
+            A robust propagation loop is more than “compute next state.” It includes error checks, event logic, constraint handling,
+            and consistent logging for validation and debugging.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- Takeaways -->
+      <section id="e4-takeaways">
+        <h2>Key Takeaways</h2>
+
+        <ul>
+          <li>
+            Numerical integration replaces continuous dynamics with a discrete update map — the method and step strategy shape error growth.
+          </li>
+          <li>
+            <strong>Fixed-step:</strong> predictable runtime and reproducibility; requires careful step-size tuning across regimes.
+          </li>
+          <li>
+            <strong>Adaptive:</strong> tolerance-driven accuracy and efficiency; can be sensitive to discontinuities and has variable compute cost.
+          </li>
+          <li>
+            Truncation error decreases with smaller $h$, but round-off and cancellation can increase — there is often a “diminishing returns” point.
+          </li>
+          <li>
+            Stability is as important as accuracy, especially for long-horizon propagation and stiff/controlled systems.
+          </li>
+          <li>
+            Orbit and attitude propagation have distinct numerical hazards (perigee/drag “hard spots” vs constraint drift in attitude states).
+          </li>
+        </ul>
+
+        <div class="callout">
+          <h3>Conceptual summary</h3>
+          <p>
+            <strong>Good propagation is not just “small step size.”</strong>
+            It is the disciplined combination of (i) an appropriate method, (ii) a step-size policy aligned to the problem,
+            (iii) stability awareness, and (iv) validation checks tied to physics and invariants.
+          </p>
+        </div>
+      </section>
+    </article>
+
+    <!-- Bottom navigation card -->
+    <section class="next-domain-card">
+      <h2>Continue Domain E</h2>
+       <p>
+        <a href="domain-e3-state-transition-matrices.html">
+          &larr; Previous: Domain E.3 — State Transition Matrices (STM)
+        </a>
+      </p>
+      <p>
+        <a href="domain-e5_stk_mission_analysis.html">Next: Domain E.5 STK for Mission Analysis &rarr;
+        </a>
+      </p>
+      <p>
+        <a href="notes.html#domain-e-overview">&larr; Back to Domain E overview</a>
+      </p>
+      
+    </section>
+  </main>
+
+  <footer class="site-footer">
+  <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>
+

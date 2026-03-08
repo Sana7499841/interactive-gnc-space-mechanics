@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COE ↔ State Vector Converter | Interactive GNC & Space Mechanics</title>
+  <link rel="stylesheet" href="../styles.css" />
+
+  <!-- MathJax -->
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <!-- Plotly for 3D orbit plot -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f6f7f8;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d9dee7;
+      --navy:#081a46;
+      --hero1:#14255f;
+      --hero2:#1d6d87;
+      --teal:#0f8b8d;
+      --blue:#2563eb;
+      --soft:#eef3f8;
+      --pill:#dce8f8;
+      --accent:#0f8b8d;
+      --orange:#f97316;
+      --green:#0f8b8d;
+      --shadow:0 8px 24px rgba(15, 23, 42, 0.06);
+      --radius:1.75rem;
+    }
+
+    * { box-sizing:border-box; }
+
+    body{
+      margin:0;
+      font-family: Georgia, "Times New Roman", serif;
+      color:var(--ink);
+      background:var(--page-bg);
+      line-height:1.65;
+    }
+
+    .page-shell{
+      width:min(1280px, calc(100% - 2rem));
+      margin:1.5rem auto 4rem;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg, var(--hero1), #24408c 45%, var(--hero2));
+      color:#fff;
+      border-radius:2rem;
+      padding:2.6rem 2.4rem 2.5rem;
+      box-shadow:var(--shadow);
+      margin-bottom:1.75rem;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#d9e7f7;
+      color:#1f2937;
+      font-weight:700;
+      padding:0.45rem 1rem;
+      border-radius:999px;
+      font-size:1.15rem;
+      line-height:1;
+      margin-bottom:1rem;
+    }
+
+    .tool-hero h1{
+      margin:0 0 0.75rem;
+      font-size:clamp(2rem, 5vw, 3.2rem);
+      line-height:1.08;
+      color:#fff;
+    }
+
+    .tool-hero p{
+      margin:0;
+      max-width:1000px;
+      font-size:1.05rem;
+      color:rgba(255,255,255,0.96);
+    }
+
+    .grid-two{
+      display:grid;
+      grid-template-columns:1.1fr 0.9fr;
+      gap:1.5rem;
+      margin-bottom:1.5rem;
+    }
+
+    .grid-two-equal{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:1.5rem;
+      margin-bottom:1.5rem;
+    }
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:1.4rem 1.5rem 1.5rem;
+    }
+
+    .card h2{
+      margin:0 0 1rem;
+      font-size:clamp(1.45rem, 3vw, 2rem);
+      line-height:1.15;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:0 0 0.75rem;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p:last-child{ margin-bottom:0; }
+
+    .card ul{
+      margin:0.6rem 0 0 1.35rem;
+      padding:0;
+    }
+
+    .card li{ margin:0.35rem 0; }
+
+    .calc-tabs{
+      display:flex;
+      gap:0.85rem;
+      flex-wrap:wrap;
+      margin-bottom:1rem;
+    }
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:0.72rem 1.2rem;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#d7dde7;
+      color:#1f2937;
+      transition:0.2s ease;
+    }
+
+    .tab-btn.active{
+      background:linear-gradient(135deg, #13857f, #1f6fe5);
+      color:#fff;
+    }
+
+    .mode-panel{ display:none; }
+    .mode-panel.active{ display:block; }
+
+    .form-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:1rem 1rem;
+      margin-top:0.75rem;
+    }
+
+    .field{
+      display:flex;
+      flex-direction:column;
+      gap:0.35rem;
+    }
+
+    .field label{
+      font-weight:700;
+      color:#0f172a;
+      font-size:1rem;
+      line-height:1.2;
+    }
+
+    .field small{
+      color:var(--muted);
+      font-size:0.88rem;
+      line-height:1.25;
+    }
+
+    .field input,
+    .field select{
+      width:100%;
+      border:1px solid #cfd7e4;
+      border-radius:0.9rem;
+      padding:0.85rem 0.95rem;
+      font-size:1rem;
+      font-family:inherit;
+      background:#fff;
+      color:#111827;
+      min-height:54px;
+    }
+
+    .full{ grid-column:1 / -1; }
+
+    .action-row{
+      display:flex;
+      gap:0.9rem;
+      margin-top:1.2rem;
+      flex-wrap:wrap;
+    }
+
+    .action-btn{
+      border:none;
+      border-radius:1rem;
+      padding:0.95rem 1.25rem;
+      font-size:1.05rem;
+      font-weight:700;
+      cursor:pointer;
+      min-width:220px;
+      transition:0.2s ease;
+    }
+
+    .primary-btn{
+      color:#fff;
+      background:linear-gradient(135deg, #13857f, #2563eb);
+    }
+
+    .secondary-btn{
+      color:#1f2937;
+      background:#e7edf5;
+    }
+
+    .action-btn:hover{
+      transform:translateY(-1px);
+      opacity:0.98;
+    }
+
+    .result-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:1rem;
+      margin-top:1rem;
+    }
+
+    .result-box{
+      background:#f8fbff;
+      border:1px solid #d9e4ef;
+      border-radius:1.15rem;
+      padding:1rem 1rem 0.9rem;
+      min-height:112px;
+    }
+
+    .result-box h4{
+      margin:0 0 0.45rem;
+      font-size:1rem;
+      color:#374151;
+    }
+
+    .result-box .value{
+      font-size:1.45rem;
+      font-weight:700;
+      color:#111827;
+      line-height:1.2;
+    }
+
+    .result-box .sub{
+      color:#475569;
+      font-size:0.92rem;
+      margin-top:0.35rem;
+    }
+
+    .formula-block{
+      background:#07163e;
+      color:#fff;
+      border-radius:1.25rem;
+      padding:1.2rem 1rem;
+      text-align:center;
+      overflow:auto;
+      margin:0.8rem 0 1rem;
+      box-shadow: inset -10px 0 0 rgba(0,0,0,0.18);
+    }
+
+    .callout{
+      border-left:5px solid var(--green);
+      background:#f7fbff;
+      border-radius:1rem;
+      padding:1rem 1rem 1rem 1.15rem;
+      margin-top:1rem;
+    }
+
+    .callout.orange{
+      border-left-color:var(--orange);
+      background:#fff9f2;
+    }
+
+    .callout h3{
+      margin:0 0 0.45rem;
+    }
+
+    .plot-wrap{
+      width:100%;
+      min-height:420px;
+      border:1px solid #dbe4ef;
+      border-radius:1.25rem;
+      overflow:hidden;
+      background:#fff;
+    }
+
+    .matrix-table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:0.75rem;
+      font-size:0.98rem;
+    }
+
+    .matrix-table th,
+    .matrix-table td{
+      border:1px solid #d7e0eb;
+      padding:0.7rem;
+      text-align:center;
+      vertical-align:middle;
+    }
+
+    .matrix-table th{
+      background:#f3f7fb;
+      font-weight:700;
+    }
+
+    .mini-note{
+      color:#475569;
+      font-size:0.95rem;
+    }
+
+    .section-space{ margin-top:1rem; }
+
+    .kpi-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:1rem;
+      margin-top:0.75rem;
+    }
+
+    .validation-box{
+      background:#07163e;
+      color:#fff;
+      border-radius:1.25rem;
+      padding:1.3rem 1.1rem;
+      text-align:center;
+      margin:1rem 0;
+      box-shadow: inset -10px 0 0 rgba(0,0,0,0.18);
+    }
+
+    .mono{
+      font-family:"SFMono-Regular", Consolas, Monaco, monospace;
+      font-size:0.96rem;
+      word-break:break-word;
+    }
+
+    .footer-note{
+      margin-top:1rem;
+      color:#475569;
+      font-size:0.95rem;
+    }
+
+    @media (max-width: 980px){
+      .grid-two,
+      .grid-two-equal{
+        grid-template-columns:1fr;
+      }
+
+      .form-grid,
+      .result-grid,
+      .kpi-grid{
+        grid-template-columns:1fr;
+      }
+
+      .page-shell{
+        width:min(100% - 1rem, 1280px);
+      }
+
+      .tool-hero{
+        padding:2rem 1.25rem;
+      }
+
+      .card{
+        padding:1.15rem 1.1rem 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-shell">
+
+    <header class="tool-hero">
+      <div class="tool-pill">Tool 2 · Orbital Mechanics</div>
+      <h1>COE ↔ State Vector Converter</h1>
+      <p>
+        Convert between <strong>Classical Orbital Elements (COEs)</strong> and
+        <strong>Cartesian position–velocity state vectors</strong> \( (\mathbf{r}, \mathbf{v}) \).
+        This tool links orbital geometry to the dynamical state representation used in astrodynamics
+        modeling, trajectory analysis, orbit propagation, and spacecraft simulation.
+      </p>
+    </header>
+
+    <section class="grid-two">
+      <article class="card">
+        <h2>What this tool computes</h2>
+        <p>
+          A Keplerian orbit can be described in two complementary ways. One is the
+          <strong>geometric orbital-element form</strong>:
+          \( a, e, i, \Omega, \omega, \nu \).
+          The other is the <strong>state-vector form</strong>:
+          position \( \mathbf{r} \) and velocity \( \mathbf{v} \) in an inertial frame.
+        </p>
+        <p>This converter provides both directions:</p>
+        <ul>
+          <li><strong>COE → State Vector:</strong> converts orbital elements into ECI position and velocity</li>
+          <li><strong>State Vector → COE:</strong> reconstructs semi-major axis, eccentricity, orientation, and true anomaly</li>
+          <li>Displays the <strong>perifocal frame</strong> and <strong>ECI frame</strong> relationship</li>
+          <li>Shows the <strong>full transformation matrix</strong></li>
+          <li>Plots the orbit in <strong>3D space</strong> around the selected central body</li>
+        </ul>
+      </article>
+
+      <article class="card">
+        <h2>Interactive converter</h2>
+
+        <div class="calc-tabs">
+          <button class="tab-btn active" id="tabCoeToState" onclick="setMode('coe2state')">COE → State</button>
+          <button class="tab-btn" id="tabStateToCoe" onclick="setMode('state2coe')">State → COE</button>
+        </div>
+
+        <!-- COE TO STATE -->
+        <div class="mode-panel active" id="mode-coe2state">
+          <div class="form-grid">
+            <div class="field full">
+              <label for="centralBody1">Central Body</label>
+              <select id="centralBody1" onchange="applyCentralBody('centralBody1','mu1','radius1')">
+                <option value="Earth" selected>Earth</option>
+                <option value="Mars">Mars</option>
+                <option value="Moon">Moon</option>
+                <option value="Jupiter">Jupiter</option>
+                <option value="Custom">Custom</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="mu1">Gravitational Parameter μ (km³/s²)</label>
+              <input id="mu1" type="number" step="any" value="398600.4418" />
+            </div>
+
+            <div class="field">
+              <label for="radius1">Body Radius R (km)</label>
+              <input id="radius1" type="number" step="any" value="6378.137" />
+            </div>
+
+            <div class="field">
+              <label for="a">Semi-major Axis a (km)</label>
+              <input id="a" type="number" step="any" value="7000" />
+            </div>
+
+            <div class="field">
+              <label for="e">Eccentricity e</label>
+              <input id="e" type="number" step="any" value="0.10" />
+            </div>
+
+            <div class="field">
+              <label for="inc">Inclination i (deg)</label>
+              <input id="inc" type="number" step="any" value="45" />
+            </div>
+
+            <div class="field">
+              <label for="raan">RAAN Ω (deg)</label>
+              <input id="raan" type="number" step="any" value="30" />
+            </div>
+
+            <div class="field">
+              <label for="argp">Argument of Periapsis ω (deg)</label>
+              <input id="argp" type="number" step="any" value="40" />
+            </div>
+
+            <div class="field">
+              <label for="ta">True Anomaly ν (deg)</label>
+              <input id="ta" type="number" step="any" value="60" />
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="action-btn primary-btn" onclick="computeCoeToState()">Convert to State Vector</button>
+            <button class="action-btn secondary-btn" onclick="loadSampleCoe()">Load Example LEO Case</button>
+          </div>
+        </div>
+
+        <!-- STATE TO COE -->
+        <div class="mode-panel" id="mode-state2coe">
+          <div class="form-grid">
+            <div class="field full">
+              <label for="centralBody2">Central Body</label>
+              <select id="centralBody2" onchange="applyCentralBody('centralBody2','mu2','radius2')">
+                <option value="Earth" selected>Earth</option>
+                <option value="Mars">Mars</option>
+                <option value="Moon">Moon</option>
+                <option value="Jupiter">Jupiter</option>
+                <option value="Custom">Custom</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="mu2">Gravitational Parameter μ (km³/s²)</label>
+              <input id="mu2" type="number" step="any" value="398600.4418" />
+            </div>
+
+            <div class="field">
+              <label for="radius2">Body Radius R (km)</label>
+              <input id="radius2" type="number" step="any" value="6378.137" />
+            </div>
+
+            <div class="field">
+              <label for="rx">Position x (km)</label>
+              <input id="rx" type="number" step="any" value="-4763.440" />
+            </div>
+
+            <div class="field">
+              <label for="ry">Position y (km)</label>
+              <input id="ry" type="number" step="any" value="3070.755" />
+            </div>
+
+            <div class="field">
+              <label for="rz">Position z (km)</label>
+              <input id="rz" type="number" step="any" value="3125.898" />
+            </div>
+
+            <div class="field">
+              <label for="vx">Velocity vx (km/s)</label>
+              <input id="vx" type="number" step="any" value="-5.233311" />
+            </div>
+
+            <div class="field">
+              <label for="vy">Velocity vy (km/s)</label>
+              <input id="vy" type="number" step="any" value="-6.181665" />
+            </div>
+
+            <div class="field">
+              <label for="vz">Velocity vz (km/s)</label>
+              <input id="vz" type="number" step="any" value="-0.791849" />
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button class="action-btn primary-btn" onclick="computeStateToCoe()">Convert to COEs</button>
+            <button class="action-btn secondary-btn" onclick="loadSampleState()">Load Example State</button>
+          </div>
+        </div>
+
+        <div class="callout" id="interpretationBox">
+          <h3>Interpretation</h3>
+          <p id="interpretationText">
+            Use either direction of the converter to move between orbital geometry and the inertial state used in astrodynamics simulation.
+          </p>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid-two">
+      <article class="card">
+        <h2>Results</h2>
+
+        <div class="result-grid">
+          <div class="result-box">
+            <h4>Position Vector \( \mathbf{r} \)</h4>
+           <div class="value-small value-vector" id="rVecOut">[ — , — , — ] km</div>
+            <div class="sub" id="rMagOut">Magnitude: — km</div>
+          </div>
+
+          <div class="result-box">
+            <h4>Velocity Vector \( \mathbf{v} \)</h4>
+           <div class="value-small value-vector" id="vVecOut">[ — , — , — ] km/s</div>
+            <div class="sub" id="vMagOut">Magnitude: — km/s</div>
+          </div>
+
+          <div class="result-box">
+            <h4>Recovered / Input Semi-major Axis</h4>
+            <div class="value-small" id="aOut">— km</div>
+            <div class="sub">Orbit size parameter</div>
+          </div>
+
+          <div class="result-box">
+            <h4>Eccentricity</h4>
+            <div class="value-small" id="eOut">—</div>
+            <div class="sub">Shape of the conic section</div>
+          </div>
+
+          <div class="result-box">
+            <h4>Inclination</h4>
+           <div class="value-small" id="iOut">— deg</div>
+            <div class="sub">Tilt of the orbital plane</div>
+          </div>
+
+          <div class="result-box">
+            <h4>RAAN / Argument of Periapsis / True Anomaly</h4>
+            <div class="value-small" id="anglesOut">— / — / —</div>
+            <div class="sub">Orientation and position angles</div>
+          </div>
+        </div>
+
+        <div class="section-space"></div>
+
+        <div class="kpi-grid">
+          <div class="result-box">
+            <h4>Specific Angular Momentum \( |\mathbf{h}| \)</h4>
+            <div class="value-small" id="hOut">— km²/s</div>
+            <div class="sub">Conserved in two-body motion</div>
+          </div>
+
+          <div class="result-box">
+            <h4>Specific Orbital Energy \( \epsilon \)</h4>
+           <div class="value-small" id="energyOut">— km²/s²</div>
+            <div class="sub">Negative for bound elliptical motion</div>
+          </div>
+
+          <div class="result-box">
+            <h4>Perigee Radius \( r_p \)</h4>
+            <div class="value-small" id="rpOut">— km</div>
+            <div class="sub">Closest orbital distance</div>
+          </div>
+
+          <div class="result-box">
+            <h4>Apogee Radius \( r_a \)</h4>
+            <div class="value-small" id="raOut">— km</div>
+            <div class="sub">Farthest orbital distance</div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>3D orbit visualization</h2>
+        <div id="orbitPlot" class="plot-wrap"></div>
+        <p class="footer-note">
+          The orbit is plotted in an Earth-centered inertial-style frame. The current spacecraft location is shown on the orbit.
+        </p>
+      </article>
+    </section>
+
+    <section class="grid-two">
+      <article class="card">
+        <h2>Core physics</h2>
+
+        <p>
+          In the perifocal frame, the orbit is expressed naturally in terms of the true anomaly \( \nu \).
+          The semilatus rectum is
+        </p>
+
+        <div class="formula-block">
+          \[
+          p = a(1-e^2)
+          \]
+        </div>
+
+        <p>The perifocal position and velocity vectors are</p>
+
+        <div class="formula-block">
+          \[
+          \mathbf{r}_{pf} =
+          \begin{bmatrix}
+          r\cos\nu \\
+          r\sin\nu \\
+          0
+          \end{bmatrix},
+          \qquad
+          r = \frac{p}{1+e\cos\nu}
+          \]
+          \[
+          \mathbf{v}_{pf} =
+          \sqrt{\frac{\mu}{p}}
+          \begin{bmatrix}
+          -\sin\nu \\
+          e+\cos\nu \\
+          0
+          \end{bmatrix}
+          \]
+        </div>
+
+        <p>
+          These vectors are then rotated into the inertial frame using the classical
+          \( R_3(\Omega)\,R_1(i)\,R_3(\omega) \) transformation.
+        </p>
+      </article>
+
+      <article class="card">
+        <h2>Transformation matrix</h2>
+        <p>
+          The perifocal-to-ECI direction cosine matrix is shown below for the current orbit:
+        </p>
+
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>1</th>
+              <th>2</th>
+              <th>3</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>Row 1</th>
+              <td id="m11">—</td>
+              <td id="m12">—</td>
+              <td id="m13">—</td>
+            </tr>
+            <tr>
+              <th>Row 2</th>
+              <td id="m21">—</td>
+              <td id="m22">—</td>
+              <td id="m23">—</td>
+            </tr>
+            <tr>
+              <th>Row 3</th>
+              <td id="m31">—</td>
+              <td id="m32">—</td>
+              <td id="m33">—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="mini-note">
+          This matrix maps \( \mathbf{r}_{pf} \) and \( \mathbf{v}_{pf} \) into the inertial frame:
+          \( \mathbf{r}_{ECI} = \mathbf{Q}_{pf\rightarrow ECI}\mathbf{r}_{pf} \),
+          \( \mathbf{v}_{ECI} = \mathbf{Q}_{pf\rightarrow ECI}\mathbf{v}_{pf} \).
+        </p>
+      </article>
+    </section>
+
+    <section class="grid-two">
+      <article class="card">
+        <h2>Assumptions and limitations</h2>
+        <div class="callout orange">
+          <p>This converter assumes:</p>
+          <ul>
+            <li>Ideal two-body motion</li>
+            <li>Point-mass central gravity field</li>
+            <li>No atmospheric drag, J2, SRP, or third-body perturbations</li>
+            <li>Classical orbital elements remain well-defined away from singular cases</li>
+          </ul>
+          <p>
+            Special caution is needed for:
+          </p>
+          <ul>
+            <li><strong>Circular orbits</strong> \( e \approx 0 \), where periapsis direction becomes undefined</li>
+            <li><strong>Equatorial orbits</strong> \( i \approx 0^\circ \), where RAAN becomes undefined</li>
+            <li><strong>Circular equatorial orbits</strong>, where multiple classical angles lose uniqueness</li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Why this tool matters</h2>
+        <p>
+          This is one of the most important core tools in orbital mechanics because it connects
+          <strong>orbital geometry</strong> with the <strong>dynamical state</strong> used by propagators,
+          guidance laws, estimation systems, and mission-analysis codes.
+        </p>
+        <p>
+          In practice, engineers constantly move between:
+        </p>
+        <ul>
+          <li>element sets for interpretation and orbit design</li>
+          <li>state vectors for propagation, simulation, and control</li>
+          <li>frame transformations for real mission analysis workflows</li>
+        </ul>
+        <p>
+          So this tool is not just educational. It is foundational.
+        </p>
+      </article>
+    </section>
+
+    <section class="grid-two">
+      <article class="card">
+        <h2>Example validation case</h2>
+        <p>
+          A standard test case is:
+          \( a = 7000\ \text{km},\ e = 0.10,\ i = 45^\circ,\ \Omega = 30^\circ,\ \omega = 40^\circ,\ \nu = 60^\circ \).
+        </p>
+
+        <div class="validation-box">
+          \[
+          a = 7000\ \text{km}, \qquad e = 0.10
+          \]
+          \[
+          i = 45^\circ, \qquad \Omega = 30^\circ, \qquad \omega = 40^\circ, \qquad \nu = 60^\circ
+          \]
+          \[
+          \mu_{Earth} = 398600.4418\ \text{km}^3/\text{s}^2
+          \]
+        </div>
+
+        <p>The page loads with this example by default so you can immediately test both conversion directions.</p>
+      </article>
+
+      <article class="card">
+        <h2>Planned later upgrades</h2>
+        <p>
+          This page is already much stronger than a basic calculator, but it can later be extended into a
+          more professional astrodynamics module with:
+        </p>
+        <ul>
+          <li>support for circular / equatorial singularity-safe element sets </li>
+          <li>perifocal, ECI, and LVLH frame overlays</li>
+          <li>3D interactive axis controls and camera presets</li>
+          <li>orbit animation with moving true anomaly</li>
+          <li>TLE import and state-vector export</li>
+          <li>ground track / Earth texture view</li>
+          <li>hyperbolic and parabolic case support</li>
+          <li>NASA-style mission analysis UI refinements</li>
+        </ul>
+      </article>
+    </section>
+
+  </main>
+
+  <script>
+    const CENTRAL_BODIES = {
+      Earth:  { mu: 398600.4418, radius: 6378.137 },
+      Mars:   { mu: 42828.375214, radius: 3389.5 },
+      Moon:   { mu: 4902.800066, radius: 1737.4 },
+      Jupiter:{ mu: 126686534.0, radius: 71492.0 }
+    };
+
+    let currentMode = 'coe2state';
+
+    function deg2rad(d){ return d * Math.PI / 180; }
+    function rad2deg(r){ return r * 180 / Math.PI; }
+
+    function norm(v){
+      return Math.sqrt(v.reduce((s, x) => s + x*x, 0));
+    }
+
+    function dot(a, b){
+      return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+    }
+
+    function cross(a, b){
+      return [
+        a[1]*b[2] - a[2]*b[1],
+        a[2]*b[0] - a[0]*b[2],
+        a[0]*b[1] - a[1]*b[0]
+      ];
+    }
+
+    function scalarMul(s, v){
+      return v.map(x => s * x);
+    }
+
+    function vecAdd(a, b){
+      return a.map((x, i) => x + b[i]);
+    }
+
+    function vecSub(a, b){
+      return a.map((x, i) => x - b[i]);
+    }
+
+    function matVecMul(M, v){
+      return [
+        M[0][0]*v[0] + M[0][1]*v[1] + M[0][2]*v[2],
+        M[1][0]*v[0] + M[1][1]*v[1] + M[1][2]*v[2],
+        M[2][0]*v[0] + M[2][1]*v[1] + M[2][2]*v[2]
+      ];
+    }
+
+    function clampAngleDeg(angle){
+      let a = angle % 360;
+      if (a < 0) a += 360;
+      return a;
+    }
+
+    function safeAcos(x){
+      return Math.acos(Math.min(1, Math.max(-1, x)));
+    }
+
+    function setMode(mode){
+      currentMode = mode;
+
+      document.getElementById('mode-coe2state').classList.toggle('active', mode === 'coe2state');
+      document.getElementById('mode-state2coe').classList.toggle('active', mode === 'state2coe');
+
+      document.getElementById('tabCoeToState').classList.toggle('active', mode === 'coe2state');
+      document.getElementById('tabStateToCoe').classList.toggle('active', mode === 'state2coe');
+    }
+
+    function applyCentralBody(selectId, muId, radiusId){
+      const body = document.getElementById(selectId).value;
+      if (body !== 'Custom' && CENTRAL_BODIES[body]) {
+        document.getElementById(muId).value = CENTRAL_BODIES[body].mu;
+        document.getElementById(radiusId).value = CENTRAL_BODIES[body].radius;
+      }
+    }
+
+    function coeToState(a, e, iDeg, raanDeg, argpDeg, taDeg, mu){
+      const i = deg2rad(iDeg);
+      const raan = deg2rad(raanDeg);
+      const argp = deg2rad(argpDeg);
+      const ta = deg2rad(taDeg);
+
+      const p = a * (1 - e*e);
+      const rmag = p / (1 + e*Math.cos(ta));
+
+      const r_pf = [rmag*Math.cos(ta), rmag*Math.sin(ta), 0];
+      const v_pf = [
+        -Math.sqrt(mu/p) * Math.sin(ta),
+        Math.sqrt(mu/p) * (e + Math.cos(ta)),
+        0
+      ];
+
+      const cO = Math.cos(raan), sO = Math.sin(raan);
+      const ci = Math.cos(i),    si = Math.sin(i);
+      const cw = Math.cos(argp), sw = Math.sin(argp);
+
+      const Q = [
+        [ cO*cw - sO*sw*ci, -cO*sw - sO*cw*ci,  sO*si ],
+        [ sO*cw + cO*sw*ci, -sO*sw + cO*cw*ci, -cO*si ],
+        [ sw*si,             cw*si,             ci    ]
+      ];
+
+      const r_eci = matVecMul(Q, r_pf);
+      const v_eci = matVecMul(Q, v_pf);
+
+      return { r_eci, v_eci, r_pf, v_pf, Q, p, rmag };
+    }
+
+    function stateToCoe(r, v, mu){
+      const rmag = norm(r);
+      const vmag = norm(v);
+
+      const h = cross(r, v);
+      const hmag = norm(h);
+
+      const k = [0, 0, 1];
+      const n = cross(k, h);
+      const nmag = norm(n);
+
+      const eVec = vecSub(
+        scalarMul(1/mu, cross(v, h)),
+        scalarMul(1/rmag, r)
+      );
+      const e = norm(eVec);
+
+      const energy = vmag*vmag/2 - mu/rmag;
+      const a = Math.abs(e - 1) < 1e-10 ? Infinity : -mu/(2*energy);
+
+      const i = rad2deg(safeAcos(h[2] / hmag));
+
+      let raan = 0;
+      if (nmag > 1e-12) {
+        raan = rad2deg(safeAcos(n[0] / nmag));
+        if (n[1] < 0) raan = 360 - raan;
+      }
+
+      let argp = 0;
+      if (nmag > 1e-12 && e > 1e-10) {
+        argp = rad2deg(safeAcos(dot(n, eVec) / (nmag * e)));
+        if (eVec[2] < 0) argp = 360 - argp;
+      }
+
+      let ta = 0;
+      if (e > 1e-10) {
+        ta = rad2deg(safeAcos(dot(eVec, r) / (e * rmag)));
+        if (dot(r, v) < 0) ta = 360 - ta;
+      } else if (nmag > 1e-12) {
+        ta = rad2deg(safeAcos(dot(n, r) / (nmag * rmag)));
+        if (r[2] < 0) ta = 360 - ta;
+      }
+
+      const rp = isFinite(a) ? a*(1-e) : NaN;
+      const ra = isFinite(a) ? a*(1+e) : NaN;
+
+      return {
+        a, e, i, raan, argp, ta,
+        h, hmag, eVec, energy, rp, ra,
+        rmag, vmag, nmag
+      };
+    }
+
+    function updateMatrix(Q){
+      const ids = [
+        ['m11','m12','m13'],
+        ['m21','m22','m23'],
+        ['m31','m32','m33']
+      ];
+      for(let r=0;r<3;r++){
+        for(let c=0;c<3;c++){
+          document.getElementById(ids[r][c]).textContent = Q ? Q[r][c].toFixed(6) : '—';
+        }
+      }
+    }
+
+    function updateResults(data){
+      document.getElementById('rVecOut').textContent =
+        `[ ${data.r[0].toFixed(3)}, ${data.r[1].toFixed(3)}, ${data.r[2].toFixed(3)} ] km`;
+      document.getElementById('rMagOut').textContent =
+        `Magnitude: ${data.rmag.toFixed(3)} km`;
+
+      document.getElementById('vVecOut').textContent =
+        `[ ${data.v[0].toFixed(6)}, ${data.v[1].toFixed(6)}, ${data.v[2].toFixed(6)} ] km/s`;
+      document.getElementById('vMagOut').textContent =
+        `Magnitude: ${data.vmag.toFixed(6)} km/s`;
+
+      document.getElementById('aOut').textContent =
+        isFinite(data.a) ? `${data.a.toFixed(3)} km` : 'Parabolic / Infinite';
+      document.getElementById('eOut').textContent = data.e.toFixed(8);
+      document.getElementById('iOut').textContent = `${data.i.toFixed(4)} deg`;
+      document.getElementById('anglesOut').textContent =
+        `${clampAngleDeg(data.raan).toFixed(4)} / ${clampAngleDeg(data.argp).toFixed(4)} / ${clampAngleDeg(data.ta).toFixed(4)} deg`;
+
+      document.getElementById('hOut').textContent = `${data.hmag.toFixed(6)} km²/s`;
+      document.getElementById('energyOut').textContent = `${data.energy.toFixed(6)} km²/s²`;
+      document.getElementById('rpOut').textContent = isFinite(data.rp) ? `${data.rp.toFixed(3)} km` : '—';
+      document.getElementById('raOut').textContent = isFinite(data.ra) ? `${data.ra.toFixed(3)} km` : '—';
+    }
+
+    function updateInterpretation(text){
+      document.getElementById('interpretationText').textContent = text;
+    }
+
+    function plotOrbitFromCoe(a, e, iDeg, raanDeg, argpDeg, taDeg, mu, bodyRadius){
+      let xs = [], ys = [], zs = [];
+
+      for (let nu = 0; nu <= 360; nu += 2) {
+        const state = coeToState(a, e, iDeg, raanDeg, argpDeg, nu, mu);
+        xs.push(state.r_eci[0]);
+        ys.push(state.r_eci[1]);
+        zs.push(state.r_eci[2]);
+      }
+
+      const currentState = coeToState(a, e, iDeg, raanDeg, argpDeg, taDeg, mu);
+
+      // body sphere
+      const sphereSteps = 30;
+      const u = [];
+      const v = [];
+      for (let j = 0; j <= sphereSteps; j++) {
+        u.push(2 * Math.PI * j / sphereSteps);
+        v.push(Math.PI * j / sphereSteps);
+      }
+
+      const sphereX = [];
+      const sphereY = [];
+      const sphereZ = [];
+      for (let m = 0; m < v.length; m++) {
+        const rowX = [], rowY = [], rowZ = [];
+        for (let n = 0; n < u.length; n++) {
+          rowX.push(bodyRadius * Math.cos(u[n]) * Math.sin(v[m]));
+          rowY.push(bodyRadius * Math.sin(u[n]) * Math.sin(v[m]));
+          rowZ.push(bodyRadius * Math.cos(v[m]));
+        }
+        sphereX.push(rowX);
+        sphereY.push(rowY);
+        sphereZ.push(rowZ);
+      }
+
+      const traces = [
+        {
+          type:'surface',
+          x:sphereX, y:sphereY, z:sphereZ,
+          opacity:0.75,
+          showscale:false,
+          colorscale:[[0,'#b8d4f2'],[1,'#5a87c8']],
+          hoverinfo:'skip',
+          name:'Central Body'
+        },
+        {
+          type:'scatter3d',
+          mode:'lines',
+          x:xs, y:ys, z:zs,
+          line:{ width:6, color:'#2563eb' },
+          name:'Orbit'
+        },
+        {
+          type:'scatter3d',
+          mode:'markers',
+          x:[currentState.r_eci[0]],
+          y:[currentState.r_eci[1]],
+          z:[currentState.r_eci[2]],
+          marker:{ size:6, color:'#ef4444' },
+          name:'Spacecraft'
+        }
+      ];
+
+      const maxExtent = Math.max(
+        ...xs.map(Math.abs),
+        ...ys.map(Math.abs),
+        ...zs.map(Math.abs),
+        bodyRadius * 1.25
+      ) * 1.15;
+
+      const layout = {
+        margin:{ l:0, r:0, t:0, b:0 },
+        scene:{
+          xaxis:{ title:'x (km)', range:[-maxExtent, maxExtent], backgroundcolor:'#f8fbff' },
+          yaxis:{ title:'y (km)', range:[-maxExtent, maxExtent], backgroundcolor:'#f8fbff' },
+          zaxis:{ title:'z (km)', range:[-maxExtent, maxExtent], backgroundcolor:'#f8fbff' },
+          aspectmode:'cube',
+          camera:{ eye:{ x:1.4, y:1.3, z:0.8 } }
+        },
+        paper_bgcolor:'#ffffff',
+        plot_bgcolor:'#ffffff',
+        showlegend:false
+      };
+
+      Plotly.newPlot('orbitPlot', traces, layout, {responsive:true, displayModeBar:false});
+    }
+
+    function computeCoeToState(){
+      const mu = parseFloat(document.getElementById('mu1').value);
+      const radius = parseFloat(document.getElementById('radius1').value);
+      const a = parseFloat(document.getElementById('a').value);
+      const e = parseFloat(document.getElementById('e').value);
+      const i = parseFloat(document.getElementById('inc').value);
+      const raan = parseFloat(document.getElementById('raan').value);
+      const argp = parseFloat(document.getElementById('argp').value);
+      const ta = parseFloat(document.getElementById('ta').value);
+
+      if (!(a > 0) || !(mu > 0) || e < 0 || e >= 1) {
+        alert('For this version, please use: a > 0, μ > 0, and 0 ≤ e < 1.');
+        return;
+      }
+
+      const state = coeToState(a, e, i, raan, argp, ta, mu);
+      const recovered = stateToCoe(state.r_eci, state.v_eci, mu);
+
+      updateResults({
+        r: state.r_eci,
+        v: state.v_eci,
+        rmag: recovered.rmag,
+        vmag: recovered.vmag,
+        a: recovered.a,
+        e: recovered.e,
+        i: recovered.i,
+        raan: recovered.raan,
+        argp: recovered.argp,
+        ta: recovered.ta,
+        hmag: recovered.hmag,
+        energy: recovered.energy,
+        rp: recovered.rp,
+        ra: recovered.ra
+      });
+
+      updateMatrix(state.Q);
+      plotOrbitFromCoe(a, e, i, raan, argp, ta, mu, radius);
+
+      let text = 'This conversion used the full perifocal-to-ECI transformation matrix to obtain the inertial position and velocity vectors.';
+      if (e < 1e-5) {
+        text += ' Because the orbit is nearly circular, the argument of periapsis becomes numerically delicate.';
+      }
+      if (Math.abs(i) < 1e-5) {
+        text += ' Because the orbit is nearly equatorial, the RAAN becomes numerically delicate.';
+      }
+      updateInterpretation(text);
+
+      // populate reverse fields so the user can test both directions
+      document.getElementById('rx').value = state.r_eci[0].toFixed(3);
+      document.getElementById('ry').value = state.r_eci[1].toFixed(3);
+      document.getElementById('rz').value = state.r_eci[2].toFixed(3);
+      document.getElementById('vx').value = state.v_eci[0].toFixed(6);
+      document.getElementById('vy').value = state.v_eci[1].toFixed(6);
+      document.getElementById('vz').value = state.v_eci[2].toFixed(6);
+    }
+
+    function computeStateToCoe(){
+      const mu = parseFloat(document.getElementById('mu2').value);
+      const radius = parseFloat(document.getElementById('radius2').value);
+
+      const r = [
+        parseFloat(document.getElementById('rx').value),
+        parseFloat(document.getElementById('ry').value),
+        parseFloat(document.getElementById('rz').value)
+      ];
+
+      const v = [
+        parseFloat(document.getElementById('vx').value),
+        parseFloat(document.getElementById('vy').value),
+        parseFloat(document.getElementById('vz').value)
+      ];
+
+      if (!(mu > 0)) {
+        alert('Please enter a valid positive gravitational parameter μ.');
+        return;
+      }
+
+      const coe = stateToCoe(r, v, mu);
+
+      updateResults({
+        r, v,
+        rmag: coe.rmag,
+        vmag: coe.vmag,
+        a: coe.a,
+        e: coe.e,
+        i: coe.i,
+        raan: coe.raan,
+        argp: coe.argp,
+        ta: coe.ta,
+        hmag: coe.hmag,
+        energy: coe.energy,
+        rp: coe.rp,
+        ra: coe.ra
+      });
+
+      if (isFinite(coe.a) && coe.e < 1) {
+        const forward = coeToState(coe.a, coe.e, coe.i, coe.raan, coe.argp, coe.ta, mu);
+        updateMatrix(forward.Q);
+        plotOrbitFromCoe(coe.a, coe.e, coe.i, coe.raan, coe.argp, coe.ta, mu, radius);
+      } else {
+        updateMatrix(null);
+        Plotly.purge('orbitPlot');
+      }
+
+      let text = 'The orbital elements were reconstructed from the inertial state using the angular momentum vector, node vector, eccentricity vector, and specific orbital energy.';
+      if (coe.e < 1e-5) {
+        text += ' This state is nearly circular, so periapsis direction is weakly defined.';
+      }
+      if (Math.abs(coe.i) < 1e-5) {
+        text += ' This state is nearly equatorial, so RAAN is weakly defined.';
+      }
+      updateInterpretation(text);
+
+      // populate forward fields for consistency
+      if (isFinite(coe.a)) document.getElementById('a').value = coe.a.toFixed(3);
+      document.getElementById('e').value = coe.e.toFixed(8);
+      document.getElementById('inc').value = coe.i.toFixed(6);
+      document.getElementById('raan').value = clampAngleDeg(coe.raan).toFixed(6);
+      document.getElementById('argp').value = clampAngleDeg(coe.argp).toFixed(6);
+      document.getElementById('ta').value = clampAngleDeg(coe.ta).toFixed(6);
+    }
+
+    function loadSampleCoe(){
+      document.getElementById('centralBody1').value = 'Earth';
+      applyCentralBody('centralBody1','mu1','radius1');
+      document.getElementById('a').value = 7000;
+      document.getElementById('e').value = 0.10;
+      document.getElementById('inc').value = 45;
+      document.getElementById('raan').value = 30;
+      document.getElementById('argp').value = 40;
+      document.getElementById('ta').value = 60;
+      setMode('coe2state');
+      computeCoeToState();
+    }
+
+    function loadSampleState(){
+      document.getElementById('centralBody2').value = 'Earth';
+      applyCentralBody('centralBody2','mu2','radius2');
+      document.getElementById('rx').value = -4763.440;
+      document.getElementById('ry').value = 3070.755;
+      document.getElementById('rz').value = 3125.898;
+      document.getElementById('vx').value = -5.233311;
+      document.getElementById('vy').value = -6.181665;
+      document.getElementById('vz').value = -0.791849;
+      setMode('state2coe');
+      computeStateToCoe();
+    }
+
+    window.addEventListener('load', () => {
+      loadSampleCoe();
+    });
+  </script>
+  <footer class="site-footer">
+  <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+</footer>
+</body>
+</html>

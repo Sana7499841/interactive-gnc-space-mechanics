@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Domain D.5 — Robust Attitude Control | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match Advanced Domains style) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain D.1 / D.4 structure) -->
+  <header class="notes-hero">
+    <h1>Domain D — Attitude Dynamics &amp; Control (Advanced)</h1>
+    <p class="notes-tagline">
+      Nonlinear rotational dynamics, maneuvering, momentum management, robust control, and stability methods.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–F)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Top intro card (same pattern as D.1 / D.4) -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–F)</a>
+      </p>
+
+      <h1> Domain D.5 — Robust Attitude Control</h1>
+      <p>
+        Most “clean” control problems assume you know the plant exactly, your sensors are perfect, actuators respond instantly,
+        and disturbances are either tiny or conveniently modeled as simple noise. Spacecraft attitude control lives in a very different world.
+      </p>
+
+      <p>
+        A real spacecraft is a <strong>coupled, uncertainty-driven system</strong>. Its pointing behaviour is shaped not only by rigid-body rotation,
+        but also by structural flexibility, shifting mass properties, imperfect sensing, limited actuators, and continuous external torques.
+        If you design a controller only for a single “nominal” model, it can look excellent on paper and still fail in flight—by drifting,
+        ringing, saturating, or even becoming unstable.
+      </p>
+
+      <div class="callout">
+        <h3>Core idea</h3>
+        <p>
+          Robust attitude control is the practical design approach that prevents this. The aim is not “best performance for one perfect model,” but:
+          <strong>stable and acceptable pointing performance across a family of plausible models, under worst-case disturbances, delays, and hardware limits.</strong>
+        </p>
+      </div>
+
+      <p>
+        That is why robust attitude control is where textbook theory becomes space-grade engineering.
+      </p>
+
+      <ul>
+        <li>See why uncertainty and disturbance are unavoidable in flight.</li>
+        <li>Learn the main environmental torque sources that drive momentum buildup and pointing error.</li>
+        <li>Understand what “robust stability” and “robust performance” mean in practice.</li>
+        <li>Connect robustness to <em>both</em> feedback design and safe maneuver shaping.</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation (match D.1 / D.4 jump bar) -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#d5-need">1. Why robustness is necessary</a> &middot;
+        <a href="#d5-disturbances">2. Environmental disturbance torques</a> &middot;
+        <a href="#d5-uncertainty">3. Modeling uncertainty</a> &middot;
+        <a href="#d5-margins">4. Classical robustness margins</a> &middot;
+        <a href="#d5-modern">5. Modern robust control thinking</a> &middot;
+        <a href="#d5-maneuvers">6. Robust maneuver shaping</a> &middot;
+        <a href="#d5-lyapunov">7. Nonlinear robustness (Lyapunov)</a> &middot;
+        <a href="#d5-csi">8. Control–structure interaction rules</a> &middot;
+        <a href="#d5-workflow">9. Space-grade validation workflow</a> &middot;
+        <a href="#d5-summary">Summary</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+
+      <!-- 1 -->
+      <section id="d5-need">
+        <h2>1) Why robust control is necessary in spacecraft</h2>
+
+        <p>
+          Robustness is not a feature you add later. It is demanded by physics, manufacturing reality, and long-duration operation.
+          Spacecraft operate for months to years with limited actuation authority, limited sensing, and an environment that continuously perturbs attitude.
+        </p>
+
+        <h3 id="d5-inertia">1.1 Mass-property uncertainty (the inertia matrix is never exact)</h3>
+        <p>
+          The spacecraft inertia matrix $J$ used in design is always an estimate. In reality it varies due to:
+        </p>
+        <ul>
+          <li>propellant depletion and shifting propellant distribution</li>
+          <li>moving mechanisms, gimbals, and payload reconfiguration</li>
+          <li>deployment of solar arrays, antennas, booms</li>
+          <li>manufacturing tolerances and integration uncertainty</li>
+        </ul>
+
+        <p>A standard way to express this is:</p>
+        <p class="math-block">
+          \[
+            J = J_0 + \Delta J
+          \]
+        </p>
+
+        <p>
+          Even a small $\Delta J$ can shift closed-loop dynamics, especially when the controller bandwidth is high.
+          The result can be reduced stability margins, overshoot, or unexpected coupling between axes.
+        </p>
+
+        <h3 id="d5-flex">1.2 Flexible structures (control–structure interaction)</h3>
+        <p>
+          Many spacecraft are not purely rigid. Large appendages introduce lightly damped vibration modes.
+          These modes can be excited by the controller—especially when:
+        </p>
+        <ul>
+          <li>the control loop bandwidth is too high</li>
+          <li>sharp actuation produces high-frequency content</li>
+          <li>structural frequencies shift with temperature or configuration</li>
+        </ul>
+
+        <p>Symptoms include:</p>
+        <ul>
+          <li>attitude “ringing” and persistent jitter</li>
+          <li>degraded pointing accuracy (even if the mean attitude is correct)</li>
+          <li>fatigue and potential structural risk</li>
+          <li>instability when flexible modes are uncertain</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Control–structure interaction (CSI)</h3>
+          <p>
+            The controller “feels” flexible dynamics even if you designed only for rigid-body motion.
+            Robust design ensures the control loop does not inject energy into uncertain structural modes.
+          </p>
+        </div>
+
+        <h3 id="d5-sensors">1.3 Sensor imperfections (noise, bias, drift, dropouts)</h3>
+        <p>Spacecraft attitude estimation is never perfect:</p>
+        <ul>
+          <li>gyros drift and accumulate bias</li>
+          <li>star trackers can be blinded or lose lock</li>
+          <li>magnetometers are disturbed by onboard currents and materials</li>
+          <li>Earth sensors have bias from albedo and geometry</li>
+        </ul>
+
+        <p>These errors propagate through the feedback loop. They can create:</p>
+        <ul>
+          <li>steady pointing error</li>
+          <li>limit cycles and jitter</li>
+          <li>poor disturbance rejection</li>
+          <li>false torque commands that waste actuator authority</li>
+        </ul>
+
+        <p>
+          Robust design treats sensors as part of the plant—because they are.
+        </p>
+
+        <h3 id="d5-actuators">1.4 Actuator limitations (constraints + dynamics + delay)</h3>
+        <p>
+          Actuators do not produce unlimited, instantaneous torque. Common non-idealities include:
+        </p>
+        <ul>
+          <li><strong>Reaction wheels:</strong> torque limit, speed limit (saturation), friction, jitter</li>
+          <li><strong>CMGs:</strong> large torque, but singularities and gimbal rate limits</li>
+          <li><strong>Thrusters:</strong> pulsed actuation, minimum impulse bit, valve delay, plume disturbance</li>
+        </ul>
+
+        <p>Controllers must remain stable and effective even when actuators:</p>
+        <ul>
+          <li>saturate (hard limits)</li>
+          <li>quantize (minimum step/impulse)</li>
+          <li>respond with delay</li>
+          <li>introduce coupling or disturbances of their own</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Flight reality</h3>
+          <p>
+            A controller that “assumes ideal torque” can become unstable once it hits real actuator limits.
+            Robust control anticipates saturation and delay as normal operating conditions, not rare exceptions.
+          </p>
+        </div>
+
+        <h3 id="d5-env">1.5 Environmental disturbances (continuous, orbit-dependent forcing)</h3>
+        <p>
+          Spacecraft are continuously perturbed. Even if the torque is small, it acts all the time, so its integrated effect matters.
+          Robustness is therefore essential for long missions and precision pointing.
+        </p>
+      </section>
+
+      <!-- 2 -->
+      <section id="d5-disturbances">
+        <h2>2) Environmental disturbance torques</h2>
+
+        <p>
+          These are the dominant external torques a spacecraft must reject, tolerate, or actively compensate.
+          Many are periodic or geometry-dependent, which is why robustness must be treated in the frequency domain as well as the time domain.
+        </p>
+
+        <h3 id="d5-gg">2.1 Gravity-gradient torque</h3>
+        <p>
+          Gravity is slightly stronger on the Earth-facing side of the spacecraft. That small difference creates a torque that tends to align
+          certain inertia axes with the local vertical. A common approximation is:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf{T}_{gg} \approx \frac{3\mu}{r^3}\left(\hat{\mathbf{r}} \times J\hat{\mathbf{r}}\right)
+          \]
+        </p>
+
+        <p>Key characteristics:</p>
+        <ul>
+          <li>stronger in lower orbits (depends on $1/r^3$)</li>
+          <li>varies periodically with orbital motion</li>
+          <li>significant for elongated bodies and large structures</li>
+          <li>can be stabilizing or destabilizing depending on attitude and geometry</li>
+        </ul>
+
+        <h3 id="d5-srp">2.2 Solar radiation pressure torque (SRP)</h3>
+        <p>
+          Photons carry momentum. When sunlight hits spacecraft surfaces, it produces a small force. If the effective pressure point is offset
+          from the center of mass, a torque appears:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf{T}_{srp} = (\mathbf{r}_{cp}-\mathbf{r}_{cm}) \times \mathbf{F}_{srp}
+          \]
+        </p>
+
+        <p>Most relevant for:</p>
+        <ul>
+          <li>large solar arrays and reflectors</li>
+          <li>high-precision pointing spacecraft</li>
+          <li>asymmetric geometries where CoP–CoM offsets are significant</li>
+        </ul>
+
+        <h3 id="d5-drag">2.3 Aerodynamic drag torque (primarily in LEO)</h3>
+        <p>
+          At low altitudes, spacecraft experience atmospheric drag. The drag force acts at an aerodynamic center; if that differs from the center of mass:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf{T}_{drag} = (\mathbf{r}_{cp}-\mathbf{r}_{cm}) \times \mathbf{F}_{drag}
+          \]
+        </p>
+
+        <p>Most relevant for:</p>
+        <ul>
+          <li>low-altitude LEO missions</li>
+          <li>large-area spacecraft</li>
+          <li>spacecraft with deployables that change projected area</li>
+        </ul>
+
+        <h3 id="d5-mag">2.4 Magnetic torque</h3>
+        <p>
+          Earth’s magnetic field interacts with spacecraft magnetic dipole moment:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf{T}_{mag} = \mathbf{m} \times \mathbf{B}
+          \]
+        </p>
+
+        <p>Dipole sources:</p>
+        <ul>
+          <li>wiring currents and electronics</li>
+          <li>magnetic materials and residual magnetization</li>
+          <li>intentional magnetic torquers</li>
+        </ul>
+
+        <p>Important for:</p>
+        <ul>
+          <li>small satellites</li>
+          <li>detumbling modes</li>
+          <li>missions with tight disturbance budgets</li>
+        </ul>
+      </section>
+
+      <!-- 3 -->
+      <section id="d5-uncertainty">
+        <h2>3) Modeling uncertainty (what “robust” is protecting against)</h2>
+
+        <p>
+          Robust design begins by explicitly acknowledging uncertainty, instead of hiding it.
+          In spacecraft, uncertainty is multi-source and coupled—mass properties, flexible dynamics, actuator behavior, sensing, and delay all interact.
+        </p>
+
+        <h3 id="d5-param">3.1 Parametric uncertainty (bounded variation)</h3>
+        <p>Some parameters are unknown but bounded:</p>
+        <ul>
+          <li>inertia tensor variations</li>
+          <li>actuator gain variation with temperature/aging</li>
+          <li>flexible mode frequencies $\omega_i$ and damping changes</li>
+        </ul>
+
+        <p>A generic representation is:</p>
+        <p class="math-block">
+          \[
+            G(s)=G_0(s)+\Delta G(s)
+          \]
+        </p>
+
+        <p>
+          The controller must stay stable for all admissible $\Delta$ within your uncertainty envelope.
+        </p>
+
+        <h3 id="d5-unmodeled">3.2 Unmodeled dynamics (what you didn’t include)</h3>
+        <p>
+          Some effects are neglected because they are complex, nonlinear, or higher order:
+        </p>
+        <ul>
+          <li>higher structural modes beyond the first few</li>
+          <li>propellant slosh dynamics</li>
+          <li>actuator nonlinearities and internal delays</li>
+          <li>sampling and quantization effects in digital control</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Why unmodeled dynamics are dangerous</h3>
+          <p>
+            Unmodeled dynamics often appear as unexpected high-frequency phase lag—directly reducing phase margin and threatening stability.
+          </p>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section id="d5-margins">
+        <h2>4) Classical robustness checks: gain and phase margins</h2>
+
+        <p>
+          A practical first check for robustness is ensuring adequate margins in the loop frequency response.
+          These are simple, widely used “insurance policies,” but they do not fully describe worst-case performance under structured uncertainty.
+        </p>
+
+        <h3 id="d5-gm">4.1 Gain margin (GM)</h3>
+        <p>
+          Gain margin measures how much gain variation the loop can tolerate before instability.
+          Larger GM helps when actuator gain or plant gain is uncertain.
+        </p>
+
+        <h3 id="d5-pm">4.2 Phase margin (PM)</h3>
+        <p>
+          Phase margin measures how much additional phase lag can be tolerated before instability.
+          Larger PM protects against:
+        </p>
+        <ul>
+          <li>sensor delay</li>
+          <li>actuator delay</li>
+          <li>computation/sampling lag</li>
+          <li>flexible mode coupling and unmodeled dynamics</li>
+        </ul>
+
+        <p>
+          Margins are helpful—but they are not a full robustness guarantee, especially when uncertainties are structured
+          (multiple coupled uncertainties at once) or when disturbance amplification is the main concern.
+        </p>
+      </section>
+
+      <!-- 5 -->
+      <section id="d5-modern">
+        <h2>5) Modern robust control thinking</h2>
+
+        <p>
+          Classical margins tell you “how close you are to instability.” Modern robustness asks a stronger question:
+          can you keep the system stable and accurate even when the real plant differs from your design model and disturbances hit the worst time/frequency?
+        </p>
+
+        <h3 id="d5-rs-rp">5.1 Robust stability + robust performance</h3>
+        <p>
+          A robust attitude controller must satisfy two requirements:
+        </p>
+        <ul>
+          <li><strong>Robust stability:</strong> stable for all allowed uncertainties</li>
+          <li><strong>Robust performance:</strong> maintains acceptable pointing error and disturbance rejection in the worst case</li>
+        </ul>
+
+        <div class="callout">
+          <h3>The key shift</h3>
+          <p>
+            Don’t optimize only the nominal response. Design so the <strong>worst-case response</strong> is still acceptable.
+          </p>
+        </div>
+
+        <h3 id="d5-worstcase">5.2 Worst-case disturbance amplification control (conceptual)</h3>
+        <p>
+          A widely used modern viewpoint is: <strong>bound the maximum amplification of disturbances and noise across frequency.</strong>
+          In practice, you shape the closed-loop transfer from disturbance/noise inputs to performance outputs so that no frequency band
+          “blows up” your pointing error or control effort.
+        </p>
+
+        <p>
+          This matters in spacecraft because many disturbances and flexible modes are frequency-structured (periodic torques, resonance peaks),
+          not purely random.
+        </p>
+
+        <h3 id="d5-structured">5.3 Structured uncertainty viewpoint (conceptual)</h3>
+        <p>
+          Spacecraft uncertainty is rarely one simple gain change. It is structured:
+        </p>
+        <ul>
+          <li>inertia error + mode frequency shifts + actuator dynamics + sensor delay</li>
+        </ul>
+
+        <p>
+          A structured robustness approach asks:
+          <em>Is the system stable for all combinations of these bounded uncertainties, acting together?</em>
+          The engineering meaning is important: robust design is about <strong>families of models</strong>, not one model.
+        </p>
+      </section>
+
+      <!-- 6 -->
+      <section id="d5-maneuvers">
+        <h2>6) Robust maneuvering: why robustness is not only feedback</h2>
+
+        <p>
+          Robust attitude control is not only about the feedback law. It also includes how you command maneuvers—especially when:
+        </p>
+        <ul>
+          <li>thrusters are pulsed (on/off)</li>
+          <li>time/fuel-optimal slews produce bang-bang / bang-off-bang inputs</li>
+          <li>flexible modes are easily excited</li>
+          <li>model parameters (stiffness, modal frequencies) are uncertain</li>
+        </ul>
+
+        <h3 id="d5-fast-unsafe">6.1 Why “fast” can be unsafe on flexible spacecraft</h3>
+        <p>
+          For a rigid-body model, the fastest maneuver often comes from sharp switching. On a flexible spacecraft, sharp switching injects
+          high-frequency energy and can excite structural modes.
+        </p>
+
+        <div class="callout">
+          <h3>Crucial practical lesson</h3>
+          <p>
+            Shorter pulses or longer maneuver time does <strong>not</strong> automatically eliminate vibration.
+            Residual vibration depends strongly on <strong>timing relative to structural frequencies</strong>, not only on total time.
+          </p>
+        </div>
+
+        <p>
+          Robust maneuver design modifies switching sequences to satisfy:
+        </p>
+        <ul>
+          <li>the rigid-body target (the commanded slew)</li>
+          <li>and “rest-to-rest” requirements for flexible modes (no leftover vibration)</li>
+        </ul>
+
+        <h3 id="d5-pulses">6.2 Pulse sequences as a realistic actuator model</h3>
+        <p>
+          For on-off actuators, commands are naturally represented as rectangular pulse sequences (start time + duration).
+          This representation is practical, flight-realistic, and directly connected to propulsion hardware limits
+          (minimum impulse bit, valve timing, duty cycle).
+        </p>
+
+        <h3 id="d5-rest">6.3 Rest-to-rest means “no residual vibration”</h3>
+        <p>A safe and precise slew ends with:</p>
+        <ul>
+          <li>rigid-body state on target</li>
+          <li>flexible mode energy near zero (no ringing after the maneuver)</li>
+        </ul>
+
+        <p>
+          This is the difference between a maneuver that merely “reaches the angle” and a maneuver that is truly spacecraft-safe.
+        </p>
+
+        <h3 id="d5-frequnc">6.4 Robustness to frequency uncertainty (the core idea)</h3>
+        <p>
+          Flexible mode frequencies can shift (thermal, configuration, aging). A maneuver tuned to one nominal frequency can leave residual vibration
+          when the frequency shifts. A robust maneuver is designed so that it remains effective even when frequencies vary—often by increasing degrees of freedom
+          (more switching times) to reduce sensitivity and suppress residual vibration across a range of possible frequencies.
+        </p>
+      </section>
+
+      <!-- 7 -->
+      <section id="d5-lyapunov">
+        <h2>7) Nonlinear robustness: Lyapunov-based attitude stabilization</h2>
+
+        <p>
+          Attitude dynamics are inherently nonlinear. A commonly used form of the rotational dynamics is:
+        </p>
+
+        <p class="math-block">
+          \[
+            J\dot{\omega} + \omega \times (J\omega) = T_c + T_d
+          \]
+        </p>
+
+        <p>
+          Linear controllers work well near small errors, but spacecraft often require large-angle slews and global stability guarantees
+          under nonlinear coupling and disturbances.
+        </p>
+
+        <h3 id="d5-lyap-idea">7.1 Lyapunov stability idea (energy-like guarantee)</h3>
+        <p>
+          Choose a scalar “energy-like” function $V(x)$. If:
+        </p>
+
+        <p class="math-block">
+          \[
+            V(x) > 0,\qquad \dot{V}(x) < 0
+          \]
+        </p>
+
+        <p>
+          then the system’s energy decreases, and the attitude stabilizes.
+        </p>
+
+        <h3 id="d5-lyap-structure">7.2 Practical Lyapunov structure for attitude</h3>
+        <p>
+          A common structure combines rotational kinetic energy and attitude error energy:
+        </p>
+
+        <p class="math-block">
+          \[
+            V = \frac{1}{2}\omega^T J\omega + k\,\Psi(q)
+          \]
+        </p>
+
+        <p>
+          A typical stabilizing torque shape is:
+        </p>
+
+        <p class="math-block">
+          \[
+            T_c = -K_p\,e(q) - K_d\,\omega
+          \]
+        </p>
+
+        <p>Intuition:</p>
+        <ul>
+          <li>$K_p$ drives attitude error down</li>
+          <li>$K_d$ dissipates rotational energy (damping)</li>
+          <li>the design aims to guarantee $\dot{V}<0$ despite bounded disturbances</li>
+        </ul>
+
+        <p>
+          This matters because it gives strong stability guarantees beyond the small-angle linear regime.
+        </p>
+      </section>
+
+      <!-- 8 -->
+      <section id="d5-csi">
+        <h2>8) Control–structure interaction: the practical rulebook</h2>
+
+        <p>
+          For flexible spacecraft, robust design is largely about preventing the controller from exciting structure.
+          This is not only a theoretical issue—it shows up as pointing jitter, structural ringing, and degraded payload performance.
+        </p>
+
+        <ul>
+          <li>Keep controller bandwidth well below the first flexible mode frequency</li>
+          <li>Add mode filters / notch filters at known structural resonances</li>
+          <li>Ensure high-frequency gain roll-off to avoid unmodeled modes</li>
+          <li>Include realistic actuator delay/sampling in analysis</li>
+          <li>Validate across mode shifts and damping variation</li>
+        </ul>
+      </section>
+
+      <!-- 9 -->
+      <section id="d5-workflow">
+        <h2>9) Space-grade validation workflow (how robust design is proven)</h2>
+
+        <p>
+          Robust attitude control is “earned” through validation, not assumed. A design that works only in a nominal simulation
+          is not robust—especially for long missions and precision pointing.
+        </p>
+
+        <ol>
+          <li><strong>Nominal closed-loop design</strong> (baseline performance)</li>
+          <li><strong>Uncertainty modeling</strong> (bounded inertia + frequency shifts + delays)</li>
+          <li><strong>Disturbance envelopes</strong> (worst-case torques by orbit and attitude)</li>
+          <li><strong>Actuator realism</strong> (saturation, rate limits, pulsing, minimum impulse)</li>
+          <li><strong>Monte Carlo testing</strong> (randomized uncertainties and noise)</li>
+          <li><strong>Nonlinear simulation</strong> (full quaternion + nonlinear dynamics)</li>
+          <li><strong>Hardware-in-the-loop / actuator-in-the-loop</strong> tests when possible</li>
+        </ol>
+
+        <p>Success metrics are not “nice plots,” but:</p>
+        <ul>
+          <li>stable for the entire uncertainty set</li>
+          <li>pointing accuracy and jitter within requirements</li>
+          <li>no persistent ringing / residual vibration</li>
+          <li>feasible actuator usage without saturation-driven failure modes</li>
+        </ul>
+      </section>
+
+      <!-- Summary -->
+      <section id="d5-summary">
+    
+
+        <div class="callout">
+          <h3> D.5 Takeaway</h3>
+          <p>
+            Robust attitude control is the discipline of making attitude systems survive reality.
+            It is designed for uncertain inertia and time-varying mass properties, flexible structures and uncertain modal frequencies,
+            continuous environmental torques, sensor noise/drift/outages, and actuator saturation/delay/quantization/pulsed actuation.
+          </p>
+          <p>
+            Crucially, robust spacecraft pointing is achieved through <strong>both</strong>:
+            <strong>robust feedback</strong> (stability + disturbance rejection under uncertainty), and
+            <strong>robust maneuver shaping</strong> (commands that avoid residual vibration even when structural parameters shift).
+          </p>
+        </div>
+
+        <ul>
+          <li>Robustness targets worst-case stability and worst-case pointing performance.</li>
+          <li>Disturbances (gravity-gradient, SRP, drag, magnetic) act continuously and can accumulate.</li>
+          <li>Flexibility and delay can destroy margins if not handled explicitly.</li>
+          <li>Validation requires uncertainty sweeps, Monte Carlo, and nonlinear simulation.</li>
+        </ul>
+      </section>
+
+    </article>
+
+    <!-- Bottom navigation card (match D.1 / D.4 pattern) -->
+    <section class="next-domain-card">
+      <h2>Continue in Domain D</h2>
+      <p>
+        <a href="domain-d4-momentum-management.html">
+          &larr; Previous: Domain D.4 — Momentum Management &amp; Momentum-Exchange Actuators
+        </a>
+      </p>
+      <p>
+        <a href="domain-d6-flexible-spacecraft.html">
+       
+          Next: Domain D.6 Flexible Spacecraft Dynamics &rarr;
+        </a>
+      </p>
+      <p>
+        <a href="notes.html#domain-d-overview">&larr; Back to Domain D overview</a>
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+ <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

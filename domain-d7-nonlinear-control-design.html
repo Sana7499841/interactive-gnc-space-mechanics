@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Domain D.7 — Nonlinear Attitude Control Design | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match Advanced Domains style) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain D pages) -->
+  <header class="notes-hero">
+    <h1>Domain D — Attitude Dynamics &amp; Control (Advanced)</h1>
+    <p class="notes-tagline">
+      Nonlinear rotational dynamics, maneuvering, momentum management, robust control, and stability methods.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–F)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Top intro card (match D.2 pattern) -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–F)</a>
+      </p>
+
+      <h1>Domain D.7 — Nonlinear Attitude Control Design</h1>
+
+      <p>
+        Applied control design with quaternions: feedback laws, stability logic, robustness ideas, and “works on hardware”
+        constraints (saturation, rate limits, pulsing).
+      </p>
+
+      <p>
+        Domain D.7 is the “controller you can actually fly” section. It treats quaternion feedback as a genuinely nonlinear
+        design problem (not a linear PD with a quaternion wrapper), then connects that design to how real spacecraft actuators
+        behave when they saturate, rate-limit, and pulse.
+      </p>
+
+      <ul>
+        <li>Explain why nonlinear attitude control is required even for rigid-body spacecraft.</li>
+        <li>State the core quaternion kinematics and rigid-body dynamics used throughout.</li>
+        <li>Build quaternion tracking error correctly and enforce shortest-rotation (avoid unwinding).</li>
+        <li>Implement quaternion feedback (PD-like) laws and understand what makes them nonlinear.</li>
+        <li>Use a Lyapunov proof structure to justify stability and energy dissipation.</li>
+        <li>Introduce sliding mode control as a robustness tool, and why chattering mitigation matters.</li>
+        <li>Embed actuator limits (saturation, rate caps, deadbands, pulsing, allocation) into flight-realistic design.</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation (match D.2 jump bar style) -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#d7-why">1. Why nonlinear attitude control</a> &middot;
+        <a href="#d7-model">2. Core model</a> &middot;
+        <a href="#d7-error">3. Quaternion tracking error</a> &middot;
+        <a href="#d7-pd">4. Quaternion feedback law</a> &middot;
+        <a href="#d7-lyapunov">5. Lyapunov stability structure</a> &middot;
+        <a href="#d7-tuning">6. PD tuning mindset</a> &middot;
+        <a href="#d7-smc">7. Sliding mode (intro)</a> &middot;
+        <a href="#d7-actuators">8. Actuator limits (flight reality)</a> &middot;
+        <a href="#d7-implementation">9. Implementation rules</a> &middot;
+        <a href="#d7-outcomes">10. Learning outcomes</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+
+      <!-- 1 -->
+      <section id="d7-why">
+        <h2>1. Why Nonlinear Attitude Control Is Its Own Topic</h2>
+
+        <p>
+          Spacecraft attitude control is nonlinear even before you add flexible appendages or real actuators. The reason is that
+          attitude is not a Euclidean vector: it evolves on a rotation manifold, the rigid-body dynamics include nonlinear
+          cross-coupling, and the actuators and digital implementation introduce discontinuities and constraints.
+        </p>
+
+        <ul>
+          <li>
+            <strong>Geometry is nonlinear:</strong> attitude lives on the rotation manifold; with quaternions you must satisfy
+            $\lVert q \rVert = 1$ at all times.
+          </li>
+          <li>
+            <strong>Dynamics are nonlinear:</strong> rigid-body rotation includes the gyroscopic coupling term
+            $\boldsymbol{\omega}\times(\mathbf{J}\boldsymbol{\omega})$.
+          </li>
+          <li>
+            <strong>Actuators are nonlinear:</strong> torque saturation, rate limits, deadbands, minimum impulse bit, and thruster pulsing.
+          </li>
+          <li>
+            <strong>Real loops include delays + filters:</strong> onboard sampling and processing delay can shrink phase margin and invite oscillations.
+          </li>
+          <li>
+            <strong>Flexibility + discontinuities create limit cycles:</strong> pulsed thrusters / saturations can inject energy near structural modes.
+          </li>
+        </ul>
+
+        <p>
+          So a “linear PD around a point” can behave perfectly in a small-angle lab test and still misbehave for
+          large-angle slews, saturation-dominated maneuvers, or sign changes in attitude error. Domain D.7 designs the
+          controller directly on quaternion geometry and then makes it implementable.
+        </p>
+
+        <div class="callout">
+          <h3>Flight-grade mindset</h3>
+          <p>
+            Nonlinear attitude control is not “extra math.” It is the minimum framework that stays well-defined under large rotations,
+            avoids long-way slews, and keeps predictable behavior when actuators clip, pulse, and rate-limit.
+          </p>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section id="d7-model">
+        <h2>2. Core Model Used Throughout D.7</h2>
+
+        <h3>2.1 Quaternion kinematics (attitude propagation)</h3>
+
+        <p>
+          Let spacecraft attitude be the unit quaternion
+        </p>
+
+        <p class="math-block">
+          \[
+            q = \begin{bmatrix}\mathbf{q}_v \\ q_4 \end{bmatrix}, \qquad \lVert q \rVert = 1
+          \]
+        </p>
+
+        <p>
+          where $\mathbf{q}_v\in\mathbb{R}^3$ is the vector part and $q_4$ is the scalar part. With body angular rate
+          $\boldsymbol{\omega}$,
+        </p>
+
+        <p class="math-block">
+          \[
+            \dot{q} = \frac{1}{2}\,\Omega(\boldsymbol{\omega})\,q
+          \]
+        </p>
+
+        <p>
+          with a standard structure
+        </p>
+
+        <p class="math-block">
+          \[
+            \Omega(\boldsymbol{\omega})=
+            \begin{bmatrix}
+              -[\boldsymbol{\omega}]_\times & \boldsymbol{\omega} \\
+              -\boldsymbol{\omega}^\mathsf{T} & 0
+            \end{bmatrix}
+          \]
+        </p>
+
+        <p>
+          Key message: kinematics are linear in $q$ but nonlinear overall because $\Omega$ depends on $\boldsymbol{\omega}$ and we must enforce
+          $\lVert q\rVert = 1$.
+        </p>
+
+        <h3>2.2 Rigid-body rotational dynamics (attitude plant)</h3>
+
+        <p class="math-block">
+          \[
+            \mathbf{J}\,\dot{\boldsymbol{\omega}} + \boldsymbol{\omega}\times(\mathbf{J}\boldsymbol{\omega})
+            = \boldsymbol{\tau} + \boldsymbol{\tau}_d
+          \]
+        </p>
+
+        <ul>
+          <li><strong>$\mathbf{J}$:</strong> inertia matrix (symmetric, positive definite)</li>
+          <li><strong>$\boldsymbol{\tau}$:</strong> control torque (reaction wheels / CMGs / thrusters / magnetorquers)</li>
+          <li><strong>$\boldsymbol{\tau}_d$:</strong> disturbances (gravity-gradient, SRP, drag, magnetic residuals, modeling error)</li>
+        </ul>
+
+        <p>
+          The plant is nonlinear because of $\boldsymbol{\omega}\times(\mathbf{J}\boldsymbol{\omega})$. Even if $\boldsymbol{\tau}$ is “PD,” the
+          closed-loop is still nonlinear.
+        </p>
+      </section>
+
+      <!-- 3 -->
+      <section id="d7-error">
+        <h2>3. Quaternion Tracking Error (the error signal that behaves well)</h2>
+
+        <p>
+          Given desired attitude $q_d$, define the error quaternion:
+        </p>
+
+        <p class="math-block">
+          \[
+            q_e = q_d^{-1}\otimes q \;\;\Rightarrow\;\;
+            q_e =
+            \begin{bmatrix}
+              \mathbf{q}_{ev}\\
+              q_{e4}
+            \end{bmatrix}
+          \]
+        </p>
+
+        <p>
+          Interpretation: $q_e$ represents the rotation that takes you from desired attitude to current attitude.
+        </p>
+
+        <h3>3.1 Why we use the vector part $\mathbf{q}_{ev}$</h3>
+
+        <p>
+          The vector part $\mathbf{q}_{ev}$ points along the instantaneous axis that “undoes” the attitude error. It is the most practical
+          geometric error for feedback: it directly encodes the direction your control torque should push.
+        </p>
+
+        <h3>3.2 Shortest-rotation convention (avoid unwinding)</h3>
+
+        <p>
+          Because $q$ and $-q$ represent the same physical attitude, the error quaternion has the same ambiguity. If you do nothing,
+          the controller can rotate the long way around (“unwinding”).
+        </p>
+
+        <p>
+          A standard operational fix:
+        </p>
+
+        <p class="math-block">
+          \[
+            \text{if } q_{e4} < 0,\quad q_e \leftarrow -q_e
+          \]
+        </p>
+
+        <p>
+          This makes the controller choose the shorter rotation consistently.
+        </p>
+
+        <div class="callout">
+          <h3>Unwinding is not a theory detail</h3>
+          <p>
+            If you ignore quaternion sign handling, you can command a physically correct but operationally wrong maneuver:
+            the spacecraft rotates the long way and wastes time, torque, power, and momentum capacity.
+          </p>
+        </div>
+
+        <h3>3.3 Rate error</h3>
+
+        <p>
+          For setpoint regulation, $\boldsymbol{\omega}_d=0 \Rightarrow \boldsymbol{\omega}_e=\boldsymbol{\omega}$.
+          For tracking maneuvers, $\boldsymbol{\omega}_e$ compares measured rate to the desired rate mapped into the correct frame.
+        </p>
+      </section>
+
+      <!-- 4 -->
+      <section id="d7-pd">
+        <h2>4. Quaternion Feedback Control Law (baseline nonlinear stabilizer)</h2>
+
+        <h3>4.1 The practical quaternion PD law</h3>
+
+        <p>
+          The workhorse for spacecraft attitude regulation is:
+        </p>
+
+        <p class="math-block">
+          \[
+            \boldsymbol{\tau} = -\mathbf{K}_p\,\mathbf{q}_{ev} - \mathbf{K}_d\,\boldsymbol{\omega}
+          \]
+        </p>
+
+        <ul>
+          <li>
+            <strong>$-\mathbf{K}_p\,\mathbf{q}_{ev}$:</strong> restoring torque in quaternion space (like a spring in rotation geometry)
+          </li>
+          <li>
+            <strong>$-\mathbf{K}_d\,\boldsymbol{\omega}$:</strong> damping (removes kinetic energy, prevents ringing)
+          </li>
+        </ul>
+
+        <p>
+          This is PD-like but not a small-angle linearization. With correct sign handling of $q_e$, it remains meaningful for large slews.
+        </p>
+
+        <h3>4.2 Adding a model-based term (optional but strong)</h3>
+
+        <p>
+          If you have good estimates of $\mathbf{J}$ and desired rate/acceleration profiles, you can add a computed-torque style feedforward:
+        </p>
+
+        <p class="math-block">
+          \[
+            \boldsymbol{\tau}
+            = \boldsymbol{\omega}\times(\mathbf{J}\boldsymbol{\omega})
+            + \mathbf{J}\dot{\boldsymbol{\omega}}_d
+            - \mathbf{K}_p\,\mathbf{q}_{ev}
+            - \mathbf{K}_d\,\boldsymbol{\omega}_e
+          \]
+        </p>
+
+        <ul>
+          <li>first two terms “pre-cancel” nonlinear coupling and follow commanded accelerations</li>
+          <li>PD terms supply robustness when the model is imperfect and suppress noise/uncertainty</li>
+        </ul>
+
+        <p>
+          In flight software, this is often implemented partially (or with conservative $\mathbf{J}$) so you don’t amplify sensor noise.
+        </p>
+      </section>
+
+      <!-- 5 -->
+      <section id="d7-lyapunov">
+        <h2>5. Lyapunov Stability Proof Structure (how you justify nonlinear control)</h2>
+
+        <p>
+          A clean proof is not about showing pretty algebra; it is about showing the controller dissipates energy despite nonlinear dynamics.
+        </p>
+
+        <h3>5.1 Choose a Lyapunov candidate (energy-like)</h3>
+
+        <p>
+          A very common structure is:
+        </p>
+
+        <p class="math-block">
+          \[
+            V(\boldsymbol{\omega}, q_e) = \frac{1}{2}\boldsymbol{\omega}^\mathsf{T}\mathbf{J}\boldsymbol{\omega} + V_q(q_e)
+          \]
+        </p>
+
+        <ul>
+          <li>$\frac{1}{2}\boldsymbol{\omega}^\mathsf{T}\mathbf{J}\boldsymbol{\omega}$ is rotational kinetic energy</li>
+          <li>$V_q(q_e)$ is an attitude “potential” that is minimal at zero attitude error</li>
+        </ul>
+
+        <p>
+          A widely used potential is shaped so that:
+          it is minimal at $q_{e4}=1$ (no error),
+          it respects quaternion geometry,
+          it avoids unwinding by using the sign convention $q_{e4}\ge 0$.
+        </p>
+
+        <h3>5.2 Differentiate along system trajectories</h3>
+
+        <p>
+          Using $\mathbf{J}\dot{\boldsymbol{\omega}} = -\boldsymbol{\omega}\times(\mathbf{J}\boldsymbol{\omega}) + \boldsymbol{\tau} + \boldsymbol{\tau}_d$,
+          the derivative typically takes the form:
+        </p>
+
+        <p class="math-block">
+          \[
+            \dot{V}
+            = \boldsymbol{\omega}^\mathsf{T}\boldsymbol{\tau}
+            + \boldsymbol{\omega}^\mathsf{T}\boldsymbol{\tau}_d
+            - \boldsymbol{\omega}^\mathsf{T}\mathbf{K}_d\boldsymbol{\omega}
+          \]
+        </p>
+
+        <p>
+          where the “mixed” attitude terms cancel by how $V_q$ is chosen and by the structure of
+          $\boldsymbol{\tau}=-\mathbf{K}_p\mathbf{q}_{ev}-\mathbf{K}_d\boldsymbol{\omega}$.
+        </p>
+
+        <h3>5.3 What the inequality tells you</h3>
+
+        <p>
+          If $\boldsymbol{\tau}_d=0$:
+        </p>
+
+        <p class="math-block">
+          \[
+            \dot{V} = -\boldsymbol{\omega}^\mathsf{T}\mathbf{K}_d\boldsymbol{\omega}\le 0
+          \]
+        </p>
+
+        <p>
+          so energy decreases and the motion settles.
+        </p>
+
+        <p>
+          If $\boldsymbol{\tau}_d\neq 0$ but bounded: you get practical stability — the system converges to a small neighborhood whose
+          size depends on disturbance magnitude and gains. Increasing damping improves rate rejection.
+        </p>
+
+        <h3>5.4 What kind of stability you should claim</h3>
+
+        <p>
+          Because attitude is not a Euclidean space, smooth global stabilization has topological caveats. In practice you state:
+        </p>
+
+        <ul>
+          <li><strong>almost-global asymptotic stability</strong> (all initial attitudes except a measure-zero set), or</li>
+          <li><strong>global practical stability</strong> under bounded disturbances and actuator constraints.</li>
+        </ul>
+
+        <p>
+          That’s also why sign-handling $q_{e4}\ge 0$ is not a cosmetic trick — it directly affects global behavior and prevents long-path rotations.
+        </p>
+      </section>
+
+      <!-- 6 -->
+      <section id="d7-tuning">
+        <h2>6. PD Control in Quaternion Space (design and tuning mindset)</h2>
+
+        <h3>6.1 Small-angle intuition still helps (but you design for large angles)</h3>
+
+        <p>
+          For small errors, $\mathbf{q}_{ev}\approx \frac{1}{2}\theta\,\hat{\mathbf{u}}$. Then:
+        </p>
+
+        <p class="math-block">
+          \[
+            \boldsymbol{\tau}\approx -\mathbf{K}_p\left(\frac{1}{2}\theta\,\hat{\mathbf{u}}\right) - \mathbf{K}_d\boldsymbol{\omega}
+          \]
+        </p>
+
+        <p>
+          So:
+        </p>
+
+        <ul>
+          <li><strong>$\mathbf{K}_p$</strong> sets how “stiff” the attitude correction feels</li>
+          <li><strong>$\mathbf{K}_d$</strong> sets damping and suppresses overshoot and oscillation</li>
+        </ul>
+
+        <p>
+          But the tuning must be validated in the large-angle + saturation regime, because that is the true nonlinear operating condition.
+        </p>
+
+        <h3>6.2 A realistic tuning workflow</h3>
+
+        <ol>
+          <li>Choose $\mathbf{K}_d$ high enough to tame rate transients and avoid ringing under saturation.</li>
+          <li>Increase $\mathbf{K}_p$ to hit maneuver-time requirements (slew speed).</li>
+          <li>Re-check $\mathbf{K}_d$ for damping under worst-case inertia and maximum disturbance torque.</li>
+        </ol>
+
+        <p>
+          Verify for:
+        </p>
+
+        <ul>
+          <li>large-angle slews (worst-case initial error)</li>
+          <li>actuator saturation duration</li>
+          <li>sensor noise (gyro noise + bias)</li>
+          <li>delays (sample time, filtering)</li>
+          <li>flexible-mode sensitivity (if appendages exist)</li>
+        </ul>
+
+        <p>
+          A controller that “feels perfect” in the linear regime can excite modes or create limit cycles once clipping starts.
+        </p>
+      </section>
+
+      <!-- 7 -->
+      <section id="d7-smc">
+        <h2>7. Sliding Mode Control (intro: robustness for uncertainty and disturbances)</h2>
+
+        <p>
+          Sliding mode is used when you expect: uncertain inertia / changing mass properties, bounded but unknown disturbance torques,
+          coarse switching actuators (thrusters), or unmodeled dynamics that degrade PD performance.
+        </p>
+
+        <h3>7.1 Define a sliding surface</h3>
+
+        <p>
+          A standard surface blends rate and attitude error:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf{s} = \boldsymbol{\omega} + \mathbf{\Lambda}\,\mathbf{q}_{ev}
+          \]
+        </p>
+
+        <p>
+          Goal: drive $\mathbf{s}\to 0$. Once on the surface, rates become “tied” to attitude error in a stable way, giving strong robustness.
+        </p>
+
+        <h3>7.2 Control structure (concept)</h3>
+
+        <p>
+          A typical form is:
+        </p>
+
+        <p class="math-block">
+          \[
+            \boldsymbol{\tau} = \boldsymbol{\tau}_{eq} - \mathbf{K}_s\,\mathrm{sat}\!\left(\frac{\mathbf{s}}{\phi}\right)
+          \]
+        </p>
+
+        <ul>
+          <li><strong>$\boldsymbol{\tau}_{eq}$:</strong> nominal model-based part</li>
+          <li><strong>$\mathbf{K}_s$:</strong> robustness gain (chosen to dominate bounded uncertainties)</li>
+          <li><strong>$\mathrm{sat}(\mathbf{s}/\phi)$:</strong> boundary-layer saturation (practical replacement for $\mathrm{sgn}(\mathbf{s})$)</li>
+        </ul>
+
+        <h3>7.3 Why boundary layers are essential in spacecraft</h3>
+
+        <p>
+          Ideal sliding mode uses discontinuous switching. Real spacecraft have sampling, quantization, delays, and flexible modes — so
+          discontinuous switching can cause chattering, which:
+        </p>
+
+        <ul>
+          <li>excites flexible structures</li>
+          <li>injects jitter into pointing</li>
+          <li>increases actuator wear (thruster cycling / wheel torque chatter)</li>
+        </ul>
+
+        <p>
+          Hence practical sliding mode is almost always smoothed (boundary layer, hysteresis, rate limits, or higher-order variants).
+        </p>
+
+        <div class="callout">
+          <h3>Engineering takeaway</h3>
+          <p>
+            Sliding mode is valuable because it is robust by design — but you must treat chattering mitigation as a primary requirement,
+            not a cosmetic improvement.
+          </p>
+        </div>
+      </section>
+
+      <!-- 8 -->
+      <section id="d7-actuators">
+        <h2>8. Actuator Limits (the difference between “stable on paper” and “flies well”)</h2>
+
+        <h3>8.1 Torque saturation (hard limit)</h3>
+
+        <p>
+          All actuators have $\lVert\boldsymbol{\tau}\rVert \le \tau_{\max}$. The moment the controller commands beyond that,
+          the loop changes character:
+        </p>
+
+        <ul>
+          <li>effective gains drop</li>
+          <li>damping may be insufficient</li>
+          <li>overshoot and limit cycles can appear</li>
+          <li>structural modes can be excited by clipped or pulsed commands</li>
+        </ul>
+
+        <p>
+          So saturation must be treated as part of the design, not an afterthought.
+        </p>
+
+        <h3>8.2 Slew-rate limits and eigenaxis-style maneuvers</h3>
+
+        <p>
+          Many missions impose maximum allowable angular rate (star tracker tracking, payload smear, structural loads).
+          Under a rate cap, a physically realistic maneuver naturally becomes:
+        </p>
+
+        <ol>
+          <li><strong>Acceleration phase:</strong> build up to allowable rate</li>
+          <li><strong>Coast phase:</strong> rotate near constant maximum rate</li>
+          <li><strong>Deceleration phase:</strong> reduce rate to zero at target</li>
+        </ol>
+
+        <p>
+          A saturation-aware quaternion controller can be designed so that these phases emerge naturally — especially important when you want
+          predictable maneuver timing and bounded stress.
+        </p>
+
+        <h3>8.3 Deadbands and minimum impulse bit (thruster reality)</h3>
+
+        <p>
+          Thrusters are switching devices:
+        </p>
+
+        <ul>
+          <li>small commands may be ignored (deadband)</li>
+          <li>there is a minimum pulse width / impulse bit</li>
+          <li>the effective torque becomes piecewise and discontinuous</li>
+        </ul>
+
+        <p>
+          This is a direct pathway to nonlinear oscillations (limit cycles), especially if the spacecraft has flexible modes. That is why
+          practical thruster attitude control often uses modulator logic (e.g., pulse-width / pulse-frequency modulation) plus structural filtering.
+        </p>
+
+        <h3>8.4 Structured saturation: cascade saturation (why it appears in nonlinear design)</h3>
+
+        <p>
+          Instead of one harsh clip, cascade saturation limits the command gradually in layers. Conceptually, it shapes the control so that:
+        </p>
+
+        <ul>
+          <li>directionality is preserved as much as possible</li>
+          <li>stability is maintained during saturation-dominated maneuvers</li>
+          <li>large-angle eigenaxis-like rotation is not destroyed by abrupt clipping</li>
+        </ul>
+
+        <p>
+          This is especially valuable when the controller must remain stable across wide operating regimes.
+        </p>
+
+        <h3>8.5 Control allocation and redistribution (multi-actuator systems)</h3>
+
+        <p>
+          With multiple wheels or thrusters, commanded body torque must be allocated through a distribution matrix.
+          When one actuator saturates:
+        </p>
+
+        <ul>
+          <li>the remaining actuators must pick up the demand</li>
+          <li>the net body torque direction should stay aligned with control intent</li>
+          <li>the controller should be “aware” of achievable torque to avoid hidden authority loss</li>
+        </ul>
+
+        <p>
+          A flight-ready design closes the loop on what torque was actually achieved, not just what was commanded.
+        </p>
+
+        <div class="callout">
+          <h3>Why “just clip the command” is risky</h3>
+          <p>
+            Naively saturating a controller output can distort torque direction, reduce effective damping, and create unexpected nonlinear
+            behaviors (limit cycles, slow recovery, structural excitation). Saturation-aware structure is a stability feature, not a tuning trick.
+          </p>
+        </div>
+      </section>
+
+      <!-- 9 -->
+      <section id="d7-implementation">
+        <h2>9. Implementation Rules That Belong Inside D.7 (what you actually code)</h2>
+
+        <h3>9.1 Quaternion normalization</h3>
+
+        <p>
+          Numerical integration drifts. Always enforce:
+        </p>
+
+        <p class="math-block">
+          \[
+            q \leftarrow \frac{q}{\lVert q\rVert}
+          \]
+        </p>
+
+        <h3>9.2 Shortest-rotation sign rule</h3>
+
+        <p>
+          Always apply:
+        </p>
+
+        <p class="math-block">
+          \[
+            q_{e4}\ge 0 \quad (\text{flip } q_e \text{ if needed})
+          \]
+        </p>
+
+        <p>
+          This prevents unwinding and makes behavior consistent.
+        </p>
+
+        <h3>9.3 Discrete-time reality</h3>
+
+        <p>
+          Controllers are sampled. You must verify:
+        </p>
+
+        <ul>
+          <li>stability margin with sample time</li>
+          <li>noise sensitivity (rate feedback amplifies gyro noise)</li>
+          <li>delay + filtering effects</li>
+        </ul>
+
+        <h3>9.4 Robustness checks</h3>
+
+        <p>
+          Always test:
+        </p>
+
+        <ul>
+          <li>inertia uncertainty (configuration changes)</li>
+          <li>disturbance torque envelopes</li>
+          <li>saturation and rate limits</li>
+          <li>sensor bias/noise</li>
+          <li>flexible mode injection (if present)</li>
+        </ul>
+      </section>
+
+      <!-- 10 -->
+      <section id="d7-outcomes">
+        <h2>10. What D.7 Should Teach (final learning outcomes)</h2>
+
+        <p>
+          After this section, the reader should be able to:
+        </p>
+
+        <ul>
+          <li>
+            Build quaternion error correctly and enforce shortest-path behavior (avoid unwinding).
+          </li>
+          <li>
+            Implement quaternion PD for large-angle attitude stabilization and understand why it is nonlinear even if it looks “PD.”
+          </li>
+          <li>
+            Explain Lyapunov proof structure: pick $V$, compute $\dot{V}$, show energy dissipation and what changes with disturbances.
+          </li>
+          <li>
+            Understand sliding mode at an engineering level: surface, robustness term, and why chattering mitigation is mandatory in spacecraft.
+          </li>
+          <li>
+            Treat actuator limits as part of control design: saturation, rate caps, deadbands, pulsing, allocation — because these dominate real flight behavior.
+          </li>
+        </ul>
+
+        <div class="callout">
+          <h3>One-line summary</h3>
+          <p>
+            Nonlinear attitude control is quaternion geometry + energy shaping + robustness logic — wrapped in actuator-aware constraints so the design stays stable and predictable in flight.
+          </p>
+        </div>
+      </section>
+
+    </article>
+
+    <!-- Bottom navigation card (match D.2 pattern) -->
+    <section class="next-domain-card">
+      <h2>Continue in Domain D</h2>
+      <p>
+        <a href="domain-d6-flexible-spacecraft.html">
+          &larr; Previous: Domain D.6 — Flexible Spacecraft Dynamics
+        </a>
+      </p>
+      <p>
+        <a href="domain-d8-stability-lyapunov.html">
+          Next: Domain   D.8 Stability &amp; Lyapunov Methods &rarr;
+        </a>
+      </p>
+      <p>
+        <a href="notes.html#domain-d-overview">
+          &larr; Back to Domain D overview
+        </a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

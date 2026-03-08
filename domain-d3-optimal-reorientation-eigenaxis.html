@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Domain D.3 — Optimal Reorientation &amp; Eigenaxis Geometry | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match Advanced Domains style) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain D.1 structure) -->
+  <header class="notes-hero">
+    <h1>Domain D — Attitude Dynamics &amp; Control (Advanced)</h1>
+    <p class="notes-tagline">
+      Nonlinear rotational dynamics, maneuvering, momentum management, robust control, and stability methods.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–F)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Top intro card (same pattern as D.1 / E.1) -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–F)</a>
+      </p>
+
+      <h1>Domain D.3 — Optimal Reorientation &amp; Eigenaxis Geometry</h1>
+      <p>
+        This page isolates the <strong>pure geometry</strong> of minimal attitude change. Given two spacecraft attitudes,
+        there are infinitely many continuous rotational paths connecting them. Yet there is a uniquely distinguished
+        rotation that is “best” in a geometric sense: a <strong>single rotation about a fixed axis</strong> by the
+        <strong>smallest possible angle</strong>.
+      </p>
+
+      <p>
+        That fixed axis is the <strong>eigenaxis</strong> of the relative attitude. In practice, eigenaxis geometry is
+        the backbone behind “shortest-path” quaternion logic and explains why many reorientation laws naturally produce
+        single-axis slews when the motion is well aligned.
+      </p>
+
+      <ul>
+        <li>Define the minimum-angle rotation between two attitudes using $SO(3)$ geometry.</li>
+        <li>Extract eigenaxis + angle via axis–angle formulas and trace identities.</li>
+        <li>Connect the same geometry to quaternion error and shortest-path selection.</li>
+        <li>Clarify when eigenaxis motion is time-optimal (and when it is not).</li>
+        <li>Compare eigenaxis (geodesic) motion with multi-axis composite maneuvers.</li>
+      </ul>
+
+      <div class="callout">
+        <h3>Scope note (kept distinct from D.2)</h3>
+        <p>
+          D.3 is <strong>geometric optimal rotation</strong>: what the shortest reorientation must look like in principle.
+          D.2 is <strong>maneuver design</strong>: how real spacecraft with actuator limits and nonlinear dynamics
+          actually execute large-angle maneuvers. Here we deliberately avoid actuator details and stay focused on
+          minimal-rotation structure.
+        </p>
+      </div>
+    </section>
+
+    <!-- In-page navigation (match D.1 jump bar pattern) -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#d3-why">1. Why eigenaxis is special</a> &middot;
+        <a href="#d3-relative">2. Relative rotation in $SO(3)$</a> &middot;
+        <a href="#d3-axisangle">3. Axis–angle extraction</a> &middot;
+        <a href="#d3-quat">4. Quaternion shortest rotation</a> &middot;
+        <a href="#d3-dynamics">5. Pure eigenaxis motion</a> &middot;
+        <a href="#d3-optimal">6. When is eigenaxis optimal?</a> &middot;
+        <a href="#d3-compare">7. Eigenaxis vs multi-axis</a> &middot;
+        <a href="#d3-visual">8. Geometric visualization</a> &middot;
+        <a href="#d3-feedback">9. Link to quaternion feedback</a> &middot;
+        <a href="#d3-summary">Summary</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+
+      <!-- 1 -->
+      <section id="d3-why">
+        <h2>1. Why Eigenaxis Rotation Is Special</h2>
+
+        <p>
+          A rigid-body attitude change is not unique: you can reach the same final orientation using many different
+          sequences and mixtures of rotations. A spacecraft could:
+        </p>
+
+        <ul>
+          <li>rotate about one axis and then another,</li>
+          <li>execute a composite multi-axis maneuver,</li>
+          <li>follow a curved path in attitude space, or</li>
+          <li>rotate about a single fixed axis from start to finish.</li>
+        </ul>
+
+        <p>
+          Among all those possibilities, there is <strong>exactly one</strong> rotation that minimizes the total angular
+          displacement. That minimal displacement motion is:
+        </p>
+
+        <p class="math-block">
+          \[
+            \text{A single rotation about one fixed axis by the smallest possible angle.}
+          \]
+        </p>
+
+        <p>
+          The distinguished axis is the <strong>eigenaxis</strong> of the relative attitude. This result is purely
+          geometric: it does not require knowledge of actuator limits, torque saturation, control gains, or feedback law.
+          It arises from the structure of the rotation group $SO(3)$ itself.
+        </p>
+
+        <h3>What D.3 builds</h3>
+        <ul>
+          <li><strong>Minimum-angle rotation geometry:</strong> the unique minimal rotation between two attitudes.</li>
+          <li><strong>Axis–angle representation:</strong> how $(\hat{\mathbf e},\theta)$ parameterizes the relative rotation.</li>
+          <li><strong>Quaternion shortest-path structure:</strong> how $q_4 \ge 0$ selects the smaller rotation.</li>
+          <li><strong>Optimality conditions:</strong> when “shortest angle” also becomes “shortest time.”</li>
+          <li><strong>Comparison:</strong> why multi-axis maneuvers may be faster for asymmetric inertia even if they rotate more.</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Key takeaway</h3>
+          <p>
+            Eigenaxis rotation is the <strong>geodesic</strong> in attitude space: it is the shortest path (minimum angle)
+            between two orientations.
+          </p>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section id="d3-relative">
+        <h2>2. Minimum-Angle Rotation Between Two Attitudes</h2>
+
+        <p>
+          Let the spacecraft’s attitude be represented by a direction cosine matrix (DCM):
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf R_c \in SO(3) \quad \text{(current attitude)}, \qquad
+            \mathbf R_d \in SO(3) \quad \text{(desired attitude)}.
+          \]
+        </p>
+
+        <p>
+          The rotation that maps the current attitude to the desired attitude is the <strong>relative rotation</strong>:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf R_e = \mathbf R_d \mathbf R_c^{T}.
+          \]
+        </p>
+
+        <p>
+          By construction, this satisfies:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf R_d = \mathbf R_e \mathbf R_c.
+          \]
+        </p>
+
+        <p>
+          Since $\mathbf R_e \in SO(3)$, it must represent a proper rotation. A fundamental result from rigid-body
+          kinematics states:
+        </p>
+
+        <div class="callout">
+          <h3>Axis theorem for rotations</h3>
+          <p>
+            Any proper orthogonal matrix can be expressed as a rotation about a single axis by a single angle.
+          </p>
+        </div>
+
+        <p>
+          Therefore $\mathbf R_e$ can be written in axis–angle (Rodrigues) form:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf R_e = \mathbf I + \sin\theta \,[\hat{\mathbf e}]_\times + (1-\cos\theta)\,[\hat{\mathbf e}]_\times^2,
+          \]
+        </p>
+
+        <ul>
+          <li>$\hat{\mathbf e} \in \mathbb{R}^3$ is a unit rotation axis (the eigenaxis).</li>
+          <li>$\theta \in [0,\pi]$ is the rotation angle (chosen minimal).</li>
+          <li>$[\hat{\mathbf e}]_\times$ is the skew-symmetric cross-product matrix.</li>
+        </ul>
+
+        <p>
+          The skew-symmetric matrix is:
+        </p>
+
+        <p class="math-block">
+          \[
+          [\hat{\mathbf e}]_\times =
+          \begin{bmatrix}
+          0 & -e_3 & e_2\\
+          e_3 & 0 & -e_1\\
+          -e_2 & e_1 & 0
+          \end{bmatrix}.
+          \]
+        </p>
+
+        <h3>Why it is called the eigenaxis</h3>
+        <p>
+          The eigenaxis is the direction left unchanged by the rotation:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf R_e \hat{\mathbf e} = \hat{\mathbf e}.
+          \]
+        </p>
+
+        <p>
+          This means $\hat{\mathbf e}$ is an eigenvector of $\mathbf R_e$ with eigenvalue 1. Geometrically:
+        </p>
+
+        <ul>
+          <li>the axis direction is invariant under the rotation,</li>
+          <li>all directions orthogonal to it rotate through the angle $\theta$.</li>
+        </ul>
+      </section>
+
+      <!-- 3 -->
+      <section id="d3-axisangle">
+        <h2>3. Axis–Angle Representation</h2>
+
+        <p>
+          The axis–angle form gives a compact representation of the entire attitude change. The angle is obtained from
+          the trace identity:
+        </p>
+
+        <p class="math-block">
+          \[
+            \theta = \cos^{-1}\left(\frac{\mathrm{trace}(\mathbf R_e)-1}{2}\right).
+          \]
+        </p>
+
+        <p>
+          Once $\theta$ is known, the eigenaxis can be extracted from the antisymmetric part of $\mathbf R_e$:
+        </p>
+
+        <p class="math-block">
+          \[
+            \hat{\mathbf e} =
+            \frac{1}{2\sin\theta}
+            \begin{bmatrix}
+            R_{32}-R_{23}\\
+            R_{13}-R_{31}\\
+            R_{21}-R_{12}
+            \end{bmatrix}.
+          \]
+        </p>
+
+        <p>
+          Therefore the attitude change is described as:
+        </p>
+
+        <p class="math-block">
+          \[
+            \boxed{\text{Rotate about } \hat{\mathbf e} \text{ by angle } \theta.}
+          \]
+        </p>
+
+        <h3>Why this is the minimum-angle rotation</h3>
+        <ul>
+          <li>For a fixed pair $(\mathbf R_c,\mathbf R_d)$, the relative rotation $\mathbf R_e$ is fixed.</li>
+          <li>Choosing $\theta \in [0,\pi]$ selects the smaller of the two equivalent rotations.</li>
+          <li>This produces the unique rotation that minimizes angular displacement (the geodesic on $SO(3)$).</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Engineering meaning</h3>
+          <p>
+            If you can command a spacecraft to rotate exactly about $\hat{\mathbf e}$ by $\theta$, you are guaranteed to
+            perform the smallest possible attitude slew in terms of total rotation angle.
+          </p>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section id="d3-quat">
+        <h2>4. Quaternion-Based Shortest Rotation</h2>
+
+        <p>
+          Axis–angle geometry is beautifully encoded by quaternions. Let the attitude error quaternion be:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf q_e = (q_1, q_2, q_3, q_4),
+          \]
+        </p>
+
+        <p>
+          using the scalar-last convention. Axis–angle parameters relate to quaternion components as:
+        </p>
+
+        <p class="math-block">
+          \[
+            q_4 = \cos\left(\frac{\theta}{2}\right), \qquad
+            \mathbf q_v = \hat{\mathbf e}\,\sin\left(\frac{\theta}{2}\right),
+          \]
+        </p>
+
+        <p>
+          where $\mathbf q_v = (q_1,q_2,q_3)$ is the vector part. Hence:
+        </p>
+
+        <p class="math-block">
+          \[
+            \theta = 2\cos^{-1}(q_4),
+            \qquad
+            \hat{\mathbf e} = \frac{\mathbf q_v}{\sin(\theta/2)}.
+          \]
+        </p>
+
+        <h3> Shortest-path logic in quaternions</h3>
+        <p>
+          Quaternions double-cover $SO(3)$:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf q \equiv -\mathbf q.
+          \]
+        </p>
+
+        <p>
+          Both represent the same physical attitude, but they imply different angles:
+        </p>
+
+        <ul>
+          <li>If $q_4 &gt; 0$, then $\theta \in [0,\pi]$ (the short rotation).</li>
+          <li>If $q_4 &lt; 0$, the implied rotation exceeds $\pi$ (the long way around).</li>
+        </ul>
+
+        <p>
+          Therefore the geometric minimum rotation is enforced by the sign choice:
+        </p>
+
+        <p class="math-block">
+          \[
+            \boxed{q_4 \ge 0.}
+          \]
+        </p>
+
+        <p>
+          This selects the quaternion on the “short” hemisphere of the unit quaternion sphere $S^3$ and guarantees the
+          minimum-angle representation.
+        </p>
+
+        <div class="callout">
+          <h3>Why this matters in practice</h3>
+          <p>
+            Many attitude-control implementations explicitly flip the quaternion sign to keep $q_4 \ge 0$. This is not a
+            control trick—it is a <strong>geometric shortest-path choice</strong>.
+          </p>
+        </div>
+      </section>
+
+      <!-- 5 -->
+      <section id="d3-dynamics">
+        <h2>5. Eigenaxis Rotation Dynamics (Pure Geometric Case)</h2>
+
+        <p>
+          Consider a motion in which the spacecraft rotates only about the eigenaxis direction:
+        </p>
+
+        <p class="math-block">
+          \[
+            \boldsymbol{\omega}(t) = \omega_e(t)\,\hat{\mathbf e}.
+          \]
+        </p>
+
+        <p>
+          In this case:
+        </p>
+
+        <ul>
+          <li>the direction of angular velocity remains fixed (collinear with $\hat{\mathbf e}$),</li>
+          <li>the quaternion vector part remains aligned with $\hat{\mathbf e}$,</li>
+          <li>no transverse components are generated by the kinematics themselves.</li>
+        </ul>
+
+        <p>
+          The rotation collapses to a scalar evolution in the rotation angle:
+        </p>
+
+        <p class="math-block">
+          \[
+            \dot{\theta} = \omega_e.
+          \]
+        </p>
+
+        <p>
+          This is the key “elegance” of eigenaxis motion: the full 3D attitude kinematics reduce to a single scalar
+          differential equation when the motion stays on the eigenaxis.
+        </p>
+
+        <div class="callout">
+          <h3>Geometric simplification</h3>
+          <p>
+            3D attitude reorientation becomes a 1D rotation problem if the motion remains a pure eigenaxis rotation.
+          </p>
+        </div>
+      </section>
+
+      <!-- 6 -->
+      <section id="d3-optimal">
+        <h2>6. When Is Eigenaxis Rotation Optimal?</h2>
+
+        <h3>Case 1 — Kinematic optimality (always)</h3>
+        <p>
+          Eigenaxis rotation always minimizes angular displacement. No other continuous rotation between the same two
+          attitudes yields a smaller rotation angle.
+        </p>
+
+        <h3>Case 2 — Time-optimal for inertially symmetric bodies</h3>
+        <p>
+          If the spacecraft is inertially symmetric:
+        </p>
+
+        <p class="math-block">
+          \[
+            J_1 = J_2 = J_3,
+          \]
+        </p>
+
+        <p>
+          then Euler’s rotational dynamics decouple (no gyroscopic coupling), and the time-optimal control under bounded
+          torque takes a bang-bang form aligned with the eigenaxis:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf u = u_{\max}\,\mathrm{sgn}(\theta)\,\hat{\mathbf e}.
+          \]
+        </p>
+
+        <p>
+          The resulting ideal structure is:
+        </p>
+
+        <ul>
+          <li><strong>accelerate</strong> along $\hat{\mathbf e}$,</li>
+          <li><strong>coast</strong> if needed,</li>
+          <li><strong>decelerate</strong> along the same axis to reach rest-to-rest.</li>
+        </ul>
+
+        <p>
+          In this special inertia case, eigenaxis rotation is both:
+        </p>
+
+        <ul>
+          <li>geometrically minimal, and</li>
+          <li>dynamically time-optimal.</li>
+        </ul>
+
+        <h3>Case 3 — Asymmetric inertia</h3>
+        <p>
+          If:
+        </p>
+
+        <p class="math-block">
+          \[
+            J_1 \ne J_2 \ne J_3,
+          \]
+        </p>
+
+        <p>
+          then gyroscopic coupling terms $\boldsymbol{\omega}\times(\mathbf J\boldsymbol{\omega})$ appear in the dynamics.
+          As a result:
+        </p>
+
+        <ul>
+          <li>pure eigenaxis motion may not remain invariant under dynamics,</li>
+          <li>multi-axis torque shaping may achieve shorter maneuver time even if it rotates more,</li>
+          <li>the “shortest-angle” path is not guaranteed to be the “shortest-time” path.</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Important distinction</h3>
+          <p>
+            Eigenaxis rotation is <strong>always</strong> geometrically minimal (minimum angle), but it is not always
+            dynamically time-optimal when inertia is asymmetric and coupling is significant.
+          </p>
+        </div>
+      </section>
+
+      <!-- 7 -->
+      <section id="d3-compare">
+        <h2>7. Eigenaxis vs Multi-Axis Reorientation</h2>
+
+        <p>
+          Eigenaxis motion is the unique minimal geodesic in rotation space. Multi-axis maneuvers can still be useful
+          (especially with actuator constraints or asymmetric inertia), but they do not follow the shortest geometric path.
+        </p>
+
+        <div class="table-wrap">
+          <table class="notes-table">
+            <thead>
+              <tr>
+                <th>Property</th>
+                <th>Eigenaxis</th>
+                <th>Multi-Axis</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Axis</td>
+                <td>Fixed</td>
+                <td>Varying</td>
+              </tr>
+              <tr>
+                <td>Path in $SO(3)$</td>
+                <td>Geodesic</td>
+                <td>Curved / composite</td>
+              </tr>
+              <tr>
+                <td>Rotation angle</td>
+                <td>Minimum</td>
+                <td>Larger (in general)</td>
+              </tr>
+              <tr>
+                <td>Quaternion vector path</td>
+                <td>Straight (aligned direction)</td>
+                <td>Curved (direction changes)</td>
+              </tr>
+              <tr>
+                <td>Time-optimal (symmetric inertia)</td>
+                <td>Yes</td>
+                <td>No</td>
+              </tr>
+              <tr>
+                <td>Time-optimal (asymmetric inertia)</td>
+                <td>Not guaranteed</td>
+                <td>Possible</td>
+              </tr>
+              <tr>
+                <td>Implementation complexity</td>
+                <td>Low</td>
+                <td>Higher</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>
+          Geometrically, eigenaxis rotation corresponds to the shortest arc on $SO(3)$. Multi-axis motion corresponds to
+          composite rotations that “bend” the path and increase total angular displacement.
+        </p>
+      </section>
+
+      <!-- 8 -->
+      <section id="d3-visual">
+        <h2>8. Geometric Visualization</h2>
+
+        <h3>8.1 Quaternion sphere picture ($S^3$)</h3>
+        <ul>
+          <li>Unit quaternions lie on a 4D unit sphere $S^3$.</li>
+          <li>Physical attitudes correspond to antipodal points ($\mathbf q$ and $-\mathbf q$ are identical).</li>
+          <li>Eigenaxis rotation traces a great-circle arc on $S^3$.</li>
+          <li>Enforcing $q_4 \ge 0$ selects the shorter hemisphere (shortest rotation).</li>
+        </ul>
+
+        <h3>8.2 Rotation manifold picture ($SO(3)$)</h3>
+        <p>
+          In the geometry of $SO(3)$, the eigenaxis rotation is the minimal geodesic between two orientations. That is why
+          it is the shortest path in rotation space and why it is the natural “optimal” rotation in a purely geometric sense.
+        </p>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: (a) Quaternion hemisphere selection $q_4 \ge 0$. (b) Eigenaxis as shortest geodesic on $SO(3)$.</div>
+          <figcaption>Suggested visuals: show the quaternion “short hemisphere” and the axis–angle rotation picture.</figcaption>
+        </figure>
+      </section>
+
+      <!-- 9 -->
+      <section id="d3-feedback">
+        <h2>9. Connection to Quaternion Feedback (Preview)</h2>
+
+        <p>
+          Consider a typical quaternion feedback structure:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf u = -\mathbf K\,\mathbf q_v - \mathbf C\,\boldsymbol{\omega}.
+          \]
+        </p>
+
+        <p>
+          This drives both:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf q_v \rightarrow \mathbf 0, \qquad \boldsymbol{\omega} \rightarrow \mathbf 0.
+          \]
+        </p>
+
+        <p>
+          If the initial angular velocity direction is aligned with the initial quaternion vector part, then the closed-loop
+          motion often stays close to a single-axis rotation. That is why many quaternion-feedback slews “look like”
+          eigenaxis rotations in practice, even when the controller was not explicitly designed as an eigenaxis command law.
+        </p>
+
+        <div class="callout">
+          <h3>Bridge to later sections</h3>
+          <p>
+            D.3 provides the geometric target. Domain D.2 and the Chapter 7 feedback/saturation logic explain how actual
+            closed-loop dynamics realize (or approximate) that target under real spacecraft constraints.
+          </p>
+        </div>
+      </section>
+
+      <!-- Summary -->
+      <section id="d3-summary">
+        <h2>Summary: What D.3 established</h2>
+
+        <ul>
+          <li>The minimum-angle reorientation between two attitudes is a <strong>single-axis rotation</strong> (eigenaxis) by $\theta \in [0,\pi]$.</li>
+          <li>The relative attitude is $\mathbf R_e = \mathbf R_d \mathbf R_c^T$ and admits an axis–angle form via Rodrigues’ formula.</li>
+          <li>The eigenaxis is the invariant direction satisfying $\mathbf R_e \hat{\mathbf e} = \hat{\mathbf e}$.</li>
+          <li>The angle follows $\theta=\cos^{-1}\!\left(\frac{\mathrm{trace}(\mathbf R_e)-1}{2}\right)$ and the axis is extracted from the antisymmetric part.</li>
+          <li>Quaternion error encodes the same geometry: $q_4=\cos(\theta/2)$ and $\mathbf q_v=\hat{\mathbf e}\sin(\theta/2)$.</li>
+          <li>The shortest-path condition is $\boxed{q_4 \ge 0}$, selecting the “short hemisphere” on $S^3$.</li>
+          <li>Pure eigenaxis motion reduces 3D attitude kinematics to the scalar relation $\dot{\theta}=\omega_e$.</li>
+          <li>Eigenaxis is always geometrically minimal, and becomes time-optimal for symmetric inertia, but not necessarily for asymmetric bodies.</li>
+        </ul>
+      </section>
+
+    </article>
+
+    <!-- Bottom navigation card (match D.1 / E.1 pattern) -->
+    <section class="next-domain-card">
+      <h2>Continue in Domain D</h2>
+        <p>
+        <a href="domain-d2-large-angle-maneuvers.html">
+          &larr; Previous:  D.2 Large-Angle Maneuvers
+        </a>
+      </p>
+      <p>
+        <a href="domain-d4-momentum-management.html">
+          Next: D.4 Momentum Management Systems &rarr;
+        </a>
+      </p>
+      <p>
+        <a href="notes.html#domain-d-overview">&larr; Back to Domain D overview</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Domain E.5 — STK (Systems Tool Kit) for Mission Analysis | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match other domain pages) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain E.2 style) -->
+  <header class="notes-hero">
+    <h1>Domain E — Special Topics &amp; Applied Space Tools</h1>
+    <p class="notes-tagline">
+      Practical mission-analysis bridges: scenario definition, geometry-consistent access, coverage metrics, and STK-based validation.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–E)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Intro card -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–E)</a>
+      </p>
+
+      <h1>Domain E.5 — STK (Systems Tool Kit) for Mission Analysis</h1>
+      <p>
+        <strong>A system-level framework for scenario construction, coverage assessment, trade studies, and model validation.</strong>
+        STK sits at the <em>mission-meaning layer</em> of astrodynamics: it connects state evolution to operational outcomes by embedding
+        orbits inside Earth geometry, sensors, pointing laws, access rules, downlinks, and time-ordered events.
+      </p>
+
+      <ul>
+        <li>Use scenario definition to make mission questions reproducible.</li>
+        <li>Interpret access as geometry + constraints, not “the orbit is nearby.”</li>
+        <li>Evaluate performance using distributions (gaps, latency, dwell), not only averages.</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation (match Domain E.2 pattern) -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#e5-overview">1. Overview</a> &middot;
+        <a href="#e5-why">2. Why STK matters</a> &middot;
+        <a href="#e5-scenario">3. Scenario construction</a> &middot;
+        <a href="#e5-objects">4. Object-based modeling</a> &middot;
+        <a href="#e5-visual">5. Visualization as diagnosis</a> &middot;
+        <a href="#e5-coverage">6. Coverage &amp; performance metrics</a> &middot;
+        <a href="#e5-access">7. Sensor geometry &amp; access</a> &middot;
+        <a href="#e5-trade">8. Constellations &amp; trade studies</a> &middot;
+        <a href="#e5-validate">9. Validation with MATLAB</a> &middot;
+        <a href="#e5-takeaway">Key takeaway</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+      <!-- 1. Overview -->
+      <section id="e5-overview">
+        <h2>1. Overview and Role in the Modeling Stack</h2>
+
+        <p>
+          Your analytical derivations and MATLAB models answer a precise question:
+          <em>where is the state and how does it evolve under chosen physics?</em>
+          STK answers a different question:
+          <em>what does that evolving state do inside a complete operational mission context?</em>
+        </p>
+
+        <p>
+          In Domain E, STK is therefore not a replacement for equations or custom simulation.
+          It is the bridge between dynamics and mission outcomes:
+        </p>
+
+        <ul>
+          <li>dynamics becomes <strong>visibility and access</strong>,</li>
+          <li>access becomes <strong>coverage, gaps, and latency</strong>,</li>
+          <li>coverage becomes <strong>requirement satisfaction</strong>,</li>
+          <li>requirements become <strong>architecture and trade decisions</strong>.</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Mental model</h3>
+          <p>
+            <strong>Equations explain motion.</strong> MATLAB computes evolution.
+            <strong>STK explains consequences.</strong>
+          </p>
+        </div>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: “Mission meaning stack” — Equations → MATLAB → STK → Decisions.</div>
+          <figcaption>
+            STK sits above propagation and below decision-making, translating state evolution into operational feasibility.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 2. Why STK matters -->
+      <section id="e5-why">
+        <h2>2. Why STK Matters in Mission Analysis</h2>
+
+        <p>
+          Modern missions don’t fail because Kepler’s laws are wrong. They fail because mission performance is shaped by
+          interacting constraints that are difficult to keep consistent in a purely analytical pipeline.
+        </p>
+
+        <p>The dominant interaction surfaces are:</p>
+        <ul>
+          <li><strong>Dynamics</strong> — orbits, perturbations, maneuvers, relative motion</li>
+          <li><strong>Geometry</strong> — Earth shape, occultation, horizon effects, terrain (if enabled)</li>
+          <li><strong>Sensors</strong> — FOV, pointing, slew limits, keep-out zones, duty cycles</li>
+          <li><strong>Operations</strong> — tasking, scheduling conflicts, comm windows, constraints</li>
+          <li><strong>Time</strong> — sampling, rise/set events, eclipse transitions, local solar time</li>
+        </ul>
+
+        <p>
+          STK exists to make those interactions <strong>explicit and consistent</strong>. In practice, STK plays three roles:
+        </p>
+
+        <ol>
+          <li><strong>Scenario integrator:</strong> one environment where all objects share the same time span, frames, and Earth model.</li>
+          <li><strong>Visual reasoning tool:</strong> makes “why is this happening?” answerable in geometry, not just in tables.</li>
+          <li><strong>Validation reference:</strong> exposes hidden assumptions in MATLAB/analytical results by forcing constraints to be modeled explicitly.</li>
+        </ol>
+      </section>
+
+      <!-- 3. Scenario construction -->
+      <section id="e5-scenario">
+        <h2>3. Scenario Construction: Making the Mission Question Well-Posed</h2>
+
+        <h3>3.1 What a “scenario” actually is</h3>
+        <p>
+          A scenario is not cosmetic. It is the <strong>formal definition of your mission question</strong>.
+          It fixes the assumptions that decide what “access,” “coverage,” and “latency” mean.
+        </p>
+
+        <ul>
+          <li><strong>Start/stop time</strong> — what operational window are you evaluating?</li>
+          <li><strong>Earth model and reference frames</strong> — sphere vs WGS-84, ECI vs ECEF, station altitude, etc.</li>
+          <li><strong>Time step / event detection rules</strong> — do you sample discretely or detect continuous events?</li>
+          <li><strong>Fidelity choices</strong> — terrain, atmosphere, lighting constraints (as applicable)</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Core takeaway</h3>
+          <p>
+            Scenario definition doesn’t change the orbit. It changes the <strong>meaning</strong> of the mission question—and makes it reproducible.
+          </p>
+        </div>
+
+        <h3>Scenario A — “My access changed when I shifted epoch. Why?”</h3>
+        <p>
+          <strong>Observation:</strong> you run the same orbit but change the start date; access and coverage shift.
+          <br />
+          <strong>Cause:</strong> Earth rotates beneath the orbit and Sun–Earth–satellite geometry changes with epoch.
+          This alters ground-track longitudes, lighting/eclipses for optical payloads, and when ground assets rotate into view.
+          <br />
+          <strong>STK provides:</strong> a single consistent temporal context tied to an operational timeline.
+        </p>
+
+        <h3>Scenario B — “One tool shows access; another misses it.”</h3>
+        <p>
+          <strong>Observation:</strong> MATLAB sampled every 60 s; STK shows short access windows you missed (or vice versa).
+          <br />
+          <strong>Cause:</strong> access can be short-lived; coarse sampling can miss brief passes, mis-estimate peak elevation, or violate minimum-duration rules.
+          <br />
+          <strong>STK provides:</strong> rise/set event detection and explicit time-resolution logic (reduced sampling artifacts).
+        </p>
+
+        <h3>Scenario C — “MATLAB sees the satellite, STK doesn’t.”</h3>
+        <p>
+          <strong>Observation:</strong> MATLAB LOS says visible; STK says occulted or below mask.
+          <br />
+          <strong>Cause:</strong> different geometry assumptions (sphere vs WGS-84, station altitude, terrain/elevation masks).
+          <br />
+          <strong>STK provides:</strong> consistent visibility evaluation using explicit Earth/terrain/mask assumptions.
+        </p>
+
+        <h3>Scenario D — “Frame choice changed my access times.”</h3>
+        <p>
+          <strong>Observation:</strong> propagation in ECI while stations/targets are Earth-fixed; access shifts.
+          <br />
+          <strong>Cause:</strong> inconsistent ECI↔ECEF transforms or Earth rotation corrupts timing and pointing.
+          <br />
+          <strong>STK provides:</strong> frame-aware geometry where inertial motion and Earth-fixed assets interact correctly by construction.
+        </p>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: Scenario contract checklist — time, Earth model, frames, event rules.</div>
+          <figcaption>
+            A compact checklist that prevents “different answers” caused by hidden scenario assumptions.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 4. Object-based modeling -->
+      <section id="e5-objects">
+        <h2>4. Object-Based Modeling: Why It Matters Conceptually</h2>
+
+        <p>
+          STK represents mission elements as interacting objects—satellites, sensors, ground stations, targets, constellations—each carrying:
+        </p>
+        <ul>
+          <li><strong>Dynamics</strong> (orbit/motion model)</li>
+          <li><strong>Geometry</strong> (shape, FOV, pointing)</li>
+          <li><strong>Operational logic</strong> (tasking rules, access constraints)</li>
+        </ul>
+
+        <p>
+          This mirrors real programs: performance emerges from interactions, not from a single equation set.
+        </p>
+
+        <h3>Scenario E — “What is limiting my mission: orbit, sensor, or operations?”</h3>
+        <p>
+          <strong>Observation:</strong> coverage fails requirements.
+          <br />
+          <strong>Risk:</strong> blaming orbit design when the bottleneck is pointing, duty cycle, downlink, or scheduling logic.
+          <br />
+          <strong>STK enables:</strong> isolate the driver by toggling one capability at a time:
+        </p>
+        <ul>
+          <li>orbit altitude/inclination → orbit-limited effects</li>
+          <li>FOV/pointing limits → sensor-limited effects</li>
+          <li>duty cycle/scheduling → operations-limited effects</li>
+        </ul>
+        <p>
+          <strong>Outcome:</strong> you can state what is limiting performance and why—which is the essence of mission analysis.
+        </p>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: Object interaction map — satellite ↔ sensor ↔ station ↔ target ↔ scheduler.</div>
+          <figcaption>
+            A simple dependency graph to show how constraints propagate into access and coverage outcomes.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 5. Visualization -->
+      <section id="e5-visual">
+        <h2>5. Orbit Visualization: Not Cosmetic—Diagnostic</h2>
+
+        <p>STK visualization makes hidden structure behind metrics visible:</p>
+        <ul>
+          <li>ground tracks evolving over days (Earth rotation beneath inertial orbit)</li>
+          <li>eclipse/lighting geometry</li>
+          <li>relative motion between objects</li>
+          <li>sensor footprints and when/where they actually cover</li>
+        </ul>
+
+        <h3>Scenario F — “Why does coverage collapse in one region at certain times?”</h3>
+        <p>
+          <strong>Observation:</strong> mean revisit looks fine, but one region has long gaps.
+          <br />
+          <strong>Cause:</strong> phasing + Earth rotation + constraints intersect, removing certain passes.
+          <br />
+          <strong>STK reveals visually:</strong> repeated footprint misses, passes removed by eclipse/pointing rules, and longitude drift over the window.
+        </p>
+
+        <h3>Scenario G — “Why are poles great but equator poor?”</h3>
+        <p>
+          <strong>Cause:</strong> ground tracks converge at high latitudes; low latitudes require deliberate phasing/architecture for persistence.
+          <br />
+          <strong>STK reveals:</strong> track stacking near poles and sparse coverage near the equator.
+        </p>
+
+        <h3>Scenario H — “Why does latency spike at certain local times?”</h3>
+        <p>
+          <strong>Cause:</strong> often not dynamics—Earth-fixed infrastructure rotates out of view, combined with eclipse/power constraints.
+          <br />
+          <strong>STK reveals:</strong> geometry-relative timing between spacecraft, stations, and lighting.
+        </p>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: Ground track + sensor footprint + eclipse overlay.</div>
+          <figcaption>
+            An annotated screenshot that turns “unexpected gaps” into explainable geometry-time behavior.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 6. Coverage -->
+      <section id="e5-coverage">
+        <h2>6. Coverage Analysis: Turning Access into Mission Performance</h2>
+
+        <p>
+          Orbit propagation answers: <em>where do I go?</em>
+          Coverage answers: <em>does the mission work?</em>
+        </p>
+
+        <p>STK converts access events into mission-level metrics:</p>
+        <ul>
+          <li>revisit distributions (not just mean revisit)</li>
+          <li>worst-case gaps (often the real requirement driver)</li>
+          <li>dwell-time distributions</li>
+          <li>percent area coverage over time</li>
+          <li>latency to observation / latency to downlink (depending on setup)</li>
+        </ul>
+
+        <h3>Scenario I — “We have access, but do we have persistence?”</h3>
+        <p>
+          <strong>Observation:</strong> the target is visible sometimes, but mission needs continuous awareness.
+          <br />
+          <strong>Why access isn’t enough:</strong> a single pass per day may be operationally useless.
+          <br />
+          <strong>STK provides:</strong> gap statistics and revisit distributions—persistence evaluated via maximum blind time.
+        </p>
+
+        <h3>Scenario J — “Are we revisit-limited or dwell-limited?”</h3>
+        <p>
+          Two architectures can share the same mean revisit but differ in dwell and operational usefulness.
+          STK provides separate revisit and dwell histograms (and their relationship) to identify the true bottleneck.
+        </p>
+
+        <h3>Scenario K — “Are we meeting requirements everywhere, or only on average?”</h3>
+        <p>
+          Global averages can hide failures in priority regions.
+          STK provides geographic coverage maps and worst-case regions—so performance is tested where it matters.
+        </p>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: Revisit/gap/dwell distributions + worst-case coverage map.</div>
+          <figcaption>
+            Show why “mean revisit” is insufficient: percentiles and maps expose worst-case behavior.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 7. Sensor geometry & access -->
+      <section id="e5-access">
+        <h2>7. Sensor Geometry &amp; Access: Access is Geometry + Constraints</h2>
+
+        <p>
+          Access is not “the orbit is nearby.” It is “a valid measurement is feasible.”
+          STK access explicitly accounts for:
+        </p>
+
+        <ul>
+          <li>Earth occultation and limb geometry</li>
+          <li>elevation masks and horizon limits</li>
+          <li>sensor FOV shape and boresight</li>
+          <li>pointing / slew / keep-out constraints</li>
+          <li>terrain/atmosphere and lighting constraints (if enabled)</li>
+        </ul>
+
+        <h3>Scenario L — “Ground track passes near my station, but no access.”</h3>
+        <p>
+          <strong>Cause:</strong> ground track proximity is 2-D; visibility is 3-D and mask-limited.
+          <br />
+          <strong>STK answers:</strong> true LOS + elevation constraints show whether curvature/masks block the pass.
+        </p>
+
+        <h3>Scenario M — “Space-based sensor misses targets at certain angles.”</h3>
+        <p>
+          <strong>Cause:</strong> off-nadir limits, FOV geometry, or slew-rate constraints prevent acquisition even at short range.
+          <br />
+          <strong>STK answers:</strong> distinguishes “visible” from “pointable,” which is the real mission condition.
+        </p>
+
+        <h3>Scenario N — “Is this an orbit issue, or a geometry/pointing issue?”</h3>
+        <ul>
+          <li>If you import the same ephemeris and mismatch remains → constraints/geometry dominate.</li>
+          <li>If mismatch disappears → propagation/dynamics assumptions dominate.</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Practical diagnostic</h3>
+          <p>
+            Importing the same ephemeris isolates the layer: if STK and MATLAB disagree, it’s rarely “the orbit”—
+            it’s the constraints, geometry model, or event logic.
+          </p>
+        </div>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: “Visible vs Pointable” — LOS exists but pointing constraints reject measurement.</div>
+          <figcaption>
+            A geometry sketch that separates line-of-sight from valid measurement feasibility.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 8. Trade studies -->
+      <section id="e5-trade">
+        <h2>8. Constellations &amp; Trade Studies: Performance is Not Linear with Satellite Count</h2>
+
+        <p>
+          Constellations reshape time structure (revisit, gaps, latency) and redistribute geometry.
+          STK supports rapid architecture setup (Walker patterns, custom phasing, mixed inclinations) and objective comparison via metrics.
+        </p>
+
+        <h3>Scenario O — “How many satellites do we actually need?”</h3>
+        <p>
+          <strong>Why theory alone struggles:</strong> mean revisit improves while worst-case gaps may remain unacceptable.
+          <br />
+          <strong>STK provides:</strong> requirement satisfaction maps and diminishing returns using distributions, not a single mean.
+        </p>
+
+        <h3>Scenario P — “Is my constellation redundant or complementary?”</h3>
+        <p>
+          <strong>Why it matters:</strong> pass clustering can inflate “total access time” while leaving maximum gaps untouched.
+          <br />
+          <strong>STK reveals:</strong> whether new satellites shrink maximum gaps or duplicate already-covered intervals.
+        </p>
+
+        <h3>Scenario Q — “Should I add planes or add sats per plane?”</h3>
+        <ul>
+          <li><strong>More planes</strong> → improves longitudinal spread and reduces global gaps</li>
+          <li><strong>More sats per plane</strong> → densifies coverage along existing tracks</li>
+        </ul>
+        <p>
+          <strong>STK’s role:</strong> quantify which move improves your mission metric (gap, latency, revisit variance), rather than relying on intuition.
+        </p>
+
+        <h3>Scenario R — “Two architectures have similar coverage—how do we choose?”</h3>
+        <p>
+          Coverage % can hide time structure differences: clustered gaps vs evenly spaced access, short frequent dwells vs fewer long dwells.
+          STK provides side-by-side comparisons of gap percentiles, latency distributions, and dwell statistics.
+        </p>
+
+        <h3>Scenario S — “How do I justify one more sensor or station to leadership?”</h3>
+        <p>
+          Leadership needs cause → effect: If we add X, we gain Y. STK provides defensible numbers:
+        </p>
+        <ul>
+          <li>worst-case gap reduction</li>
+          <li>latency improvement in priority regions</li>
+          <li>additional targets maintained with custody</li>
+          <li>robustness when one asset fails</li>
+        </ul>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: Trade study dashboard — gap percentiles, latency CDFs, dwell histograms.</div>
+          <figcaption>
+            A “decision-ready” comparison that avoids using coverage % as the only architecture discriminator.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 9. Validation -->
+      <section id="e5-validate">
+        <h2>9. Validation with MATLAB/Analytical Models: STK as “Assumption Exposure”</h2>
+
+        <p>
+          Analytical/MATLAB models excel at transparency and custom physics.
+          STK excels at integrated geometry and operational realism. Used together, you gain confidence and understanding.
+        </p>
+
+        <h3>9.1 Why validation is needed</h3>
+        <p>Most disagreements come from assumptions you didn’t realize you were making:</p>
+        <ul>
+          <li>spherical vs ellipsoidal Earth</li>
+          <li>missing elevation masks/terrain</li>
+          <li>idealized pointing</li>
+          <li>ignored eclipse/lighting rules</li>
+          <li>coarse sampling steps</li>
+          <li>missing tasking conflicts</li>
+        </ul>
+
+        <h3>9.2 Cross-validation as a reasoning method (not a “check”)</h3>
+        <ol>
+          <li>MATLAB predicts: orbit + access + revisit</li>
+          <li>STK predicts: orbit + access + revisit</li>
+          <li>If mismatch occurs, don’t ask “who is wrong?” Ask: <strong>what assumption does the mismatch expose?</strong></li>
+        </ol>
+
+        <h3>Scenario T — “Our access windows don’t match. What do we test first?”</h3>
+        <p>A structured diagnostic sequence usually resolves it quickly:</p>
+        <ul>
+          <li><strong>Time alignment:</strong> start/stop, epoch definitions, UTC handling</li>
+          <li><strong>Earth model:</strong> sphere vs WGS-84, station altitude, terrain</li>
+          <li><strong>Masks:</strong> minimum elevation, keep-out zones</li>
+          <li><strong>Sensor modeling:</strong> FOV shape, boresight, pointing limits</li>
+          <li><strong>Sampling vs events:</strong> discrete sampling artifacts vs event detection</li>
+        </ul>
+
+        <div class="callout">
+          <h3>One-line takeaway</h3>
+          <p>
+            STK cross-validation turns disagreement into understanding by revealing which assumptions actually control your mission.
+          </p>
+        </div>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: Validation loop — MATLAB ↔ STK with a diagnostic checklist.</div>
+          <figcaption>
+            Treat mismatches as structured symptoms: they identify the assumption dominating mission performance.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- Key takeaway -->
+      <section id="e5-takeaway">
+        <h2>Key Takeaway</h2>
+
+        <div class="callout">
+          <h3>STK is the bridge between dynamics and outcomes</h3>
+          <p>
+            STK does not replace your physics. It makes mission performance <strong>well-posed, constraint-consistent, and decision-ready</strong>
+            by embedding dynamics inside geometry, sensing, operations, and time.
+          </p>
+        </div>
+      </section>
+    </article>
+
+    <!-- Bottom navigation card (match your other domain pages) -->
+    <section class="next-domain-card">
+      <h2>Next in Domain E</h2>
+      <p>
+         <a href="domain-e4-numerical-integration.html">
+          &larr; Back: Domain E.4 — Numerical Integration Methods 
+        </a>
+      </p>
+      
+      <p>
+        <a href="notes.html#domain-e-overview">&larr; Back to Domain E overview</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+   <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

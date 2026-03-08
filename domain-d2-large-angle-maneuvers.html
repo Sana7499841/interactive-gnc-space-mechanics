@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Domain D.2 — Large-Angle Attitude Maneuvers | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match Advanced Domains style) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain D.1 structure) -->
+  <header class="notes-hero">
+    <h1>Domain D — Attitude Dynamics &amp; Control (Advanced)</h1>
+    <p class="notes-tagline">
+      Nonlinear rotational dynamics, maneuvering, momentum management, robust control, and stability methods.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–F)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Top intro card (match D.1 pattern) -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–F)</a>
+      </p>
+
+      <h1>Domain D.2 — Large-Angle Attitude Maneuvers</h1>
+
+      <p>
+        Domain D.1 established the nonlinear structure of rigid-body rotation and why torque-free motion can exhibit
+        rich behavior even without external forcing. Domain D.2 builds on that foundation and focuses on <em>commanded</em>
+        large-angle reorientation: slews that exceed small-angle linearization and must respect actuator and rate limits.
+      </p>
+
+      <p>
+        Large-angle maneuvers are fundamentally geometric and constrained. Attitude evolves on the nonlinear manifold
+        $\mathrm{SO}(3)$, Euler angles can become singular, and actuators impose hard bounds on torque and rate. As a result,
+        practical reorientation is designed using globally valid attitude representations (quaternions), well-defined error
+        signals, and control structures that remain stable under saturation.
+      </p>
+
+      <ul>
+        <li>Explain why small-angle models fail for real slews and why quaternions become the default.</li>
+        <li>Define rest-to-rest maneuvers and the coupled attitude–rate regulation requirement.</li>
+        <li>Construct quaternion attitude error with a sign convention to ensure shortest-path rotation.</li>
+        <li>Connect eigenaxis geometry to practical constraints: torque bounds, rate limits, wheel saturation.</li>
+        <li>Compare time-optimal (bang-bang) and effort-optimal (smooth) maneuver objectives.</li>
+        <li>Introduce saturation-structured control and pulse-modulated control for discrete actuators.</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation (match D.1 jump bar style) -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#d2-need">1. Why large-angle theory is required</a> &middot;
+        <a href="#d2-breakdown">2. Breakdown of small-angle linear models</a> &middot;
+        <a href="#d2-quat-state">3. Quaternion state representation</a> &middot;
+        <a href="#d2-rest2rest">4. Rest-to-rest slews</a> &middot;
+        <a href="#d2-error">5. Quaternion attitude error</a> &middot;
+        <a href="#d2-law">6. Quaternion-feedback reorientation law</a> &middot;
+        <a href="#d2-eigenaxis">7. Eigenaxis rotation</a> &middot;
+        <a href="#d2-optimality">8. Time-optimal vs effort-optimal</a> &middot;
+        <a href="#d2-rate">9. Slew-rate constraints</a> &middot;
+        <a href="#d2-sat">10. Saturation and cascade-saturation</a> &middot;
+        <a href="#d2-pulse">11. Pulse-modulated attitude control</a> &middot;
+        <a href="#d2-workflow">12. Maneuver design workflow</a> &middot;
+        <a href="#d2-summary">Summary</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+
+      <!-- 1 -->
+      <section id="d2-need">
+        <h2>1. Why Large-Angle Maneuver Theory Is Required</h2>
+
+        <p>
+          Small-angle attitude models assume the spacecraft remains close to a reference orientation, allowing linearization
+          of kinematics and dynamics. This approximation becomes unreliable for practical slews involving large rotations,
+          where the geometry of orientation and the realities of actuation dominate the behavior.
+        </p>
+
+        <ul>
+          <li><strong>Nonlinear attitude geometry (SO(3)):</strong> attitude is not a Euclidean vector; global error mappings are nonlinear.</li>
+          <li><strong>Euler-angle singularities:</strong> gimbal lock can occur depending on the attitude path and chosen angles.</li>
+          <li><strong>Short vs long rotation path:</strong> the same target attitude can be reached by two valid rotation directions.</li>
+          <li><strong>Actuator limits:</strong> maximum torque, maximum body rate, and reaction wheel saturation constrain feasible slews.</li>
+        </ul>
+
+        <p>
+          Therefore, large-angle reorientation must be treated as a nonlinear, constrained maneuver design problem using
+          globally valid attitude representations and control laws that remain stable under bounded actuation.
+        </p>
+      </section>
+
+      <!-- 2 -->
+      <section id="d2-breakdown">
+        <h2>2. Breakdown of Small-Angle Linear Models</h2>
+
+        <p>
+          Under small-angle assumptions, rotational dynamics are commonly approximated as:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf{J}\dot{\boldsymbol{\omega}} \approx \mathbf{u}, \qquad
+            \dot{\boldsymbol{\theta}} \approx \boldsymbol{\omega}.
+          \]
+        </p>
+
+        <p>
+          This supports simple linear PD control in an angle-error coordinate system. For large rotations, two issues appear:
+        </p>
+
+        <h3>(a) Nonlinear kinematics</h3>
+        <p>
+          Attitude evolves on the nonlinear manifold $\mathrm{SO}(3)$. A linear 3-vector “angle error” is not globally valid:
+          the mapping between orientation and a local error coordinate changes with the operating point.
+        </p>
+
+        <h3>(b) Rotation-direction ambiguity</h3>
+        <p>
+          The same physical orientation can be represented in multiple equivalent ways. Without a consistent convention,
+          feedback may command a longer-than-necessary rotation path.
+        </p>
+
+        <p>
+          These issues motivate quaternion-based states and quaternion-based error definitions for large-angle maneuver control.
+        </p>
+      </section>
+
+      <!-- 3 -->
+      <section id="d2-quat-state">
+        <h2>3. Quaternion State Representation: the large-angle friendly state</h2>
+
+        <p>
+          A standard large-angle maneuver state uses the attitude quaternion and body angular velocity:
+        </p>
+
+        <p class="math-block">
+          \[
+            q = [\mathbf{q},\,q_4], \qquad \boldsymbol{\omega}.
+          \]
+        </p>
+
+        <p>
+          Quaternions avoid Euler-angle singularities, but they introduce an important equivalence:
+        </p>
+
+        <p class="math-block">
+          \[
+            q \;\text{and}\; -q \quad \text{represent the same physical orientation.}
+          \]
+        </p>
+
+        <div class="callout">
+          <h3>Practical implementation note</h3>
+          <p>
+            Control implementations usually enforce a sign convention so the maneuver follows the shortest rotation.
+            A common choice is to ensure the scalar part of the error quaternion is non-negative (or equivalently,
+            flip the sign when needed).
+          </p>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section id="d2-rest2rest">
+        <h2>4. Rest-to-Rest Slews: what “good” means</h2>
+
+        <p>
+          A rest-to-rest maneuver starts and ends with zero body rate:
+        </p>
+
+        <p class="math-block">
+          \[
+            q(0)=q_0,\;\boldsymbol{\omega}(0)=0,
+            \qquad
+            q(t_f)=q_c,\;\boldsymbol{\omega}(t_f)=0.
+          \]
+        </p>
+
+        <p>
+          The controller must do two jobs simultaneously:
+        </p>
+
+        <ul>
+          <li><strong>Reorient:</strong> drive the attitude to the commanded orientation.</li>
+          <li><strong>Stop:</strong> remove angular rate at the final time so there is no residual spin.</li>
+        </ul>
+
+        <p>
+          This coupling is central: large-angle maneuver control cannot treat attitude and rate as independent problems.
+        </p>
+      </section>
+
+      <!-- 5 -->
+      <section id="d2-error">
+        <h2>5. Quaternion Attitude Error: the correct large-angle error signal</h2>
+
+        <p>
+          Feedback control uses an attitude error quaternion $q_e$ that represents the relative rotation from the current
+          attitude to the commanded attitude. In practice, $q_e$ is constructed through quaternion multiplication
+          (commanded attitude relative to current attitude).
+        </p>
+
+        <h3>Design principles for a usable large-angle error</h3>
+        <ul>
+          <li>Construct $q_e$ as a relative attitude (via quaternion composition).</li>
+          <li>Use the <strong>vector part</strong> of $q_e$ to define the torque direction.</li>
+          <li>Apply a <strong>sign convention</strong> (e.g., $q_{e4}\ge 0$) to ensure shortest-path rotation.</li>
+        </ul>
+
+        <p>
+          This produces an error signal that remains meaningful across large rotations and avoids unintended long-way slews.
+        </p>
+      </section>
+
+      <!-- 6 -->
+      <section id="d2-law">
+        <h2>6. Quaternion-Feedback Reorientation Law</h2>
+
+        <p>
+          A widely used nonlinear feedback structure combines an attitude error term and a rate damping term:
+        </p>
+
+        <p class="math-block">
+          \[
+            \mathbf{u} = -\mathbf{K}\,\mathbf{q}_e - \mathbf{C}\,\boldsymbol{\omega}.
+          \]
+        </p>
+
+        <ul>
+          <li><strong>$\mathbf{q}_e$:</strong> vector part of the error quaternion (rotation direction).</li>
+          <li><strong>$\mathbf{K}$:</strong> attitude gain matrix (how strongly the controller drives the rotation).</li>
+          <li><strong>$\mathbf{C}$:</strong> rate damping matrix (removes kinetic energy and suppresses overshoot).</li>
+        </ul>
+
+        <p>
+          The quaternion term drives the spacecraft toward the target orientation, while the damping term dissipates
+          rotational energy so the maneuver can end at rest. Correct sign handling of the quaternion error is essential
+          to maintain shortest-path behavior.
+        </p>
+      </section>
+
+      <!-- 7 -->
+      <section id="d2-eigenaxis">
+        <h2>7. Eigenaxis Rotation: the clean geometric way to describe a slew</h2>
+
+        <p>
+          Any reorientation between two attitudes can be expressed as a rotation about a single axis — the <strong>eigenaxis</strong>.
+          In an unconstrained setting, an eigenaxis maneuver can be viewed as a clean “rotate about one fixed axis” solution.
+        </p>
+
+        <h3>Why eigenaxis geometry is useful</h3>
+        <ul>
+          <li>It describes the shortest rotation between orientations (minimum-angle reorientation).</li>
+          <li>It aligns naturally with quaternion error feedback (the error defines an axis and an angle).</li>
+          <li>It provides an intuitive physical picture for large slews.</li>
+        </ul>
+
+        <p>
+          In real spacecraft, eigenaxis slews must be executed under constraints: torque bounds, rate limits,
+          and internal momentum limits (reaction wheels / CMGs).
+        </p>
+      </section>
+
+      <!-- 8 -->
+      <section id="d2-optimality">
+        <h2>8. Time-Optimal vs Effort-Optimal Maneuvers: What changes, what stays </h2>
+
+        <h3>8.1 Time-optimal reorientation (minimum time)</h3>
+        <p>
+          With bounded control (e.g., $|u_i|\le u_{\max}$), minimum-time slews typically produce
+          <strong>bang-bang</strong> control: torque saturates at its limit and switches sign at specific times.
+          In a decoupled or single-axis approximation, the canonical structure is:
+        </p>
+
+        <ul>
+          <li>accelerate at maximum available torque,</li>
+          <li>switch and decelerate at maximum opposite torque,</li>
+          <li>arrive at the target with zero rate.</li>
+        </ul>
+
+        <h3>8.2 Effort-optimal / fuel-optimal reorientation</h3>
+        <p>
+          If the objective penalizes effort (e.g., $\int \|\mathbf{u}\|^2\,dt$) or propellant usage,
+          the resulting control tends to be smoother:
+        </p>
+
+        <ul>
+          <li>lower peak torque demand,</li>
+          <li>reduced excitation of flexible / slosh modes,</li>
+          <li>longer maneuver time.</li>
+        </ul>
+
+        <p>
+          The choice reflects a tradeoff between speed and actuator usage (and often, between aggressiveness and structural excitation).
+        </p>
+      </section>
+
+      <!-- 9 -->
+      <section id="d2-rate">
+        <h2>9. Slew-Rate Constraints</h2>
+
+        <p>
+          Spacecraft often impose explicit rate limits due to sensor tracking constraints (e.g., star trackers),
+          structural loads, wheel momentum buildup, or pointing stability requirements. Constraints may be written as:
+        </p>
+
+        <p class="math-block">
+          \[
+            \|\boldsymbol{\omega}\| \le \omega_{\max}
+            \qquad \text{or} \qquad
+            |\omega_i| \le \omega_{i,\max}.
+          \]
+        </p>
+
+        <p>
+          A practical control strategy is to embed saturation or command shaping into the control law itself so the system:
+        </p>
+
+        <ul>
+          <li>behaves like quaternion PD when far from limits,</li>
+          <li>smoothly reduces authority as limits are approached,</li>
+          <li>remains stable and predictable under bounded actuation.</li>
+        </ul>
+      </section>
+
+      <!-- 10 -->
+      <section id="d2-sat">
+        <h2>10. Saturation and Cascade-Saturation Control: how to stay stable with actuator limits </h2>
+
+        <p>
+          Naively clipping a continuous torque command after designing a controller can degrade stability and performance.
+          Instead, saturation is incorporated into the control structure so bounded actuation is handled in a stable,
+          well-defined manner.
+        </p>
+
+        <p>
+          A useful interpretation is a three-phase rest-to-rest slew profile:
+        </p>
+
+        <ol>
+          <li><strong>Acceleration phase:</strong> torque saturates to build angular rate efficiently.</li>
+          <li><strong>Rate-limited phase:</strong> rate stays near an allowable level (coast-like behavior).</li>
+          <li><strong>Deceleration phase:</strong> torque reverses (often saturated) to drive rate to zero at the target.</li>
+        </ol>
+
+        <p>
+          This viewpoint directly connects bounded-torque and bounded-rate constraints to maneuver execution structure.
+        </p>
+      </section>
+
+      <!-- 11 -->
+      <section id="d2-pulse">
+        <h2>11. Pulse-Modulated Attitude Control: when actuators are on/off or quantized</h2>
+
+        <p>
+          Some spacecraft cannot command smooth continuous torque. Thrusters produce discrete impulses, systems may be limited
+          by a minimum impulse bit, and digital implementations can introduce quantization. In these settings, continuous
+          commands must be converted into implementable pulse sequences.
+        </p>
+
+        <h3>Key features and consequences</h3>
+        <ul>
+          <li><strong>Discrete actuation:</strong> control is executed as on/off pulses rather than continuous torque.</li>
+          <li><strong>Minimum pulse width / minimum impulse bit:</strong> imposes a hard lower bound on achievable command resolution.</li>
+          <li><strong>Limit cycles near the setpoint:</strong> small oscillations can persist because arbitrarily small commands are impossible.</li>
+        </ul>
+
+        <h3>Hysteresis (Schmitt-trigger-like switching)</h3>
+        <p>
+          A common approach is to introduce hysteresis to avoid high-frequency chattering:
+        </p>
+
+        <ul>
+          <li>switch <strong>ON</strong> when the error exceeds an upper threshold,</li>
+          <li>switch <strong>OFF</strong> only after the error falls below a lower threshold.</li>
+        </ul>
+
+        <p>
+          Pulse-width and pulse-frequency modulation extend this idea by converting continuous control demands into pulse patterns
+          while accounting for actuator dynamics and minimum pulse constraints.
+        </p>
+      </section>
+
+      <!-- 12 -->
+      <section id="d2-workflow">
+        <h2>12. Maneuver Design Workflow</h2>
+
+        <ol>
+          <li>Represent the commanded reorientation with quaternions (avoid singularities).</li>
+          <li>Define an attitude error quaternion $q_e$ and enforce a sign convention (short rotation).</li>
+          <li>Apply quaternion feedback reorientation using a PD-like structure in quaternion space.</li>
+          <li>Embed actuator constraints using saturation / cascade-saturation (avoid naïve clipping).</li>
+          <li>Interpret maneuver phases: accelerate $\rightarrow$ rate-limited (coast-like) $\rightarrow$ decelerate.</li>
+          <li>Select an objective: minimum time (bang-bang) vs reduced effort (smooth).</li>
+          <li>Choose implementation: continuous torque (wheels/CMGs) or pulse modulation (thrusters).</li>
+        </ol>
+      </section>
+
+      <!-- Summary -->
+      <section id="d2-summary">
+        <h2>Summary: What D.2 established</h2>
+
+        <p>
+          D.2 framed large-angle slews as nonlinear, constrained maneuver problems and established the key design concepts:
+        </p>
+
+        <ul>
+          <li>Large slews require nonlinear modeling on $\mathrm{SO}(3)$ beyond small-angle linearization.</li>
+          <li>Quaternions provide a globally valid attitude representation without Euler-angle singularities.</li>
+          <li>Rest-to-rest maneuvers regulate both orientation and angular velocity simultaneously.</li>
+          <li>Quaternion attitude error with a sign convention ensures shortest-path rotation behavior.</li>
+          <li>Quaternion-feedback reorientation uses a PD-like structure: $\mathbf{u}=-\mathbf{K}\mathbf{q}_e-\mathbf{C}\boldsymbol{\omega}$.</li>
+          <li>Eigenaxis rotation supplies a clean geometric interpretation of minimum-angle reorientation.</li>
+          <li>Minimum-time slews under bounded torque typically yield bang-bang switching behavior.</li>
+          <li>Effort/fuel-optimal slews trade time for smoother, lower-peak actuation.</li>
+          <li>Slew-rate and torque constraints should be embedded structurally using saturation-aware control.</li>
+          <li>Pulse modulation enables discrete thruster-based control but introduces minimum-pulse limits and limit-cycle behavior.</li>
+        </ul>
+      </section>
+
+    </article>
+
+    <!-- Bottom navigation card (match D.1 pattern) -->
+    <section class="next-domain-card">
+      <h2>Continue in Domain D</h2>
+      <p>
+        <a href="domain-d1-advanced-attitude-dynamics.html">
+          &larr; Previous:  D.1 Advanced Attitude Dynamics
+        </a>
+      </p>
+      <p>
+        <a href="domain-d3-optimal-reorientation-eigenaxis.html">
+          Next: Domain D.3 — Optimal Reorientation &amp; Eigenaxis &rarr;
+        </a>
+      </p>
+      <p>
+        <a href="notes.html#domain-d-overview">&larr; Back to Domain D overview</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+   <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

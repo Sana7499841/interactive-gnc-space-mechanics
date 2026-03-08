@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Domain D.4 — Momentum Management &amp; Momentum-Exchange Actuators | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match Advanced Domains style) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain D.1 structure) -->
+  <header class="notes-hero">
+    <h1>Domain D — Attitude Dynamics &amp; Control (Advanced)</h1>
+    <p class="notes-tagline">
+      Nonlinear rotational dynamics, maneuvering, momentum management, robust control, and stability methods.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–F)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Top intro card (same pattern as D.1 / E.1) -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–F)</a>
+      </p>
+
+      <h1>Domain D.4 — Momentum Management &amp; Momentum-Exchange Actuators</h1>
+      <p>
+        Domains D.1 and D.3 explain <em>how</em> a rigid spacecraft rotates and how to describe large reorientations cleanly
+        (eigenaxis / shortest rotation). Domain D.4 bridges that geometry to flight hardware:
+      </p>
+
+      <div class="callout">
+        <h3>Engineering question</h3>
+        <p>
+          <strong>How do we generate control torque for real maneuvers without constantly spending propellant?</strong>
+        </p>
+      </div>
+
+      <p>
+        The standard answer is <strong>internal momentum-exchange actuators</strong>—reaction wheels and control moment gyros (CMGs).
+        They re-distribute angular momentum inside the spacecraft to create torque externally on the body. This enables precision
+        pointing and long-duration operation, but introduces a non-negotiable reality:
+      </p>
+
+      <div class="callout">
+        <h3>Non-negotiable reality</h3>
+        <p>
+          <strong>Momentum must be managed.</strong> Disturbances inject momentum continuously. Internal actuators absorb it and drift
+          toward limits, so the spacecraft must periodically unload momentum using external torques (magnetorquers or thrusters).
+        </p>
+      </div>
+
+      <ul>
+        <li>Understand the difference between wheel torque and CMG precession torque.</li>
+        <li>Recognize saturation as an operational inevitability, not a rare event.</li>
+        <li>Learn how unloading restores control margin.</li>
+        <li>See why CMGs introduce geometry-driven singularities—and how steering logic avoids them.</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation (match D.1 jump bar) -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#d4-families">1. Actuation families</a> &middot;
+        <a href="#d4-wheels">2. Reaction wheels</a> &middot;
+        <a href="#d4-cmgs">3. CMGs</a> &middot;
+        <a href="#d4-envelope">4. Momentum envelope</a> &middot;
+        <a href="#d4-disturbances">5. Disturbances &amp; buildup</a> &middot;
+        <a href="#d4-saturation">6. Saturation</a> &middot;
+        <a href="#d4-unloading">7. Momentum unloading</a> &middot;
+        <a href="#d4-singularities">8. CMG singularities</a> &middot;
+        <a href="#d4-steering">9. Steering logic</a> &middot;
+        <a href="#d4-limiters">10. Torque/rate limiting</a> &middot;
+        <a href="#d4-vscmg">11. Variable-speed CMGs</a> &middot;
+        <a href="#d4-checklist">12. Design checklist</a> &middot;
+        <a href="#d4-summary">Summary</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+
+      <!-- 1 -->
+      <section id="d4-families">
+        <h2>1. Actuation families: stored momentum vs momentum exchange</h2>
+
+        <p>
+          Practical spacecraft often combine multiple actuator types. A useful mental model is to separate what happens
+          <em>internally</em> (momentum exchange) from what happens via the <em>environment</em> (momentum dumping).
+        </p>
+
+        <h3>(A) Momentum exchange (internal)</h3>
+        <ul>
+          <li><strong>Reaction wheels:</strong> change wheel speed &rarr; change wheel momentum</li>
+          <li><strong>CMGs:</strong> steer the direction of a large rotor momentum vector using gimbals</li>
+        </ul>
+
+        <h3>(B) Momentum dumping (external torque)</h3>
+        <ul>
+          <li><strong>Magnetorquers:</strong> torque from interaction with Earth’s magnetic field</li>
+          <li><strong>Thrusters:</strong> propellant torque (strong and fast, but consumes fuel)</li>
+        </ul>
+
+        <h3>(C) Passive / environmental use</h3>
+        <ul>
+          <li>Gravity-gradient stabilization, aerodynamic torques, etc. (rarely primary for agile pointing)</li>
+        </ul>
+
+        <p>
+          Domain D.4 focuses on (A), and how (B) is used to keep (A) usable over long mission time.
+        </p>
+      </section>
+
+      <!-- 2 -->
+      <section id="d4-wheels">
+        <h2>2. Reaction wheel systems (precise but limited torque)</h2>
+
+        <p>
+          A reaction wheel is a motor-driven flywheel. Accelerating the wheel changes its angular momentum; the spacecraft
+          responds with an equal and opposite change to conserve total angular momentum.
+        </p>
+
+        <h3>2.1 Angular momentum bookkeeping</h3>
+        <p>
+          Let the spacecraft body angular momentum be $J\\,\\omega$ and the total stored wheel momentum be $h_w$ (vector sum over wheels).
+          A compact conservation statement is:
+        </p>
+
+        <p class="math-block">
+          \[
+            H_{\text{total}} = J\,\omega + h_w.
+          \]
+        </p>
+
+        <p>In the ideal “no external torque” case:</p>
+
+        <p class="math-block">
+          \[
+            \dot{H}_{\text{total}} \approx 0
+            \;\Rightarrow\;
+            J\,\dot{\omega} \approx -\dot{h}_w.
+          \]
+        </p>
+
+        <h3>2.2 Wheel torque generation</h3>
+        <p>
+          For a single wheel with inertia $J_w$ and wheel speed $\Omega$, one common model is $h_w = J_w\,\Omega$ along its spin axis.
+          Then the torque delivered to the spacecraft is:
+        </p>
+
+        <p class="math-block">
+          \[
+            u = -\dot{h}_w = -J_w\,\dot{\Omega}.
+          \]
+        </p>
+
+        <div class="callout">
+          <h3>Key interpretation</h3>
+          <p>
+            Wheels make torque by <strong>changing speed</strong>, not by simply spinning fast.
+          </p>
+        </div>
+
+        <h3>2.3 Strengths and limits</h3>
+        <ul>
+          <li><strong>Strengths:</strong> high pointing smoothness, low jitter (good for imaging), continuous torque within limits.</li>
+          <li><strong>Limits:</strong> modest torque compared to CMGs, and bounded stored momentum.</li>
+        </ul>
+
+        <p class="math-block">
+          \[
+            \lVert h_w \rVert \le h_{w,\max}.
+          \]
+        </p>
+
+        <p>
+          Long-term disturbances push wheels toward saturation (see Section 6).
+        </p>
+      </section>
+
+      <!-- 3 -->
+      <section id="d4-cmgs">
+        <h2>3. Control Moment Gyros (high torque via precession)</h2>
+
+        <p>
+          CMGs are designed for agility: rapid slews, fast retargeting, and strong disturbance rejection—especially important for
+          agile imaging spacecraft that repeatedly rotate between targets.
+        </p>
+
+        <h3>3.1 The essential mechanism</h3>
+        <p>
+          A CMG stores a large rotor momentum vector $h$. Unlike wheels (which mainly change the magnitude), CMGs primarily
+          change the <em>direction</em> of $h$ using gimbals. The spacecraft torque is associated with the momentum-rate:
+        </p>
+
+        <p class="math-block">
+          \[
+            \tau = \dot{h}.
+          \]
+        </p>
+
+        <p>
+          For a gimbaled rotor, a common geometric form is:
+        </p>
+
+        <p class="math-block">
+          \[
+            \dot{h} = \omega_g \times h,
+          \]
+        </p>
+
+        <p>
+          where $\omega_g$ is the gimbal-rate vector.
+        </p>
+
+        <h3>3.2 Why CMGs are “agile-satellite actuators”</h3>
+        <p>
+          If $\lVert h \rVert$ is large, moderate gimbal rates can generate large torque. CMGs are therefore used when missions require:
+        </p>
+        <ul>
+          <li>repeated large-angle slews (roll/pitch/yaw)</li>
+          <li>rapid settling and frequent retargeting</li>
+          <li>high torque authority without continuous thruster use</li>
+        </ul>
+      </section>
+
+      <!-- 4 -->
+      <section id="d4-envelope">
+        <h2>4. Momentum envelope (what is achievable, not just what is stored)</h2>
+
+        <p>
+          Both wheels and CMGs have finite capacity. The set of momentum vectors the actuator set can realize is the
+          <strong>momentum envelope</strong>. The envelope matters because it constrains not only “how much” momentum can be stored,
+          but also “which directions” are practically reachable during maneuvers.
+        </p>
+
+        <h3>4.1 Reaction wheel envelope</h3>
+        <p>
+          With three orthogonal wheels and independent axis bounds, the reachable momentum set is box-like in momentum space:
+          simple to reason about, but rigid—each axis can saturate independently.
+        </p>
+
+        <h3>4.2 CMG envelope depends on geometry</h3>
+        <p>
+          CMG envelopes depend on array layout (pyramid, skewed, parallel gimbals, etc.). Two consequences:
+        </p>
+        <ul>
+          <li>High stored momentum does <em>not</em> guarantee good torque authority in every direction.</li>
+          <li>Envelope geometry is tightly linked to singularity behavior (Section 8).</li>
+        </ul>
+      </section>
+
+      <!-- 5 -->
+      <section id="d4-disturbances">
+        <h2>5. Disturbances and why momentum builds up</h2>
+
+        <p>
+          Even with “perfect” control laws, the environment injects torque. If wheels/CMGs counteract those torques,
+          actuator momentum accumulates (drifts) over time.
+        </p>
+
+        <p>Common sources:</p>
+        <ul>
+          <li>gravity-gradient torque (attitude-dependent)</li>
+          <li>solar radiation pressure (geometry-dependent)</li>
+          <li>aerodynamic torque (LEO)</li>
+          <li>magnetic effects (residual dipole interacting with Earth field)</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Operational takeaway</h3>
+          <p>
+            Momentum buildup is a <strong>lifetime operational effect</strong>, not an edge case.
+          </p>
+        </div>
+      </section>
+
+      <!-- 6 -->
+      <section id="d4-saturation">
+        <h2>6. Saturation (the “actuator fills up” failure mode)</h2>
+
+        <h3>6.1 Reaction wheel saturation</h3>
+        <p>
+          When $\lVert h_w \rVert$ approaches its limit, the wheel cannot provide further torque in the required direction
+          without violating speed bounds. Practically:
+        </p>
+        <ul>
+          <li>control margin shrinks</li>
+          <li>authority becomes axis-dependent</li>
+          <li>pointing quality degrades (or fails) unless unloading is performed</li>
+        </ul>
+
+        <h3>6.2 CMG “limits” vs CMG singularity</h3>
+        <p>CMGs also face hardware constraints:</p>
+        <ul>
+          <li>gimbal rate limits</li>
+          <li>gimbal angle limits (mechanical stops)</li>
+          <li>distribution/geometry limits (not all momentum directions are equally reachable)</li>
+        </ul>
+
+        <div class="callout">
+          <h3>CMG-specific problem</h3>
+          <p>
+            CMGs have an additional <strong>geometry-driven failure mode</strong>: <strong>singularity</strong>, where the torque mapping
+            collapses even if rotors have plenty of stored momentum (Section 8).
+          </p>
+        </div>
+      </section>
+
+      <!-- 7 -->
+      <section id="d4-unloading">
+        <h2>7. Momentum unloading (dumping) — returning actuators to a “healthy zone”</h2>
+
+        <p>
+          Unloading applies an external torque so internal actuators can be driven back toward mid-range operating conditions.
+        </p>
+
+        <h3>7.1 Magnetorquer unloading</h3>
+        <p>
+          Magnetorquers create a magnetic dipole $m$ and interact with Earth’s field $B$:
+        </p>
+
+        <p class="math-block">
+          \[
+            \tau = m \times B.
+          \]
+        </p>
+
+        <ul>
+          <li>torque is always perpendicular to $B$ (direction is constrained)</li>
+          <li>unloading is slower than wheel/CMG control</li>
+          <li>works best in LEO and is commonly used as a routine “management mode”</li>
+        </ul>
+
+        <h3>7.2 Thruster unloading</h3>
+        <p>Thrusters provide strong torque quickly but consume propellant. Typical use cases:</p>
+        <ul>
+          <li>rapid recovery of control margin</li>
+          <li>magnetic unloading is insufficient (orbit/geometry/power constraints)</li>
+          <li>mission constraints demand immediate detumble or retarget capability</li>
+        </ul>
+      </section>
+
+      <!-- 8 -->
+      <section id="d4-singularities">
+        <h2>8. CMG singularities (the geometry-driven control bottleneck)</h2>
+
+        <p>
+          CMGs map gimbal rates into a momentum-rate (and therefore torque) through a configuration-dependent mapping.
+          A common abstract form is:
+        </p>
+
+        <p class="math-block">
+          \[
+            \dot{h} = A(\delta)\,\dot{\delta},
+          \]
+        </p>
+
+        <ul>
+          <li>$\delta$: vector of gimbal angles</li>
+          <li>$\dot{\delta}$: gimbal rate commands</li>
+          <li>$A(\delta)$: Jacobian-like mapping dependent on geometry and configuration</li>
+        </ul>
+
+        <p>A singularity occurs when this mapping loses rank:</p>
+
+        <p class="math-block">
+          \[
+            \operatorname{rank}(A(\delta)) < 3.
+          \]
+        </p>
+
+        <h3>Engineering meaning</h3>
+        <ul>
+          <li>some torque directions become unreachable</li>
+          <li>required gimbal rates can blow up near the singular set</li>
+          <li>tracking becomes unreliable even if the attitude controller is “correct”</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Why imaging missions care</h3>
+          <p>
+            Agile retargeting repeatedly drives the CMGs through large configuration changes—so singularity avoidance is not optional.
+          </p>
+        </div>
+      </section>
+
+      <!-- 9 -->
+      <section id="d4-steering">
+        <h2>9. Steering logic (how we turn a desired torque into gimbal motion)</h2>
+
+        <p>
+          The attitude controller outputs a desired control torque $u$. CMG steering converts that command into gimbal rates
+          $\dot{\delta}$ while respecting hardware constraints.
+        </p>
+
+        <h3>9.1 Baseline: pseudoinverse steering</h3>
+        <p class="math-block">
+          \[
+            \dot{\delta} = A^{\dagger}u.
+          \]
+        </p>
+
+        <p>
+          In many implementations, $A^{\dagger}$ is formed using a generalized inverse such as
+          $A^T(AA^T)^{-1}$ when well-conditioned, with modifications near singularity.
+        </p>
+
+        <h3>9.2 Singularity-robust steering (regularization)</h3>
+        <p>
+          To avoid numerical blow-up near singular configurations, a damped/regularized inverse is common:
+        </p>
+
+        <p class="math-block">
+          \[
+            A^* = A^T(AA^T + \lambda I)^{-1},
+          \]
+        </p>
+
+        <p>where $\lambda > 0$ increases as singularity is approached.</p>
+
+        <h3>9.3 Null-space motion (do two jobs at once)</h3>
+        <p>
+          With redundancy, you can add a component that does not change the commanded momentum-rate:
+        </p>
+
+        <p class="math-block">
+          \[
+            \dot{\delta} = A^*u + \gamma n,
+          \]
+        </p>
+
+        <ul>
+          <li>$n$ is chosen from the null space of $A$ (so it does not affect $\dot{h}$ from the commanded $u$)</li>
+          <li>$\gamma$ sets how strongly you bias configuration shaping</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Interpretation</h3>
+          <p>
+            CMGs can simultaneously (1) track commanded torque and (2) reshape their internal geometry to avoid singularities and
+            stay away from gimbal limits.
+          </p>
+        </div>
+
+        <h3>9.4 Real actuator constraints</h3>
+        <p>
+          Practical steering must obey bounds such as:
+        </p>
+        <p>1: gimbal angle bounds 2: gimbal rate bounds 3: torque / slew-rate constraints from attitude controller outputs </p>
+
+        <p class="math-block">
+          \[
+            |\delta_i| \le \delta_{\max}, \qquad |\dot{\delta}_i| \le \dot{\delta}_{\max}.
+          \]
+        </p>
+
+        <p>
+          That is why flight steering implementations include saturation, rate limiting, and configuration bias terms
+          (penalties for approaching stops, damping near singularity, etc.).
+        </p>
+      </section>
+
+      <!-- 10 -->
+      <section id="d4-limiters">
+        <h2>10. Slew-rate/torque limiting in the attitude controller (why limiters show up)</h2>
+
+        <p>
+          High-agility commands must still protect structure, actuators, and sensors. Therefore many spacecraft controllers
+          use saturation and limiter ideas:
+        </p>
+
+        <ul>
+          <li>small errors &rarr; smooth, approximately linear behavior</li>
+          <li>large errors &rarr; torque/rate limiting to prevent actuator overdrive and undesirable dynamics</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Bridge to flight robustness</h3>
+          <p>
+            Limiters are a practical bridge between ideal rigid-body math and stable flight behavior with real hardware constraints.
+          </p>
+        </div>
+      </section>
+
+      <!-- 11 -->
+      <section id="d4-vscmg">
+        <h2>11. Variable-speed CMGs (VSCMGs) — why they matter</h2>
+
+        <p>
+          Traditional CMGs assume near-constant rotor speed (large stored momentum magnitude). Variable-speed CMGs add an extra
+          control degree of freedom by allowing rotor speed to change.
+        </p>
+
+        <ul>
+          <li>can improve momentum shaping and singularity avoidance in some cases</li>
+          <li>introduces additional coupling between rotor-speed control and gimbal steering</li>
+        </ul>
+
+        <div class="callout">
+          <h3>Tradeoff</h3>
+          <p>
+            Added complexity (power electronics, thermal load, control design) in exchange for additional flexibility.
+          </p>
+        </div>
+      </section>
+
+      <!-- 12 -->
+      <section id="d4-checklist">
+        <h2>12. Engineering design checklist</h2>
+
+        <h3>12.1 When reaction wheels are usually enough</h3>
+        <ul>
+          <li>small satellites</li>
+          <li>high-precision pointing, modest slew requirements</li>
+          <li>tight mass/power budgets</li>
+          <li>standard architecture: wheels + magnetorquer unloading</li>
+        </ul>
+
+        <h3>12.2 When CMGs are justified</h3>
+        <ul>
+          <li>fast retargeting / agile imaging</li>
+          <li>large spacecraft or high inertia axes</li>
+          <li>repeated large-angle slews with limited propellant budget</li>
+          <li>willingness to implement steering + singularity management properly</li>
+        </ul>
+
+        <h3>12.3 Always design for momentum management (not just control)</h3>
+        <ul>
+          <li>ensure unloading authority exists (magnetic or thruster)</li>
+          <li>define operational modes (fine pointing vs dumping vs maneuver)</li>
+          <li>include fault tolerance (wheel failures, gimbal failures, degraded steering)</li>
+        </ul>
+      </section>
+
+      <!-- Summary -->
+      <section id="d4-summary">
+        <h2>Summary: What D.4 established</h2>
+
+        <ul>
+          <li><strong>Reaction wheels</strong> generate torque by changing wheel speed (momentum exchange).</li>
+          <li><strong>CMGs</strong> generate higher torque by steering a large stored momentum vector (gyroscopic precession).</li>
+          <li>External disturbances inject momentum continuously, so internal actuators drift toward limits.</li>
+          <li><strong>Saturation</strong> is inevitable without unloading; unloading uses magnetorquers/thrusters to restore margin.</li>
+          <li><strong>CMG singularities</strong> are geometry-driven loss of authority: $\operatorname{rank}(A(\delta))<3$.</li>
+          <li>
+            <strong>Steering logic</strong> (pseudoinverse, damping/regularization, null-space bias, plus constraint handling)
+            is central to safe CMG operation.
+          </li>
+          <li>For high agility, designs often use torque/rate limiters and may consider variable-speed CMGs for extra flexibility.</li>
+        </ul>
+      </section>
+
+    </article>
+
+    <!-- Bottom navigation card (match D.1 pattern) -->
+    <section class="next-domain-card">
+      <h2>Continue in Domain D</h2>
+    <p>
+        <a href="domain-d3-optimal-reorientation-eigenaxis.html">
+          &larr; Previous:  Domain D.3 — Optimal Reorientation &amp; Eigenaxis
+        </a>
+      </p>
+      <p>
+        <a href="domain-d5-robust-attitude-control.html">
+          Next: Domain D.5 — Robust Attitude Control &amp; Constraints &rarr;
+        </a>
+      </p>
+      <p>
+        <a href="notes.html#domain-d-overview">&larr; Back to Domain D overview</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>

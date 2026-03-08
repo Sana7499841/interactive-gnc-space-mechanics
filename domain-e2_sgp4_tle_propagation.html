@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Domain E.2 — SGP4 &amp; TLE-Based Propagation | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax configuration (match other domain pages) -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <!-- Hero header + global navigation (match Domain B.5 style) -->
+  <header class="notes-hero">
+    <h1>Domain E — Special Topics &amp; Applied Space Tools</h1>
+    <p class="notes-tagline">
+      Practical orbit modeling bridges: TLE/SGP4 fundamentals, estimation concepts, and tool-driven mission analysis.
+    </p>
+
+    <nav class="notes-nav">
+      <a href="index.html">Home</a>
+      <a href="problems.html">Problem Bank</a>
+      <a href="tools.html">Tools</a>
+      <a href="notes.html">Theory Notes</a>
+      <a href="notes.html#advanced-domains" class="active">Advanced Domains (A–E)</a>
+         <a href="references.html" class="pill">References</a>
+      <a href="about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <!-- Intro card -->
+    <section class="notes-intro-card">
+      <p>
+        <a href="notes.html#advanced-domains">&larr; Back to Advanced Domains (A–E)</a>
+      </p>
+
+      <h1>Domain E.2 — SGP4 &amp; TLE-Based Propagation</h1>
+      <p>
+        <strong>A model-consistent framework for large-scale orbit prediction.</strong>
+        SGP4 is designed for operational catalogs: fast, scalable, and compatible with TLEs—rather than fully
+        physics-complete propagation.
+      </p>
+
+      <ul>
+        <li>Understand why TLEs are model parameters (not classical initial conditions).</li>
+        <li>Separate mean-element evolution from osculating state reconstruction.</li>
+        <li>Recognize where error growth comes from, and why catalogs refresh TLEs frequently.</li>
+      </ul>
+    </section>
+
+    <!-- In-page navigation -->
+    <nav class="subtopic-nav">
+      <p>
+        <strong>Jump to:</strong>
+        <a href="#e2-overview">1. Overview</a> &middot;
+        <a href="#e2-theory">2. SGP4 theory &amp; assumptions</a> &middot;
+        <a href="#e2-mean-osculating">3. Mean vs osculating</a> &middot;
+        <a href="#e2-bstar">4. Drag &amp; $B^\ast$</a> &middot;
+        <a href="#e2-errors">5. Error growth</a> &middot;
+        <a href="#e2-refresh">6. TLE refresh</a> &middot;
+        <a href="#e2-sdp4">7. SGP4 vs SDP4</a> &middot;
+        <a href="#e2-modern">8. Modern context</a> &middot;
+        <a href="#e2-takeaway">Key takeaway</a>
+      </p>
+    </nav>
+
+    <article class="notes-content">
+      <!-- 1. Overview -->
+      <section id="e2-overview">
+        <h2>1. Overview and Motivation</h2>
+
+        <p>
+          In space situational awareness (SSA) and space object catalog maintenance, orbit propagation must strike a
+          balance between three competing requirements:
+        </p>
+
+        <ul>
+          <li><strong>Computational efficiency</strong></li>
+          <li><strong>Global scalability</strong></li>
+          <li><strong>Acceptable predictive accuracy</strong></li>
+        </ul>
+
+        <p>
+          The <strong>SGP4 (Simplified General Perturbations–4)</strong> model, used together with
+          <strong>Two-Line Element (TLE)</strong> sets, forms the backbone of operational orbit propagation for
+          Earth-orbiting objects. Rather than attempting high-fidelity force modeling, SGP4 provides a
+          <strong>semi-analytical, averaged solution</strong> explicitly designed for:
+        </p>
+
+        <ul>
+          <li>very large populations (≈ $10^4$–$10^5$ objects),</li>
+          <li>sparse, irregular, and noisy tracking observations,</li>
+          <li>frequent catalog updates over extended operational lifetimes.</li>
+        </ul>
+
+        <p>
+          A fundamental conceptual point is that <strong>TLEs are not physical initial conditions</strong> in the
+          classical astrodynamics sense. Instead, they are <strong>model-specific parameters</strong>,
+          meaningful only within the SGP4/SDP4 dynamical framework. Any interpretation of SGP4 results must therefore
+          remain <em>model-consistent</em>.
+        </p>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: “Catalog loop” — observations → TLE fit → SGP4 propagate → predictions.</div>
+          <figcaption>
+            Operational perspective: SGP4 is typically one component in a closed-loop catalog maintenance pipeline.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 2. Theory -->
+      <section id="e2-theory">
+        <h2>2. SGP4 Theory and Core Assumptions</h2>
+
+        <h3>2.1 Semi-Analytical Propagation Philosophy</h3>
+        <p>
+          SGP4 does <strong>not</strong> numerically integrate the equations of motion. Instead, it propagates
+          <strong>mean orbital elements</strong> using <strong>closed-form analytical expressions</strong> derived
+          from perturbation theory. These expressions approximate the cumulative effects of dominant perturbations
+          over time while avoiding the computational expense of numerical integration.
+        </p>
+
+        <p>The perturbations represented in SGP4 include:</p>
+        <ul>
+          <li>Earth’s oblateness (dominantly $J_2$, with additional $J_3$ and $J_4$ corrections),</li>
+          <li>secular and long-period gravitational perturbations,</li>
+          <li>simplified atmospheric drag through a single tuning parameter ($B^\ast$),</li>
+          <li>Earth rotation effects and inertial–Earth-fixed frame transformations.</li>
+        </ul>
+
+        <p>
+          This formulation yields exceptional speed and robustness, making SGP4 well-suited to operational catalogs,
+          though at the expense of detailed physical realism.
+        </p>
+
+        <h3>2.2 Key Modeling Assumptions</h3>
+        <p>The SGP4 framework relies on several simplifying assumptions:</p>
+        <ul>
+          <li>Orbital motion is represented using <strong>mean elements</strong>, not instantaneous osculating states.</li>
+          <li>Atmospheric drag follows a <strong>simplified exponential density model</strong>, absorbed into $B^\ast$.</li>
+          <li>Short-period perturbations are averaged rather than explicitly resolved.</li>
+          <li>Solar radiation pressure, attitude-dependent drag, thermal recoil forces, and active maneuvers are not explicitly modeled.</li>
+        </ul>
+
+        <p>
+          These assumptions define both the strengths (speed, stability, scalability) and the limitations
+          (reduced physical fidelity) of the SGP4 approach.
+        </p>
+      </section>
+
+      <!-- 3. Mean vs Osculating -->
+      <section id="e2-mean-osculating">
+        <h2>3. Mean vs Osculating Orbital Elements</h2>
+
+        <p>
+          A frequent source of misuse and confusion in practice arises from misunderstanding the distinction between
+          <strong>mean</strong> and <strong>osculating</strong> orbital elements.
+        </p>
+
+        <h3>3.1 Mean Elements (TLE Elements)</h3>
+        <p>TLEs contain <strong>mean orbital elements</strong>, which:</p>
+        <ul>
+          <li>are averaged over short-period perturbations,</li>
+          <li>are valid only within the SGP4/SDP4 dynamical framework,</li>
+          <li>do not represent a true instantaneous physical state vector.</li>
+        </ul>
+
+        <p>
+          Typical examples include mean motion, mean eccentricity, and mean argument of perigee.
+          <strong>A TLE must never be treated as a physical initial condition for a general numerical orbit propagator.</strong>
+        </p>
+
+        <h3>3.2 Osculating Elements</h3>
+        <p>
+          Osculating elements describe the instantaneous Keplerian orbit tangent to the true trajectory at a given epoch.
+          They arise from:
+        </p>
+        <ul>
+          <li>numerical integration using full force models,</li>
+          <li>precise orbit determination (POD),</li>
+          <li>high-fidelity ephemerides.</li>
+        </ul>
+
+        <p>
+          Within SGP4, an osculating position and velocity are reconstructed only <em>after</em> propagating the mean
+          elements using the SGP4 equations.
+        </p>
+
+        <h3>3.3 Practical Consequence</h3>
+        <div class="callout">
+          <h3>Operational pitfall</h3>
+          <p>
+            Using TLEs outside the SGP4 framework without proper conversion leads to systematic drift,
+            inconsistent residuals, and misleading error growth.
+          </p>
+        </div>
+
+        <figure class="notes-figure">
+          <div class="figure-placeholder">Figure placeholder: Mean elements → SGP4 mean propagation → osculating state reconstruction.</div>
+          <figcaption>
+            Conceptual flow: TLE mean elements are propagated within the SGP4 model; osculating states are derived after propagation.
+          </figcaption>
+        </figure>
+      </section>
+
+      <!-- 4. Drag and B* -->
+      <section id="e2-bstar">
+        <h2>4. Atmospheric Drag Representation and $B^\ast$</h2>
+
+        <p>
+          Atmospheric drag in SGP4 is represented through the BSTAR parameter, schematically expressed as
+        </p>
+
+        <p class="math-block">
+          \[
+            B^\ast \propto \frac{C_D A}{m}.
+          \]
+        </p>
+
+        <p>
+          Rather than representing a physical drag coefficient, $B^\ast$ functions as a
+          <strong>model-tuning parameter</strong> that absorbs:
+        </p>
+
+        <ul>
+          <li>atmospheric density uncertainty,</li>
+          <li>attitude and geometry variations,</li>
+          <li>simplifications in the drag formulation.</li>
+        </ul>
+
+        <p>
+          Consequently, $B^\ast$ should be interpreted as an <strong>effective drag parameter</strong>, not a constant
+          physical property. This interpretation directly motivates modern work on ballistic-coefficient estimation,
+          where drag parameters are treated as <em>time-varying</em> quantities inferred from orbital behavior.
+        </p>
+      </section>
+
+      <!-- 5. Errors -->
+      <section id="e2-errors">
+        <h2>5. Error Growth and Validity Limits</h2>
+
+        <h3>5.1 Sources of Error</h3>
+        <p>Propagation errors in SGP4 arise primarily from:</p>
+        <ul>
+          <li>simplified drag and density modeling,</li>
+          <li>unmodeled solar and geomagnetic variability,</li>
+          <li>omission of solar radiation pressure and attitude dynamics,</li>
+          <li>accumulation of secular approximation errors.</li>
+        </ul>
+
+        <p>
+          Because SGP4 is semi-analytical, along-track errors typically grow approximately
+          <strong>quadratically with time</strong> for many low-Earth-orbit objects.
+        </p>
+
+        <h3>5.2 Typical Accuracy Regimes</h3>
+        <ul>
+          <li><strong>Hours to ~1 day:</strong> excellent agreement with catalog truth</li>
+          <li><strong>Several days:</strong> along-track error dominates</li>
+          <li><strong>Weeks:</strong> propagation becomes unreliable without TLE refresh</li>
+        </ul>
+
+        <p>
+          This behavior reflects SGP4’s intended role: short-arc prediction between frequent catalog updates,
+          not long-term precision orbit determination.
+        </p>
+      </section>
+
+      <!-- 6. Refresh -->
+      <section id="e2-refresh">
+        <h2>6. TLE Refresh and Catalog Maintenance</h2>
+
+        <p>Operational catalogs operate as a closed-loop estimation system:</p>
+        <ul>
+          <li>new observations are collected,</li>
+          <li>mean elements are re-estimated,</li>
+          <li>updated TLEs reset accumulated propagation error.</li>
+        </ul>
+
+        <p>
+          SGP4 should therefore be viewed as one component of an operational tracking pipeline, rather than a standalone
+          long-term predictor.
+        </p>
+      </section>
+
+      <!-- 7. SGP4 vs SDP4 -->
+      <section id="e2-sdp4">
+        <h2>7. SGP4 vs SDP4 — Near-Earth and Deep-Space Regimes</h2>
+
+        <p>Within the NORAD General Perturbations (GP) family:</p>
+        <ul>
+          <li>
+            <strong>SGP4</strong> applies to near-Earth objects (orbital period &lt; ≈ 225 minutes),
+            where atmospheric drag and Earth oblateness dominate.
+          </li>
+          <li>
+            <strong>SDP4 (Simplified Deep-Space Perturbations)</strong> applies to deep-space objects
+            (orbital period ≥ ≈ 225 minutes), incorporating:
+            <ul>
+              <li>lunar–solar gravitational perturbations,</li>
+              <li>resonance effects,</li>
+              <li>long-period dynamical behavior.</li>
+            </ul>
+          </li>
+        </ul>
+
+        <p>
+          The selection between SGP4 and SDP4 is automatic and based on orbital period, ensuring consistency between
+          the TLE representation and the applied perturbation model.
+        </p>
+      </section>
+
+      <!-- 8. Modern context -->
+      <section id="e2-modern">
+        <h2>8. Modern Interpretation and Research Context</h2>
+
+        <p>SGP4 and TLE-based propagation should be understood as:</p>
+        <ul>
+          <li>a model-consistent prediction framework,</li>
+          <li>optimized for scalability and robustness,</li>
+          <li>not a substitute for high-fidelity orbit determination.</li>
+        </ul>
+
+        <p>
+          Modern research—such as ballistic-coefficient estimation, physics-guided machine learning, and residual
+          correction networks—does not replace SGP4. Instead, it builds upon it, correcting systematic biases while
+          preserving compatibility with operational catalogs.
+        </p>
+      </section>
+
+      <!-- Key takeaway -->
+      <section id="e2-takeaway">
+        <h2>Key Takeaway</h2>
+
+        <div class="callout">
+          <h3>Model-consistent interpretation matters</h3>
+          <p>
+            <strong>SGP4 does not propagate the “true” orbit.</strong>
+            It propagates a mean dynamical representation designed to remain consistent with sparse observations and
+            simplified physics. Understanding this distinction is essential before attempting refinement, correction,
+            or replacement of SGP4-based predictions.
+          </p>
+        </div>
+      </section>
+    </article>
+
+    <!-- Bottom navigation card (match your other domain pages) -->
+    <section class="next-domain-card">
+      <h2>Next in Domain E</h2>
+      <p>
+        <a href="domain-e1_ballistic_coefficient.html">
+          &larr; Domain E.1 — Ballistic Coefficient Estimation
+        </a>
+      </p>
+      <p>
+        <a href="domain-e3-state-transition-matrices.html">
+          Next: Domain E.3 — State Transition Matrices (STM) &rarr;
+        </a>
+      </p>
+      </p>
+        <a href="notes.html#domain-e-overview">&larr; Back to Domain E overview</a>
+      </p>
+      
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
+  Educational resource for spacecraft dynamics, orbital mechanics,
+  and guidance–navigation–control systems.
+  </p>
+  </footer>
+</body>
+</html>
