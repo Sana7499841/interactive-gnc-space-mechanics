@@ -284,6 +284,288 @@
         Required attitude state:<br><br>
         \( \text{state}_{attitude} = [\theta,\ \omega] \)
       </div>
+      <section class="lab-card">
+  <div class="lab-section-title">Stage 3 — Attitude Control PD Tuning</div>
+
+  <h3>Problem</h3>
+  <p>
+    After fixing the rotational state, the spacecraft can now be controlled.
+    The goal is to tune a PD controller so the spacecraft tracks a target attitude.
+  </p>
+
+  <div class="lab-control-box">
+    <label>Kp:
+      <input type="range" id="attKp" min="0" max="12" step="0.5" value="5">
+      <span id="attKpVal">5</span>
+    </label>
+    <br><br>
+
+    <label>Kd:
+      <input type="range" id="attKd" min="0" max="8" step="0.5" value="2">
+      <span id="attKdVal">2</span>
+    </label>
+    <br><br>
+
+    <button class="lab-button" onclick="runAttitudeControl()">Run Attitude Control</button>
+  </div>
+
+  <div id="attitudePlot"></div>
+  <div id="torquePlot"></div>
+
+  <div id="attitudeFeedback" class="feedback">
+    Tune Kp and Kd to compare slow, oscillatory, and well-damped responses.
+  </div>
+</section>
+
+<section class="lab-card">
+  <div class="lab-section-title">Stage 4 — Chaser–Target Relative Navigation</div>
+
+  <h3>Problem</h3>
+  <p>
+    Satellite 2 acts as the chaser and must reduce its distance from Satellite 1.
+    The controller uses relative position and velocity feedback.
+  </p>
+
+  <div class="lab-control-box">
+    <label>Initial Distance:
+      <input type="range" id="relDist0" min="20" max="100" step="5" value="50">
+      <span id="relDistVal">50</span>
+    </label>
+    <br><br>
+
+    <label>Kp:
+      <input type="range" id="relKp" min="0" max="10" step="0.5" value="2">
+      <span id="relKpVal">2</span>
+    </label>
+    <br><br>
+
+    <label>Kd:
+      <input type="range" id="relKd" min="0" max="12" step="0.5" value="5">
+      <span id="relKdVal">5</span>
+    </label>
+    <br><br>
+
+    <label>
+      <input type="checkbox" id="wrongSign">
+      Use wrong controller sign
+    </label>
+    <br><br>
+
+    <button class="lab-button" onclick="runChaserControl()">Run Chaser Control</button>
+  </div>
+
+  <div id="relativeDistancePlot"></div>
+  <div id="thrustPlot"></div>
+
+  <div id="chaserFeedback" class="feedback">
+    Try the wrong sign first, then correct it.
+  </div>
+</section>
+
+<section class="lab-card">
+  <div class="lab-section-title">Stage 5 — State-Machine Threshold Test</div>
+
+  <h3>Problem</h3>
+  <p>
+    A chaser spacecraft changes behaviour depending on its distance from the target.
+    This test shows how APPROACH and RENDEZVOUS modes change the thrust command.
+  </p>
+
+  <div class="lab-control-box">
+    <label>Approach threshold:
+      <input type="range" id="approachThreshold" min="30" max="80" step="1" value="49.8">
+      <span id="approachVal">49.8</span>
+    </label>
+    <br><br>
+
+    <label>Rendezvous threshold:
+      <input type="range" id="rendezvousThreshold" min="20" max="60" step="1" value="49.4">
+      <span id="rendezvousVal">49.4</span>
+    </label>
+    <br><br>
+
+    <button class="lab-button" onclick="runStateMachine()">Run State Machine</button>
+  </div>
+
+  <div id="modePlot"></div>
+
+  <div id="modeFeedback" class="feedback">
+    Demonstration thresholds make mode transitions visible in a short simulation.
+  </div>
+</section>
+      function runAttitudeControl() {
+  const kp = parseFloat(document.getElementById("attKp").value);
+  const kd = parseFloat(document.getElementById("attKd").value);
+
+  document.getElementById("attKpVal").innerText = kp;
+  document.getElementById("attKdVal").innerText = kd;
+
+  const dt = 0.05;
+  const tFinal = 30;
+  const thetaTarget = 1.0;
+
+  let t = [], theta = [], omega = [], torque = [], target = [];
+
+  theta[0] = 0;
+  omega[0] = 0;
+  t[0] = 0;
+
+  for (let i = 1; i <= tFinal / dt; i++) {
+    t[i] = i * dt;
+    target[i] = thetaTarget;
+
+    const error = thetaTarget - theta[i - 1];
+    torque[i] = kp * error - kd * omega[i - 1];
+
+    const alpha = torque[i];
+    omega[i] = omega[i - 1] + alpha * dt;
+    theta[i] = theta[i - 1] + omega[i] * dt;
+  }
+
+  Plotly.newPlot("attitudePlot", [
+    { x: t, y: theta, mode: "lines", name: "Actual θ" },
+    { x: t, y: target, mode: "lines", name: "Target θ" }
+  ], {
+    title: "Target vs Actual Attitude",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "θ (rad)" }
+  }, { responsive: true });
+
+  Plotly.newPlot("torquePlot", [
+    { x: t, y: torque, mode: "lines", name: "Control Torque" }
+  ], {
+    title: "Control Torque Response",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "Torque command" }
+  }, { responsive: true });
+
+  const feedback = document.getElementById("attitudeFeedback");
+
+  if (kp <= 5 && kd <= 2) {
+    feedback.className = "feedback";
+    feedback.innerHTML = "<strong>Observation:</strong> stable but slower response, similar to the lower-gain Stage 2 case.";
+  } else if (kp >= 8 && kd >= 4) {
+    feedback.className = "feedback good";
+    feedback.innerHTML = "<strong>Observation:</strong> faster convergence and stronger damping, similar to the preferred Stage 2 tuning.";
+  } else {
+    feedback.className = "feedback";
+    feedback.innerHTML = "<strong>Observation:</strong> intermediate response. Compare overshoot, settling time, and torque demand.";
+  }
+}
+
+function runChaserControl() {
+  const dist0 = parseFloat(document.getElementById("relDist0").value);
+  const kp = parseFloat(document.getElementById("relKp").value);
+  const kd = parseFloat(document.getElementById("relKd").value);
+  const wrongSign = document.getElementById("wrongSign").checked;
+
+  document.getElementById("relDistVal").innerText = dist0;
+  document.getElementById("relKpVal").innerText = kp;
+  document.getElementById("relKdVal").innerText = kd;
+
+  const dt = 0.1;
+  const tFinal = 60;
+  const maxThrust = 100;
+
+  let t = [], x = [], v = [], thrust = [], distance = [];
+
+  x[0] = dist0;
+  v[0] = 0;
+  t[0] = 0;
+  distance[0] = Math.abs(x[0]);
+
+  for (let i = 1; i <= tFinal / dt; i++) {
+    t[i] = i * dt;
+
+    let u;
+
+    if (wrongSign) {
+      u = kp * x[i - 1] + kd * v[i - 1];
+    } else {
+      u = -kp * x[i - 1] - kd * v[i - 1];
+    }
+
+    u = Math.max(-maxThrust, Math.min(maxThrust, u));
+    thrust[i] = u;
+
+    const a = u * 0.001;
+    v[i] = v[i - 1] + a * dt;
+    x[i] = x[i - 1] + v[i] * dt;
+
+    distance[i] = Math.abs(x[i]);
+  }
+
+  Plotly.newPlot("relativeDistancePlot", [
+    { x: t, y: distance, mode: "lines", name: "Relative Distance" }
+  ], {
+    title: "Relative Distance Between Target and Chaser",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "Distance" }
+  }, { responsive: true });
+
+  Plotly.newPlot("thrustPlot", [
+    { x: t, y: thrust, mode: "lines", name: "Thrust Command" }
+  ], {
+    title: "Chaser Thrust Command",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "Thrust" }
+  }, { responsive: true });
+
+  const feedback = document.getElementById("chaserFeedback");
+
+  if (wrongSign) {
+    feedback.className = "feedback bad";
+    feedback.innerHTML =
+      "<strong>Wrong sign:</strong> the chaser can move away from the target. This shows why controller sign must be validated against the implemented relative-state definition.";
+  } else {
+    feedback.className = "feedback good";
+    feedback.innerHTML =
+      "<strong>Correct sign:</strong> the relative distance decreases. This reproduces the Stage 3 debugging lesson: the controller must match the plant sign convention.";
+  }
+}
+
+function runStateMachine() {
+  const approachThreshold = parseFloat(document.getElementById("approachThreshold").value);
+  const rendezvousThreshold = parseFloat(document.getElementById("rendezvousThreshold").value);
+
+  document.getElementById("approachVal").innerText = approachThreshold;
+  document.getElementById("rendezvousVal").innerText = rendezvousThreshold;
+
+  const dt = 0.1;
+  const tFinal = 60;
+
+  let t = [], distance = [], mode = [];
+
+  for (let i = 0; i <= tFinal / dt; i++) {
+    t[i] = i * dt;
+
+    distance[i] = 50 - 0.015 * t[i];
+
+    if (distance[i] > approachThreshold) {
+      mode[i] = 1; // APPROACH
+    } else if (distance[i] > rendezvousThreshold) {
+      mode[i] = 2; // RENDEZVOUS
+    } else {
+      mode[i] = 3; // STATION_KEEP
+    }
+  }
+
+  Plotly.newPlot("modePlot", [
+    { x: t, y: mode, mode: "lines", name: "Control Mode" }
+  ], {
+    title: "State-Machine Mode Output",
+    xaxis: { title: "Time (s)" },
+    yaxis: {
+      title: "Mode",
+      tickvals: [1, 2, 3],
+      ticktext: ["APPROACH", "RENDEZVOUS", "STATION_KEEP"]
+    }
+  }, { responsive: true });
+
+  document.getElementById("modeFeedback").className = "feedback good";
+  document.getElementById("modeFeedback").innerHTML =
+    "<strong>Mode logic active:</strong> changing thresholds changes when the controller transitions between APPROACH, RENDEZVOUS, and STATION_KEEP.";
+}
     </section>
 
   </main>
@@ -296,129 +578,4 @@
     </p>
   </footer>
 
-  <script>
-    function runRotationalSimulation() {
-      const selected = document.querySelector('input[name="modelChoice"]:checked').value;
-
-      const dt = 0.1;
-      const tFinal = 50;
-      const alpha = 0.02;
-
-      let t = [];
-      let theta = [];
-      let omega = [];
-
-      theta[0] = 0;
-      omega[0] = 0;
-      t[0] = 0;
-
-      for (let i = 1; i <= tFinal / dt; i++) {
-        t[i] = i * dt;
-
-        if (selected === "wrong") {
-          // Incorrect: angular acceleration directly drives orientation
-          omega[i] = 0;
-          theta[i] = theta[i - 1] + alpha * dt;
-        } else {
-          // Correct: alpha -> omega -> theta
-          omega[i] = omega[i - 1] + alpha * dt;
-          theta[i] = theta[i - 1] + omega[i] * dt;
-        }
-      }
-
-      Plotly.newPlot("thetaPlot", [{
-        x: t,
-        y: theta,
-        mode: "lines",
-        name: "theta"
-      }], {
-        title: "Orientation θ(t)",
-        xaxis: { title: "Time (s)" },
-        yaxis: { title: "θ (rad)" },
-        margin: { t: 50 }
-      }, { responsive: true });
-
-      Plotly.newPlot("omegaPlot", [{
-        x: t,
-        y: omega,
-        mode: "lines",
-        name: "omega"
-      }], {
-        title: "Angular Velocity ω(t)",
-        xaxis: { title: "Time (s)" },
-        yaxis: { title: "ω (rad/s)" },
-        margin: { t: 50 }
-      }, { responsive: true });
-
-      const feedback = document.getElementById("rotationalFeedback");
-
-      if (selected === "wrong") {
-        feedback.className = "feedback bad";
-        feedback.innerHTML =
-          "<strong>Incorrect model:</strong> orientation is being driven directly by angular acceleration. " +
-          "The angular velocity state is skipped, so the rotational dynamics are physically incomplete.";
-      } else {
-        feedback.className = "feedback good";
-        feedback.innerHTML =
-          "<strong>Correct model:</strong> angular acceleration is integrated to angular velocity, " +
-          "and angular velocity is integrated to orientation. This preserves the second-order rotational state.";
-      }
-    }
-
-    function checkBus() {
-      const position = document.getElementById("busPosition").checked;
-      const velocity = document.getElementById("busVelocity").checked;
-      const orientation = document.getElementById("busOrientation").checked;
-      const omega = document.getElementById("busOmega").checked;
-      const mass = document.getElementById("busMass").checked;
-      const area = document.getElementById("busArea").checked;
-
-      const feedback = document.getElementById("busFeedback");
-
-      if (!position) {
-        feedback.className = "feedback bad";
-        feedback.innerHTML =
-          "<strong>Missing position:</strong> nadir pointing cannot be computed because the spacecraft direction relative to Earth is unknown.";
-        return;
-      }
-
-      if (!velocity) {
-        feedback.className = "feedback bad";
-        feedback.innerHTML =
-          "<strong>Missing velocity:</strong> translational dynamics and disturbance models cannot be evaluated reliably.";
-        return;
-      }
-
-      if (!orientation) {
-        feedback.className = "feedback bad";
-        feedback.innerHTML =
-          "<strong>Missing orientation:</strong> the spacecraft attitude state is incomplete.";
-        return;
-      }
-
-      if (!omega) {
-        feedback.className = "feedback bad";
-        feedback.innerHTML =
-          "<strong>Missing angular velocity:</strong> the controller cannot use rate damping. " +
-          "A PD attitude controller needs both θ and ω.";
-        return;
-      }
-
-      if (!mass || !area) {
-        feedback.className = "feedback";
-        feedback.innerHTML =
-          "<strong>Partially complete bus:</strong> attitude control may work, but disturbance and force models often require mass and area.";
-        return;
-      }
-
-      feedback.className = "feedback good";
-      feedback.innerHTML =
-        "<strong>Complete bus:</strong> position, velocity, orientation, angular velocity, mass, and area are available. " +
-        "This is suitable for the simplified 2D spacecraft control model.";
-    }
-
-    runRotationalSimulation();
-  </script>
-
-</body>
-</html>
+  
