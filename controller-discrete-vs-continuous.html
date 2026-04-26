@@ -479,8 +479,35 @@ and the state update at the same known timestep.
     become inconsistent, the response may overshoot more, and the torque command may
     become irregular.
   </p>
+ 
 </section>
+   <section class="lab-card">
+  <span class="section-pill">Inside the Solver</span>
 
+  <h2>What the Adaptive Solver Is Actually Doing</h2>
+
+  <p>
+    An adaptive solver does not step randomly. It adjusts its timestep based on
+    how fast the solution is changing.
+  </p>
+
+  <p>
+    When dynamics are fast → small timestep  
+    When dynamics are smooth → large timestep
+  </p>
+
+  <div id="dtPlot" class="plot-box"></div>
+
+  <button class="lab-button" onclick="showAdaptiveSteps()">
+    Visualise Adaptive Time Steps
+  </button>
+
+  <p>
+    Notice how the timestep shrinks during rapid motion and expands when the
+    system settles. This behaviour is ideal for solving physics — but it breaks
+    assumptions of a fixed-rate controller.
+  </p>
+</section>
 <section class="lab-card" id="fix">
   <span class="section-pill">Engineering Fix</span>
 
@@ -515,6 +542,47 @@ and the state update at the same known timestep.
   <p>
     This is mathematically valid, but it is not the same as real digital flight
     software unless the real controller is also continuous.
+  </p>
+</section>
+  <section class="lab-card">
+  <span class="section-pill">Python Implementation</span>
+
+  <h2>Reproducing This Behaviour in Python</h2>
+
+  <p>
+    The same mismatch appears when using adaptive solvers like
+    <code>solve_ivp</code> in Python.
+  </p>
+
+<pre><code>
+import numpy as np
+from scipy.integrate import solve_ivp
+
+Kp = 5
+Kd = 2
+theta_target = 1
+
+def dynamics(t, state):
+    theta, omega = state
+    tau = Kp*(theta_target - theta) - Kd*omega
+    return [omega, tau]
+
+t_span = (0, 20)
+y0 = [0, 0]
+
+sol = solve_ivp(dynamics, t_span, y0, method='RK45')
+
+import matplotlib.pyplot as plt
+plt.plot(sol.t, sol.y[0])
+plt.xlabel("Time")
+plt.ylabel("Theta")
+plt.title("Adaptive Solver Response")
+plt.show()
+</code></pre>
+
+  <p>
+    This produces behaviour similar to the adaptive simulation shown earlier.
+    The controller is evaluated at solver-selected time points, not at a fixed rate.
   </p>
 </section>
 
@@ -689,14 +757,31 @@ function runSimulation() {
       "<strong>Sample-and-hold:</strong> the plant uses variable internal steps, but the controller updates at a fixed clock rate. The torque command is held between updates, which is closer to real flight software.";
   }
 }
+  function showAdaptiveSteps() {
+  let t = [], dt = [];
+  let time = 0;
+
+  for (let i = 0; i < 200; i++) {
+    let step = 0.01 + 0.1 * Math.abs(Math.sin(0.5 * time));
+    time += step;
+
+    t.push(time);
+    dt.push(step);
+  }
+
+  Plotly.newPlot("dtPlot", [{
+    x: t,
+    y: dt,
+    mode: "lines",
+    name: "Adaptive Δt"
+  }], {
+    title: "Adaptive Solver Time Step Behaviour",
+    xaxis: { title: "Time" },
+    yaxis: { title: "Δt" }
+  });
+}
 </script>
-<footer class="site-footer">
-    <p>
-  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
-  Educational resource for spacecraft dynamics, orbital mechanics,
-  and guidance–navigation–control systems.
-  </p>
-  </footer>
+
 </body>
 </html>
 
