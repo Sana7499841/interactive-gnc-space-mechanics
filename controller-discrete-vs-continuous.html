@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>Discrete vs Continuous Controller | Problem Bank</title>
+
+<link rel="stylesheet" href="../styles.css" />
+
+<script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+body {
+  background: #f8fafc;
+}
+
+.problem-hero {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  color: white;
+  padding: 4rem 1.5rem 3.2rem;
+}
+
+.problem-hero-inner {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+.problem-hero h1 {
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: 3.2rem;
+  line-height: 1.1;
+  margin: 0 0 1rem;
+}
+
+.problem-hero p {
+  max-width: 900px;
+  font-size: 1.2rem;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.page-main {
+  max-width: 960px;
+  margin: auto;
+  padding: 2.5rem 1.5rem 3.5rem;
+}
+
+.lab-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2.4rem;
+  margin-bottom: 2.4rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  font-size: 1.06rem;
+  line-height: 1.7;
+}
+
+.lab-card h2 {
+  margin-top: 0;
+  font-size: 2rem;
+}
+
+.lab-card h3 {
+  margin-top: 1.7rem;
+  font-size: 1.35rem;
+}
+
+.section-pill {
+  display: inline-block;
+  background: #dbeafe;
+  color: #1d4ed8;
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.subtopic-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.subtopic-nav a {
+  text-decoration: none;
+  padding: 0.65rem 1.1rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.subtopic-nav a:hover {
+  background: #2563eb;
+  color: white;
+}
+
+.equation-box {
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 14px;
+  padding: 1rem 1.2rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+.lab-control-box {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 1.3rem;
+  margin: 1.2rem 0;
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.choice-row label {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+}
+
+.lab-button {
+  margin-top: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lab-button:hover {
+  background: #1d4ed8;
+}
+
+.feedback {
+  margin-top: 1rem;
+  padding: 1rem 1.2rem;
+  border-radius: 14px;
+  background: #f8fafc;
+  border-left: 5px solid #2563eb;
+}
+
+.feedback.good {
+  background: #f0fdf4;
+  border-left-color: #16a34a;
+}
+
+.feedback.warn {
+  background: #fff7ed;
+  border-left-color: #f97316;
+}
+
+.plot-box {
+  height: 360px;
+  margin-top: 1rem;
+}
+
+input[type="range"] {
+  width: 280px;
+  max-width: 100%;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.result-card {
+  background: #f8fafc;
+  border-radius: 14px;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+}
+</style>
+</head>
+
+<body>
+
+<header class="problem-hero">
+  <div class="problem-hero-inner">
+    <h1>Why Your Controller Works in Discrete Time but Fails in Continuous Simulation</h1>
+    <p>
+      A spacecraft attitude controller may look stable in a fixed-step simulation,
+      but behave differently when placed inside an adaptive solver. This problem
+      investigates why the controller, the physics, and the gains can remain the same,
+      while the response changes because the timing assumption changed.
+    </p>
+  </div>
+</header>
+
+<main class="page-main">
+
+<nav class="subtopic-nav">
+  <a href="#problem">Problem</a>
+  <a href="#controller">PD Controller</a>
+  <a href="#cases">Three Cases</a>
+  <a href="#interactive">Interactive Demo</a>
+  <a href="#why">Why It Happens</a>
+  <a href="#fix">Engineering Fix</a>
+  <a href="#takeaway">Takeaway</a>
+</nav>
+
+<section class="lab-card" id="problem">
+  <span class="section-pill">Problem Setup</span>
+
+  <h2>Spacecraft Attitude Problem</h2>
+
+  <p>
+    The spacecraft is represented by a simple rotational model. Its attitude is
+    described using orientation angle \( \theta \), angular velocity \( \omega \),
+    and control torque \( \tau \).
+  </p>
+
+  <p>
+    The goal is to rotate the spacecraft toward a target attitude without excessive
+    overshoot or oscillation.
+  </p>
+
+  <div class="equation-box">
+    $$ \dot{\theta} = \omega $$
+    $$ \dot{\omega} = \tau $$
+  </div>
+
+  <p>
+    In this simplified model, the moment of inertia is taken as unity so that the
+    torque command directly produces angular acceleration. This keeps the focus on
+    the simulation timing problem rather than spacecraft inertia modelling.
+  </p>
+</section>
+
+<section class="lab-card" id="controller">
+  <span class="section-pill">Controller Design</span>
+
+  <h2>PD Attitude Controller</h2>
+
+  <p>
+    The controller uses attitude error and angular velocity to calculate torque.
+    The proportional term pulls the spacecraft toward the target. The derivative
+    term provides damping.
+  </p>
+
+  <div class="equation-box">
+    $$ \tau = K_p(\theta_{target} - \theta) - K_d\omega $$
+  </div>
+   <div class="equation-box">
+  $$ \theta_{k+1} = \theta_k + \omega_k \Delta t $$
+  $$ \omega_{k+1} = \omega_k + \tau_k \Delta t $$
+  $$ \tau_k = K_p(\theta_{target} - \theta_k) - K_d\omega_k $$
+</div>
+
+<p>
+In the fixed-step version, the response looks stable because both the controller
+and the state update at the same known timestep.
+</p>
+  <p>
+    \(K_p\) decides how strongly the spacecraft reacts to attitude error.
+    \(K_d\) decides how strongly the controller resists angular velocity.
+  </p>
+
+  <p>
+    In a fixed-step simulation, this controller is evaluated at a regular time interval.
+    That means the damping behaviour is predictable. The hidden assumption is that
+    the controller has a known update rate.
+  </p>
+</section>
+
+<section class="lab-card" id="cases">
+  <span class="section-pill">Simulation Cases</span>
+
+  <h2>What This Problem Investigates</h2>
+
+  <p>
+    This problem compares three ways of simulating the same spacecraft attitude
+    controller. The gains are unchanged. The spacecraft dynamics are unchanged.
+    Only the timing assumption changes.
+  </p>
+
+  <ul>
+    <li>
+      <strong>Case 1 — Fixed-step Euler:</strong>
+      the state and controller update every fixed \( \Delta t \).
+    </li>
+    <li>
+      <strong>Case 2 — Adaptive solver style:</strong>
+      the timestep changes, as if the solver is choosing internal steps.
+      The controller is evaluated at irregular intervals.
+    </li>
+    <li>
+      <strong>Case 3 — Sample-and-hold hybrid:</strong>
+      the plant may move with smaller internal steps, but the controller updates
+      only at a fixed clock rate. Between updates, the torque command is held constant.
+    </li>
+  </ul>
+
+  <p>
+    The third case represents the engineering fix. Real flight software does not
+    update whenever the numerical solver feels like stepping. It updates on a clock.
+  </p>
+</section>
+<section class="lab-card" id="breaks">
+  <span class="section-pill">Where It Breaks</span>
+
+  <h2>Where the Timing Assumption Breaks</h2>
+
+  <p>
+    The controller implicitly assumes a known control update rate:
+  </p>
+
+  <div class="equation-box">
+    $$ \text{Control update rate} = \frac{1}{\Delta t} $$
+  </div>
+
+  <p>
+    With adaptive stepping, \( \Delta t \) is no longer constant.
+  </p>
+
+  <div class="equation-box">
+    $$ \Delta t \neq \text{constant} $$
+  </div>
+
+  <p>
+    That means control may be applied too late, too frequently, or at irregular
+    intervals. The derivative term no longer behaves with the same damping effect.
+  </p>
+</section>
+
+<section class="lab-card" id="interactive">
+  <span class="section-pill">Interactive Demo</span>
+
+  <h2>Run the Same Controller Three Ways</h2>
+
+  <p>
+    Select a simulation mode, adjust the gains, and run the response. The purpose is
+    to observe how timing affects attitude response, angular velocity, torque command,
+    and effective timestep.
+  </p>
+
+  <div class="lab-control-box">
+
+    <strong>Choose simulation mode:</strong>
+
+    <div class="choice-row">
+      <label>
+        <input type="radio" name="mode" value="fixed" checked>
+        Fixed-step Euler
+      </label>
+
+      <label>
+        <input type="radio" name="mode" value="adaptive">
+        Adaptive solver style
+      </label>
+
+      <label>
+        <input type="radio" name="mode" value="samplehold">
+        Sample-and-hold controller
+      </label>
+    </div>
+
+    <label>Kp:
+      <input type="range" id="kpSlider" min="0" max="12" step="0.5" value="5"
+      oninput="document.getElementById('kpVal').textContent=this.value">
+      <span id="kpVal">5</span>
+    </label>
+
+    <br><br>
+
+    <label>Kd:
+      <input type="range" id="kdSlider" min="0" max="8" step="0.5" value="2"
+      oninput="document.getElementById('kdVal').textContent=this.value">
+      <span id="kdVal">2</span>
+    </label>
+
+    <br><br>
+
+    <label>Target attitude:
+      <input type="range" id="targetSlider" min="0.2" max="2" step="0.1" value="1"
+      oninput="document.getElementById('targetVal').textContent=this.value">
+      <span id="targetVal">1</span> rad
+    </label>
+
+    <br>
+
+    <button class="lab-button" onclick="runSimulation()">Run Simulation</button>
+  </div>
+
+  <div id="attitudePlot" class="plot-box"></div>
+  <div id="omegaPlot" class="plot-box"></div>
+  <div id="torquePlot" class="plot-box"></div>
+  <div id="timeStepPlot" class="plot-box"></div>
+
+  <div id="feedback" class="feedback">
+    Select a mode and run the simulation.
+  </div>
+</section>
+<section class="lab-card" id="observe">
+  <span class="section-pill">What You Observe</span>
+
+  <h2>Fixed Step vs Adaptive Solver Behaviour</h2>
+
+  <table style="width:100%; border-collapse: collapse;">
+    <tr>
+      <th style="border-bottom:1px solid #ccc; text-align:left;">Behaviour</th>
+      <th style="border-bottom:1px solid #ccc;">Fixed Step</th>
+      <th style="border-bottom:1px solid #ccc;">Adaptive Solver</th>
+    </tr>
+    <tr>
+      <td>Rise time</td>
+      <td>Smooth</td>
+      <td>Irregular</td>
+    </tr>
+    <tr>
+      <td>Damping</td>
+      <td>Consistent</td>
+      <td>Varies</td>
+    </tr>
+    <tr>
+      <td>Stability</td>
+      <td>Stable</td>
+      <td>May oscillate</td>
+    </tr>
+    <tr>
+      <td>Control effort</td>
+      <td>Predictable</td>
+      <td>Spiky</td>
+    </tr>
+  </table>
+</section>
+<section class="lab-card" id="why">
+  <span class="section-pill">Why It Happens</span>
+
+  <h2>Why Adaptive Stepping Can Mislead the Controller</h2>
+
+  <p>
+    An adaptive solver such as ODE45 changes its timestep to solve the differential
+    equation efficiently and accurately. If the motion changes quickly, the solver
+    may take smaller steps. If the motion is smooth, it may take larger steps.
+  </p>
+
+  <p>
+    That behaviour is good for solving physics. The problem appears when a discrete
+    controller is placed inside the solver without modelling its update timing.
+  </p>
+
+  <p>
+    A digital controller normally assumes a fixed update rate. It reads the state,
+    calculates a command, sends the command, waits for the next control cycle, and
+    repeats. That is a sampled-data system.
+  </p>
+
+  <div class="equation-box">
+    Read sensors → Estimate state → Compute control command → Send actuator command → Wait until next control cycle
+  </div>
+
+  <p>
+    If the controller is evaluated at irregular solver-selected times, then the
+    controller is no longer behaving like real flight software. The damping term can
+    become inconsistent, the response may overshoot more, and the torque command may
+    become irregular.
+  </p>
+</section>
+
+<section class="lab-card" id="fix">
+  <span class="section-pill">Engineering Fix</span>
+
+  <h2>The Fix Is Not Simply “Change the Gains”</h2>
+
+  <p>
+    Poor behaviour does not always mean the controller gains are wrong. Sometimes the
+    simulation architecture is wrong.
+  </p>
+
+  <h3>Option A — Fixed-step simulation</h3>
+  <p>
+    Use a fixed simulation timestep when the controller is intended to run at a fixed
+    update rate.
+  </p>
+
+  <h3>Option B — Sample-and-hold inside continuous propagation</h3>
+  <p>
+    Let the plant evolve continuously, but update the controller only at fixed clock
+    intervals. Between controller updates, hold the previous torque command constant.
+  </p>
+
+  <h3>Option C — Fully continuous controller</h3>
+  <p>
+    Treat the controller as a continuous-time law:
+  </p>
+
+  <div class="equation-box">
+    $$ \tau(t) = K_p(\theta_{target} - \theta(t)) - K_d\dot{\theta}(t) $$
+  </div>
+
+  <p>
+    This is mathematically valid, but it is not the same as real digital flight
+    software unless the real controller is also continuous.
+  </p>
+</section>
+
+<section class="lab-card" id="takeaway">
+  <span class="section-pill">Takeaway</span>
+
+  <h2>What This Problem Shows</h2>
+
+  <p>
+    A controller that works in simulation is not automatically a good controller.
+    It only works under the assumptions used by that simulation.
+  </p>
+
+  <div class="result-grid">
+    <div class="result-card">
+      <strong>Controller</strong>
+      <p>Same \(K_p\), same \(K_d\), same target attitude.</p>
+    </div>
+
+    <div class="result-card">
+      <strong>Plant</strong>
+      <p>Same attitude dynamics: \( \dot{\theta} = \omega \), \( \dot{\omega} = \tau \).</p>
+    </div>
+
+    <div class="result-card">
+      <strong>Difference</strong>
+      <p>The timing assumption changes.</p>
+    </div>
+  </div>
+
+  <p>
+    The engineering lesson is simple but important:
+  </p>
+
+  <div class="equation-box">
+    Controller design is inseparable from simulation timing.
+  </div>
+</section>
+
+</main>
+
+<script>
+function runSimulation() {
+
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+
+  const kp = parseFloat(document.getElementById("kpSlider").value);
+  const kd = parseFloat(document.getElementById("kdSlider").value);
+  const thetaTarget = parseFloat(document.getElementById("targetSlider").value);
+
+  const tFinal = 25;
+  const fixedDt = 0.05;
+  const controlDt = 0.20;
+
+  let t = [0];
+  let theta = [0];
+  let omega = [0];
+  let torque = [0];
+  let dtHistory = [fixedDt];
+  let target = [thetaTarget];
+
+  let currentTorque = 0;
+  let nextControlUpdate = 0;
+
+  let i = 0;
+
+  while (t[i] < tFinal) {
+
+    let dt;
+
+    if (mode === "fixed") {
+      dt = fixedDt;
+    }
+
+    else if (mode === "adaptive") {
+      dt = 0.015 + 0.10 * Math.abs(Math.sin(0.75 * t[i] + 0.5));
+    }
+
+    else if (mode === "samplehold") {
+      dt = 0.015 + 0.10 * Math.abs(Math.sin(0.75 * t[i] + 0.5));
+    }
+
+    let error = thetaTarget - theta[i];
+
+    if (mode === "samplehold") {
+      if (t[i] >= nextControlUpdate) {
+        currentTorque = kp * error - kd * omega[i];
+        nextControlUpdate += controlDt;
+      }
+    } else {
+      currentTorque = kp * error - kd * omega[i];
+    }
+
+    const newOmega = omega[i] + currentTorque * dt;
+    const newTheta = theta[i] + newOmega * dt;
+    const newTime = t[i] + dt;
+
+    i++;
+
+    t[i] = newTime;
+    theta[i] = newTheta;
+    omega[i] = newOmega;
+    torque[i] = currentTorque;
+    dtHistory[i] = dt;
+    target[i] = thetaTarget;
+  }
+
+  Plotly.newPlot("attitudePlot", [
+    { x: t, y: theta, mode: "lines", name: "Actual θ" },
+    { x: t, y: target, mode: "lines", name: "Target θ" }
+  ], {
+    title: "Attitude Response",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "θ (rad)" },
+    margin: { l: 70, r: 30, t: 60, b: 60 }
+  }, { responsive: true });
+
+  Plotly.newPlot("omegaPlot", [
+    { x: t, y: omega, mode: "lines", name: "Angular velocity ω" }
+  ], {
+    title: "Angular Velocity Response",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "ω (rad/s)" },
+    margin: { l: 70, r: 30, t: 60, b: 60 }
+  }, { responsive: true });
+
+  Plotly.newPlot("torquePlot", [
+    { x: t, y: torque, mode: "lines", name: "Torque command τ" }
+  ], {
+    title: "Control Torque Command",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "τ" },
+    margin: { l: 70, r: 30, t: 60, b: 60 }
+  }, { responsive: true });
+
+  Plotly.newPlot("timeStepPlot", [
+    { x: t, y: dtHistory, mode: "lines", name: "Effective timestep Δt" }
+  ], {
+    title: "Effective Simulation Timestep",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "Δt (s)" },
+    margin: { l: 70, r: 30, t: 60, b: 60 }
+  }, { responsive: true });
+
+  const feedback = document.getElementById("feedback");
+
+  if (mode === "fixed") {
+    feedback.className = "feedback good";
+    feedback.innerHTML =
+      "<strong>Fixed-step Euler:</strong> the controller and state update at the same regular timestep. This gives predictable damping and a smooth response.";
+  }
+
+  else if (mode === "adaptive") {
+    feedback.className = "feedback warn";
+    feedback.innerHTML =
+      "<strong>Adaptive solver style:</strong> the timestep changes during propagation. The controller is evaluated at irregular times, so the damping behaviour can become inconsistent.";
+  }
+
+  else if (mode === "samplehold") {
+    feedback.className = "feedback good";
+    feedback.innerHTML =
+      "<strong>Sample-and-hold:</strong> the plant uses variable internal steps, but the controller updates at a fixed clock rate. The torque command is held between updates, which is closer to real flight software.";
+  }
+}
+</script>
+
+</body>
+</html>
+```
