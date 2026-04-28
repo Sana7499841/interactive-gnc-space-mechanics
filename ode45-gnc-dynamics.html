@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ODE45 in GNC | Dynamics, Stability, and Control</title>
+
+  <!-- Optional: keep your shared website styling if this file sits beside styles.css -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax for equations -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)'], ['$', '$']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <!-- Plotly for interactive graphs -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root {
+      --blue-1: #0b5ed7;
+      --blue-2: #083f9e;
+      --blue-3: #062b6f;
+      --ink: #1f2937;
+      --muted: #5f6b7a;
+      --soft: #f5f8ff;
+      --card: #ffffff;
+      --border: #dbe5f5;
+      --code-bg: #07111f;
+      --good: #0f8b5f;
+      --warn: #b7791f;
+      --bad: #b91c1c;
+      --shadow: 0 12px 30px rgba(15, 35, 75, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #f7faff 0%, #eef4ff 100%);
+      line-height: 1.7;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.22;
+      color: #102a56;
+    }
+
+    h1 { font-size: clamp(2.1rem, 4vw, 4.2rem); margin: 0 0 0.75rem; }
+    h2 { font-size: clamp(1.75rem, 3vw, 2.45rem); margin: 0 0 1rem; }
+    h3 { font-size: 1.45rem; margin: 1.4rem 0 0.7rem; }
+    h4 { font-size: 1.18rem; margin: 1rem 0 0.5rem; }
+
+    p { margin: 0 0 1rem; }
+    a { color: var(--blue-1); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .problem-hero {
+      width: min(1120px, calc(100% - 2rem));
+      margin: 2rem auto 1.25rem;
+      padding: 3.2rem 2rem;
+      border-radius: 30px;
+      background: linear-gradient(135deg, var(--blue-1), var(--blue-2) 62%, var(--blue-3));
+      color: white;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .problem-hero::after {
+      content: "";
+      position: absolute;
+      right: -120px;
+      top: -120px;
+      width: 330px;
+      height: 330px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.13);
+    }
+
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.28);
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 1rem;
+    }
+
+    .problem-hero h1,
+    .problem-hero p { color: white; position: relative; z-index: 1; }
+
+    .hero-subtitle {
+      max-width: 860px;
+      font-size: 1.18rem;
+      opacity: 0.96;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .pill-link,
+    .back-pill,
+    .mini-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-weight: 750;
+      text-decoration: none;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    .pill-link {
+      background: #ffffff;
+      color: #0b4cad;
+      padding: 0.72rem 1.05rem;
+      box-shadow: 0 8px 20px rgba(4, 25, 70, 0.18);
+    }
+
+    .pill-link:hover,
+    .back-pill:hover,
+    .mini-pill:hover {
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+
+    .page-main {
+      width: min(1120px, calc(100% - 2rem));
+      margin: 0 auto 4rem;
+    }
+
+    .top-nav-card,
+    .content-card,
+    .interactive-card,
+    .next-domain-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .top-nav-card {
+      padding: 1.15rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .subtopic-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
+    .mini-pill {
+      background: #eef5ff;
+      color: #164a9d;
+      padding: 0.52rem 0.82rem;
+      border: 1px solid #d2e2fb;
+      font-size: 0.94rem;
+    }
+
+    .content-card,
+    .interactive-card {
+      padding: clamp(1.25rem, 2.4vw, 2.25rem);
+      margin-bottom: 1.35rem;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.78rem;
+      border-radius: 999px;
+      background: #eaf2ff;
+      color: #0a4ca8;
+      font-size: 0.88rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+
+    .lead {
+      font-size: 1.08rem;
+      color: #334155;
+      max-width: 900px;
+    }
+
+    .roadmap-grid,
+    .two-col,
+    .three-col {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .roadmap-grid { grid-template-columns: repeat(3, 1fr); }
+    .two-col { grid-template-columns: 1fr 1fr; }
+    .three-col { grid-template-columns: repeat(3, 1fr); }
+
+    @media (max-width: 820px) {
+      .roadmap-grid,
+      .two-col,
+      .three-col { grid-template-columns: 1fr; }
+      .problem-hero { padding: 2.25rem 1.25rem; border-radius: 22px; }
+    }
+
+    .roadmap-item,
+    .concept-box,
+    .output-box,
+    .snippet-note {
+      background: var(--soft);
+      border: 1px solid #dce9ff;
+      border-radius: 18px;
+      padding: 1rem;
+    }
+
+    .roadmap-item strong,
+    .concept-box strong { color: #123e83; }
+
+    .callout {
+      border-left: 5px solid var(--blue-1);
+      background: #f2f7ff;
+      border-radius: 16px;
+      padding: 1rem 1.15rem;
+      margin: 1.1rem 0;
+    }
+
+    .callout.good { border-left-color: var(--good); background: #eefaf5; }
+    .callout.warn { border-left-color: var(--warn); background: #fff8ea; }
+    .callout.bad { border-left-color: var(--bad); background: #fff1f1; }
+
+    .math-block {
+      overflow-x: auto;
+      background: #f8fbff;
+      border: 1px solid #dbe8fb;
+      border-radius: 18px;
+      padding: 1rem 1.15rem;
+      margin: 1rem 0;
+      text-align: center;
+      font-size: 1.04rem;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.85rem;
+      margin: 1rem 0;
+    }
+
+    @media (max-width: 900px) {
+      .controls { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 560px) {
+      .controls { grid-template-columns: 1fr; }
+    }
+
+    .control-group {
+      background: #f8fbff;
+      border: 1px solid #dbe8fb;
+      border-radius: 16px;
+      padding: 0.85rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 800;
+      color: #193b70;
+      margin-bottom: 0.35rem;
+      font-size: 0.92rem;
+    }
+
+    input[type="number"], input[type="range"], select {
+      width: 100%;
+    }
+
+    input[type="number"], select {
+      border: 1px solid #cbd9ef;
+      border-radius: 12px;
+      padding: 0.65rem 0.7rem;
+      font-size: 1rem;
+      background: white;
+      color: #172033;
+    }
+
+    input[type="range"] { accent-color: var(--blue-1); }
+
+    .value-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 0.8rem 0 1rem;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.75rem 1.05rem;
+      background: linear-gradient(135deg, var(--blue-1), var(--blue-2));
+      color: white;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(11, 94, 215, 0.23);
+    }
+
+    button.secondary {
+      background: #111827;
+      box-shadow: 0 8px 18px rgba(17, 24, 39, 0.22);
+    }
+
+    button.ghost {
+      background: #edf4ff;
+      color: #0b4cad;
+      box-shadow: none;
+      border: 1px solid #cfe1fb;
+    }
+
+    button:hover { filter: brightness(1.03); transform: translateY(-1px); }
+
+    .plot {
+      min-height: 430px;
+      width: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid #dbe8fb;
+      background: white;
+    }
+
+    .small-plot { min-height: 360px; }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.8rem;
+      margin-top: 1rem;
+    }
+
+    @media (max-width: 820px) { .status-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .status-grid { grid-template-columns: 1fr; } }
+
+    .metric {
+      background: #f8fbff;
+      border: 1px solid #dbe8fb;
+      border-radius: 16px;
+      padding: 0.9rem;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .metric strong {
+      color: #102a56;
+      font-size: 1.1rem;
+    }
+
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin: 0.7rem 0 0;
+    }
+
+    .legend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.92rem;
+      color: #334155;
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      display: inline-block;
+      border: 1px solid rgba(0,0,0,0.15);
+    }
+
+    .dot.stable { background: #2e8b57; }
+    .dot.osc { background: #f59e0b; }
+    .dot.unstable { background: #ef4444; }
+    .dot.sensitive { background: #7c3aed; }
+
+    pre {
+      background: var(--code-bg);
+      color: #e6edf7;
+      border-radius: 18px;
+      padding: 1rem;
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 0.94rem;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .code-tabs {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.8rem;
+    }
+
+    .tab-btn {
+      background: #111827;
+      box-shadow: none;
+      padding: 0.58rem 0.9rem;
+    }
+
+    .tab-btn.active { background: linear-gradient(135deg, var(--blue-1), var(--blue-2)); }
+
+    .hidden { display: none; }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #dbe8fb;
+    }
+
+    th, td {
+      padding: 0.8rem;
+      border-bottom: 1px solid #e6eefc;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #eef5ff; color: #123e83; }
+
+    .next-domain-card {
+      padding: 1.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 1.5rem;
+    }
+
+    .back-pill {
+      background: #111827;
+      color: white;
+      padding: 0.72rem 1.05rem;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="problem-hero">
+    <div class="hero-pill">Problem Bank · Interactive GNC</div>
+    <h1>Interactive GNC Problem: When ODE45 Reveals the Truth About Your Model</h1>
+    <p class="hero-subtitle">From missing angular velocity to PD stability, high-gain numerical instability, and chaser-target control.</p>
+    <div class="hero-actions">
+      <a class="pill-link" href="#part-a">Start with Missing ω</a>
+      <a class="pill-link" href="#part-d">Open Stability Map</a>
+      <a class="pill-link" href="#snippets">Python / MATLAB Snippets</a>
+      <a class="pill-link" href="problem.html">← Back to Problem Bank</a>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section class="top-nav-card">
+      <nav class="subtopic-nav" aria-label="Page sections">
+        <a class="mini-pill" href="#why">Why This Matters</a>
+        <a class="mini-pill" href="#roadmap">Problem Roadmap</a>
+        <a class="mini-pill" href="#part-a">Part A</a>
+        <a class="mini-pill" href="#part-b">Part B</a>
+        <a class="mini-pill" href="#part-c">Part C</a>
+        <a class="mini-pill" href="#part-d">Part D</a>
+        <a class="mini-pill" href="#part-e">Part E</a>
+        <a class="mini-pill" href="#part-f">Part F</a>
+        <a class="mini-pill" href="#snippets">Snippets</a>
+        <a class="mini-pill" href="#takeaway">Takeaway</a>
+      </nav>
+    </section>
+
+    <section id="why" class="content-card">
+      <span class="section-label">Why this matters</span>
+      <h2>The solver is not the intelligence</h2>
+      <p class="lead">In GNC simulation, a smooth plot can be dangerously convincing. A numerical solver such as ODE45 does not know whether the equations describe real physics. It only integrates the equations supplied to it.</p>
+      <p>If the model is wrong, the result can still look clean, stable, and professional. That is the danger. A trajectory can be visually smooth and still be physically false. This page is built around that idea: <strong>simulation is not validation</strong>.</p>
+      <div class="callout bad">
+        <strong>Core warning:</strong> ODE45 does not fix a wrong model. It faithfully integrates the mistake.
+      </div>
+      <p>This problem walks through a progressive GNC learning path: first a missing state variable, then a correct second-order model, then PD control, then a gain-sweep stability map, then high-gain numerical sensitivity, and finally a chaser-target control extension.</p>
+    </section>
+
+    <section id="roadmap" class="content-card">
+      <span class="section-label">Problem roadmap</span>
+      <h2>One problem, six connected lessons</h2>
+      <div class="roadmap-grid">
+        <div class="roadmap-item"><strong>A · Missing ω</strong><br />A small modeling omission turns second-order rotational dynamics into the wrong first-order system.</div>
+        <div class="roadmap-item"><strong>B · ODE45 comparison</strong><br />The wrong and correct systems are integrated with the same solver to isolate model error.</div>
+        <div class="roadmap-item"><strong>C · PD control</strong><br />The rotational system is rewritten in state-space form so a feedback controller can be simulated correctly.</div>
+        <div class="roadmap-item"><strong>D · Stability map</strong><br />A sweep over \(K_p\) and \(K_d\) reveals stable, oscillatory, unstable, and numerically sensitive regions.</div>
+        <div class="roadmap-item"><strong>E · High gains</strong><br />Aggressive control can make the physical response faster, but also make the numerical problem harder.</div>
+        <div class="roadmap-item"><strong>F · Chaser-target</strong><br />The same second-order control idea is extended to relative motion and compared using Euler-style and ODE45-style integration.</div>
+      </div>
+    </section>
+
+    <section id="part-a" class="content-card">
+      <span class="section-label">Part A</span>
+      <h2>Missing ω: wrong vs correct second-order dynamics</h2>
+      <p>Rotational motion is naturally second-order. Angular acceleration changes angular velocity, and angular velocity changes angle. The correct model therefore keeps both states.</p>
+      <div class="math-block">\[\dot{\omega}=\alpha,\qquad \dot{\theta}=\omega\]</div>
+      <p>The common mistake is to directly integrate angular acceleration as if it were angular rate:</p>
+      <div class="math-block">\[\dot{\theta}=\alpha\]</div>
+      <div class="two-col">
+        <div class="concept-box">
+          <strong>Wrong model</strong>
+          <p>Only one state is used: angle. Angular velocity is missing, so the system has lost its true dynamic memory.</p>
+        </div>
+        <div class="concept-box">
+          <strong>Correct model</strong>
+          <p>Two states are used: angle and angular velocity. The angle changes because velocity exists, not because acceleration directly changes angle.</p>
+        </div>
+      </div>
+      <div class="callout warn">
+        <strong>Insight:</strong> Missing angular velocity turns a second-order rotational system into the wrong first-order model. Nothing crashes, but the physics is broken.
+      </div>
+    </section>
+
+    <section id="part-b" class="interactive-card">
+      <span class="section-label">Part B</span>
+      <h2>ODE45 trajectory comparison: same solver, different physics</h2>
+      <p>Use this interactive comparison to see how the wrong and correct models separate over time. Both curves are smooth. That is the important lesson: smoothness is not proof of correctness.</p>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="alphaInput">Constant angular acceleration, α</label>
+          <input id="alphaInput" type="number" value="0.4" step="0.05" />
+        </div>
+        <div class="control-group">
+          <label for="omega0Input">Initial angular velocity, ω₀</label>
+          <input id="omega0Input" type="number" value="0.0" step="0.05" />
+        </div>
+        <div class="control-group">
+          <label for="theta0Input">Initial angle, θ₀</label>
+          <input id="theta0Input" type="number" value="0.0" step="0.05" />
+        </div>
+        <div class="control-group">
+          <label for="tFinalInput">Simulation time</label>
+          <input id="tFinalInput" type="number" value="10" min="1" max="30" step="1" />
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runWrongVsCorrect()">Run wrong vs correct model</button>
+        <button class="ghost" onclick="setWrongCorrectExample('slow')">Slow example</button>
+        <button class="ghost" onclick="setWrongCorrectExample('fast')">Fast divergence</button>
+      </div>
+
+      <div id="wrongCorrectPlot" class="plot"></div>
+
+      <div class="status-grid">
+        <div class="metric"><span>Wrong final θ</span><strong id="wrongFinal">—</strong></div>
+        <div class="metric"><span>Correct final θ</span><strong id="correctFinal">—</strong></div>
+        <div class="metric"><span>Final mismatch</span><strong id="mismatchFinal">—</strong></div>
+        <div class="metric"><span>Main lesson</span><strong>Model error</strong></div>
+      </div>
+
+      <div class="callout bad">
+        <strong>Output message:</strong> ODE45 does not fix a wrong model. It faithfully integrates the mistake.
+      </div>
+    </section>
+
+    <section id="part-c" class="content-card">
+      <span class="section-label">Part C</span>
+      <h2>PD controller in state-space form</h2>
+      <p>A PD controller applies correction based on position error and velocity damping. For rotational motion, the controlled equation is:</p>
+      <div class="math-block">\[\ddot{\theta}=K_p(\theta_{ref}-\theta)-K_d\dot{\theta}\]</div>
+      <p>ODE45 does not directly integrate a second derivative equation in this written form. It needs a first-order state-space system. Define:</p>
+      <div class="math-block">\[x_1=\theta,\qquad x_2=\dot{\theta}\]</div>
+      <p>Then the correct state model becomes:</p>
+      <div class="math-block">\[\dot{x}_1=x_2\]</div>
+      <div class="math-block">\[\dot{x}_2=K_p(\theta_{ref}-x_1)-K_d x_2\]</div>
+      <div class="callout good">
+        <strong>GNC connection:</strong> This is the same mental model used in attitude control, pointing control, and flight-control loops. A controller acts through states, not just through equations written on paper.
+      </div>
+    </section>
+
+    <section class="interactive-card">
+      <span class="section-label">Interactive PD response</span>
+      <h2>Run the rotational PD controller</h2>
+      <p>Change \(K_p\) and \(K_d\) to see how proportional action and damping shape the response. Low damping can oscillate. Too little proportional action can be slow. Large gains can become numerically demanding.</p>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="kpSlider">Kp</label>
+          <input id="kpSlider" type="range" min="0" max="80" value="12" step="1" oninput="updateSliderLabels()" />
+          <div class="value-row"><span>0</span><strong id="kpLabel">12</strong><span>80</span></div>
+        </div>
+        <div class="control-group">
+          <label for="kdSlider">Kd</label>
+          <input id="kdSlider" type="range" min="0" max="40" value="6" step="0.5" oninput="updateSliderLabels()" />
+          <div class="value-row"><span>0</span><strong id="kdLabel">6</strong><span>40</span></div>
+        </div>
+        <div class="control-group">
+          <label for="thetaRefInput">Reference angle θref</label>
+          <input id="thetaRefInput" type="number" value="1" step="0.1" />
+        </div>
+        <div class="control-group">
+          <label for="thetaInitialInput">Initial angle θ₀</label>
+          <input id="thetaInitialInput" type="number" value="0" step="0.1" />
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runPDResponse()">Run PD response</button>
+        <button class="ghost" onclick="setPDExample('underdamped')">Underdamped</button>
+        <button class="ghost" onclick="setPDExample('wellDamped')">Well damped</button>
+        <button class="ghost" onclick="setPDExample('aggressive')">Aggressive</button>
+      </div>
+
+      <div id="pdPlot" class="plot"></div>
+
+      <div class="status-grid">
+        <div class="metric"><span>Classification</span><strong id="pdClass">—</strong></div>
+        <div class="metric"><span>Overshoot</span><strong id="pdOvershoot">—</strong></div>
+        <div class="metric"><span>Final error</span><strong id="pdFinalError">—</strong></div>
+        <div class="metric"><span>Numerical effort</span><strong id="pdEffort">—</strong></div>
+      </div>
+    </section>
+
+    <section id="part-d" class="interactive-card">
+      <span class="section-label">Part D</span>
+      <h2>Stability map for Kp and Kd</h2>
+      <p>Instead of randomly trying gains, sweep the controller space. The plot below classifies the response for many \((K_p,K_d)\) combinations. This turns tuning into a structured engineering task.</p>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="kpMaxMap">Kp maximum</label>
+          <input id="kpMaxMap" type="number" value="80" min="10" max="200" step="10" />
+        </div>
+        <div class="control-group">
+          <label for="kdMaxMap">Kd maximum</label>
+          <input id="kdMaxMap" type="number" value="40" min="5" max="100" step="5" />
+        </div>
+        <div class="control-group">
+          <label for="mapTheta0">Initial angle</label>
+          <input id="mapTheta0" type="number" value="0" step="0.1" />
+        </div>
+        <div class="control-group">
+          <label for="mapTFinal">Simulation time</label>
+          <input id="mapTFinal" type="number" value="8" min="2" max="20" step="1" />
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="generateStabilityMap()">Generate stability map</button>
+        <button class="secondary" onclick="runPDFromMapHint()">Use selected idea in PD plot</button>
+      </div>
+
+      <div class="legend-row">
+        <span class="legend-chip"><span class="dot stable"></span>Stable</span>
+        <span class="legend-chip"><span class="dot osc"></span>Oscillatory</span>
+        <span class="legend-chip"><span class="dot unstable"></span>Unstable</span>
+        <span class="legend-chip"><span class="dot sensitive"></span>Numerically sensitive</span>
+      </div>
+
+      <div id="stabilityMap" class="plot"></div>
+      <div class="callout good">
+        <strong>Insight:</strong> Tuning is not random trial-and-error. Gain choices create structured regions of behaviour.
+      </div>
+    </section>
+
+    <section id="part-e" class="interactive-card">
+      <span class="section-label">Part E</span>
+      <h2>High gains: physical vs numerical instability</h2>
+      <p>Higher gains often reduce response time, but they also create faster state changes. A physical system may be stable in theory while the numerical simulation becomes difficult because the solver must resolve rapid dynamics.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Instability type</th><th>Meaning</th><th>What to check</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Physical instability</strong></td><td>The modeled dynamics genuinely diverge or fail to settle.</td><td>Controller structure, sign convention, damping, actuator limits.</td></tr>
+            <tr><td><strong>Numerical instability</strong></td><td>The equations may be stable, but the solver/timestep/tolerance cannot resolve them well.</td><td>Step size, tolerances, stiffness, scaling, saturation modeling.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="highGainKp">High-gain Kp</label>
+          <input id="highGainKp" type="number" value="160" min="1" max="500" step="10" />
+        </div>
+        <div class="control-group">
+          <label for="highGainKd">High-gain Kd</label>
+          <input id="highGainKd" type="number" value="3" min="0" max="100" step="1" />
+        </div>
+        <div class="control-group">
+          <label for="fixedDtInput">Manual fixed timestep</label>
+          <input id="fixedDtInput" type="number" value="0.08" min="0.005" max="0.5" step="0.005" />
+        </div>
+        <div class="control-group">
+          <label for="highGainTFinal">Simulation time</label>
+          <input id="highGainTFinal" type="number" value="8" min="2" max="20" step="1" />
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runHighGainDemo()">Run high-gain demo</button>
+        <button class="ghost" onclick="setHighGainExample('numerical')">Numerical sensitivity</button>
+        <button class="ghost" onclick="setHighGainExample('damped')">Stabilize with damping</button>
+      </div>
+
+      <div id="highGainPlot" class="plot"></div>
+      <div class="callout warn">
+        <strong>Engineering message:</strong> Not all instability is physics. Sometimes it is your solver, timestep, tolerance, or model scaling.
+      </div>
+    </section>
+
+    <section id="part-f" class="interactive-card">
+      <span class="section-label">Part F</span>
+      <h2>Chaser-target control extension</h2>
+      <p>Now apply the same idea to a mission-style relative-motion problem. A chaser begins with position error \(x\) and relative velocity \(\dot{x}\). A PD-like controller tries to bring the chaser to the target.</p>
+      <div class="math-block">\[\ddot{x}=-K_p x-K_d\dot{x}\]</div>
+      <p>This comparison shows why manual integration can exaggerate error when the timestep is too coarse, while ODE45-style adaptive integration usually gives a smoother response. But the lesson remains: even a better solver cannot repair poor gains or incorrect dynamics.</p>
+
+      <div class="controls">
+        <div class="control-group">
+          <label for="chaserX0">Initial relative position x₀</label>
+          <input id="chaserX0" type="number" value="120" step="10" />
+        </div>
+        <div class="control-group">
+          <label for="chaserV0">Initial relative velocity v₀</label>
+          <input id="chaserV0" type="number" value="-2" step="0.5" />
+        </div>
+        <div class="control-group">
+          <label for="chaserKp">Kp</label>
+          <input id="chaserKp" type="number" value="0.18" step="0.02" />
+        </div>
+        <div class="control-group">
+          <label for="chaserKd">Kd</label>
+          <input id="chaserKd" type="number" value="0.85" step="0.05" />
+        </div>
+        <div class="control-group">
+          <label for="chaserDt">Euler timestep</label>
+          <input id="chaserDt" type="number" value="0.25" min="0.01" max="2" step="0.01" />
+        </div>
+        <div class="control-group">
+          <label for="chaserTFinal">Simulation time</label>
+          <input id="chaserTFinal" type="number" value="35" min="5" max="100" step="5" />
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runChaserDemo()">Compare Euler and ODE45-style integration</button>
+        <button class="ghost" onclick="setChaserExample('smooth')">Smooth convergence</button>
+        <button class="ghost" onclick="setChaserExample('coarse')">Coarse timestep problem</button>
+      </div>
+
+      <div id="chaserPlot" class="plot"></div>
+      <div class="callout good">
+        <strong>Mission insight:</strong> Relative-motion control is still a second-order dynamics problem. The same modeling discipline applies whether the state is angle or position error.
+      </div>
+    </section>
+
+    <section id="snippets" class="content-card">
+      <span class="section-label">Interactive Python / MATLAB snippets</span>
+      <h2>Code translation: from page logic to engineering tools</h2>
+      <p>Use these snippets as teaching blocks in the page. Keep the black-pill code style because it visually separates implementation from theory.</p>
+
+      <div class="code-tabs">
+        <button class="tab-btn active" onclick="showCodeTab('pythonCode', this)">Python</button>
+        <button class="tab-btn" onclick="showCodeTab('matlabCode', this)">MATLAB / ODE45</button>
+        <button class="tab-btn" onclick="showCodeTab('classificationCode', this)">Classification Logic</button>
+      </div>
+
+      <div id="pythonCode">
+<pre><code># Python version using scipy.solve_ivp as an ODE45-style adaptive RK solver
+import numpy as np
+from scipy.integrate import solve_ivp
+import matplotlib.pyplot as plt
+
+alpha = 0.4
+omega0 = 0.0
+theta0 = 0.0
+t_final = 10.0
+
+# Wrong: theta_dot = alpha
+def wrong_model(t, y):
+    theta = y[0]
+    return [alpha]
+
+# Correct: omega_dot = alpha, theta_dot = omega
+def correct_model(t, y):
+    theta, omega = y
+    return [omega, alpha]
+
+t_eval = np.linspace(0, t_final, 400)
+wrong = solve_ivp(wrong_model, [0, t_final], [theta0], t_eval=t_eval)
+correct = solve_ivp(correct_model, [0, t_final], [theta0, omega0], t_eval=t_eval)
+
+plt.plot(wrong.t, wrong.y[0], label="Wrong: theta_dot = alpha")
+plt.plot(correct.t, correct.y[0], label="Correct: theta_dot = omega")
+plt.xlabel("Time [s]")
+plt.ylabel("Angle theta")
+plt.legend()
+plt.grid(True)
+plt.show()</code></pre>
+      </div>
+
+      <div id="matlabCode" class="hidden">
+<pre><code>% MATLAB ODE45 version for PD-controlled rotational dynamics
+Kp = 12;
+Kd = 6;
+theta_ref = 1;
+x0 = [0; 0];   % x(1) = theta, x(2) = theta_dot
+
+tspan = [0 10];
+
+f = @(t,x) [
+    x(2);
+    Kp*(theta_ref - x(1)) - Kd*x(2)
+];
+
+[t,x] = ode45(f, tspan, x0);
+
+figure;
+plot(t, x(:,1), 'LineWidth', 1.8); hold on;
+yline(theta_ref, '--', 'Reference');
+xlabel('Time [s]');
+ylabel('Angle theta');
+grid on;
+title('PD-Controlled Rotational Response using ODE45');</code></pre>
+      </div>
+
+      <div id="classificationCode" class="hidden">
+<pre><code># Simple response classification idea
+# This can be used after simulating theta(t)
+
+final_error = abs(theta[-1] - theta_ref)
+overshoot = max(theta) - theta_ref
+peak_abs = max(abs(theta))
+zero_crossings = np.sum(np.diff(np.sign(theta - theta_ref)) != 0)
+
+if peak_abs > 10 * max(1, abs(theta_ref)):
+    label = "Unstable"
+elif final_error > 0.2 * max(1, abs(theta_ref)):
+    label = "Unstable or too slow"
+elif zero_crossings >= 3 or overshoot > 0.15 * max(1, abs(theta_ref)):
+    label = "Oscillatory"
+else:
+    label = "Stable"
+
+print(label)</code></pre>
+      </div>
+
+      <div class="snippet-note">
+        <strong>Teaching note:</strong> MATLAB uses <code>ode45</code>. Python does not call it ODE45, but <code>solve_ivp</code> with RK45 plays the same role conceptually: adaptive Runge-Kutta integration.
+      </div>
+    </section>
+
+    <section id="takeaway" class="content-card">
+      <span class="section-label">Engineering takeaway</span>
+      <h2>A simulation can look smooth and still be wrong</h2>
+      <div class="three-col">
+        <div class="concept-box">
+          <strong>1 · Model structure is everything</strong>
+          <p>If a state such as \(\omega\) is missing, the simulation no longer represents the physical system.</p>
+        </div>
+        <div class="concept-box">
+          <strong>2 · Solvers are not validators</strong>
+          <p>ODE45 improves numerical integration, but it does not check whether your equations are correct.</p>
+        </div>
+        <div class="concept-box">
+          <strong>3 · Control tuning has structure</strong>
+          <p>Gain choices create regions of stable, oscillatory, unstable, and numerically sensitive behaviour.</p>
+        </div>
+      </div>
+      <div class="callout good">
+        <strong>Final insight:</strong> A GNC engineer must question the model before trusting the plot.
+      </div>
+    </section>
+
+    <section class="next-domain-card">
+      <div>
+        <h3 style="margin:0 0 0.35rem;">Return to the Problem Bank</h3>
+        <p style="margin:0; color:#526171;">Use this as a flagship deep-dive problem under Interactive GNC & Space Mechanics.</p>
+      </div>
+      <a class="back-pill" href="problem.html">← Back to Problem Bank</a>
+    </section>
+  </main>
+
+  <script>
+    function rk4Step(f, t, y, h) {
+      const k1 = f(t, y);
+      const k2 = f(t + h/2, y.map((v,i) => v + h*k1[i]/2));
+      const k3 = f(t + h/2, y.map((v,i) => v + h*k2[i]/2));
+      const k4 = f(t + h, y.map((v,i) => v + h*k3[i]));
+      return y.map((v,i) => v + h*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6);
+    }
+
+    // Lightweight adaptive RK-style integration for browser demonstration.
+    // This is not MATLAB ode45, but it demonstrates the same state-space idea.
+    function integrateAdaptive(f, y0, t0, tf, h0=0.04, tol=1e-5) {
+      let t = t0;
+      let y = y0.slice();
+      let h = h0;
+      const ts = [t];
+      const ys = [y.slice()];
+      let steps = 0;
+      let rejected = 0;
+      const maxSteps = 80000;
+
+      while (t < tf && steps < maxSteps) {
+        if (t + h > tf) h = tf - t;
+
+        const yBig = rk4Step(f, t, y, h);
+        const yHalf = rk4Step(f, t, y, h/2);
+        const ySmall = rk4Step(f, t + h/2, yHalf, h/2);
+        const err = Math.max(...ySmall.map((v,i) => Math.abs(v - yBig[i])));
+
+        if (err < tol || h < 1e-5) {
+          t += h;
+          y = ySmall;
+          ts.push(t);
+          ys.push(y.slice());
+          steps++;
+          const scale = err === 0 ? 1.8 : Math.min(1.8, Math.max(0.45, 0.9 * Math.pow(tol / err, 0.2)));
+          h *= scale;
+        } else {
+          h *= 0.5;
+          rejected++;
+        }
+      }
+      return { t: ts, y: ys, steps, rejected };
+    }
+
+    function integrateFixedEuler(f, y0, t0, tf, h) {
+      let t = t0;
+      let y = y0.slice();
+      const ts = [t];
+      const ys = [y.slice()];
+      while (t < tf - 1e-12) {
+        const dt = Math.min(h, tf - t);
+        const dy = f(t, y);
+        y = y.map((v,i) => v + dt * dy[i]);
+        t += dt;
+        ts.push(t);
+        ys.push(y.slice());
+        if (Math.max(...y.map(v => Math.abs(v))) > 1e6) break;
+      }
+      return { t: ts, y: ys };
+    }
+
+    function linspace(a, b, n) {
+      if (n === 1) return [a];
+      return Array.from({length: n}, (_, i) => a + (b-a)*i/(n-1));
+    }
+
+    function fmt(x, digits=3) {
+      if (!Number.isFinite(x)) return "—";
+      return Number(x).toFixed(digits);
+    }
+
+    function plotLayout(title, xTitle, yTitle) {
+      return {
+        title: { text: title, font: { family: 'Georgia, Times New Roman, serif', size: 20 } },
+        margin: { l: 58, r: 24, t: 58, b: 54 },
+        xaxis: { title: xTitle, gridcolor: '#e8eef8' },
+        yaxis: { title: yTitle, gridcolor: '#e8eef8' },
+        paper_bgcolor: 'white',
+        plot_bgcolor: 'white',
+        legend: { orientation: 'h', y: -0.22 }
+      };
+    }
+
+    function runWrongVsCorrect() {
+      const alpha = parseFloat(document.getElementById('alphaInput').value);
+      const omega0 = parseFloat(document.getElementById('omega0Input').value);
+      const theta0 = parseFloat(document.getElementById('theta0Input').value);
+      const tf = parseFloat(document.getElementById('tFinalInput').value);
+
+      const wrong = integrateAdaptive((t, y) => [alpha], [theta0], 0, tf, 0.05, 1e-7);
+      const correct = integrateAdaptive((t, y) => [y[1], alpha], [theta0, omega0], 0, tf, 0.05, 1e-7);
+
+      const wrongTheta = wrong.y.map(v => v[0]);
+      const correctTheta = correct.y.map(v => v[0]);
+      const correctOmega = correct.y.map(v => v[1]);
+
+      const wrongFinal = wrongTheta[wrongTheta.length-1];
+      const correctFinal = correctTheta[correctTheta.length-1];
+
+      document.getElementById('wrongFinal').textContent = fmt(wrongFinal, 3);
+      document.getElementById('correctFinal').textContent = fmt(correctFinal, 3);
+      document.getElementById('mismatchFinal').textContent = fmt(Math.abs(correctFinal - wrongFinal), 3);
+
+      Plotly.newPlot('wrongCorrectPlot', [
+        { x: wrong.t, y: wrongTheta, name: 'Wrong: θ̇ = α', mode: 'lines', line: { width: 3 } },
+        { x: correct.t, y: correctTheta, name: 'Correct: θ̇ = ω', mode: 'lines', line: { width: 3 } },
+        { x: correct.t, y: correctOmega, name: 'Correct: ω(t)', mode: 'lines', line: { width: 2, dash: 'dot' }, yaxis: 'y2' }
+      ], {
+        ...plotLayout('Wrong vs Correct Rotational Dynamics', 'Time [s]', 'Angle θ'),
+        yaxis2: { title: 'Angular velocity ω', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' }
+      }, { responsive: true, displaylogo: false });
+    }
+
+    function setWrongCorrectExample(type) {
+      if (type === 'slow') {
+        document.getElementById('alphaInput').value = 0.15;
+        document.getElementById('omega0Input').value = 0.0;
+        document.getElementById('tFinalInput').value = 10;
+      } else {
+        document.getElementById('alphaInput').value = 0.65;
+        document.getElementById('omega0Input').value = 0.25;
+        document.getElementById('tFinalInput').value = 12;
+      }
+      runWrongVsCorrect();
+    }
+
+    function updateSliderLabels() {
+      document.getElementById('kpLabel').textContent = document.getElementById('kpSlider').value;
+      document.getElementById('kdLabel').textContent = document.getElementById('kdSlider').value;
+    }
+
+    function simulatePD(Kp, Kd, theta0=0, omega0=0, thetaRef=1, tf=10, tol=1e-5) {
+      const f = (t, y) => [y[1], Kp*(thetaRef - y[0]) - Kd*y[1]];
+      return integrateAdaptive(f, [theta0, omega0], 0, tf, 0.03, tol);
+    }
+
+    function classifyResponse(t, theta, thetaRef, steps=0, rejected=0) {
+      const scale = Math.max(1, Math.abs(thetaRef));
+      const finalError = Math.abs(theta[theta.length-1] - thetaRef);
+      const maxAbs = Math.max(...theta.map(v => Math.abs(v)));
+      const overshoot = Math.max(0, Math.max(...theta) - thetaRef);
+      let crossings = 0;
+      for (let i=1; i<theta.length; i++) {
+        const a = theta[i-1] - thetaRef;
+        const b = theta[i] - thetaRef;
+        if (a*b < 0) crossings++;
+      }
+
+      let label = 'Stable';
+      let code = 0;
+      if (!Number.isFinite(maxAbs) || maxAbs > 8*scale || finalError > 1.2*scale) {
+        label = 'Unstable'; code = 2;
+      } else if (steps > 2500 || rejected > 900) {
+        label = 'Numerically sensitive'; code = 3;
+      } else if (crossings >= 3 || overshoot > 0.15*scale) {
+        label = 'Oscillatory'; code = 1;
+      }
+      return { label, code, finalError, overshoot, crossings };
+    }
+
+    function runPDResponse() {
+      updateSliderLabels();
+      const Kp = parseFloat(document.getElementById('kpSlider').value);
+      const Kd = parseFloat(document.getElementById('kdSlider').value);
+      const thetaRef = parseFloat(document.getElementById('thetaRefInput').value);
+      const theta0 = parseFloat(document.getElementById('thetaInitialInput').value);
+      const sol = simulatePD(Kp, Kd, theta0, 0, thetaRef, 10, 1e-5);
+      const theta = sol.y.map(v => v[0]);
+      const omega = sol.y.map(v => v[1]);
+      const cls = classifyResponse(sol.t, theta, thetaRef, sol.steps, sol.rejected);
+
+      document.getElementById('pdClass').textContent = cls.label;
+      document.getElementById('pdOvershoot').textContent = fmt(cls.overshoot, 3);
+      document.getElementById('pdFinalError').textContent = fmt(cls.finalError, 4);
+      document.getElementById('pdEffort').textContent = sol.steps > 1800 ? 'High' : sol.steps > 700 ? 'Medium' : 'Low';
+
+      Plotly.newPlot('pdPlot', [
+        { x: sol.t, y: theta, name: 'θ(t)', mode: 'lines', line: { width: 3 } },
+        { x: sol.t, y: omega, name: 'ω(t)', mode: 'lines', line: { width: 2, dash: 'dot' } },
+        { x: [0, 10], y: [thetaRef, thetaRef], name: 'θref', mode: 'lines', line: { width: 2, dash: 'dash' } }
+      ], plotLayout(`PD response: Kp=${Kp}, Kd=${Kd}`, 'Time [s]', 'Response'), { responsive: true, displaylogo: false });
+    }
+
+    function setPDExample(type) {
+      if (type === 'underdamped') {
+        document.getElementById('kpSlider').value = 28;
+        document.getElementById('kdSlider').value = 1.5;
+      } else if (type === 'wellDamped') {
+        document.getElementById('kpSlider').value = 12;
+        document.getElementById('kdSlider').value = 7;
+      } else {
+        document.getElementById('kpSlider').value = 70;
+        document.getElementById('kdSlider').value = 4;
+      }
+      updateSliderLabels();
+      runPDResponse();
+    }
+
+    function generateStabilityMap() {
+      const kpMax = parseFloat(document.getElementById('kpMaxMap').value);
+      const kdMax = parseFloat(document.getElementById('kdMaxMap').value);
+      const theta0 = parseFloat(document.getElementById('mapTheta0').value);
+      const tf = parseFloat(document.getElementById('mapTFinal').value);
+
+      const kpVals = linspace(0, kpMax, 36);
+      const kdVals = linspace(0, kdMax, 30);
+      const z = [];
+
+      for (let j=0; j<kdVals.length; j++) {
+        const row = [];
+        for (let i=0; i<kpVals.length; i++) {
+          const Kp = kpVals[i];
+          const Kd = kdVals[j];
+          if (Kp === 0 && Kd === 0) { row.push(2); continue; }
+          const sol = simulatePD(Kp, Kd, theta0, 0, 1, tf, 5e-4);
+          const theta = sol.y.map(v => v[0]);
+          const cls = classifyResponse(sol.t, theta, 1, sol.steps, sol.rejected);
+          row.push(cls.code);
+        }
+        z.push(row);
+      }
+
+      const colorscale = [
+        [0.00, '#2e8b57'], [0.249, '#2e8b57'],
+        [0.25, '#f59e0b'], [0.499, '#f59e0b'],
+        [0.50, '#ef4444'], [0.749, '#ef4444'],
+        [0.75, '#7c3aed'], [1.00, '#7c3aed']
+      ];
+
+      Plotly.newPlot('stabilityMap', [{
+        x: kpVals,
+        y: kdVals,
+        z: z,
+        type: 'heatmap',
+        colorscale,
+        zmin: 0,
+        zmax: 3,
+        showscale: false,
+        hovertemplate: 'Kp=%{x:.2f}<br>Kd=%{y:.2f}<br>Class code=%{z}<extra></extra>'
+      }], {
+        ...plotLayout('PD Stability Map: Gain-Space Behaviour', 'Kp', 'Kd'),
+        annotations: [{
+          text: 'Green = stable · Orange = oscillatory · Red = unstable · Purple = numerically sensitive',
+          xref: 'paper', yref: 'paper', x: 0.5, y: 1.08, showarrow: false,
+          font: { size: 13, color: '#334155' }
+        }]
+      }, { responsive: true, displaylogo: false });
+    }
+
+    function runPDFromMapHint() {
+      document.getElementById('kpSlider').value = 20;
+      document.getElementById('kdSlider').value = 8;
+      updateSliderLabels();
+      runPDResponse();
+      document.getElementById('part-c').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function runHighGainDemo() {
+      const Kp = parseFloat(document.getElementById('highGainKp').value);
+      const Kd = parseFloat(document.getElementById('highGainKd').value);
+      const dt = parseFloat(document.getElementById('fixedDtInput').value);
+      const tf = parseFloat(document.getElementById('highGainTFinal').value);
+      const thetaRef = 1;
+      const f = (t, y) => [y[1], Kp*(thetaRef - y[0]) - Kd*y[1]];
+      const adaptive = integrateAdaptive(f, [0, 0], 0, tf, 0.02, 1e-5);
+      const fixed = integrateFixedEuler(f, [0, 0], 0, tf, dt);
+
+      Plotly.newPlot('highGainPlot', [
+        { x: adaptive.t, y: adaptive.y.map(v => v[0]), name: 'ODE45-style adaptive RK', mode: 'lines', line: { width: 3 } },
+        { x: fixed.t, y: fixed.y.map(v => v[0]), name: `Manual Euler, dt=${dt}`, mode: 'lines', line: { width: 2, dash: 'dot' } },
+        { x: [0, tf], y: [thetaRef, thetaRef], name: 'Reference', mode: 'lines', line: { width: 2, dash: 'dash' } }
+      ], plotLayout(`High-gain comparison: Kp=${Kp}, Kd=${Kd}`, 'Time [s]', 'Angle θ'), { responsive: true, displaylogo: false });
+    }
+
+    function setHighGainExample(type) {
+      if (type === 'numerical') {
+        document.getElementById('highGainKp').value = 180;
+        document.getElementById('highGainKd').value = 2;
+        document.getElementById('fixedDtInput').value = 0.08;
+      } else {
+        document.getElementById('highGainKp').value = 120;
+        document.getElementById('highGainKd').value = 22;
+        document.getElementById('fixedDtInput').value = 0.08;
+      }
+      runHighGainDemo();
+    }
+
+    function runChaserDemo() {
+      const x0 = parseFloat(document.getElementById('chaserX0').value);
+      const v0 = parseFloat(document.getElementById('chaserV0').value);
+      const Kp = parseFloat(document.getElementById('chaserKp').value);
+      const Kd = parseFloat(document.getElementById('chaserKd').value);
+      const dt = parseFloat(document.getElementById('chaserDt').value);
+      const tf = parseFloat(document.getElementById('chaserTFinal').value);
+      const f = (t, y) => [y[1], -Kp*y[0] - Kd*y[1]];
+      const adaptive = integrateAdaptive(f, [x0, v0], 0, tf, 0.08, 1e-4);
+      const euler = integrateFixedEuler(f, [x0, v0], 0, tf, dt);
+
+      Plotly.newPlot('chaserPlot', [
+        { x: adaptive.t, y: adaptive.y.map(v => v[0]), name: 'ODE45-style adaptive: x(t)', mode: 'lines', line: { width: 3 } },
+        { x: euler.t, y: euler.y.map(v => v[0]), name: `Euler: x(t), dt=${dt}`, mode: 'lines', line: { width: 2, dash: 'dot' } },
+        { x: adaptive.t, y: adaptive.y.map(v => v[1]), name: 'ODE45-style velocity', mode: 'lines', line: { width: 2, dash: 'dash' }, yaxis: 'y2' }
+      ], {
+        ...plotLayout('Chaser-target convergence: Euler vs ODE45-style integration', 'Time [s]', 'Relative position x'),
+        yaxis2: { title: 'Relative velocity', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' }
+      }, { responsive: true, displaylogo: false });
+    }
+
+    function setChaserExample(type) {
+      if (type === 'smooth') {
+        document.getElementById('chaserX0').value = 120;
+        document.getElementById('chaserV0').value = -2;
+        document.getElementById('chaserKp').value = 0.12;
+        document.getElementById('chaserKd').value = 0.75;
+        document.getElementById('chaserDt').value = 0.12;
+      } else {
+        document.getElementById('chaserX0').value = 120;
+        document.getElementById('chaserV0').value = -2;
+        document.getElementById('chaserKp').value = 0.35;
+        document.getElementById('chaserKd').value = 0.35;
+        document.getElementById('chaserDt').value = 0.9;
+      }
+      runChaserDemo();
+    }
+
+    function showCodeTab(id, button) {
+      ['pythonCode','matlabCode','classificationCode'].forEach(x => document.getElementById(x).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      button.classList.add('active');
+    }
+
+    window.addEventListener('load', () => {
+      updateSliderLabels();
+      runWrongVsCorrect();
+      runPDResponse();
+      generateStabilityMap();
+      runHighGainDemo();
+      runChaserDemo();
+    });
+  </script>
+</body>
+</html>
