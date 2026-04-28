@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Runge–Kutta for Space Mechanics | Orbit Propagation</title>
+
+  <link rel="stylesheet" href="styles-home.css" />
+  <link rel="icon" type="image/png" href="favicon1.png" />
+
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)'], ['$', '$']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --ink: #111827;
+      --muted: #526173;
+      --soft: #f8fafc;
+      --soft-blue: #eff6ff;
+      --border: #dbeafe;
+      --card: #ffffff;
+      --code-bg: #0f172a;
+      --good: #16a34a;
+      --warn: #d97706;
+      --bad: #dc2626;
+      --purple: #7c3aed;
+      --shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: "Times New Roman", Georgia, serif;
+      line-height: 1.12;
+      color: #111827;
+    }
+
+    h2 { font-size: clamp(2rem, 3.2vw, 2.65rem); margin: 0 0 1.1rem; }
+    h3 { font-size: 1.45rem; margin: 1.2rem 0 0.7rem; }
+    p { margin: 0 0 1rem; }
+
+    .problem-hero {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      color: #ffffff;
+      padding: 4rem 1.5rem 3.2rem;
+    }
+
+    .problem-hero-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .problem-hero h1 {
+      color: #ffffff;
+      font-size: clamp(2.6rem, 5vw, 3.7rem);
+      line-height: 1.1;
+      margin: 0 0 1.2rem;
+      max-width: 1050px;
+    }
+
+    .problem-hero p {
+      max-width: 900px;
+      color: #ffffff;
+      font-size: 1.25rem;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .page-main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3.5rem;
+    }
+
+    .content-card,
+    .interactive-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 2.5rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(191, 219, 254, 0.65);
+      font-size: 1.08rem;
+    }
+
+    .section-title {
+      display: inline-block;
+      background: #dbeafe;
+      padding: 0.6rem 1.2rem;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--blue-dark);
+      margin-bottom: 1.2rem;
+      letter-spacing: 0.01em;
+    }
+
+    .subtopic-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin: 0 0 2rem;
+      justify-content: center;
+    }
+
+    .subtopic-nav a,
+    .back-link-pill {
+      text-decoration: none;
+      padding: 0.65rem 1.15rem;
+      border-radius: 999px;
+      background: var(--soft-blue);
+      border: 1px solid #bfdbfe;
+      color: var(--blue-dark);
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .subtopic-nav a:hover,
+    .back-link-pill:hover {
+      background: var(--blue);
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .equation-box {
+      background: var(--code-bg);
+      color: #f8fafc;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .math-light {
+      background: #f8fbff;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      border-radius: 16px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    .callout {
+      margin: 1.2rem 0;
+      padding: 1rem 1.2rem;
+      border-radius: 14px;
+      background: #eff6ff;
+      border-left: 5px solid var(--blue);
+    }
+
+    .callout.good { background: #f0fdf4; border-left-color: var(--good); }
+    .callout.warn { background: #fff7ed; border-left-color: var(--warn); }
+    .callout.bad { background: #fef2f2; border-left-color: var(--bad); }
+    .callout.purple { background: #f5f3ff; border-left-color: var(--purple); }
+
+    .roadmap-grid,
+    .two-col,
+    .metric-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .roadmap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 1rem; }
+
+    @media (max-width: 820px) {
+      .roadmap-grid,
+      .two-col,
+      .metric-grid { grid-template-columns: 1fr; }
+      .content-card,
+      .interactive-card { padding: 1.4rem; }
+    }
+
+    .mini-card,
+    .metric,
+    .control-box {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 1rem;
+    }
+
+    .mini-card strong,
+    .metric strong { color: #123e83; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin: 1.1rem 0;
+    }
+
+    @media (max-width: 900px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 620px) { .controls { grid-template-columns: 1fr; } }
+
+    label {
+      display: block;
+      color: #1e3a8a;
+      font-weight: 800;
+      font-size: 0.94rem;
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="number"], input[type="range"], select { width: 100%; }
+
+    input[type="number"], select {
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 0.65rem 0.75rem;
+      font-size: 1rem;
+      background: #ffffff;
+      color: var(--ink);
+    }
+
+    input[type="range"] { accent-color: var(--blue); }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    button {
+      border: none;
+      padding: 0.75rem 1.2rem;
+      border-radius: 999px;
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--blue-dark); }
+    button.secondary { background: #0f172a; }
+    button.ghost {
+      background: var(--soft-blue);
+      color: var(--blue-dark);
+      border: 1px solid #bfdbfe;
+    }
+    button.ghost:hover { background: var(--blue); color: #fff; }
+
+    .plot-box {
+      width: 100%;
+      min-height: 410px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.2rem;
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: #e5e7eb;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 0.92rem;
+    }
+
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .code-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .tab-btn { background: #0f172a; }
+    .tab-btn.active { background: var(--blue); }
+    .hidden { display: none; }
+
+    .back-link-row {
+      max-width: 960px;
+      margin: 0 auto 2rem;
+      padding: 0 1.5rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      font-size: 1rem;
+      color: #444;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="problem-hero">
+    <div class="problem-hero-inner">
+      <h1>Runge–Kutta for Space Mechanics: Orbit Propagation, Energy Conservation, and Step-Size Sensitivity</h1>
+      <p>
+        This interactive space mechanics problem compares Euler, RK4, and RK7 for two-body orbit propagation,
+        long-term energy conservation, trajectory prediction, and timestep sensitivity.
+      </p>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section id="why" class="content-card">
+      <span class="section-title">Why this matters</span>
+      <h2>Numerical error can look like real orbital behaviour</h2>
+      <p>
+        In an ideal two-body orbit, the spacecraft is only acted on by central gravity. There is no drag, no thrust, and no perturbation.
+        That means the specific mechanical energy should remain constant. If a simulation shows the orbit spiraling outward or decaying inward,
+        the first question should be: is this physics, or is this numerical error?
+      </p>
+      <p>
+        This page uses Runge–Kutta methods as a space-mechanics diagnostic tool. The goal is not to memorize solver formulas. The goal is to learn
+        how propagation accuracy, timestep size, and conservation checks affect trajectory prediction.
+      </p>
+      <div class="equation-box">
+        ideal two-body orbit → energy should be conserved<br />
+        numerical propagation → energy must be checked
+      </div>
+      <div class="callout purple">
+        <strong>Core message:</strong> Higher-order integration can improve orbit prediction, but long-term accuracy depends on timestep, conservation checks, and whether the numerical method preserves orbital physics.
+      </div>
+    </section>
+
+    <nav class="subtopic-nav" aria-label="Page sections">
+      <a href="#roadmap">Roadmap</a>
+      <a href="#part-a">A: Two-body model</a>
+      <a href="#part-b">B: Orbit paths</a>
+      <a href="#part-c">C: Energy</a>
+      <a href="#part-d">D: Prediction error</a>
+      <a href="#part-e">E: Step size</a>
+      <a href="#snippets">Snippets</a>
+      <a href="#takeaway">Takeaway</a>
+    </nav>
+
+    <section id="roadmap" class="content-card">
+      <span class="section-title">Problem roadmap</span>
+      <h2>Orbit propagation as a numerical experiment</h2>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>A · Two-body orbit propagation</strong><br />Define the ideal gravitational model and compute initial orbit quantities.</div>
+        <div class="mini-card"><strong>B · Orbit paths</strong><br />Compare Euler, RK4, RK7, and a reference-like solution visually.</div>
+        <div class="mini-card"><strong>C · Energy conservation</strong><br />Use specific mechanical energy as a physics diagnostic.</div>
+        <div class="mini-card"><strong>D · Trajectory prediction</strong><br />Measure final position error after several revolutions.</div>
+        <div class="mini-card"><strong>E · Step-size sensitivity</strong><br />Sweep timestep values and see how error grows.</div>
+        <div class="mini-card"><strong>Final link</strong><br />Treat timestep selection as an engineering decision, not a cosmetic setting.</div>
+      </div>
+    </section>
+
+    <section id="part-a" class="interactive-card">
+      <span class="section-title">Part A — Two-body orbit propagation</span>
+      <h2>The model: central gravity only</h2>
+      <p>
+        The two-body model assumes a spacecraft moving under Earth’s central gravitational acceleration. In vector form, the acceleration points toward Earth’s centre.
+      </p>
+      <div class="math-light">\[\ddot{\mathbf r} = -\frac{\mu}{\lVert \mathbf r \rVert^3}\mathbf r\]</div>
+      <p>
+        For a clean educational setup, the spacecraft starts at perigee. The initial velocity is computed from the chosen altitude and eccentricity using the vis-viva equation.
+        When eccentricity is zero, the orbit is circular. When eccentricity is above zero, the starting point is perigee of an elliptical orbit.
+      </p>
+
+      <div class="controls">
+        <div class="control-box"><label for="baseAlt">Initial perigee altitude [km]</label><input id="baseAlt" type="number" value="400" min="150" max="3000" step="50" /></div>
+        <div class="control-box"><label for="baseEcc">Eccentricity e</label><input id="baseEcc" type="number" value="0" min="0" max="0.65" step="0.01" /></div>
+        <div class="control-box"><label for="basePeriods">Number of orbits</label><input id="basePeriods" type="number" value="3" min="1" max="15" step="1" /></div>
+        <div class="control-box"><label for="baseDt">Timestep Δt [s]</label><input id="baseDt" type="number" value="90" min="1" max="500" step="5" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="updateOrbitSetup()">Compute orbit setup</button>
+        <button class="ghost" onclick="setBaseCase('circular')">Circular LEO</button>
+        <button class="ghost" onclick="setBaseCase('elliptic')">Elliptical case</button>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric"><span>Perigee radius</span><strong id="setupRp">—</strong></div>
+        <div class="metric"><span>Semi-major axis</span><strong id="setupA">—</strong></div>
+        <div class="metric"><span>Initial speed</span><strong id="setupV">—</strong></div>
+        <div class="metric"><span>Orbital period</span><strong id="setupT">—</strong></div>
+      </div>
+      <div class="callout good">
+        <strong>What to check:</strong> In this ideal model, energy should remain nearly constant. If it does not, the issue is likely numerical rather than physical.
+      </div>
+    </section>
+
+    <section id="part-b" class="interactive-card">
+      <span class="section-title">Part B — Euler vs RK4 vs RK7 orbit paths</span>
+      <h2>Seeing orbit distortion directly</h2>
+      <p>
+        Orbit plots make numerical error visually obvious. Euler can spiral outward or distort because it does not preserve the orbital geometry well.
+        RK4 and RK7 stay closer to the reference trajectory, especially when the timestep is reasonable.
+      </p>
+
+      <div class="controls">
+        <div class="control-box"><label for="pathAlt">Perigee altitude [km]</label><input id="pathAlt" type="number" value="400" min="150" max="3000" step="50" /></div>
+        <div class="control-box"><label for="pathEcc">Eccentricity e</label><input id="pathEcc" type="number" value="0" min="0" max="0.65" step="0.01" /></div>
+        <div class="control-box"><label for="pathDt">Timestep Δt [s]</label><input id="pathDt" type="number" value="90" min="1" max="500" step="5" /></div>
+        <div class="control-box"><label for="pathPeriods">Number of orbits</label><input id="pathPeriods" type="number" value="3" min="1" max="15" step="1" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runOrbitPathDemo()">Compare orbit paths</button>
+        <button class="ghost" onclick="setPathCase('accurate')">Reasonable timestep</button>
+        <button class="ghost" onclick="setPathCase('distorted')">Distorted Euler case</button>
+      </div>
+
+      <div id="orbitPathPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Euler final position error</span><strong id="pathEulerError">—</strong></div>
+        <div class="metric"><span>RK4 final position error</span><strong id="pathRk4Error">—</strong></div>
+        <div class="metric"><span>RK7 final position error</span><strong id="pathRk7Error">—</strong></div>
+        <div class="metric"><span>Euler radius drift</span><strong id="pathRadiusDrift">—</strong></div>
+      </div>
+      <div class="callout warn">
+        <strong>Visual insight:</strong> A distorted orbit path is not automatically a new physical effect. It may be the numerical method failing to preserve the orbit.
+      </div>
+    </section>
+
+    <section id="part-c" class="interactive-card">
+      <span class="section-title">Part C — Long-term energy conservation</span>
+      <h2>Energy drift as a physics diagnostic</h2>
+      <p>
+        Specific mechanical energy is a powerful diagnostic because the ideal two-body problem should conserve it. This plot shows how much the numerical energy changes over time.
+      </p>
+      <div class="math-light">\[\epsilon = \frac{v^2}{2} - \frac{\mu}{r}\]</div>
+
+      <div class="controls">
+        <div class="control-box"><label for="energyAlt">Perigee altitude [km]</label><input id="energyAlt" type="number" value="400" min="150" max="3000" step="50" /></div>
+        <div class="control-box"><label for="energyEcc">Eccentricity e</label><input id="energyEcc" type="number" value="0" min="0" max="0.65" step="0.01" /></div>
+        <div class="control-box"><label for="energyDt">Timestep Δt [s]</label><input id="energyDt" type="number" value="90" min="1" max="500" step="5" /></div>
+        <div class="control-box"><label for="energyPeriods">Number of orbits</label><input id="energyPeriods" type="number" value="6" min="1" max="20" step="1" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runEnergyDemo()">Plot energy conservation</button>
+        <button class="ghost" onclick="setEnergyCase('small')">Small timestep</button>
+        <button class="ghost" onclick="setEnergyCase('large')">Large timestep</button>
+      </div>
+
+      <div id="energyPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Euler energy drift</span><strong id="energyEulerDrift">—</strong></div>
+        <div class="metric"><span>RK4 energy drift</span><strong id="energyRk4Drift">—</strong></div>
+        <div class="metric"><span>RK7 energy drift</span><strong id="energyRk7Drift">—</strong></div>
+        <div class="metric"><span>Best conservation</span><strong id="energyBest">—</strong></div>
+      </div>
+      <div class="callout good">
+        <strong>Core insight:</strong> Energy drift is a diagnostic. It tells you whether your numerical solution is respecting the physics.
+      </div>
+    </section>
+
+    <section id="part-d" class="interactive-card">
+      <span class="section-title">Part D — Trajectory prediction error</span>
+      <h2>Small per-step errors compound</h2>
+      <p>
+        A propagator can look acceptable after one orbit but become poor after many revolutions. This section compares final-state prediction error against a reference-like RK7 solution with a very small timestep.
+      </p>
+
+      <div class="controls">
+        <div class="control-box"><label for="predAlt">Perigee altitude [km]</label><input id="predAlt" type="number" value="400" min="150" max="3000" step="50" /></div>
+        <div class="control-box"><label for="predEcc">Eccentricity e</label><input id="predEcc" type="number" value="0.05" min="0" max="0.65" step="0.01" /></div>
+        <div class="control-box"><label for="predDt">Timestep Δt [s]</label><input id="predDt" type="number" value="120" min="1" max="500" step="5" /></div>
+        <div class="control-box"><label for="predMaxOrbits">Maximum orbit count</label><input id="predMaxOrbits" type="number" value="10" min="2" max="20" step="1" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runPredictionErrorDemo()">Plot prediction error growth</button>
+        <button class="ghost" onclick="setPredictionCase('short')">Short propagation</button>
+        <button class="ghost" onclick="setPredictionCase('long')">Long propagation</button>
+      </div>
+
+      <div id="predictionErrorPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Euler final error</span><strong id="predEulerFinal">—</strong></div>
+        <div class="metric"><span>RK4 final error</span><strong id="predRk4Final">—</strong></div>
+        <div class="metric"><span>RK7 final error</span><strong id="predRk7Final">—</strong></div>
+        <div class="metric"><span>Error growth</span><strong id="predGrowth">—</strong></div>
+      </div>
+      <div class="callout bad">
+        <strong>Insight:</strong> Orbit propagation errors compound. A method that looks acceptable for one orbit may be unacceptable after many revolutions.
+      </div>
+    </section>
+
+    <section id="part-e" class="interactive-card">
+      <span class="section-title">Part E — Step-size sensitivity map</span>
+      <h2>Timestep is an engineering choice</h2>
+      <p>
+        This is the strongest diagnostic section. Instead of testing one timestep, sweep a range of timesteps and compare final position error and energy drift.
+        This shows how quickly a numerical method becomes unreliable as the timestep increases.
+      </p>
+
+      <div class="controls">
+        <div class="control-box"><label for="sweepAlt">Perigee altitude [km]</label><input id="sweepAlt" type="number" value="400" min="150" max="3000" step="50" /></div>
+        <div class="control-box"><label for="sweepEcc">Eccentricity e</label><input id="sweepEcc" type="number" value="0" min="0" max="0.65" step="0.01" /></div>
+        <div class="control-box"><label for="sweepMinDt">Minimum Δt [s]</label><input id="sweepMinDt" type="number" value="10" min="1" max="200" step="5" /></div>
+        <div class="control-box"><label for="sweepMaxDt">Maximum Δt [s]</label><input id="sweepMaxDt" type="number" value="240" min="20" max="800" step="10" /></div>
+        <div class="control-box"><label for="sweepCount">Number of tested step sizes</label><input id="sweepCount" type="number" value="12" min="5" max="30" step="1" /></div>
+        <div class="control-box"><label for="sweepPeriods">Number of orbits</label><input id="sweepPeriods" type="number" value="3" min="1" max="12" step="1" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runStepSensitivityDemo()">Generate step-size sensitivity map</button>
+        <button class="ghost" onclick="setSweepCase('gentle')">Gentle sweep</button>
+        <button class="ghost" onclick="setSweepCase('wide')">Wide sweep</button>
+      </div>
+
+      <div id="stepErrorPlot" class="plot-box"></div>
+      <div id="stepEnergyPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Worst Euler error</span><strong id="sweepWorstEuler">—</strong></div>
+        <div class="metric"><span>Worst RK4 error</span><strong id="sweepWorstRk4">—</strong></div>
+        <div class="metric"><span>Worst RK7 error</span><strong id="sweepWorstRk7">—</strong></div>
+        <div class="metric"><span>Recommended action</span><strong id="sweepAction">—</strong></div>
+      </div>
+      <div class="callout purple">
+        <strong>Insight:</strong> Step size is an engineering choice, not just a numerical setting.
+      </div>
+    </section>
+
+    <section id="snippets" class="content-card">
+      <span class="section-title">Python / MATLAB snippets</span>
+      <h2>Code patterns for orbit propagation checks</h2>
+      <p>
+        These snippets show the core checks used in this page: two-body acceleration, Runge–Kutta stepping, and specific mechanical energy monitoring.
+      </p>
+
+      <div class="code-tabs">
+        <button class="tab-btn active" onclick="showCodeTab('twoBodyCode', this)">Two-body model</button>
+        <button class="tab-btn" onclick="showCodeTab('rk4Code', this)">RK4 step</button>
+        <button class="tab-btn" onclick="showCodeTab('energyCode', this)">Energy check</button>
+      </div>
+
+      <div id="twoBodyCode">
+<pre><code>% Two-body acceleration in 2D
+mu = 398600.4418; % km^3/s^2
+
+r = x(1:2);
+v = x(3:4);
+rnorm = norm(r);
+
+a = -mu * r / rnorm^3;
+xdot = [v; a];</code></pre>
+      </div>
+
+      <div id="rk4Code" class="hidden">
+<pre><code>% Fixed-step RK4 update
+k1 = f(t, x);
+k2 = f(t + dt/2, x + dt*k1/2);
+k3 = f(t + dt/2, x + dt*k2/2);
+k4 = f(t + dt,   x + dt*k3);
+
+x_next = x + dt*(k1 + 2*k2 + 2*k3 + k4)/6;</code></pre>
+      </div>
+
+      <div id="energyCode" class="hidden">
+<pre><code>% Specific mechanical energy diagnostic
+rnorm = norm(r);
+vnorm = norm(v);
+energy = 0.5*vnorm^2 - mu/rnorm;
+
+% For an ideal two-body orbit, energy should remain nearly constant.
+% If energy drifts strongly, check timestep and integration method.</code></pre>
+      </div>
+    </section>
+
+    <section id="takeaway" class="content-card">
+      <span class="section-title">Engineering takeaway</span>
+      <h2>Orbit propagation must be checked against invariants</h2>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>1 · Orbit path</strong><br />A visual orbit plot can reveal spiraling, distortion, or phase error.</div>
+        <div class="mini-card"><strong>2 · Energy conservation</strong><br />Specific mechanical energy is a diagnostic for ideal two-body propagation.</div>
+        <div class="mini-card"><strong>3 · Prediction error</strong><br />Small per-step errors can become large final-state errors over many orbits.</div>
+        <div class="mini-card"><strong>4 · Step-size sensitivity</strong><br />A timestep that works for one orbit may fail for long propagation.</div>
+        <div class="mini-card"><strong>5 · RK4 and RK7</strong><br />Higher-order methods help, but only when timestep choice remains reasonable.</div>
+        <div class="mini-card"><strong>6 · Engineering judgement</strong><br />The solver is part of the simulation assumption set.</div>
+      </div>
+      <div class="callout good">
+        <strong>Final insight:</strong> For orbit propagation, accuracy is not only about choosing RK4 or RK7. It is about checking whether the numerical trajectory preserves the physical invariants of the problem.
+      </div>
+    </section>
+  </main>
+
+  <div class="back-link-row">
+    <a href="problems.html" class="back-link-pill">← Back to Problem Bank</a>
+  </div>
+
+  <footer>
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br />
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const MU = 398600.4418;
+    const RE = 6378.137;
+
+    function fmt(x, d=3) { return Number.isFinite(x) ? Number(x).toFixed(d) : '—'; }
+    function norm2(x, y) { return Math.sqrt(x*x + y*y); }
+    function addScaled(a, b, s) { return a.map((v, i) => v + s*b[i]); }
+
+    function twoBodyState(altKm, ecc) {
+      ecc = Math.max(0, Math.min(0.75, ecc));
+      const rp = RE + altKm;
+      const a = rp / (1 - ecc);
+      const vp = Math.sqrt(MU * (2/rp - 1/a));
+      const T = 2*Math.PI*Math.sqrt(Math.pow(a,3)/MU);
+      return { rp, a, vp, T, y0: [rp, 0, 0, vp] };
+    }
+
+    function twoBodyF(t, y) {
+      const r = Math.sqrt(y[0]*y[0] + y[1]*y[1]);
+      return [y[2], y[3], -MU*y[0]/Math.pow(r,3), -MU*y[1]/Math.pow(r,3)];
+    }
+
+    function eulerStep(f, t, y, h) {
+      return addScaled(y, f(t, y), h);
+    }
+
+    function rk4Step(f, t, y, h) {
+      const k1 = f(t, y);
+      const k2 = f(t + h/2, addScaled(y, k1, h/2));
+      const k3 = f(t + h/2, addScaled(y, k2, h/2));
+      const k4 = f(t + h, addScaled(y, k3, h));
+      return y.map((v, i) => v + h*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6);
+    }
+
+    // High-order RK-style teaching method using Richardson-extrapolated RK4.
+    // It illustrates the RK7 concept: more derivative evaluations for higher accuracy per step.
+    function rk7DemoStep(f, t, y, h) {
+      const big = rk4Step(f, t, y, h);
+      const half1 = rk4Step(f, t, y, h/2);
+      const half2 = rk4Step(f, t + h/2, half1, h/2);
+      const factor = Math.pow(2, 4) - 1;
+      return half2.map((v, i) => v + (v - big[i]) / factor);
+    }
+
+    function integrateFixed(f, y0, t0, tf, h, method) {
+      let t = t0;
+      let y = y0.slice();
+      const ts = [t];
+      const ys = [y.slice()];
+      let steps = 0;
+      while (t < tf - 1e-12 && steps < 250000) {
+        const dt = Math.min(h, tf - t);
+        if (method === 'Euler') y = eulerStep(f, t, y, dt);
+        else if (method === 'RK4') y = rk4Step(f, t, y, dt);
+        else y = rk7DemoStep(f, t, y, dt);
+        t += dt;
+        ts.push(t);
+        ys.push(y.slice());
+        steps++;
+        if (Math.max(...y.map(v => Math.abs(v))) > 1e9) break;
+      }
+      return { t: ts, y: ys, steps };
+    }
+
+    function energy(y) {
+      const r = Math.sqrt(y[0]*y[0] + y[1]*y[1]);
+      const v2 = y[2]*y[2] + y[3]*y[3];
+      return 0.5*v2 - MU/r;
+    }
+
+    function stateError(a, b) {
+      return norm2(a[0]-b[0], a[1]-b[1]);
+    }
+
+    function finalRadius(sol) {
+      const y = sol.y[sol.y.length-1];
+      return norm2(y[0], y[1]);
+    }
+
+    function driftPercent(arr) {
+      return 100*(arr[arr.length-1] - arr[0])/Math.abs(arr[0]);
+    }
+
+    function referenceSolution(alt, ecc, periods) {
+      const setup = twoBodyState(alt, ecc);
+      const tf = periods*setup.T;
+      const refDt = Math.min(5, setup.T/2500);
+      return integrateFixed(twoBodyF, setup.y0, 0, tf, refDt, 'RK7');
+    }
+
+    function plotLayout(title, xTitle, yTitle) {
+      return {
+        title: { text: title, font: { family: 'Times New Roman, Georgia, serif', size: 21 } },
+        margin: { l: 65, r: 25, t: 60, b: 55 },
+        xaxis: { title: xTitle, gridcolor: '#e5e7eb' },
+        yaxis: { title: yTitle, gridcolor: '#e5e7eb' },
+        paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff',
+        legend: { orientation: 'h', y: -0.22 }
+      };
+    }
+
+    function updateOrbitSetup() {
+      const alt = parseFloat(document.getElementById('baseAlt').value);
+      const ecc = parseFloat(document.getElementById('baseEcc').value);
+      const setup = twoBodyState(alt, ecc);
+      document.getElementById('setupRp').textContent = fmt(setup.rp, 2) + ' km';
+      document.getElementById('setupA').textContent = fmt(setup.a, 2) + ' km';
+      document.getElementById('setupV').textContent = fmt(setup.vp, 4) + ' km/s';
+      document.getElementById('setupT').textContent = fmt(setup.T/60, 2) + ' min';
+    }
+
+    function setBaseCase(type) {
+      if (type === 'circular') {
+        document.getElementById('baseAlt').value = 400;
+        document.getElementById('baseEcc').value = 0;
+      } else {
+        document.getElementById('baseAlt').value = 500;
+        document.getElementById('baseEcc').value = 0.18;
+      }
+      updateOrbitSetup();
+    }
+
+    function runOrbitPathDemo() {
+      const alt = parseFloat(document.getElementById('pathAlt').value);
+      const ecc = parseFloat(document.getElementById('pathEcc').value);
+      const dt = parseFloat(document.getElementById('pathDt').value);
+      const periods = parseFloat(document.getElementById('pathPeriods').value);
+      const setup = twoBodyState(alt, ecc);
+      const tf = periods*setup.T;
+      const eul = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'Euler');
+      const rk4 = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'RK4');
+      const rk7 = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'RK7');
+      const ref = referenceSolution(alt, ecc, periods);
+      const refFinal = ref.y[ref.y.length-1];
+      document.getElementById('pathEulerError').textContent = fmt(stateError(eul.y[eul.y.length-1], refFinal), 2) + ' km';
+      document.getElementById('pathRk4Error').textContent = fmt(stateError(rk4.y[rk4.y.length-1], refFinal), 4) + ' km';
+      document.getElementById('pathRk7Error').textContent = fmt(stateError(rk7.y[rk7.y.length-1], refFinal), 4) + ' km';
+      document.getElementById('pathRadiusDrift').textContent = fmt(finalRadius(eul) - setup.rp, 2) + ' km';
+
+      Plotly.newPlot('orbitPathPlot', [
+        { x: eul.y.map(y=>y[0]), y: eul.y.map(y=>y[1]), mode: 'lines', name: 'Euler', line: { width: 2, dash: 'dot' } },
+        { x: rk4.y.map(y=>y[0]), y: rk4.y.map(y=>y[1]), mode: 'lines', name: 'RK4', line: { width: 3 } },
+        { x: rk7.y.map(y=>y[0]), y: rk7.y.map(y=>y[1]), mode: 'lines', name: 'RK7-style', line: { width: 3, dash: 'dash' } },
+        { x: ref.y.map(y=>y[0]), y: ref.y.map(y=>y[1]), mode: 'lines', name: 'Reference-like', line: { width: 2, dash: 'dashdot' } },
+        { x: [0], y: [0], mode: 'markers', name: 'Earth center', marker: { size: 10 } }
+      ], { ...plotLayout('Orbit path comparison', 'x [km]', 'y [km]'), yaxis: { title: 'y [km]', scaleanchor: 'x', scaleratio: 1 } }, { responsive: true, displaylogo: false });
+    }
+
+    function setPathCase(type) {
+      document.getElementById('pathDt').value = type === 'accurate' ? 20 : 180;
+      document.getElementById('pathEcc').value = type === 'accurate' ? 0 : 0.05;
+      runOrbitPathDemo();
+    }
+
+    function runEnergyDemo() {
+      const alt = parseFloat(document.getElementById('energyAlt').value);
+      const ecc = parseFloat(document.getElementById('energyEcc').value);
+      const dt = parseFloat(document.getElementById('energyDt').value);
+      const periods = parseFloat(document.getElementById('energyPeriods').value);
+      const setup = twoBodyState(alt, ecc);
+      const tf = periods*setup.T;
+      const eul = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'Euler');
+      const rk4 = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'RK4');
+      const rk7 = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'RK7');
+      const eE = eul.y.map(energy);
+      const r4E = rk4.y.map(energy);
+      const r7E = rk7.y.map(energy);
+      const dE = Math.abs(driftPercent(eE));
+      const d4 = Math.abs(driftPercent(r4E));
+      const d7 = Math.abs(driftPercent(r7E));
+      document.getElementById('energyEulerDrift').textContent = fmt(driftPercent(eE), 4) + ' %';
+      document.getElementById('energyRk4Drift').textContent = fmt(driftPercent(r4E), 6) + ' %';
+      document.getElementById('energyRk7Drift').textContent = fmt(driftPercent(r7E), 6) + ' %';
+      document.getElementById('energyBest').textContent = d7 <= d4 && d7 <= dE ? 'RK7-style' : d4 <= dE ? 'RK4' : 'Euler';
+
+      Plotly.newPlot('energyPlot', [
+        { x: eul.t.map(t=>t/3600), y: eE.map(e=>100*(e-eE[0])/Math.abs(eE[0])), mode: 'lines', name: 'Euler energy drift [%]', line: { width: 2, dash: 'dot' } },
+        { x: rk4.t.map(t=>t/3600), y: r4E.map(e=>100*(e-r4E[0])/Math.abs(r4E[0])), mode: 'lines', name: 'RK4 energy drift [%]', line: { width: 3 } },
+        { x: rk7.t.map(t=>t/3600), y: r7E.map(e=>100*(e-r7E[0])/Math.abs(r7E[0])), mode: 'lines', name: 'RK7-style energy drift [%]', line: { width: 3, dash: 'dash' } }
+      ], plotLayout('Long-term specific mechanical energy drift', 'Time [hours]', 'Energy drift [%]'), { responsive: true, displaylogo: false });
+    }
+
+    function setEnergyCase(type) {
+      document.getElementById('energyDt').value = type === 'small' ? 20 : 180;
+      runEnergyDemo();
+    }
+
+    function runPredictionErrorDemo() {
+      const alt = parseFloat(document.getElementById('predAlt').value);
+      const ecc = parseFloat(document.getElementById('predEcc').value);
+      const dt = parseFloat(document.getElementById('predDt').value);
+      const maxOrbits = parseInt(document.getElementById('predMaxOrbits').value, 10);
+      const setup = twoBodyState(alt, ecc);
+      const orbitNums = [];
+      const eErrors = [];
+      const r4Errors = [];
+      const r7Errors = [];
+      for (let n=1; n<=maxOrbits; n++) {
+        const tf = n*setup.T;
+        const ref = integrateFixed(twoBodyF, setup.y0, 0, tf, Math.min(5, setup.T/2500), 'RK7');
+        const eul = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'Euler');
+        const rk4 = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'RK4');
+        const rk7 = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, 'RK7');
+        const refFinal = ref.y[ref.y.length-1];
+        orbitNums.push(n);
+        eErrors.push(stateError(eul.y[eul.y.length-1], refFinal));
+        r4Errors.push(stateError(rk4.y[rk4.y.length-1], refFinal));
+        r7Errors.push(stateError(rk7.y[rk7.y.length-1], refFinal));
+      }
+      document.getElementById('predEulerFinal').textContent = fmt(eErrors[eErrors.length-1], 2) + ' km';
+      document.getElementById('predRk4Final').textContent = fmt(r4Errors[r4Errors.length-1], 4) + ' km';
+      document.getElementById('predRk7Final').textContent = fmt(r7Errors[r7Errors.length-1], 4) + ' km';
+      document.getElementById('predGrowth').textContent = eErrors[eErrors.length-1] > eErrors[0]*5 ? 'Strong' : 'Moderate';
+
+      Plotly.newPlot('predictionErrorPlot', [
+        { x: orbitNums, y: eErrors, mode: 'lines+markers', name: 'Euler final position error', line: { width: 2, dash: 'dot' } },
+        { x: orbitNums, y: r4Errors, mode: 'lines+markers', name: 'RK4 final position error', line: { width: 3 } },
+        { x: orbitNums, y: r7Errors, mode: 'lines+markers', name: 'RK7-style final position error', line: { width: 3, dash: 'dash' } }
+      ], plotLayout('Trajectory prediction error growth', 'Number of orbits', 'Final position error [km]'), { responsive: true, displaylogo: false });
+    }
+
+    function setPredictionCase(type) {
+      document.getElementById('predMaxOrbits').value = type === 'short' ? 4 : 14;
+      runPredictionErrorDemo();
+    }
+
+    function linspace(a, b, n) {
+      if (n <= 1) return [a];
+      return Array.from({length: n}, (_, i) => a + (b-a)*i/(n-1));
+    }
+
+    function runStepSensitivityDemo() {
+      const alt = parseFloat(document.getElementById('sweepAlt').value);
+      const ecc = parseFloat(document.getElementById('sweepEcc').value);
+      const minDt = parseFloat(document.getElementById('sweepMinDt').value);
+      const maxDt = parseFloat(document.getElementById('sweepMaxDt').value);
+      const count = parseInt(document.getElementById('sweepCount').value, 10);
+      const periods = parseFloat(document.getElementById('sweepPeriods').value);
+      const setup = twoBodyState(alt, ecc);
+      const tf = periods*setup.T;
+      const ref = integrateFixed(twoBodyF, setup.y0, 0, tf, Math.min(5, setup.T/2500), 'RK7');
+      const refFinal = ref.y[ref.y.length-1];
+      const dts = linspace(minDt, maxDt, count);
+      const methods = ['Euler', 'RK4', 'RK7'];
+      const err = { Euler: [], RK4: [], RK7: [] };
+      const edrift = { Euler: [], RK4: [], RK7: [] };
+      methods.forEach(method => {
+        dts.forEach(dt => {
+          const sol = integrateFixed(twoBodyF, setup.y0, 0, tf, dt, method);
+          err[method].push(stateError(sol.y[sol.y.length-1], refFinal));
+          const E = sol.y.map(energy);
+          edrift[method].push(Math.abs(driftPercent(E)));
+        });
+      });
+      document.getElementById('sweepWorstEuler').textContent = fmt(Math.max(...err.Euler), 2) + ' km';
+      document.getElementById('sweepWorstRk4').textContent = fmt(Math.max(...err.RK4), 4) + ' km';
+      document.getElementById('sweepWorstRk7').textContent = fmt(Math.max(...err.RK7), 4) + ' km';
+      document.getElementById('sweepAction').textContent = Math.max(...err.RK4) > 10 ? 'Reduce Δt' : 'Check mission tolerance';
+
+      Plotly.newPlot('stepErrorPlot', [
+        { x: dts, y: err.Euler, mode: 'lines+markers', name: 'Euler error', line: { width: 2, dash: 'dot' } },
+        { x: dts, y: err.RK4, mode: 'lines+markers', name: 'RK4 error', line: { width: 3 } },
+        { x: dts, y: err.RK7, mode: 'lines+markers', name: 'RK7-style error', line: { width: 3, dash: 'dash' } }
+      ], plotLayout('Step-size sensitivity: final position error', 'Timestep Δt [s]', 'Final position error [km]'), { responsive: true, displaylogo: false });
+
+      Plotly.newPlot('stepEnergyPlot', [
+        { x: dts, y: edrift.Euler, mode: 'lines+markers', name: 'Euler energy drift', line: { width: 2, dash: 'dot' } },
+        { x: dts, y: edrift.RK4, mode: 'lines+markers', name: 'RK4 energy drift', line: { width: 3 } },
+        { x: dts, y: edrift.RK7, mode: 'lines+markers', name: 'RK7-style energy drift', line: { width: 3, dash: 'dash' } }
+      ], plotLayout('Step-size sensitivity: energy drift', 'Timestep Δt [s]', 'Absolute energy drift [%]'), { responsive: true, displaylogo: false });
+    }
+
+    function setSweepCase(type) {
+      if (type === 'gentle') {
+        document.getElementById('sweepMinDt').value = 10;
+        document.getElementById('sweepMaxDt').value = 120;
+        document.getElementById('sweepPeriods').value = 3;
+      } else {
+        document.getElementById('sweepMinDt').value = 20;
+        document.getElementById('sweepMaxDt').value = 360;
+        document.getElementById('sweepPeriods').value = 6;
+      }
+      runStepSensitivityDemo();
+    }
+
+    function showCodeTab(id, btn) {
+      ['twoBodyCode','rk4Code','energyCode'].forEach(x => document.getElementById(x).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    window.addEventListener('load', () => {
+      updateOrbitSetup();
+      runOrbitPathDemo();
+      runEnergyDemo();
+      runPredictionErrorDemo();
+      runStepSensitivityDemo();
+    });
+  </script>
+</body>
+</html>
