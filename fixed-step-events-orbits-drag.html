@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fixed-Step Solver | Events, Orbits, and Drag</title>
+
+  <!-- Keep this if the page sits beside your shared styles.css -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- MathJax for equations -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)'], ['$', '$']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <!-- Plotly for interactive graphs -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root {
+      --blue-1: #0b5ed7;
+      --blue-2: #083f9e;
+      --blue-3: #062b6f;
+      --ink: #1f2937;
+      --muted: #5f6b7a;
+      --soft: #f5f8ff;
+      --card: #ffffff;
+      --border: #dbe5f5;
+      --code-bg: #07111f;
+      --good: #0f8b5f;
+      --warn: #b7791f;
+      --bad: #b91c1c;
+      --purple: #7c3aed;
+      --shadow: 0 12px 30px rgba(15, 35, 75, 0.10);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: linear-gradient(180deg, #f7faff 0%, #eef4ff 100%);
+      line-height: 1.7;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.22;
+      color: #102a56;
+    }
+
+    h1 { font-size: clamp(2.1rem, 4vw, 4.2rem); margin: 0 0 0.75rem; }
+    h2 { font-size: clamp(1.75rem, 3vw, 2.45rem); margin: 0 0 1rem; }
+    h3 { font-size: 1.45rem; margin: 1.4rem 0 0.7rem; }
+    h4 { font-size: 1.18rem; margin: 1rem 0 0.5rem; }
+
+    p { margin: 0 0 1rem; }
+    a { color: var(--blue-1); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .problem-hero {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      color: #ffffff;
+      padding: 4rem 1.5rem 3.2rem;
+    }
+
+    .problem-hero-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .problem-hero h1 {
+      font-family: "Times New Roman", Georgia, serif;
+      font-size: 3.4rem;
+      line-height: 1.1;
+      margin: 0 0 1.2rem;
+      color: #ffffff;
+    }
+
+    .problem-hero p {
+      max-width: 940px;
+      font-size: 1.25rem;
+      line-height: 1.7;
+      margin: 0 0 1rem;
+      color: #ffffff;
+    }
+
+    .hero-core {
+      display: inline-flex;
+      margin-top: 0.9rem;
+      padding: 0.65rem 1rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.28);
+      font-weight: 850;
+      color: #ffffff;
+      backdrop-filter: blur(8px);
+    }
+
+    .page-main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3.5rem;
+    }
+
+    .top-nav-card,
+    .content-card,
+    .interactive-card,
+    .next-domain-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .top-nav-card {
+      padding: 1.15rem;
+      margin-bottom: 1.4rem;
+    }
+
+    .subtopic-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
+    .mini-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      font-weight: 750;
+      text-decoration: none;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+      background: #eef5ff;
+      color: #164a9d;
+      padding: 0.52rem 0.82rem;
+      border: 1px solid #d2e2fb;
+      font-size: 0.94rem;
+    }
+
+    .mini-pill:hover {
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+
+    .content-card,
+    .interactive-card {
+      padding: clamp(1.25rem, 2.4vw, 2.25rem);
+      margin-bottom: 1.35rem;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.78rem;
+      border-radius: 999px;
+      background: #eaf2ff;
+      color: #0a4ca8;
+      font-size: 0.88rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+
+    .lead {
+      font-size: 1.08rem;
+      color: #334155;
+      max-width: 900px;
+    }
+
+    .roadmap-grid,
+    .two-col,
+    .three-col {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .roadmap-grid { grid-template-columns: repeat(2, 1fr); }
+    .two-col { grid-template-columns: 1fr 1fr; }
+    .three-col { grid-template-columns: repeat(3, 1fr); }
+
+    @media (max-width: 820px) {
+      .roadmap-grid,
+      .two-col,
+      .three-col { grid-template-columns: 1fr; }
+      .problem-hero { padding: 2.25rem 1.25rem; }
+      .problem-hero h1 { font-size: 2.35rem; }
+    }
+
+    .roadmap-item,
+    .concept-box,
+    .output-box,
+    .snippet-note {
+      background: var(--soft);
+      border: 1px solid #dce9ff;
+      border-radius: 18px;
+      padding: 1rem;
+    }
+
+    .roadmap-item strong,
+    .concept-box strong { color: #123e83; }
+
+    .callout {
+      border-left: 5px solid var(--blue-1);
+      background: #f2f7ff;
+      border-radius: 16px;
+      padding: 1rem 1.15rem;
+      margin: 1.1rem 0;
+    }
+
+    .callout.good { border-left-color: var(--good); background: #eefaf5; }
+    .callout.warn { border-left-color: var(--warn); background: #fff8ea; }
+    .callout.bad { border-left-color: var(--bad); background: #fff1f1; }
+
+    .math-block {
+      overflow-x: auto;
+      background: #f8fbff;
+      border: 1px solid #dbe8fb;
+      border-radius: 18px;
+      padding: 1rem 1.15rem;
+      margin: 1rem 0;
+      text-align: center;
+      font-size: 1.04rem;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.85rem;
+      margin: 1rem 0;
+    }
+
+    @media (max-width: 900px) { .controls { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .controls { grid-template-columns: 1fr; } }
+
+    .control-group {
+      background: #f8fbff;
+      border: 1px solid #dbe8fb;
+      border-radius: 16px;
+      padding: 0.85rem;
+    }
+
+    label {
+      display: block;
+      font-weight: 800;
+      color: #193b70;
+      margin-bottom: 0.35rem;
+      font-size: 0.92rem;
+    }
+
+    input[type="number"], input[type="range"], select { width: 100%; }
+
+    input[type="number"], select {
+      border: 1px solid #cbd9ef;
+      border-radius: 12px;
+      padding: 0.65rem 0.7rem;
+      font-size: 1rem;
+      background: white;
+      color: #172033;
+    }
+
+    input[type="range"] { accent-color: var(--blue-1); }
+
+    .value-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 0.8rem 0 1rem;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.75rem 1.05rem;
+      background: linear-gradient(135deg, var(--blue-1), var(--blue-2));
+      color: white;
+      font-weight: 850;
+      cursor: pointer;
+      box-shadow: 0 8px 18px rgba(11, 94, 215, 0.23);
+      transition: transform 0.18s ease, filter 0.18s ease;
+    }
+
+    button.secondary {
+      background: #111827;
+      box-shadow: 0 8px 18px rgba(17, 24, 39, 0.22);
+    }
+
+    button.ghost {
+      background: #edf4ff;
+      color: #0b4cad;
+      box-shadow: none;
+      border: 1px solid #cfe1fb;
+    }
+
+    button:hover { filter: brightness(1.03); transform: translateY(-1px); }
+
+    .plot {
+      min-height: 430px;
+      width: 100%;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid #dbe8fb;
+      background: white;
+    }
+
+    .small-plot { min-height: 360px; }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.8rem;
+      margin-top: 1rem;
+    }
+
+    @media (max-width: 820px) { .status-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 520px) { .status-grid { grid-template-columns: 1fr; } }
+
+    .metric {
+      background: #f8fbff;
+      border: 1px solid #dbe8fb;
+      border-radius: 16px;
+      padding: 0.9rem;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-bottom: 0.15rem;
+    }
+
+    .metric strong {
+      color: #102a56;
+      font-size: 1.1rem;
+    }
+
+    .legend-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin: 0.7rem 0 0;
+    }
+
+    .legend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.92rem;
+      color: #334155;
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      display: inline-block;
+      border: 1px solid rgba(0,0,0,0.15);
+    }
+
+    .dot.good { background: #2e8b57; }
+    .dot.warn { background: #f59e0b; }
+    .dot.bad { background: #ef4444; }
+    .dot.purple { background: #7c3aed; }
+
+    .table-wrap { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #dbe8fb;
+    }
+
+    th, td {
+      padding: 0.8rem;
+      border-bottom: 1px solid #e6eefc;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #eef5ff; color: #123e83; }
+
+    pre {
+      background: var(--code-bg);
+      color: #e6edf7;
+      border-radius: 18px;
+      padding: 1rem;
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 0.94rem;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .code-tabs {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.8rem;
+    }
+
+    .tab-btn {
+      background: #111827;
+      box-shadow: none;
+      padding: 0.58rem 0.9rem;
+    }
+
+    .tab-btn.active { background: linear-gradient(135deg, var(--blue-1), var(--blue-2)); }
+    .hidden { display: none; }
+
+    .back-link { margin-top: 1.5rem; }
+
+    .back-link a {
+      color: #5b21b6;
+      font-weight: 700;
+      font-size: 1.00rem;
+      text-decoration: underline;
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+      display: inline;
+    }
+
+    .back-link a:hover { color: #3b0764; }
+
+    .site-footer {
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      font-size: 1rem;
+      color: #444;
+    }
+  </style>
+</head>
+
+<body>
+<header class="problem-hero">
+  <div class="problem-hero-inner">
+    <h1>Fixed-Step Solver — Events, Orbits, and Drag</h1>
+    <p>
+      This page extends fixed-step simulation beyond basic dynamics into mission logic: chaser motion,
+      event switching, orbit propagation, drag decay, and stiff fast-slow systems.
+    </p>
+    <div class="hero-core">
+      In fixed-step simulation, timestep decides when events are seen, when modes switch, and whether orbital physics stays believable.
+    </div>
+  </div>
+</header>
+
+<main class="page-main">
+
+  <section id="why" class="content-card">
+    <span class="section-label">Why this matters</span>
+    <h3>A fixed-step solver only checks the world at sample instants</h3>
+    <p class="lead">
+      Many GNC simulations are not just continuous motion. They include threshold events, mode switching,
+      orbital propagation, drag decay, and fast actuator or sensor dynamics.
+    </p>
+    <p>
+      A fixed-step solver can be useful for real-time simulation and flight-software logic, but it does not continuously watch the system.
+      It checks the state at discrete times: \(t_0,t_1,t_2,\dots\). That means a threshold crossing can be detected late, or completely missed.
+    </p>
+    <div class="callout bad">
+      <strong>Core warning:</strong> In mission simulation, timestep error is not just numerical error. It can become a delayed mode switch,
+      missed safety event, false orbital energy, wrong drag decay, or unstable fast dynamics.
+    </div>
+  </section>
+
+  <section class="top-nav-card">
+    <nav class="subtopic-nav" aria-label="Page sections">
+      <a class="mini-pill" href="#roadmap">Problem Roadmap</a>
+      <a class="mini-pill" href="#part-a">Part A</a>
+      <a class="mini-pill" href="#part-b">Part B</a>
+      <a class="mini-pill" href="#missed-event">Missed Event</a>
+      <a class="mini-pill" href="#part-c">Part C</a>
+      <a class="mini-pill" href="#energy">Energy Error</a>
+      <a class="mini-pill" href="#part-d">Part D</a>
+      <a class="mini-pill" href="#part-e">Part E</a>
+      <a class="mini-pill" href="#snippets">Snippets</a>
+      <a class="mini-pill" href="#takeaway">Takeaway</a>
+    </nav>
+  </section>
+
+  <section id="roadmap" class="content-card">
+    <span class="section-label">Problem roadmap</span>
+    <h3>One page, five mission-level fixed-step failures</h3>
+    <div class="roadmap-grid">
+      <div class="roadmap-item"><strong>A · Chaser response</strong><br />Small timestep gives smooth convergence. Large timestep can create overshoot, oscillation, or divergence.</div>
+      <div class="roadmap-item"><strong>B · Event switching</strong><br />Threshold events are detected late because fixed-step logic only checks sampled points.</div>
+      <div class="roadmap-item"><strong>C · Orbit propagation</strong><br />Euler integration injects false energy, so a circular orbit can spiral outward.</div>
+      <div class="roadmap-item"><strong>D · Drag + BC</strong><br />Coarse integration can amplify orbital decay prediction error when drag is present.</div>
+      <div class="roadmap-item"><strong>E · Stiff systems</strong><br />A timestep safe for slow orbital motion can be unsafe for fast actuator or sensor dynamics.</div>
+      <div class="roadmap-item"><strong>Upgrades</strong><br />Event delay, missed event, and energy error vs timestep are included as explicit interactive diagnostics.</div>
+    </div>
+  </section>
+
+  <section id="part-a" class="interactive-card">
+    <span class="section-label">Part A</span>
+    <h3>Chaser control: discrete only</h3>
+    <p>
+      A one-dimensional chaser moves toward a target using a sampled PD-like controller. The controller is simple, but the result depends strongly on update rate.
+    </p>
+    <div class="math-block">\[\ddot{x}=\frac{u}{m},\qquad u_k=-K_p x_k-K_d v_k\]</div>
+    <div class="math-block">\[v_{k+1}=v_k+\frac{u_k}{m}\Delta t,\qquad x_{k+1}=x_k+v_k\Delta t\]</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="aX0">Initial position \(x_0\)</label>
+        <input id="aX0" type="number" value="120" step="10" />
+      </div>
+      <div class="control-group">
+        <label for="aV0">Initial velocity \(v_0\)</label>
+        <input id="aV0" type="number" value="-2" step="0.5" />
+      </div>
+      <div class="control-group">
+        <label for="aKp">Kp</label>
+        <input id="aKp" type="number" value="0.18" step="0.02" />
+      </div>
+      <div class="control-group">
+        <label for="aKd">Kd</label>
+        <input id="aKd" type="number" value="0.75" step="0.05" />
+      </div>
+      <div class="control-group">
+        <label for="aSmallDt">Small timestep</label>
+        <input id="aSmallDt" type="number" value="0.05" min="0.005" step="0.005" />
+      </div>
+      <div class="control-group">
+        <label for="aLargeDt">Large timestep</label>
+        <input id="aLargeDt" type="number" value="0.75" min="0.01" step="0.01" />
+      </div>
+      <div class="control-group">
+        <label for="aTf">Simulation time</label>
+        <input id="aTf" type="number" value="35" min="5" max="100" step="5" />
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button onclick="runChaserCompare()">Compare small and large dt</button>
+      <button class="ghost" onclick="setChaserCase('smooth')">Smooth case</button>
+      <button class="ghost" onclick="setChaserCase('diverge')">Divergence case</button>
+    </div>
+
+    <div id="chaserPlot" class="plot"></div>
+    <div class="status-grid">
+      <div class="metric"><span>Small dt result</span><strong id="aSmallClass">—</strong></div>
+      <div class="metric"><span>Large dt result</span><strong id="aLargeClass">—</strong></div>
+      <div class="metric"><span>Small final |x|</span><strong id="aSmallFinal">—</strong></div>
+      <div class="metric"><span>Large final |x|</span><strong id="aLargeFinal">—</strong></div>
+    </div>
+    <div class="callout warn">
+      <strong>Insight:</strong> The controller is not only defined by \(K_p\) and \(K_d\). It is also defined by how often it is allowed to act.
+    </div>
+  </section>
+
+  <section id="part-b" class="interactive-card">
+    <span class="section-label">Part B</span>
+    <h3>Event switching: late detection</h3>
+    <p>
+      A chaser approaches a docking threshold. In continuous reality, the threshold crossing can happen between two fixed-step samples.
+      The simulation only detects the event at the next sampled point, so the mode switch is delayed.
+    </p>
+    <div class="math-block">\[|x|\leq x_{threshold}\quad \Rightarrow \quad \text{switch from approach mode to docking mode}\]</div>
+    <div class="math-block">\[\Delta t_{event}=t_{detected}-t_{true}\]</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="bX0">Initial distance</label>
+        <input id="bX0" type="number" value="100" step="5" />
+      </div>
+      <div class="control-group">
+        <label for="bSpeed">Closing speed</label>
+        <input id="bSpeed" type="number" value="7" min="0.1" step="0.1" />
+      </div>
+      <div class="control-group">
+        <label for="bThreshold">Switch threshold</label>
+        <input id="bThreshold" type="number" value="10" min="0" step="1" />
+      </div>
+      <div class="control-group">
+        <label for="bDt">Fixed timestep</label>
+        <input id="bDt" type="number" value="2.0" min="0.01" step="0.01" />
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button onclick="runEventDelay()">Compute event delay</button>
+      <button class="ghost" onclick="setEventCase('small')">Small delay</button>
+      <button class="ghost" onclick="setEventCase('large')">Large delay</button>
+    </div>
+
+    <div id="eventDelayPlot" class="plot"></div>
+    <div class="status-grid">
+      <div class="metric"><span>True crossing time</span><strong id="bTrueTime">—</strong></div>
+      <div class="metric"><span>Detected crossing time</span><strong id="bDetectedTime">—</strong></div>
+      <div class="metric"><span>Event delay</span><strong id="bDelay">—</strong></div>
+      <div class="metric"><span>Mode switch</span><strong id="bSwitchStatus">—</strong></div>
+    </div>
+    <div class="callout bad">
+      <strong>Critical GNC insight:</strong> Fixed-step solvers detect events late, which can cause incorrect mode switching.
+    </div>
+  </section>
+
+  <section id="missed-event" class="interactive-card">
+    <span class="section-label">Upgrade 2</span>
+    <h3>Missed event: threshold window skipped in one step</h3>
+    <p>
+      A late event is eventually detected. A missed event is worse: bad logic can fail completely if no sampled point lands inside the event window.
+    </p>
+    <div class="math-block">\[x_k=10.5,\qquad x_{k+1}=9.4\]</div>
+    <p>
+      The system passed through the threshold region, but no sampled point landed inside it. This is dangerous for contact detection, burn cutoff,
+      docking thresholds, sensor handover, safe-mode triggers, and altitude crossings.
+    </p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="mX0">Initial distance</label>
+        <input id="mX0" type="number" value="13" step="0.5" />
+      </div>
+      <div class="control-group">
+        <label for="mSpeed">Closing speed</label>
+        <input id="mSpeed" type="number" value="1.4" step="0.1" />
+      </div>
+      <div class="control-group">
+        <label for="mDt">Fixed timestep</label>
+        <input id="mDt" type="number" value="1.3" step="0.05" />
+      </div>
+      <div class="control-group">
+        <label for="mLow">Event window low</label>
+        <input id="mLow" type="number" value="9.8" step="0.1" />
+      </div>
+      <div class="control-group">
+        <label for="mHigh">Event window high</label>
+        <input id="mHigh" type="number" value="10.2" step="0.1" />
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button onclick="runMissedEvent()">Check missed event</button>
+      <button class="ghost" onclick="setMissedCase('detected')">Detected case</button>
+      <button class="ghost" onclick="setMissedCase('missed')">Missed case</button>
+    </div>
+
+    <div id="missedEventPlot" class="plot"></div>
+    <div class="status-grid">
+      <div class="metric"><span>Event status</span><strong id="mStatus">—</strong></div>
+      <div class="metric"><span>Closest sample</span><strong id="mClosest">—</strong></div>
+      <div class="metric"><span>Window</span><strong id="mWindow">—</strong></div>
+      <div class="metric"><span>Bug type</span><strong id="mBugType">—</strong></div>
+    </div>
+  </section>
+
+  <section id="part-c" class="interactive-card">
+    <span class="section-label">Part C</span>
+    <h3>Orbit propagation: Euler orbit spirals out</h3>
+    <p>
+      A circular two-body orbit should remain circular if no drag or perturbation exists. If the simulated orbit spirals outward,
+      the spacecraft did not gain energy. The numerical method created it.
+    </p>
+    <div class="math-block">\[\ddot{\mathbf r}=-\mu\frac{\mathbf r}{r^3},\qquad v_0=\sqrt{\frac{\mu}{r_0}}\]</div>
+    <div class="math-block">\[\mathbf v_{k+1}=\mathbf v_k+\mathbf a_k\Delta t,\qquad \mathbf r_{k+1}=\mathbf r_k+\mathbf v_k\Delta t\]</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="cRadius">Orbit radius [km]</label>
+        <input id="cRadius" type="number" value="7000" min="6500" step="100" />
+      </div>
+      <div class="control-group">
+        <label for="cDt">Euler timestep [s]</label>
+        <input id="cDt" type="number" value="60" min="1" step="1" />
+      </div>
+      <div class="control-group">
+        <label for="cOrbits">Number of orbits</label>
+        <input id="cOrbits" type="number" value="2" min="0.25" max="8" step="0.25" />
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button onclick="runOrbitDemo()">Propagate circular orbit</button>
+      <button class="ghost" onclick="setOrbitCase('fine')">Fine timestep</button>
+      <button class="ghost" onclick="setOrbitCase('coarse')">Coarse timestep</button>
+    </div>
+
+    <div id="orbitPlot" class="plot"></div>
+    <div class="status-grid">
+      <div class="metric"><span>Initial energy</span><strong id="cE0">—</strong></div>
+      <div class="metric"><span>Final energy</span><strong id="cEf">—</strong></div>
+      <div class="metric"><span>Energy error</span><strong id="cEnergyErr">—</strong></div>
+      <div class="metric"><span>Final radius error</span><strong id="cRadiusErr">—</strong></div>
+    </div>
+  </section>
+
+  <section id="energy" class="interactive-card">
+    <span class="section-label">Upgrade 3</span>
+    <h3>Energy conservation comparison: error vs timestep</h3>
+    <p>
+      In ideal two-body motion, specific orbital energy should remain constant:
+    </p>
+    <div class="math-block">\[\epsilon=\frac{v^2}{2}-\frac{\mu}{r}\]</div>
+    <p>
+      This sweep turns the visual orbit drift into a numerical diagnostic. The larger the timestep, the faster energy conservation breaks down.
+    </p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="enRadius">Orbit radius [km]</label>
+        <input id="enRadius" type="number" value="7000" min="6500" step="100" />
+      </div>
+      <div class="control-group">
+        <label for="enOrbits">Number of orbits</label>
+        <input id="enOrbits" type="number" value="1.5" min="0.25" max="5" step="0.25" />
+      </div>
+      <div class="control-group">
+        <label for="enMaxDt">Maximum dt [s]</label>
+        <input id="enMaxDt" type="number" value="140" min="10" step="10" />
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button onclick="runEnergySweep()">Sweep timestep energy error</button>
+    </div>
+
+    <div id="energySweepPlot" class="plot"></div>
+    <div class="callout warn">
+      <strong>Insight:</strong> Energy error grows rapidly with timestep size in fixed-step integration.
+    </div>
+  </section>
+
+  <section id="part-d" class="interactive-card">
+    <span class="section-label">Part D</span>
+    <h3>Drag + ballistic coefficient: decay error amplification</h3>
+    <p>
+      With drag, timestep error can change the predicted decay trend. Drag depends on velocity squared and atmospheric density,
+      so coarse integration can over-predict or under-predict altitude loss.
+    </p>
+    <div class="math-block">\[\mathbf a_{drag}=-\frac{1}{2}\rho\frac{v^2}{B}\hat{\mathbf v},\qquad B=\frac{m}{C_DA}\]</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="dBC">Ballistic coefficient B</label>
+        <input id="dBC" type="number" value="80" min="5" step="5" />
+      </div>
+      <div class="control-group">
+        <label for="dRho">Density multiplier</label>
+        <input id="dRho" type="number" value="1" min="0.1" step="0.1" />
+      </div>
+      <div class="control-group">
+        <label for="dFineDt">Fine timestep [s]</label>
+        <input id="dFineDt" type="number" value="10" min="1" step="1" />
+      </div>
+      <div class="control-group">
+        <label for="dCoarseDt">Coarse timestep [s]</label>
+        <input id="dCoarseDt" type="number" value="120" min="5" step="5" />
+      </div>
+      <div class="control-group">
+        <label for="dHours">Propagation time [hours]</label>
+        <input id="dHours" type="number" value="2" min="0.5" max="12" step="0.5" />
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button onclick="runDragDemo()">Compare drag decay</button>
+      <button class="ghost" onclick="setDragCase('mild')">Mild decay</button>
+      <button class="ghost" onclick="setDragCase('strong')">Strong decay</button>
+    </div>
+
+    <div id="dragPlot" class="plot"></div>
+    <div class="status-grid">
+      <div class="metric"><span>Fine final altitude</span><strong id="dFineAlt">—</strong></div>
+      <div class="metric"><span>Coarse final altitude</span><strong id="dCoarseAlt">—</strong></div>
+      <div class="metric"><span>Decay mismatch</span><strong id="dMismatch">—</strong></div>
+      <div class="metric"><span>Driver</span><strong>dt + drag</strong></div>
+    </div>
+  </section>
+
+  <section id="part-e" class="interactive-card">
+    <span class="section-label">Part E</span>
+    <h3>Stiff systems: fixed dt fails completely</h3>
+    <p>
+      Some systems contain slow orbital motion and fast actuator, sensor, or control-loop dynamics. One timestep may be fine for the slow state but unsafe for the fast state.
+    </p>
+    <div class="math-block">\[\dot{x}_{slow}=-0.2x_{slow},\qquad \dot{x}_{fast}=-\lambda x_{fast}\]</div>
+    <div class="math-block">\[x_{fast,k+1}=(1-\lambda\Delta t)x_{fast,k},\qquad |1-\lambda\Delta t|<1\]</div>
+
+    <div class="controls">
+      <div class="control-group">
+        <label for="eLambda">Fast decay rate \(\lambda\)</label>
+        <input id="eLambda" type="number" value="50" min="1" step="1" />
+      </div>
+      <div class="control-group">
+        <label for="eSafeDt">Safe dt</label>
+        <input id="eSafeDt" type="number" value="0.01" min="0.001" step="0.001" />
+      </div>
+      <div class="control-group">
+        <label for="eBadDt">Unsafe dt</label>
+        <input id="eBadDt" type="number" value="0.08" min="0.001" step="0.001" />
+      </div>
+      <div class="control-group">
+        <label for="eTf">Simulation time</label>
+        <input id="eTf" type="number" value="1.2" min="0.2" max="5" step="0.1" />
+      </div>
+    </div>
+
+    <div class="button-row">
+      <button onclick="runStiffDemo()">Run stiff-system demo</button>
+      <button class="ghost" onclick="setStiffCase('safe')">Mostly safe</button>
+      <button class="ghost" onclick="setStiffCase('explode')">Exploding fast mode</button>
+    </div>
+
+    <div id="stiffPlot" class="plot"></div>
+    <div class="status-grid">
+      <div class="metric"><span>Euler fast-mode limit</span><strong id="eLimit">—</strong></div>
+      <div class="metric"><span>Safe dt status</span><strong id="eSafeStatus">—</strong></div>
+      <div class="metric"><span>Unsafe dt status</span><strong id="eBadStatus">—</strong></div>
+      <div class="metric"><span>Main lesson</span><strong>Fast dynamics</strong></div>
+    </div>
+    <div class="callout bad">
+      <strong>Insight:</strong> A timestep acceptable for slow orbital motion may be completely unsafe for fast actuator, sensor, or control-loop dynamics.
+    </div>
+  </section>
+
+  <section id="snippets" class="content-card">
+    <span class="section-label">Python / MATLAB snippets</span>
+    <h3>Mission-level fixed-step snippets</h3>
+    <p>
+      These snippets show the page logic in compact engineering form: event delay, circular orbit energy drift, and stiff-mode instability.
+    </p>
+
+    <div class="code-tabs">
+      <button class="tab-btn active" onclick="showCodeTab('eventCode', this)">Event Delay</button>
+      <button class="tab-btn" onclick="showCodeTab('orbitCode', this)">Orbit Energy</button>
+      <button class="tab-btn" onclick="showCodeTab('stiffCode', this)">Stiff Mode</button>
+    </div>
+
+    <div id="eventCode">
+<pre><code># Fixed-step event delay
+import numpy as np
+
+x0 = 100.0
+closing_speed = 7.0
+threshold = 10.0
+dt = 2.0
+
+true_crossing = (x0 - threshold) / closing_speed
+sample_times = np.arange(0, true_crossing + 5*dt, dt)
+distance = x0 - closing_speed * sample_times
+
+detected_index = np.where(distance <= threshold)[0][0]
+detected_time = sample_times[detected_index]
+
+event_delay = detected_time - true_crossing
+print(true_crossing, detected_time, event_delay)</code></pre>
+    </div>
+
+    <div id="orbitCode" class="hidden">
+<pre><code># Euler orbit propagation and energy error
+import numpy as np
+
+mu = 398600.4418
+r0 = np.array([7000.0, 0.0])
+v0 = np.array([0.0, np.sqrt(mu / np.linalg.norm(r0))])
+dt = 60.0
+steps = 200
+
+r = r0.copy()
+v = v0.copy()
+energy0 = 0.5*np.dot(v,v) - mu/np.linalg.norm(r)
+
+for k in range(steps):
+    a = -mu * r / np.linalg.norm(r)**3
+    v = v + a*dt
+    r = r + v*dt
+
+energy_final = 0.5*np.dot(v,v) - mu/np.linalg.norm(r)
+print(abs(energy_final - energy0))</code></pre>
+    </div>
+
+    <div id="stiffCode" class="hidden">
+<pre><code># Explicit Euler stability for a fast mode
+lambda_fast = 50.0
+stability_limit = 2.0 / lambda_fast
+
+for dt in [0.01, 0.04, 0.08]:
+    multiplier = 1.0 - lambda_fast*dt
+    stable = abs(multiplier) < 1.0
+    print(dt, multiplier, stable)</code></pre>
+    </div>
+
+    <div class="snippet-note">
+      <strong>Teaching note:</strong> Fixed-step methods are not wrong. But event logic, energy conservation, drag decay, and fast modes must be checked against the chosen timestep.
+    </div>
+  </section>
+
+  <section id="takeaway" class="content-card">
+    <span class="section-label">Engineering takeaway</span>
+    <h3>Fixed-step simulation is powerful only when timestep is treated as design</h3>
+    <div class="three-col">
+      <div class="concept-box">
+        <strong>1 · Events are sampled</strong>
+        <p>Threshold crossing can be detected late, and narrow event windows can be skipped entirely.</p>
+      </div>
+      <div class="concept-box">
+        <strong>2 · Orbits reveal energy error</strong>
+        <p>A circular orbit should conserve energy. If it spirals, the numerical method has changed the physics.</p>
+      </div>
+      <div class="concept-box">
+        <strong>3 · Fast modes set dt limits</strong>
+        <p>A timestep chosen for slow motion can be unstable for fast actuator or sensor dynamics.</p>
+      </div>
+    </div>
+    <div class="callout good">
+      <strong>Final insight:</strong> For GNC, fixed-step simulation is powerful only when the timestep is treated as part of the design.
+    </div>
+  </section>
+
+  <div class="back-link">
+    <a href="problems.html">← Back to Problem Bank</a>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <p>
+    © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.<br />
+    Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+  </p>
+</footer>
+
+<script>
+  const MU = 398600.4418;
+  const RE = 6378.0;
+
+  function linspace(a, b, n) {
+    if (n === 1) return [a];
+    return Array.from({length: n}, (_, i) => a + (b-a)*i/(n-1));
+  }
+
+  function fmt(x, digits=3) {
+    if (!Number.isFinite(x)) return "—";
+    return Number(x).toFixed(digits);
+  }
+
+  function plotLayout(title, xTitle, yTitle) {
+    return {
+      title: { text: title, font: { family: 'Georgia, Times New Roman, serif', size: 20 } },
+      margin: { l: 58, r: 24, t: 58, b: 58 },
+      xaxis: { title: xTitle, gridcolor: '#e8eef8' },
+      yaxis: { title: yTitle, gridcolor: '#e8eef8' },
+      paper_bgcolor: 'white',
+      plot_bgcolor: 'white',
+      legend: { orientation: 'h', y: -0.24 }
+    };
+  }
+
+  function simulateChaser(x0, v0, Kp, Kd, m, dt, tf) {
+    let t = 0, x = x0, v = v0;
+    const T = [t], X = [x], V = [v], U = [-Kp*x - Kd*v];
+    const maxSteps = Math.ceil(tf/dt) + 5;
+    for (let k=0; k<maxSteps && t < tf - 1e-12; k++) {
+      const h = Math.min(dt, tf - t);
+      const u = -Kp*x - Kd*v;
+      v = v + (u/m)*h;
+      x = x + v*h;
+      t += h;
+      T.push(t); X.push(x); V.push(v); U.push(-Kp*x - Kd*v);
+      if (Math.abs(x) > 1e6 || Math.abs(v) > 1e6) break;
+    }
+    return {T, X, V, U};
+  }
+
+  function classifyChaser(X, x0) {
+    const finalAbs = Math.abs(X[X.length-1]);
+    const peak = Math.max(...X.map(v => Math.abs(v)));
+    if (!Number.isFinite(peak) || peak > 10*Math.max(1, Math.abs(x0))) return 'Divergent';
+    if (finalAbs < 0.05*Math.max(1, Math.abs(x0))) return 'Converged';
+    if (peak > 1.5*Math.max(1, Math.abs(x0))) return 'Oscillatory';
+    return 'Slow/oscillatory';
+  }
+
+  function runChaserCompare() {
+    const x0 = parseFloat(document.getElementById('aX0').value);
+    const v0 = parseFloat(document.getElementById('aV0').value);
+    const Kp = parseFloat(document.getElementById('aKp').value);
+    const Kd = parseFloat(document.getElementById('aKd').value);
+    const smallDt = parseFloat(document.getElementById('aSmallDt').value);
+    const largeDt = parseFloat(document.getElementById('aLargeDt').value);
+    const tf = parseFloat(document.getElementById('aTf').value);
+
+    const small = simulateChaser(x0, v0, Kp, Kd, 1, smallDt, tf);
+    const large = simulateChaser(x0, v0, Kp, Kd, 1, largeDt, tf);
+
+    document.getElementById('aSmallClass').textContent = classifyChaser(small.X, x0);
+    document.getElementById('aLargeClass').textContent = classifyChaser(large.X, x0);
+    document.getElementById('aSmallFinal').textContent = fmt(Math.abs(small.X[small.X.length-1]), 2);
+    document.getElementById('aLargeFinal').textContent = fmt(Math.abs(large.X[large.X.length-1]), 2);
+
+    Plotly.newPlot('chaserPlot', [
+      {x: small.T, y: small.X, name: `Small dt=${smallDt}: x(t)`, mode: 'lines', line: {width: 3}},
+      {x: large.T, y: large.X, name: `Large dt=${largeDt}: x(t)`, mode: 'lines+markers', line: {width: 3, dash: 'dot'}},
+      {x: large.T, y: large.U, name: 'Large-dt sampled control', mode: 'lines', line: {shape: 'hv', width: 2, dash: 'dash'}, yaxis: 'y2'}
+    ], {
+      ...plotLayout('Chaser control with small vs large timestep', 'Time [s]', 'Relative position x'),
+      yaxis2: {title: 'Control u', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)'}
+    }, {responsive: true, displaylogo: false});
+  }
+
+  function setChaserCase(type) {
+    if (type === 'smooth') {
+      document.getElementById('aKp').value = 0.12;
+      document.getElementById('aKd').value = 0.75;
+      document.getElementById('aSmallDt').value = 0.05;
+      document.getElementById('aLargeDt').value = 0.25;
+    } else {
+      document.getElementById('aKp').value = 0.35;
+      document.getElementById('aKd').value = 0.25;
+      document.getElementById('aSmallDt').value = 0.04;
+      document.getElementById('aLargeDt').value = 0.95;
+    }
+    runChaserCompare();
+  }
+
+  function runEventDelay() {
+    const x0 = parseFloat(document.getElementById('bX0').value);
+    const speed = parseFloat(document.getElementById('bSpeed').value);
+    const threshold = parseFloat(document.getElementById('bThreshold').value);
+    const dt = parseFloat(document.getElementById('bDt').value);
+    const trueT = Math.max(0, (x0 - threshold) / speed);
+    const detectedT = Math.ceil(trueT / dt) * dt;
+    const delay = detectedT - trueT;
+    const tf = detectedT + 2*dt;
+
+    const fineT = linspace(0, tf, 300);
+    const fineD = fineT.map(t => Math.max(0, x0 - speed*t));
+    const sampleT = [];
+    for (let t=0; t<=tf+1e-12; t+=dt) sampleT.push(t);
+    const sampleD = sampleT.map(t => Math.max(0, x0 - speed*t));
+
+    document.getElementById('bTrueTime').textContent = fmt(trueT, 3) + ' s';
+    document.getElementById('bDetectedTime').textContent = fmt(detectedT, 3) + ' s';
+    document.getElementById('bDelay').textContent = fmt(delay, 3) + ' s';
+    document.getElementById('bSwitchStatus').textContent = delay > 0.001 ? 'Late' : 'On sample';
+
+    Plotly.newPlot('eventDelayPlot', [
+      {x: fineT, y: fineD, name: 'Continuous distance', mode: 'lines', line: {width: 3}},
+      {x: sampleT, y: sampleD, name: 'Fixed-step samples', mode: 'markers+lines', marker: {size: 8}, line: {width: 2, dash: 'dot'}},
+      {x: [0, tf], y: [threshold, threshold], name: 'Switch threshold', mode: 'lines', line: {width: 2, dash: 'dash'}},
+      {x: [trueT, trueT], y: [0, x0], name: 'True crossing', mode: 'lines', line: {width: 3}},
+      {x: [detectedT, detectedT], y: [0, x0], name: 'Detected crossing', mode: 'lines', line: {width: 3, dash: 'dot'}}
+    ], plotLayout('Fixed-step event detection delay', 'Time [s]', 'Distance |x|'), {responsive: true, displaylogo: false});
+  }
+
+  function setEventCase(type) {
+    if (type === 'small') {
+      document.getElementById('bDt').value = 0.3;
+      document.getElementById('bSpeed').value = 7;
+    } else {
+      document.getElementById('bDt').value = 2.4;
+      document.getElementById('bSpeed').value = 7;
+    }
+    runEventDelay();
+  }
+
+  function runMissedEvent() {
+    const x0 = parseFloat(document.getElementById('mX0').value);
+    const speed = parseFloat(document.getElementById('mSpeed').value);
+    const dt = parseFloat(document.getElementById('mDt').value);
+    const low = parseFloat(document.getElementById('mLow').value);
+    const high = parseFloat(document.getElementById('mHigh').value);
+    const tf = Math.max(6*dt, (x0-low)/speed + 2*dt);
+    const T = [], X = [];
+    for (let t=0; t<=tf+1e-12; t+=dt) {
+      T.push(t);
+      X.push(Math.max(0, x0 - speed*t));
+    }
+    const detected = X.some(x => x >= low && x <= high);
+    const closest = X.reduce((best, x) => Math.abs(x - (low+high)/2) < Math.abs(best - (low+high)/2) ? x : best, X[0]);
+
+    document.getElementById('mStatus').textContent = detected ? 'Detected' : 'Missed';
+    document.getElementById('mClosest').textContent = fmt(closest, 3);
+    document.getElementById('mWindow').textContent = `${fmt(low,1)}–${fmt(high,1)}`;
+    document.getElementById('mBugType').textContent = detected ? 'No miss' : 'Skipped window';
+
+    const fineT = linspace(0, tf, 400);
+    const fineX = fineT.map(t => Math.max(0, x0 - speed*t));
+
+    Plotly.newPlot('missedEventPlot', [
+      {x: fineT, y: fineX, name: 'Continuous path', mode: 'lines', line: {width: 3}},
+      {x: T, y: X, name: 'Sampled points', mode: 'markers+lines', marker: {size: 10}, line: {width: 2, dash: 'dot'}},
+      {x: [0, tf], y: [low, low], name: 'Window low', mode: 'lines', line: {width: 2, dash: 'dash'}},
+      {x: [0, tf], y: [high, high], name: 'Window high', mode: 'lines', line: {width: 2, dash: 'dash'}}
+    ], plotLayout('Missed event due to coarse sampling window', 'Time [s]', 'Distance |x|'), {responsive: true, displaylogo: false});
+  }
+
+  function setMissedCase(type) {
+    if (type === 'detected') {
+      document.getElementById('mDt').value = 0.25;
+      document.getElementById('mSpeed').value = 1.4;
+    } else {
+      document.getElementById('mDt').value = 1.3;
+      document.getElementById('mSpeed').value = 1.4;
+    }
+    runMissedEvent();
+  }
+
+  function orbitalEnergy(rx, ry, vx, vy) {
+    const r = Math.hypot(rx, ry);
+    const v2 = vx*vx + vy*vy;
+    return 0.5*v2 - MU/r;
+  }
+
+  function propagateOrbitEuler(radius, dt, orbits, withDrag=false, B=80, rhoMult=1) {
+    let rx = radius, ry = 0;
+    let vx = 0, vy = Math.sqrt(MU/radius);
+    const period = 2*Math.PI*Math.sqrt(Math.pow(radius,3)/MU);
+    const tf = orbits*period;
+    const T = [0], RX = [rx], RY = [ry], ALT = [radius-RE], E = [orbitalEnergy(rx,ry,vx,vy)];
+    let t = 0;
+    const maxSteps = Math.ceil(tf/dt)+5;
+
+    for (let k=0; k<maxSteps && t < tf - 1e-12; k++) {
+      const h = Math.min(dt, tf-t);
+      const r = Math.hypot(rx, ry);
+      let ax = -MU*rx/Math.pow(r,3);
+      let ay = -MU*ry/Math.pow(r,3);
+
+      if (withDrag) {
+        const v = Math.hypot(vx, vy);
+        const alt = r - RE;
+        const rho = rhoMult * 2.5e-10 * Math.exp(-(alt-300)/80); // scaled pedagogical density
+        const dragAcc = 0.5 * rho * v*v / B * 1e3; // pedagogical scale for visible effect
+        ax += -dragAcc * vx / Math.max(v, 1e-9);
+        ay += -dragAcc * vy / Math.max(v, 1e-9);
+      }
+
+      vx += ax*h;
+      vy += ay*h;
+      rx += vx*h;
+      ry += vy*h;
+      t += h;
+      T.push(t); RX.push(rx); RY.push(ry); ALT.push(Math.hypot(rx,ry)-RE); E.push(orbitalEnergy(rx,ry,vx,vy));
+      if (!Number.isFinite(rx) || Math.hypot(rx,ry) > 50000 || Math.hypot(rx,ry) < RE) break;
+    }
+    return {T, RX, RY, ALT, E, period};
+  }
+
+  function runOrbitDemo() {
+    const radius = parseFloat(document.getElementById('cRadius').value);
+    const dt = parseFloat(document.getElementById('cDt').value);
+    const orbits = parseFloat(document.getElementById('cOrbits').value);
+    const sol = propagateOrbitEuler(radius, dt, orbits, false);
+    const circleTheta = linspace(0, 2*Math.PI, 300);
+    const circleX = circleTheta.map(th => radius*Math.cos(th));
+    const circleY = circleTheta.map(th => radius*Math.sin(th));
+    const e0 = sol.E[0], ef = sol.E[sol.E.length-1];
+    const rf = Math.hypot(sol.RX[sol.RX.length-1], sol.RY[sol.RY.length-1]);
+
+    document.getElementById('cE0').textContent = fmt(e0, 4);
+    document.getElementById('cEf').textContent = fmt(ef, 4);
+    document.getElementById('cEnergyErr').textContent = fmt(Math.abs(ef-e0), 4);
+    document.getElementById('cRadiusErr').textContent = fmt(rf-radius, 2) + ' km';
+
+    Plotly.newPlot('orbitPlot', [
+      {x: circleX, y: circleY, name: 'Ideal circular orbit', mode: 'lines', line: {width: 2, dash: 'dash'}},
+      {x: sol.RX, y: sol.RY, name: `Euler orbit, dt=${dt}s`, mode: 'lines', line: {width: 3}},
+      {x: [0], y: [0], name: 'Earth center', mode: 'markers', marker: {size: 10}}
+    ], {
+      ...plotLayout('Euler two-body propagation can inject false energy', 'x [km]', 'y [km]'),
+      yaxis: {title: 'y [km]', scaleanchor: 'x', scaleratio: 1, gridcolor: '#e8eef8'}
+    }, {responsive: true, displaylogo: false});
+  }
+
+  function setOrbitCase(type) {
+    document.getElementById('cDt').value = type === 'fine' ? 10 : 120;
+    runOrbitDemo();
+  }
+
+  function runEnergySweep() {
+    const radius = parseFloat(document.getElementById('enRadius').value);
+    const orbits = parseFloat(document.getElementById('enOrbits').value);
+    const maxDt = parseFloat(document.getElementById('enMaxDt').value);
+    const dts = linspace(2, maxDt, 36);
+    const errors = [];
+    dts.forEach(dt => {
+      const sol = propagateOrbitEuler(radius, dt, orbits, false);
+      errors.push(Math.abs(sol.E[sol.E.length-1] - sol.E[0]));
+    });
+
+    Plotly.newPlot('energySweepPlot', [
+      {x: dts, y: errors, name: 'Energy error |εf - ε0|', mode: 'lines+markers', line: {width: 3}}
+    ], plotLayout('Energy conservation error vs fixed timestep', 'Timestep Δt [s]', 'Specific energy error [km²/s²]'), {responsive: true, displaylogo: false});
+  }
+
+  function runDragDemo() {
+    const B = parseFloat(document.getElementById('dBC').value);
+    const rhoMult = parseFloat(document.getElementById('dRho').value);
+    const fineDt = parseFloat(document.getElementById('dFineDt').value);
+    const coarseDt = parseFloat(document.getElementById('dCoarseDt').value);
+    const hours = parseFloat(document.getElementById('dHours').value);
+    const radius = RE + 320;
+    const orbits = (hours*3600) / (2*Math.PI*Math.sqrt(Math.pow(radius,3)/MU));
+
+    const fine = propagateOrbitEuler(radius, fineDt, orbits, true, B, rhoMult);
+    const coarse = propagateOrbitEuler(radius, coarseDt, orbits, true, B, rhoMult);
+    const fineFinal = fine.ALT[fine.ALT.length-1];
+    const coarseFinal = coarse.ALT[coarse.ALT.length-1];
+
+    document.getElementById('dFineAlt').textContent = fmt(fineFinal, 2) + ' km';
+    document.getElementById('dCoarseAlt').textContent = fmt(coarseFinal, 2) + ' km';
+    document.getElementById('dMismatch').textContent = fmt(Math.abs(fineFinal-coarseFinal), 2) + ' km';
+
+    Plotly.newPlot('dragPlot', [
+      {x: fine.T.map(t => t/3600), y: fine.ALT, name: `Fine dt=${fineDt}s`, mode: 'lines', line: {width: 3}},
+      {x: coarse.T.map(t => t/3600), y: coarse.ALT, name: `Coarse dt=${coarseDt}s`, mode: 'lines+markers', line: {width: 3, dash: 'dot'}}
+    ], plotLayout('Drag decay with fine vs coarse fixed timestep', 'Time [hours]', 'Altitude [km]'), {responsive: true, displaylogo: false});
+  }
+
+  function setDragCase(type) {
+    if (type === 'mild') {
+      document.getElementById('dBC').value = 180;
+      document.getElementById('dRho').value = 0.6;
+      document.getElementById('dCoarseDt').value = 80;
+    } else {
+      document.getElementById('dBC').value = 35;
+      document.getElementById('dRho').value = 2.5;
+      document.getElementById('dCoarseDt').value = 180;
+    }
+    runDragDemo();
+  }
+
+  function simulateStiff(lambda, dt, tf) {
+    let t = 0, slow = 1, fast = 1;
+    const T = [t], S = [slow], F = [fast];
+    const maxSteps = Math.ceil(tf/dt)+5;
+    for (let k=0; k<maxSteps && t < tf - 1e-12; k++) {
+      const h = Math.min(dt, tf-t);
+      slow = slow + (-0.2*slow)*h;
+      fast = fast + (-lambda*fast)*h;
+      t += h;
+      T.push(t); S.push(slow); F.push(fast);
+      if (Math.abs(fast) > 1e6) break;
+    }
+    return {T, S, F};
+  }
+
+  function runStiffDemo() {
+    const lambda = parseFloat(document.getElementById('eLambda').value);
+    const safeDt = parseFloat(document.getElementById('eSafeDt').value);
+    const badDt = parseFloat(document.getElementById('eBadDt').value);
+    const tf = parseFloat(document.getElementById('eTf').value);
+    const limit = 2/lambda;
+    const safe = simulateStiff(lambda, safeDt, tf);
+    const bad = simulateStiff(lambda, badDt, tf);
+
+    document.getElementById('eLimit').textContent = 'dt < ' + fmt(limit, 4);
+    document.getElementById('eSafeStatus').textContent = safeDt < limit ? 'Stable' : 'Unsafe';
+    document.getElementById('eBadStatus').textContent = badDt < limit ? 'Stable' : 'Unsafe';
+
+    Plotly.newPlot('stiffPlot', [
+      {x: safe.T, y: safe.S, name: 'Slow state, safe dt', mode: 'lines', line: {width: 3}},
+      {x: safe.T, y: safe.F, name: `Fast state, safe dt=${safeDt}`, mode: 'lines', line: {width: 3}},
+      {x: bad.T, y: bad.F, name: `Fast state, unsafe dt=${badDt}`, mode: 'lines+markers', line: {width: 3, dash: 'dot'}}
+    ], plotLayout('Fixed-step failure in fast-slow dynamics', 'Time [s]', 'State value'), {responsive: true, displaylogo: false});
+  }
+
+  function setStiffCase(type) {
+    if (type === 'safe') {
+      document.getElementById('eLambda').value = 30;
+      document.getElementById('eSafeDt').value = 0.01;
+      document.getElementById('eBadDt').value = 0.04;
+    } else {
+      document.getElementById('eLambda').value = 50;
+      document.getElementById('eSafeDt').value = 0.01;
+      document.getElementById('eBadDt').value = 0.08;
+    }
+    runStiffDemo();
+  }
+
+  function showCodeTab(id, button) {
+    ['eventCode','orbitCode','stiffCode'].forEach(x => document.getElementById(x).classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    button.classList.add('active');
+  }
+
+  window.addEventListener('load', () => {
+    runChaserCompare();
+    runEventDelay();
+    runMissedEvent();
+    runOrbitDemo();
+    runEnergySweep();
+    runDragDemo();
+    runStiffDemo();
+  });
+</script>
+</body>
+</html>
