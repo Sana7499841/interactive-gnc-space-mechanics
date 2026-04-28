@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Runge–Kutta Methods in GNC & Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles-home.css" />
+  <link rel="icon" type="image/png" href="favicon1.png" />
+
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)'], ['$', '$']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --ink: #111827;
+      --muted: #526173;
+      --soft: #f8fafc;
+      --soft-blue: #eff6ff;
+      --border: #dbeafe;
+      --card: #ffffff;
+      --code-bg: #0f172a;
+      --good: #16a34a;
+      --warn: #d97706;
+      --bad: #dc2626;
+      --purple: #7c3aed;
+      --shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: "Times New Roman", Georgia, serif;
+      line-height: 1.12;
+      color: #111827;
+    }
+
+    h2 { font-size: clamp(2rem, 3.2vw, 2.65rem); margin: 0 0 1.1rem; }
+    h3 { font-size: 1.45rem; margin: 1.2rem 0 0.7rem; }
+    p { margin: 0 0 1rem; }
+
+    .problem-hero {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      color: #ffffff;
+      padding: 4rem 1.5rem 3.2rem;
+    }
+
+    .problem-hero-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .problem-hero h1 {
+      color: #ffffff;
+      font-size: clamp(2.6rem, 5vw, 3.7rem);
+      line-height: 1.1;
+      margin: 0 0 1.2rem;
+      max-width: 1050px;
+    }
+
+    .problem-hero p {
+      max-width: 900px;
+      color: #ffffff;
+      font-size: 1.25rem;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .page-main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3.5rem;
+    }
+
+    .content-card,
+    .interactive-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 2.5rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(191, 219, 254, 0.65);
+      font-size: 1.08rem;
+    }
+
+    .section-title {
+      display: inline-block;
+      background: #dbeafe;
+      padding: 0.6rem 1.2rem;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--blue-dark);
+      margin-bottom: 1.2rem;
+      letter-spacing: 0.01em;
+    }
+
+    .subtopic-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin: 0 0 2rem;
+      justify-content: center;
+    }
+
+    .subtopic-nav a,
+    .back-link-pill {
+      text-decoration: none;
+      padding: 0.65rem 1.15rem;
+      border-radius: 999px;
+      background: var(--soft-blue);
+      border: 1px solid #bfdbfe;
+      color: var(--blue-dark);
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .subtopic-nav a:hover,
+    .back-link-pill:hover {
+      background: var(--blue);
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .equation-box {
+      background: var(--code-bg);
+      color: #f8fafc;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .math-light {
+      background: #f8fbff;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      border-radius: 16px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    .callout {
+      margin: 1.2rem 0;
+      padding: 1rem 1.2rem;
+      border-radius: 14px;
+      background: #eff6ff;
+      border-left: 5px solid var(--blue);
+    }
+
+    .callout.good { background: #f0fdf4; border-left-color: var(--good); }
+    .callout.warn { background: #fff7ed; border-left-color: var(--warn); }
+    .callout.bad { background: #fef2f2; border-left-color: var(--bad); }
+    .callout.purple { background: #f5f3ff; border-left-color: var(--purple); }
+
+    .roadmap-grid,
+    .two-col,
+    .metric-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .roadmap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 1rem; }
+
+    @media (max-width: 820px) {
+      .roadmap-grid,
+      .two-col,
+      .metric-grid { grid-template-columns: 1fr; }
+      .content-card,
+      .interactive-card { padding: 1.4rem; }
+    }
+
+    .mini-card,
+    .metric,
+    .control-box {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 1rem;
+    }
+
+    .mini-card strong,
+    .metric strong { color: #123e83; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin: 1.1rem 0;
+    }
+
+    @media (max-width: 900px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 620px) { .controls { grid-template-columns: 1fr; } }
+
+    label {
+      display: block;
+      color: #1e3a8a;
+      font-weight: 800;
+      font-size: 0.94rem;
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="number"], input[type="range"], select { width: 100%; }
+
+    input[type="number"], select {
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 0.65rem 0.75rem;
+      font-size: 1rem;
+      background: #ffffff;
+      color: var(--ink);
+    }
+
+    input[type="range"] { accent-color: var(--blue); }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    button {
+      border: none;
+      padding: 0.75rem 1.2rem;
+      border-radius: 999px;
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--blue-dark); }
+    button.secondary { background: #0f172a; }
+    button.ghost {
+      background: var(--soft-blue);
+      color: var(--blue-dark);
+      border: 1px solid #bfdbfe;
+    }
+    button.ghost:hover { background: var(--blue); color: #fff; }
+
+    .plot-box {
+      width: 100%;
+      min-height: 390px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.2rem;
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: #e5e7eb;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 0.92rem;
+    }
+
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .code-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .tab-btn { background: #0f172a; }
+    .tab-btn.active { background: var(--blue); }
+    .hidden { display: none; }
+
+    .back-link-row {
+      max-width: 960px;
+      margin: 0 auto 2rem;
+      padding: 0 1.5rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      font-size: 1rem;
+      color: #444;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="problem-hero">
+    <div class="problem-hero-inner">
+      <h1>Runge–Kutta Methods in GNC & Space Mechanics: Accuracy, Stability, and Solver Choice</h1>
+      <p>
+        This interactive problem compares Euler, RK4, and RK7 methods to show how solver order affects
+        control response, orbit propagation, energy drift, timestep sensitivity, and engineering judgement.
+      </p>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section id="why" class="content-card">
+      <span class="section-title">Why this matters</span>
+      <h2>Higher order is not the same as better engineering</h2>
+      <p>
+        When students first learn numerical integration, it is tempting to rank methods as if the highest order is always the best:
+        Euler is basic, RK4 is better, and RK7 must be best. In engineering simulation, that is not enough.
+      </p>
+      <p>
+        A higher-order method reduces numerical error, but the final result still depends on model correctness, timestep choice,
+        controller timing, event handling, and physical assumptions.
+      </p>
+      <div class="equation-box">
+        Euler → RK4 → RK7 → adaptive RK<br />
+        increasing numerical accuracy does not automatically mean increasing physical truth
+      </div>
+      <div class="callout purple">
+        <strong>Core message:</strong> Higher-order integration improves numerical accuracy, but does not fix bad physics, bad timestep choice, or poor control design.
+      </div>
+    </section>
+
+    <nav class="subtopic-nav" aria-label="Page sections">
+      <a href="#roadmap">Roadmap</a>
+      <a href="#part-a">A: Euler → RK4</a>
+      <a href="#part-b">B: RK4 vs RK7</a>
+      <a href="#part-c">C: Orbit Energy</a>
+      <a href="#part-d">D: Control</a>
+      <a href="#part-e">E: Adaptive RK</a>
+      <a href="#snippets">Snippets</a>
+      <a href="#takeaway">Takeaway</a>
+    </nav>
+
+    <section id="roadmap" class="content-card">
+      <span class="section-title">Problem roadmap</span>
+      <h2>One page, five solver lessons</h2>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>A · Euler to RK4</strong><br />See why integration order matters for a simple oscillator.</div>
+        <div class="mini-card"><strong>B · RK4 vs RK7</strong><br />Compare accuracy improvement with computational cost.</div>
+        <div class="mini-card"><strong>C · Orbit propagation</strong><br />Connect solver order to energy drift and orbit distortion.</div>
+        <div class="mini-card"><strong>D · Control response</strong><br />Check whether higher-order solvers change control behaviour.</div>
+        <div class="mini-card"><strong>E · Adaptive RK</strong><br />Understand where adaptive RK helps and where discrete logic still matters.</div>
+        <div class="mini-card"><strong>Final link</strong><br />Use solver choice as an engineering decision, not just a numerical preference.</div>
+      </div>
+    </section>
+
+    <section id="part-a" class="interactive-card">
+      <span class="section-title">Part A — Euler to RK4</span>
+      <h2>Why order matters</h2>
+      <p>
+        Begin with a simple oscillator. Physically, this system should exchange energy between position and velocity without steadily gaining or losing energy.
+        Euler integration often creates artificial energy drift. RK4 reduces this error significantly for the same timestep.
+      </p>
+      <div class="math-light">\[\ddot{\theta} = -K\theta\]</div>
+
+      <div class="controls">
+        <div class="control-box"><label for="oscK">Stiffness K</label><input id="oscK" type="number" value="4" min="0.1" max="50" step="0.5" /></div>
+        <div class="control-box"><label for="oscTheta0">Initial angle θ₀</label><input id="oscTheta0" type="number" value="1" step="0.1" /></div>
+        <div class="control-box"><label for="oscDt">Timestep Δt [s]</label><input id="oscDt" type="number" value="0.15" min="0.005" max="1" step="0.005" /></div>
+        <div class="control-box"><label for="oscTf">Simulation time [s]</label><input id="oscTf" type="number" value="20" min="2" max="80" step="2" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runOscillatorDemo()">Run Euler vs RK4</button>
+        <button class="ghost" onclick="setOscillatorCase('small')">Small timestep</button>
+        <button class="ghost" onclick="setOscillatorCase('large')">Large timestep</button>
+      </div>
+
+      <div id="oscillatorPlot" class="plot-box"></div>
+      <div id="oscillatorEnergyPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Euler final error</span><strong id="oscEulerError">—</strong></div>
+        <div class="metric"><span>RK4 final error</span><strong id="oscRk4Error">—</strong></div>
+        <div class="metric"><span>Euler energy drift</span><strong id="oscEulerEnergy">—</strong></div>
+        <div class="metric"><span>RK4 energy drift</span><strong id="oscRk4Energy">—</strong></div>
+      </div>
+      <div class="callout good">
+        <strong>Insight:</strong> Higher-order methods reduce numerical error without reducing timestep.
+      </div>
+    </section>
+
+    <section id="part-b" class="interactive-card">
+      <span class="section-title">Part B — RK4 vs RK7</span>
+      <h2>Accuracy vs cost</h2>
+      <p>
+        RK7 is a higher-order fixed-step Runge–Kutta method. It uses more intermediate evaluations of the derivative to achieve higher accuracy per step.
+        This section compares RK4 and RK7 on a damped second-order response.
+      </p>
+      <div class="math-light">\[\ddot{x} = -K_p x - K_d \dot{x}\]</div>
+
+      <div class="controls">
+        <div class="control-box"><label for="rkKp">Kp</label><input id="rkKp" type="number" value="3" min="0" max="50" step="0.5" /></div>
+        <div class="control-box"><label for="rkKd">Kd</label><input id="rkKd" type="number" value="0.8" min="0" max="20" step="0.1" /></div>
+        <div class="control-box"><label for="rkDt">Timestep Δt [s]</label><input id="rkDt" type="number" value="0.25" min="0.005" max="2" step="0.005" /></div>
+        <div class="control-box"><label for="rkTf">Simulation time [s]</label><input id="rkTf" type="number" value="18" min="2" max="80" step="2" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runRk4Rk7Demo()">Compare RK4 and RK7</button>
+        <button class="ghost" onclick="setRkCase('easy')">Easy case</button>
+        <button class="ghost" onclick="setRkCase('sensitive')">Sensitive case</button>
+      </div>
+
+      <div id="rkComparePlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>RK4 final error</span><strong id="rk4FinalError">—</strong></div>
+        <div class="metric"><span>RK7 final error</span><strong id="rk7FinalError">—</strong></div>
+        <div class="metric"><span>RK4 function evals</span><strong id="rk4Evals">—</strong></div>
+        <div class="metric"><span>RK7 function evals</span><strong id="rk7Evals">—</strong></div>
+      </div>
+      <div class="callout warn">
+        <strong>Insight:</strong> RK7 gives higher accuracy per step, but it costs more computations. It improves integration of the model; it does not improve the model itself.
+      </div>
+    </section>
+
+    <section id="part-c" class="interactive-card">
+      <span class="section-title">Part C — Orbit propagation and energy drift</span>
+      <h2>When numerical error looks like physics</h2>
+      <p>
+        In an ideal two-body orbit, specific mechanical energy should remain nearly constant. If the numerical method introduces artificial energy drift,
+        the orbit may spiral or distort even though the physical model says it should not.
+      </p>
+      <div class="math-light">\[\ddot{\mathbf r} = -\frac{\mu}{\lVert \mathbf r \rVert^3}\mathbf r\]</div>
+
+      <div class="controls">
+        <div class="control-box"><label for="orbitAlt">Initial altitude [km]</label><input id="orbitAlt" type="number" value="400" min="150" max="3000" step="50" /></div>
+        <div class="control-box"><label for="orbitDt">Timestep Δt [s]</label><input id="orbitDt" type="number" value="90" min="1" max="500" step="5" /></div>
+        <div class="control-box"><label for="orbitPeriods">Number of orbits</label><input id="orbitPeriods" type="number" value="3" min="1" max="10" step="1" /></div>
+        <div class="control-box"><label for="orbitMethod">Method focus</label><select id="orbitMethod"><option>Euler / RK4 / RK7</option><option>Euler only</option><option>RK4 and RK7</option></select></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runOrbitDemo()">Run orbit propagation</button>
+        <button class="ghost" onclick="setOrbitCase('small')">Small timestep</button>
+        <button class="ghost" onclick="setOrbitCase('large')">Large timestep</button>
+      </div>
+
+      <div id="orbitPathPlot" class="plot-box"></div>
+      <div id="orbitEnergyPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Euler energy drift</span><strong id="orbitEulerEnergy">—</strong></div>
+        <div class="metric"><span>RK4 energy drift</span><strong id="orbitRk4Energy">—</strong></div>
+        <div class="metric"><span>RK7 energy drift</span><strong id="orbitRk7Energy">—</strong></div>
+        <div class="metric"><span>Orbit distortion</span><strong id="orbitDistortion">—</strong></div>
+      </div>
+      <div class="callout bad">
+        <strong>Insight:</strong> In orbital mechanics, numerical error can look like real physical drift.
+      </div>
+    </section>
+
+    <section id="part-d" class="interactive-card">
+      <span class="section-title">Part D — Control response with RK methods</span>
+      <h2>Solver order does not replace controller design</h2>
+      <p>
+        A PD attitude controller can be simulated with Euler, RK4, or RK7. Higher-order methods may produce a more accurate numerical trajectory,
+        but they do not repair an underdamped or poorly tuned controller.
+      </p>
+      <div class="math-light">\[\ddot{\theta} = K_p(\theta_{ref}-\theta)-K_d\dot{\theta}\]</div>
+
+      <div class="controls">
+        <div class="control-box"><label for="ctrlKp">Kp</label><input id="ctrlKp" type="number" value="12" min="0" max="100" step="1" /></div>
+        <div class="control-box"><label for="ctrlKd">Kd</label><input id="ctrlKd" type="number" value="5" min="0" max="50" step="0.5" /></div>
+        <div class="control-box"><label for="ctrlThetaRef">Reference θref</label><input id="ctrlThetaRef" type="number" value="1" step="0.1" /></div>
+        <div class="control-box"><label for="ctrlDt">Timestep Δt [s]</label><input id="ctrlDt" type="number" value="0.08" min="0.005" max="1" step="0.005" /></div>
+        <div class="control-box"><label for="ctrlTf">Simulation time [s]</label><input id="ctrlTf" type="number" value="10" min="2" max="40" step="1" /></div>
+        <div class="control-box"><label for="ctrlMethod">Method focus</label><select id="ctrlMethod"><option>Euler / RK4 / RK7</option><option>RK4 and RK7</option><option>Euler only</option></select></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runControlDemo()">Run control response</button>
+        <button class="ghost" onclick="setControlCase('well')">Well damped</button>
+        <button class="ghost" onclick="setControlCase('poor')">Poorly damped</button>
+      </div>
+
+      <div id="controlPlot" class="plot-box"></div>
+      <div id="torquePlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Overshoot</span><strong id="ctrlOvershoot">—</strong></div>
+        <div class="metric"><span>Settling time</span><strong id="ctrlSettling">—</strong></div>
+        <div class="metric"><span>Final error</span><strong id="ctrlFinalError">—</strong></div>
+        <div class="metric"><span>Oscillation flag</span><strong id="ctrlOscillation">—</strong></div>
+      </div>
+      <div class="callout good">
+        <strong>Insight:</strong> Solver choice changes numerical accuracy, not control design.
+      </div>
+    </section>
+
+    <section id="part-e" class="interactive-card">
+      <span class="section-title">Part E — When adaptive RK helps</span>
+      <h2>Useful for smooth problems, risky for discrete logic</h2>
+      <p>
+        Adaptive RK methods estimate local error and change timestep automatically. This is useful for smooth continuous dynamics,
+        but fixed-rate controllers and event logic still require careful discrete-time thinking.
+      </p>
+      <div class="equation-box">
+        fixed RK7: same Δt for every step<br />
+        adaptive RK-style: reduce Δt when error grows, increase Δt when dynamics are smooth
+      </div>
+
+      <div class="controls">
+        <div class="control-box"><label for="adaptiveDt">Fixed RK7 step [s]</label><input id="adaptiveDt" type="number" value="0.25" min="0.005" max="1" step="0.005" /></div>
+        <div class="control-box"><label for="adaptiveTol">Adaptive tolerance</label><input id="adaptiveTol" type="number" value="0.00001" min="0.000001" max="0.01" step="0.00001" /></div>
+        <div class="control-box"><label for="adaptiveTf">Simulation time [s]</label><input id="adaptiveTf" type="number" value="20" min="2" max="60" step="2" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runAdaptiveDemo()">Compare fixed RK7 and adaptive RK-style</button>
+        <button class="ghost" onclick="setAdaptiveCase('loose')">Loose tolerance</button>
+        <button class="ghost" onclick="setAdaptiveCase('tight')">Tight tolerance</button>
+      </div>
+
+      <div id="adaptivePlot" class="plot-box"></div>
+      <div id="stepSizePlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Fixed RK7 steps</span><strong id="fixedRk7Steps">—</strong></div>
+        <div class="metric"><span>Adaptive steps</span><strong id="adaptiveSteps">—</strong></div>
+        <div class="metric"><span>Rejected steps</span><strong id="adaptiveRejected">—</strong></div>
+        <div class="metric"><span>Suitability</span><strong id="adaptiveSuitability">—</strong></div>
+      </div>
+      <div class="callout purple">
+        <strong>Insight:</strong> Adaptive RK helps smooth continuous problems, but fixed-rate controllers and event logic may still require discrete-time thinking.
+      </div>
+    </section>
+
+    <section id="snippets" class="content-card">
+      <span class="section-title">Python / MATLAB snippets</span>
+      <h2>How the methods translate into code</h2>
+      <p>
+        The snippets below are intentionally compact. For RK7, the page uses a high-order fixed-step demonstration method to show the concept:
+        more derivative evaluations produce higher accuracy per step, but also higher cost.
+      </p>
+
+      <div class="code-tabs">
+        <button class="tab-btn active" onclick="showCodeTab('rk4Code', this)">RK4</button>
+        <button class="tab-btn" onclick="showCodeTab('rk7ConceptCode', this)">RK7 concept</button>
+        <button class="tab-btn" onclick="showCodeTab('orbitCode', this)">Orbit energy</button>
+      </div>
+
+      <div id="rk4Code">
+<pre><code>% Fixed-step RK4 update
+k1 = f(t, x);
+k2 = f(t + dt/2, x + dt*k1/2);
+k3 = f(t + dt/2, x + dt*k2/2);
+k4 = f(t + dt,   x + dt*k3);
+
+x_next = x + dt*(k1 + 2*k2 + 2*k3 + k4)/6;</code></pre>
+      </div>
+
+      <div id="rk7ConceptCode" class="hidden">
+<pre><code>% RK7 concept
+% A seventh-order Runge-Kutta method uses more intermediate stages
+% than RK4 to reduce truncation error per step.
+%
+% In practice, published RK7 methods use specific Butcher-tableau
+% coefficients. The engineering lesson is:
+%
+%   more stages  -> higher accuracy per step
+%   more stages  -> higher computational cost
+%   higher order -> still cannot fix wrong physics or poor timestep choice</code></pre>
+      </div>
+
+      <div id="orbitCode" class="hidden">
+<pre><code>% Specific mechanical energy check for orbit propagation
+rnorm = norm(r);
+vnorm = norm(v);
+energy = 0.5*vnorm^2 - mu/rnorm;
+
+% For an ideal two-body orbit, this should remain nearly constant.
+% If energy drifts, check timestep, method order, and numerical settings.</code></pre>
+      </div>
+    </section>
+
+    <section id="takeaway" class="content-card">
+      <span class="section-title">Engineering takeaway</span>
+      <h2>Solver order is a tool, not a guarantee</h2>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>Euler</strong><br />Simple and useful for intuition, but error grows quickly.</div>
+        <div class="mini-card"><strong>RK4</strong><br />A common fixed-step engineering method with strong accuracy for moderate cost.</div>
+        <div class="mini-card"><strong>RK7</strong><br />Higher accuracy per step, but more derivative evaluations and more computation.</div>
+        <div class="mini-card"><strong>Orbit propagation</strong><br />Numerical energy drift can look like real orbital behavior if not checked.</div>
+        <div class="mini-card"><strong>Control response</strong><br />Higher-order integration does not fix poor gain selection or bad control logic.</div>
+        <div class="mini-card"><strong>Adaptive RK</strong><br />Useful for smooth dynamics, but not a substitute for discrete-control reasoning.</div>
+      </div>
+      <div class="callout good">
+        <strong>Final insight:</strong> In GNC and space mechanics, the best solver is not always the highest-order solver. It is the solver whose assumptions match the system being simulated.
+      </div>
+    </section>
+  </main>
+
+  <div class="back-link-row">
+    <a href="problems.html" class="back-link-pill">← Back to Problem Bank</a>
+  </div>
+
+  <footer>
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br />
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    function add(a, b) { return a.map((v, i) => v + b[i]); }
+    function scale(a, s) { return a.map(v => v*s); }
+    function addScaled(a, b, s) { return a.map((v, i) => v + s*b[i]); }
+    function norm2(x, y) { return Math.sqrt(x*x + y*y); }
+    function fmt(x, d=3) { return Number.isFinite(x) ? Number(x).toFixed(d) : '—'; }
+
+    function eulerStep(f, t, y, h) {
+      return addScaled(y, f(t, y), h);
+    }
+
+    function rk4Step(f, t, y, h) {
+      const k1 = f(t, y);
+      const k2 = f(t + h/2, addScaled(y, k1, h/2));
+      const k3 = f(t + h/2, addScaled(y, k2, h/2));
+      const k4 = f(t + h, addScaled(y, k3, h));
+      return y.map((v, i) => v + h*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6);
+    }
+
+    // Browser-friendly high-order demonstration: Richardson-extrapolated RK4.
+    // It behaves as a high-order fixed-step RK-style method for teaching the RK7 idea.
+    function rk7DemoStep(f, t, y, h) {
+      const big = rk4Step(f, t, y, h);
+      const half1 = rk4Step(f, t, y, h/2);
+      const half2 = rk4Step(f, t + h/2, half1, h/2);
+      const factor = Math.pow(2, 4) - 1;
+      return half2.map((v, i) => v + (v - big[i]) / factor);
+    }
+
+    function integrateFixed(f, y0, t0, tf, h, method) {
+      let t = t0;
+      let y = y0.slice();
+      const ts = [t];
+      const ys = [y.slice()];
+      let evalsPerStep = method === 'Euler' ? 1 : method === 'RK4' ? 4 : 12;
+      let steps = 0;
+      while (t < tf - 1e-12 && steps < 200000) {
+        const dt = Math.min(h, tf - t);
+        if (method === 'Euler') y = eulerStep(f, t, y, dt);
+        else if (method === 'RK4') y = rk4Step(f, t, y, dt);
+        else y = rk7DemoStep(f, t, y, dt);
+        t += dt;
+        ts.push(t);
+        ys.push(y.slice());
+        steps++;
+        if (Math.max(...y.map(v => Math.abs(v))) > 1e12) break;
+      }
+      return { t: ts, y: ys, steps, evals: steps*evalsPerStep };
+    }
+
+    function integrateAdaptiveRk(f, y0, t0, tf, h0, tol) {
+      let t = t0;
+      let y = y0.slice();
+      let h = h0;
+      const ts = [t], ys = [y.slice()], hs = [h];
+      let steps = 0, rejected = 0;
+      while (t < tf - 1e-12 && steps < 200000) {
+        if (t + h > tf) h = tf - t;
+        const yBig = rk4Step(f, t, y, h);
+        const yHalf = rk4Step(f, t, y, h/2);
+        const ySmall = rk4Step(f, t + h/2, yHalf, h/2);
+        const err = Math.max(...ySmall.map((v, i) => Math.abs(v - yBig[i])));
+        if (err < tol || h < 1e-7) {
+          t += h;
+          y = ySmall;
+          ts.push(t); ys.push(y.slice()); hs.push(h);
+          steps++;
+          const scaleFactor = err === 0 ? 1.7 : Math.min(1.7, Math.max(0.35, 0.9*Math.pow(tol/err, 0.2)));
+          h *= scaleFactor;
+        } else {
+          h *= 0.5;
+          rejected++;
+        }
+      }
+      return { t: ts, y: ys, h: hs, steps, rejected };
+    }
+
+    function plotLayout(title, xTitle, yTitle) {
+      return {
+        title: { text: title, font: { family: 'Times New Roman, Georgia, serif', size: 21 } },
+        margin: { l: 60, r: 25, t: 60, b: 55 },
+        xaxis: { title: xTitle, gridcolor: '#e5e7eb' },
+        yaxis: { title: yTitle, gridcolor: '#e5e7eb' },
+        paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff',
+        legend: { orientation: 'h', y: -0.22 }
+      };
+    }
+
+    function oscillatorEnergy(y, K) {
+      return 0.5*y[1]*y[1] + 0.5*K*y[0]*y[0];
+    }
+
+    function runOscillatorDemo() {
+      const K = parseFloat(document.getElementById('oscK').value);
+      const theta0 = parseFloat(document.getElementById('oscTheta0').value);
+      const dt = parseFloat(document.getElementById('oscDt').value);
+      const tf = parseFloat(document.getElementById('oscTf').value);
+      const f = (t, y) => [y[1], -K*y[0]];
+      const y0 = [theta0, 0];
+      const eul = integrateFixed(f, y0, 0, tf, dt, 'Euler');
+      const rk4 = integrateFixed(f, y0, 0, tf, dt, 'RK4');
+      const ref = integrateFixed(f, y0, 0, tf, Math.min(dt/20, 0.002), 'RK7');
+
+      const exactTheta = theta0*Math.cos(Math.sqrt(K)*tf);
+      const eErr = Math.abs(eul.y[eul.y.length-1][0] - exactTheta);
+      const rErr = Math.abs(rk4.y[rk4.y.length-1][0] - exactTheta);
+      const eE = eul.y.map(y => oscillatorEnergy(y, K));
+      const rE = rk4.y.map(y => oscillatorEnergy(y, K));
+      const eDrift = 100*(eE[eE.length-1] - eE[0])/Math.abs(eE[0]);
+      const rDrift = 100*(rE[rE.length-1] - rE[0])/Math.abs(rE[0]);
+
+      document.getElementById('oscEulerError').textContent = fmt(eErr, 4);
+      document.getElementById('oscRk4Error').textContent = fmt(rErr, 6);
+      document.getElementById('oscEulerEnergy').textContent = fmt(eDrift, 3) + ' %';
+      document.getElementById('oscRk4Energy').textContent = fmt(rDrift, 5) + ' %';
+
+      Plotly.newPlot('oscillatorPlot', [
+        { x: eul.t, y: eul.y.map(y=>y[0]), mode: 'lines', name: 'Euler θ(t)', line: { width: 2, dash: 'dot' } },
+        { x: rk4.t, y: rk4.y.map(y=>y[0]), mode: 'lines', name: 'RK4 θ(t)', line: { width: 3 } },
+        { x: ref.t, y: ref.y.map(y=>y[0]), mode: 'lines', name: 'Reference-like', line: { width: 2, dash: 'dash' } }
+      ], plotLayout('Oscillator response: Euler vs RK4', 'Time [s]', 'θ'), { responsive: true, displaylogo: false });
+
+      Plotly.newPlot('oscillatorEnergyPlot', [
+        { x: eul.t, y: eE.map(e => 100*(e-eE[0])/Math.abs(eE[0])), mode: 'lines', name: 'Euler energy drift [%]', line: { width: 2, dash: 'dot' } },
+        { x: rk4.t, y: rE.map(e => 100*(e-rE[0])/Math.abs(rE[0])), mode: 'lines', name: 'RK4 energy drift [%]', line: { width: 3 } }
+      ], plotLayout('Numerical energy drift', 'Time [s]', 'Energy drift [%]'), { responsive: true, displaylogo: false });
+    }
+
+    function setOscillatorCase(type) {
+      document.getElementById('oscDt').value = type === 'small' ? 0.03 : 0.28;
+      runOscillatorDemo();
+    }
+
+    function runRk4Rk7Demo() {
+      const Kp = parseFloat(document.getElementById('rkKp').value);
+      const Kd = parseFloat(document.getElementById('rkKd').value);
+      const dt = parseFloat(document.getElementById('rkDt').value);
+      const tf = parseFloat(document.getElementById('rkTf').value);
+      const f = (t, y) => [y[1], -Kp*y[0] - Kd*y[1]];
+      const y0 = [1, 0];
+      const rk4 = integrateFixed(f, y0, 0, tf, dt, 'RK4');
+      const rk7 = integrateFixed(f, y0, 0, tf, dt, 'RK7');
+      const ref = integrateFixed(f, y0, 0, tf, Math.min(dt/25, 0.002), 'RK7');
+      const refFinal = ref.y[ref.y.length-1];
+      const err4 = norm2(rk4.y[rk4.y.length-1][0]-refFinal[0], rk4.y[rk4.y.length-1][1]-refFinal[1]);
+      const err7 = norm2(rk7.y[rk7.y.length-1][0]-refFinal[0], rk7.y[rk7.y.length-1][1]-refFinal[1]);
+      document.getElementById('rk4FinalError').textContent = fmt(err4, 6);
+      document.getElementById('rk7FinalError').textContent = fmt(err7, 6);
+      document.getElementById('rk4Evals').textContent = rk4.evals;
+      document.getElementById('rk7Evals').textContent = rk7.evals;
+
+      Plotly.newPlot('rkComparePlot', [
+        { x: rk4.t, y: rk4.y.map(y=>y[0]), mode: 'lines', name: 'RK4 x(t)', line: { width: 3 } },
+        { x: rk7.t, y: rk7.y.map(y=>y[0]), mode: 'lines', name: 'RK7-style x(t)', line: { width: 3, dash: 'dash' } },
+        { x: ref.t, y: ref.y.map(y=>y[0]), mode: 'lines', name: 'Reference-like', line: { width: 2, dash: 'dot' } }
+      ], plotLayout('RK4 vs RK7-style fixed-step response', 'Time [s]', 'x'), { responsive: true, displaylogo: false });
+    }
+
+    function setRkCase(type) {
+      if (type === 'easy') {
+        document.getElementById('rkKp').value = 2;
+        document.getElementById('rkKd').value = 1.1;
+        document.getElementById('rkDt').value = 0.12;
+      } else {
+        document.getElementById('rkKp').value = 10;
+        document.getElementById('rkKd').value = 0.3;
+        document.getElementById('rkDt').value = 0.35;
+      }
+      runRk4Rk7Demo();
+    }
+
+    function orbitEnergy(y, mu) {
+      const r = Math.sqrt(y[0]*y[0] + y[1]*y[1]);
+      const v2 = y[2]*y[2] + y[3]*y[3];
+      return 0.5*v2 - mu/r;
+    }
+
+    function runOrbitDemo() {
+      const mu = 398600.4418;
+      const Re = 6378.137;
+      const alt = parseFloat(document.getElementById('orbitAlt').value);
+      const dt = parseFloat(document.getElementById('orbitDt').value);
+      const periods = parseFloat(document.getElementById('orbitPeriods').value);
+      const r0 = Re + alt;
+      const v0 = Math.sqrt(mu/r0);
+      const T = 2*Math.PI*Math.sqrt(Math.pow(r0, 3)/mu);
+      const tf = periods*T;
+      const f = (t, y) => {
+        const r = Math.sqrt(y[0]*y[0] + y[1]*y[1]);
+        return [y[2], y[3], -mu*y[0]/Math.pow(r,3), -mu*y[1]/Math.pow(r,3)];
+      };
+      const y0 = [r0, 0, 0, v0];
+      const eul = integrateFixed(f, y0, 0, tf, dt, 'Euler');
+      const rk4 = integrateFixed(f, y0, 0, tf, dt, 'RK4');
+      const rk7 = integrateFixed(f, y0, 0, tf, dt, 'RK7');
+      const eE = eul.y.map(y => orbitEnergy(y, mu));
+      const r4E = rk4.y.map(y => orbitEnergy(y, mu));
+      const r7E = rk7.y.map(y => orbitEnergy(y, mu));
+      const drift = arr => 100*(arr[arr.length-1] - arr[0])/Math.abs(arr[0]);
+      document.getElementById('orbitEulerEnergy').textContent = fmt(drift(eE), 4) + ' %';
+      document.getElementById('orbitRk4Energy').textContent = fmt(drift(r4E), 6) + ' %';
+      document.getElementById('orbitRk7Energy').textContent = fmt(drift(r7E), 6) + ' %';
+      const eFinalR = Math.sqrt(eul.y[eul.y.length-1][0]**2 + eul.y[eul.y.length-1][1]**2);
+      document.getElementById('orbitDistortion').textContent = Math.abs(eFinalR-r0) > 100 ? 'High' : Math.abs(eFinalR-r0) > 10 ? 'Medium' : 'Low';
+
+      Plotly.newPlot('orbitPathPlot', [
+        { x: eul.y.map(y=>y[0]), y: eul.y.map(y=>y[1]), mode: 'lines', name: 'Euler', line: { width: 2, dash: 'dot' } },
+        { x: rk4.y.map(y=>y[0]), y: rk4.y.map(y=>y[1]), mode: 'lines', name: 'RK4', line: { width: 3 } },
+        { x: rk7.y.map(y=>y[0]), y: rk7.y.map(y=>y[1]), mode: 'lines', name: 'RK7-style', line: { width: 3, dash: 'dash' } },
+        { x: [0], y: [0], mode: 'markers', name: 'Earth center', marker: { size: 10 } }
+      ], { ...plotLayout('Orbit path comparison', 'x [km]', 'y [km]'), yaxis: { title: 'y [km]', scaleanchor: 'x', scaleratio: 1 } }, { responsive: true, displaylogo: false });
+
+      Plotly.newPlot('orbitEnergyPlot', [
+        { x: eul.t.map(t=>t/3600), y: eE.map(e => 100*(e-eE[0])/Math.abs(eE[0])), mode: 'lines', name: 'Euler energy drift [%]', line: { width: 2, dash: 'dot' } },
+        { x: rk4.t.map(t=>t/3600), y: r4E.map(e => 100*(e-r4E[0])/Math.abs(r4E[0])), mode: 'lines', name: 'RK4 energy drift [%]', line: { width: 3 } },
+        { x: rk7.t.map(t=>t/3600), y: r7E.map(e => 100*(e-r7E[0])/Math.abs(r7E[0])), mode: 'lines', name: 'RK7-style energy drift [%]', line: { width: 3, dash: 'dash' } }
+      ], plotLayout('Specific mechanical energy drift', 'Time [hours]', 'Energy drift [%]'), { responsive: true, displaylogo: false });
+    }
+
+    function setOrbitCase(type) {
+      document.getElementById('orbitDt').value = type === 'small' ? 20 : 180;
+      runOrbitDemo();
+    }
+
+    function runControlDemo() {
+      const Kp = parseFloat(document.getElementById('ctrlKp').value);
+      const Kd = parseFloat(document.getElementById('ctrlKd').value);
+      const ref = parseFloat(document.getElementById('ctrlThetaRef').value);
+      const dt = parseFloat(document.getElementById('ctrlDt').value);
+      const tf = parseFloat(document.getElementById('ctrlTf').value);
+      const f = (t, y) => [y[1], Kp*(ref-y[0]) - Kd*y[1]];
+      const y0 = [0, 0];
+      const eul = integrateFixed(f, y0, 0, tf, dt, 'Euler');
+      const rk4 = integrateFixed(f, y0, 0, tf, dt, 'RK4');
+      const rk7 = integrateFixed(f, y0, 0, tf, dt, 'RK7');
+      const theta = rk7.y.map(y=>y[0]);
+      const omega = rk7.y.map(y=>y[1]);
+      const torque = rk7.y.map(y => Kp*(ref-y[0]) - Kd*y[1]);
+      const overshoot = Math.max(0, Math.max(...theta)-ref);
+      const finalError = Math.abs(theta[theta.length-1]-ref);
+      let settle = 'not settled';
+      for (let i=0; i<theta.length; i++) {
+        const rest = theta.slice(i);
+        if (rest.every(v => Math.abs(v-ref) < 0.02*Math.max(1, Math.abs(ref)))) { settle = fmt(rk7.t[i], 2) + ' s'; break; }
+      }
+      let crossings = 0;
+      for (let i=1; i<theta.length; i++) if ((theta[i-1]-ref)*(theta[i]-ref) < 0) crossings++;
+      document.getElementById('ctrlOvershoot').textContent = fmt(overshoot, 3);
+      document.getElementById('ctrlSettling').textContent = settle;
+      document.getElementById('ctrlFinalError').textContent = fmt(finalError, 5);
+      document.getElementById('ctrlOscillation').textContent = crossings >= 3 ? 'Yes' : 'No';
+
+      Plotly.newPlot('controlPlot', [
+        { x: eul.t, y: eul.y.map(y=>y[0]), mode: 'lines', name: 'Euler θ(t)', line: { width: 2, dash: 'dot' } },
+        { x: rk4.t, y: rk4.y.map(y=>y[0]), mode: 'lines', name: 'RK4 θ(t)', line: { width: 3 } },
+        { x: rk7.t, y: theta, mode: 'lines', name: 'RK7-style θ(t)', line: { width: 3, dash: 'dash' } },
+        { x: [0, tf], y: [ref, ref], mode: 'lines', name: 'Reference', line: { width: 2, dash: 'dashdot' } }
+      ], plotLayout('PD control response with different RK methods', 'Time [s]', 'θ'), { responsive: true, displaylogo: false });
+
+      Plotly.newPlot('torquePlot', [
+        { x: rk7.t, y: torque, mode: 'lines', name: 'Control torque command', line: { width: 3 } },
+        { x: rk7.t, y: omega, mode: 'lines', name: 'Angular velocity ω', yaxis: 'y2', line: { width: 2, dash: 'dot' } }
+      ], { ...plotLayout('Torque and angular velocity', 'Time [s]', 'Torque'), yaxis2: { title: 'ω', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' } }, { responsive: true, displaylogo: false });
+    }
+
+    function setControlCase(type) {
+      if (type === 'well') {
+        document.getElementById('ctrlKp').value = 12;
+        document.getElementById('ctrlKd').value = 7;
+        document.getElementById('ctrlDt').value = 0.05;
+      } else {
+        document.getElementById('ctrlKp').value = 30;
+        document.getElementById('ctrlKd').value = 1.2;
+        document.getElementById('ctrlDt').value = 0.12;
+      }
+      runControlDemo();
+    }
+
+    function runAdaptiveDemo() {
+      const fixedDt = parseFloat(document.getElementById('adaptiveDt').value);
+      const tol = parseFloat(document.getElementById('adaptiveTol').value);
+      const tf = parseFloat(document.getElementById('adaptiveTf').value);
+      const f = (t, y) => [y[1], -4*y[0] - 0.35*y[1] + 0.4*Math.sin(3*t)];
+      const y0 = [1, 0];
+      const fixed = integrateFixed(f, y0, 0, tf, fixedDt, 'RK7');
+      const adaptive = integrateAdaptiveRk(f, y0, 0, tf, fixedDt, tol);
+      document.getElementById('fixedRk7Steps').textContent = fixed.steps;
+      document.getElementById('adaptiveSteps').textContent = adaptive.steps;
+      document.getElementById('adaptiveRejected').textContent = adaptive.rejected;
+      document.getElementById('adaptiveSuitability').textContent = adaptive.rejected > 1000 ? 'Check model' : 'Smooth dynamics';
+
+      Plotly.newPlot('adaptivePlot', [
+        { x: fixed.t, y: fixed.y.map(y=>y[0]), mode: 'lines', name: 'Fixed RK7-style', line: { width: 3 } },
+        { x: adaptive.t, y: adaptive.y.map(y=>y[0]), mode: 'lines', name: 'Adaptive RK-style', line: { width: 2, dash: 'dash' } }
+      ], plotLayout('Fixed RK7-style vs adaptive RK-style', 'Time [s]', 'x'), { responsive: true, displaylogo: false });
+
+      Plotly.newPlot('stepSizePlot', [
+        { x: adaptive.t, y: adaptive.h, mode: 'lines', name: 'Adaptive step size', line: { width: 3 } },
+        { x: fixed.t, y: fixed.t.map(()=>fixedDt), mode: 'lines', name: 'Fixed RK7 step', line: { width: 2, dash: 'dot' } }
+      ], plotLayout('Step-size behaviour', 'Time [s]', 'Step size [s]'), { responsive: true, displaylogo: false });
+    }
+
+    function setAdaptiveCase(type) {
+      document.getElementById('adaptiveTol').value = type === 'loose' ? 0.001 : 0.000001;
+      runAdaptiveDemo();
+    }
+
+    function showCodeTab(id, btn) {
+      ['rk4Code','rk7ConceptCode','orbitCode'].forEach(x => document.getElementById(x).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    window.addEventListener('load', () => {
+      runOscillatorDemo();
+      runRk4Rk7Demo();
+      runOrbitDemo();
+      runControlDemo();
+      runAdaptiveDemo();
+    });
+  </script>
+</body>
+</html>
