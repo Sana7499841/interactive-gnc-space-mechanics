@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ODE45 Beyond Dynamics | Events, Orbits, Drag, and Solver Limits</title>
+
+  <link rel="stylesheet" href="styles-home.css" />
+  <link rel="icon" type="image/png" href="favicon1.png" />
+
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)'], ['$', '$']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --ink: #111827;
+      --muted: #526173;
+      --soft: #f8fafc;
+      --soft-blue: #eff6ff;
+      --border: #dbeafe;
+      --card: #ffffff;
+      --code-bg: #0f172a;
+      --good: #16a34a;
+      --warn: #d97706;
+      --bad: #dc2626;
+      --purple: #7c3aed;
+      --shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: "Times New Roman", Georgia, serif;
+      line-height: 1.12;
+      color: #111827;
+    }
+
+    h2 { font-size: clamp(2rem, 3.2vw, 2.65rem); margin: 0 0 1.1rem; }
+    h3 { font-size: 1.45rem; margin: 1.2rem 0 0.7rem; }
+    p { margin: 0 0 1rem; }
+
+    .problem-hero {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      color: #ffffff;
+      padding: 4rem 1.5rem 3.2rem;
+    }
+
+    .problem-hero-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .problem-hero h1 {
+      color: #ffffff;
+      font-size: clamp(2.6rem, 5vw, 3.7rem);
+      line-height: 1.1;
+      margin: 0 0 1.2rem;
+      max-width: 1000px;
+    }
+
+    .problem-hero p {
+      max-width: 900px;
+      color: #ffffff;
+      font-size: 1.25rem;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .page-main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3.5rem;
+    }
+
+    .content-card,
+    .interactive-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 2.5rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(191, 219, 254, 0.65);
+      font-size: 1.08rem;
+    }
+
+    .section-title {
+      display: inline-block;
+      background: #dbeafe;
+      padding: 0.6rem 1.2rem;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--blue-dark);
+      margin-bottom: 1.2rem;
+      letter-spacing: 0.01em;
+    }
+
+    .subtopic-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin: 0 0 2rem;
+      justify-content: center;
+    }
+
+    .subtopic-nav a,
+    .back-link-pill {
+      text-decoration: none;
+      padding: 0.65rem 1.15rem;
+      border-radius: 999px;
+      background: var(--soft-blue);
+      border: 1px solid #bfdbfe;
+      color: var(--blue-dark);
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .subtopic-nav a:hover,
+    .back-link-pill:hover {
+      background: var(--blue);
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .equation-box {
+      background: var(--code-bg);
+      color: #f8fafc;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .math-light {
+      background: #f8fbff;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      border-radius: 16px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    .callout {
+      margin: 1.2rem 0;
+      padding: 1rem 1.2rem;
+      border-radius: 14px;
+      background: #eff6ff;
+      border-left: 5px solid var(--blue);
+    }
+
+    .callout.good { background: #f0fdf4; border-left-color: var(--good); }
+    .callout.warn { background: #fff7ed; border-left-color: var(--warn); }
+    .callout.bad { background: #fef2f2; border-left-color: var(--bad); }
+    .callout.purple { background: #f5f3ff; border-left-color: var(--purple); }
+
+    .roadmap-grid,
+    .two-col,
+    .metric-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .roadmap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    @media (max-width: 820px) {
+      .roadmap-grid,
+      .two-col,
+      .metric-grid { grid-template-columns: 1fr; }
+      .content-card,
+      .interactive-card { padding: 1.4rem; }
+    }
+
+    .mini-card,
+    .metric,
+    .control-box {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 1rem;
+    }
+
+    .mini-card strong,
+    .metric strong { color: #123e83; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin: 1.1rem 0;
+    }
+
+    @media (max-width: 900px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 620px) { .controls { grid-template-columns: 1fr; } }
+
+    label {
+      display: block;
+      color: #1e3a8a;
+      font-weight: 800;
+      font-size: 0.94rem;
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="number"], input[type="range"], select {
+      width: 100%;
+    }
+
+    input[type="number"], select {
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 0.65rem 0.75rem;
+      font-size: 1rem;
+      background: #ffffff;
+      color: var(--ink);
+    }
+
+    input[type="range"] { accent-color: var(--blue); }
+
+    .value-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.6rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-top: 0.2rem;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    button {
+      border: none;
+      padding: 0.75rem 1.2rem;
+      border-radius: 999px;
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--blue-dark); }
+    button.secondary { background: #0f172a; }
+    button.ghost {
+      background: var(--soft-blue);
+      color: var(--blue-dark);
+      border: 1px solid #bfdbfe;
+    }
+    button.ghost:hover { background: var(--blue); color: #fff; }
+
+    .plot-box {
+      width: 100%;
+      min-height: 390px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.2rem;
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: #e5e7eb;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 0.92rem;
+    }
+
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .code-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .tab-btn { background: #0f172a; }
+    .tab-btn.active { background: var(--blue); }
+    .hidden { display: none; }
+
+    .back-link-row {
+      max-width: 960px;
+      margin: 0 auto 2rem;
+      padding: 0 1.5rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2.5rem 1.5rem;
+      font-size: 1rem;
+      color: #444;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="problem-hero">
+    <div class="problem-hero-inner">
+      <h1>ODE45 Beyond Basic Dynamics — Events, Orbits, Drag, and Solver Limits</h1>
+      <p>
+        This page develops a deeper GNC simulation workflow, connecting relative control,
+        event-based mode switching, orbital energy drift, drag modeling with ballistic coefficient,
+        and solver-limit interpretation in one coherent flow.
+      </p>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section id="why" class="content-card">
+      <span class="section-title">Why this matters</span>
+      <h2>A solver is part of the engineering model</h2>
+      <p>
+        The first ODE45 problem showed that a solver does not fix a wrong model. This advanced problem goes one step deeper:
+        in real GNC simulation, the solver, switching logic, environmental model, and numerical method all affect the engineering result.
+      </p>
+      <p>
+        Real GNC simulation is not only continuous integration. It is a hybrid workflow of equations, events, mode logic,
+        environmental effects, and solver choices.
+      </p>
+      <div class="equation-box">
+        continuous dynamics → event detection → mode switching → environment modeling → solver interpretation
+      </div>
+      <div class="callout purple">
+        <strong>Core message:</strong> A good simulation does not only ask “what equation should I integrate?” It also asks “when does the system change mode, how does the environment enter, and can the solver resolve the physics?”
+      </div>
+    </section>
+
+    <nav class="subtopic-nav" aria-label="Page sections">
+      <a href="#roadmap">Roadmap</a>
+      <a href="#part-a">A: Chaser</a>
+      <a href="#part-b">B: Events</a>
+      <a href="#part-c">C: Energy Drift</a>
+      <a href="#part-d">D: Drag + BC</a>
+      <a href="#part-e">E: Stiffness</a>
+      <a href="#snippets">Snippets</a>
+      <a href="#takeaway">Takeaway</a>
+    </nav>
+
+    <section id="roadmap" class="content-card">
+      <span class="section-title">Problem roadmap</span>
+      <h2>Five advanced simulation lessons</h2>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>A · Chaser-target control</strong><br />Compare Euler integration with ODE45-style adaptive integration for relative motion.</div>
+        <div class="mini-card"><strong>B · Event detection</strong><br />Switch between APPROACH, RENDEZVOUS, and DOCK when thresholds are crossed.</div>
+        <div class="mini-card"><strong>C · Orbital energy drift</strong><br />Compare Euler and ODE45-style propagation for the two-body problem.</div>
+        <div class="mini-card"><strong>D · Drag + ballistic coefficient</strong><br />Compare constant BC and time-varying BC decay predictions.</div>
+        <div class="mini-card"><strong>E · Stiff systems</strong><br />Combine fast control dynamics with slow orbital drift to see why solver choice matters.</div>
+        <div class="mini-card"><strong>Final link</strong><br />Connect numerical simulation choices to mission-level engineering judgement.</div>
+      </div>
+    </section>
+
+    <section id="part-a" class="interactive-card">
+      <span class="section-title">Part A — Chaser-target control</span>
+      <h2>Euler vs ODE45-style integration</h2>
+      <p>
+        A chaser spacecraft reduces relative position error using a simple PD-like law. The physics is second-order:
+        acceleration depends on both position error and relative velocity.
+      </p>
+      <div class="math-light">\[\ddot{x} = -K_p x - K_d \dot{x}\]</div>
+      <p>
+        This comparison shows why manual Euler integration can exaggerate overshoot or divergence when the timestep is coarse,
+        while adaptive integration follows the continuous response more smoothly.
+      </p>
+
+      <div class="controls">
+        <div class="control-box"><label for="chaserX0">Initial distance x₀ [m]</label><input id="chaserX0" type="number" value="120" step="10" /></div>
+        <div class="control-box"><label for="chaserV0">Initial velocity v₀ [m/s]</label><input id="chaserV0" type="number" value="-2" step="0.5" /></div>
+        <div class="control-box"><label for="chaserKp">Kp</label><input id="chaserKp" type="number" value="0.18" step="0.02" /></div>
+        <div class="control-box"><label for="chaserKd">Kd</label><input id="chaserKd" type="number" value="0.85" step="0.05" /></div>
+        <div class="control-box"><label for="chaserDt">Euler timestep [s]</label><input id="chaserDt" type="number" value="0.25" min="0.01" max="2" step="0.01" /></div>
+        <div class="control-box"><label for="chaserTf">Simulation time [s]</label><input id="chaserTf" type="number" value="35" min="5" max="120" step="5" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runChaserDemo()">Compare Euler and ODE45-style integration</button>
+        <button class="ghost" onclick="setChaserCase('smooth')">Smooth convergence</button>
+        <button class="ghost" onclick="setChaserCase('sensitive')">Gain/timestep sensitive</button>
+      </div>
+
+      <div id="chaserPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Euler final error</span><strong id="chaserEulerErr">—</strong></div>
+        <div class="metric"><span>ODE45-style final error</span><strong id="chaserOdeErr">—</strong></div>
+        <div class="metric"><span>Max mismatch</span><strong id="chaserMismatch">—</strong></div>
+        <div class="metric"><span>Interpretation</span><strong id="chaserInterp">—</strong></div>
+      </div>
+      <div class="callout warn">
+        <strong>Insight:</strong> Manual integration can exaggerate overshoot, especially with large gains or coarse timestep.
+      </div>
+    </section>
+
+    <section id="part-b" class="interactive-card">
+      <span class="section-title">Part B — Event detection and mode switching</span>
+      <h2>APPROACH → RENDEZVOUS → DOCK</h2>
+      <p>
+        Real control systems are hybrid. They do not only follow one continuous equation; they also switch controller behaviour
+        when mission thresholds are crossed. In MATLAB, this is often handled using ODE45 event functions.
+      </p>
+      <div class="equation-box">
+        if distance &gt; approach threshold → APPROACH<br />
+        if dock threshold &lt; distance ≤ approach threshold → RENDEZVOUS<br />
+        if distance ≤ dock threshold → DOCK
+      </div>
+
+      <div class="controls">
+        <div class="control-box"><label for="eventX0">Initial distance [m]</label><input id="eventX0" type="number" value="120" step="10" /></div>
+        <div class="control-box"><label for="approachThreshold">Approach threshold [m]</label><input id="approachThreshold" type="number" value="50" step="5" /></div>
+        <div class="control-box"><label for="dockThreshold">Dock threshold [m]</label><input id="dockThreshold" type="number" value="10" step="1" /></div>
+        <div class="control-box"><label for="approachGain">Approach gain</label><input id="approachGain" type="number" value="0.04" step="0.01" /></div>
+        <div class="control-box"><label for="rendezvousGain">Rendezvous gain</label><input id="rendezvousGain" type="number" value="0.10" step="0.01" /></div>
+        <div class="control-box"><label for="dockGain">Dock gain</label><input id="dockGain" type="number" value="0.22" step="0.01" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runEventDemo()">Run event-based mode switching</button>
+        <button class="ghost" onclick="setEventCase('gentle')">Gentle docking</button>
+        <button class="ghost" onclick="setEventCase('aggressive')">Aggressive docking</button>
+      </div>
+
+      <div id="eventPlot" class="plot-box"></div>
+      <div id="modePlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Approach event</span><strong id="approachEventTime">—</strong></div>
+        <div class="metric"><span>Dock event</span><strong id="dockEventTime">—</strong></div>
+        <div class="metric"><span>Final mode</span><strong id="finalMode">—</strong></div>
+        <div class="metric"><span>Final distance</span><strong id="eventFinalDistance">—</strong></div>
+      </div>
+      <div class="callout good">
+        <strong>Insight:</strong> Control systems are hybrid. They combine continuous dynamics with discrete decisions.
+      </div>
+    </section>
+
+    <section id="part-c" class="interactive-card">
+      <span class="section-title">Part C — Energy drift in orbit propagation</span>
+      <h2>Bad integration can break orbital motion</h2>
+      <p>
+        In the two-body problem, specific mechanical energy should remain nearly constant for an ideal orbit.
+        If the numerical method is poor, the orbit may slowly gain or lose energy even when the physics says it should not.
+      </p>
+      <div class="math-light">\[\ddot{\mathbf r} = -\frac{\mu}{r^3}\mathbf r\]</div>
+
+      <div class="controls">
+        <div class="control-box"><label for="orbitAlt">Initial altitude [km]</label><input id="orbitAlt" type="number" value="400" step="50" /></div>
+        <div class="control-box"><label for="orbitDt">Euler timestep [s]</label><input id="orbitDt" type="number" value="60" min="1" max="300" step="5" /></div>
+        <div class="control-box"><label for="orbitPeriods">Number of orbits</label><input id="orbitPeriods" type="number" value="3" min="1" max="10" step="1" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runOrbitEnergyDemo()">Compare orbit energy drift</button>
+        <button class="ghost" onclick="setOrbitCase('good')">Small timestep</button>
+        <button class="ghost" onclick="setOrbitCase('bad')">Large timestep</button>
+      </div>
+
+      <div id="orbitPathPlot" class="plot-box"></div>
+      <div id="energyPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Euler energy drift</span><strong id="eulerEnergyDrift">—</strong></div>
+        <div class="metric"><span>ODE45-style energy drift</span><strong id="odeEnergyDrift">—</strong></div>
+        <div class="metric"><span>Euler radius error</span><strong id="eulerRadiusError">—</strong></div>
+        <div class="metric"><span>Main lesson</span><strong>Method matters</strong></div>
+      </div>
+      <div class="callout bad">
+        <strong>Insight:</strong> Numerical method affects mission prediction. An orbit can distort because of integration error, not because the spacecraft physics changed.
+      </div>
+    </section>
+
+    <section id="part-d" class="interactive-card">
+      <span class="section-title">Part D — Drag modeling with ballistic coefficient</span>
+      <h2>Constant BC vs time-varying BC</h2>
+      <p>
+        Drag modeling is where this page connects directly to your thesis direction. A ballistic coefficient summarizes mass,
+        drag coefficient, and reference area. If BC changes with attitude, configuration, or learned correction, decay prediction changes.
+      </p>
+      <div class="math-light">\[BC = \frac{m}{C_d A},\qquad a_D = -\frac{1}{2}\rho v^2\frac{1}{BC}\]</div>
+
+      <div class="controls">
+        <div class="control-box"><label for="dragAlt">Initial altitude [km]</label><input id="dragAlt" type="number" value="260" step="10" /></div>
+        <div class="control-box"><label for="bcConst">Constant BC [kg/m²]</label><input id="bcConst" type="number" value="80" step="5" /></div>
+        <div class="control-box"><label for="bcAmp">BC variation amplitude [%]</label><input id="bcAmp" type="number" value="30" step="5" /></div>
+        <div class="control-box"><label for="densityScale">Density scale</label><input id="densityScale" type="number" value="1" min="0.1" max="10" step="0.1" /></div>
+        <div class="control-box"><label for="dragDays">Simulation duration [days]</label><input id="dragDays" type="number" value="7" min="1" max="60" step="1" /></div>
+        <div class="control-box"><label for="bcPeriod">BC variation period [days]</label><input id="bcPeriod" type="number" value="2" min="0.5" max="20" step="0.5" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runDragBcDemo()">Compare constant and time-varying BC</button>
+        <button class="ghost" onclick="setDragCase('low')">Lower drag</button>
+        <button class="ghost" onclick="setDragCase('high')">Higher drag</button>
+      </div>
+
+      <div id="dragPlot" class="plot-box"></div>
+      <div id="bcPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Constant BC final altitude</span><strong id="constBcFinalAlt">—</strong></div>
+        <div class="metric"><span>Time-varying BC final altitude</span><strong id="varBcFinalAlt">—</strong></div>
+        <div class="metric"><span>Prediction difference</span><strong id="bcPredictionDiff">—</strong></div>
+        <div class="metric"><span>Research link</span><strong>BC sensitivity</strong></div>
+      </div>
+      <div class="callout purple">
+        <strong>Insight:</strong> A small change in drag modeling can shift decay prediction, especially over long propagation windows.
+      </div>
+    </section>
+
+    <section id="part-e" class="interactive-card">
+      <span class="section-title">Part E — Stiff systems in GNC</span>
+      <h2>Fast control + slow orbital drift</h2>
+      <p>
+        Stiffness appears when one simulation contains very fast and very slow dynamics together. A spacecraft simulation may combine
+        fast attitude control transients with slow orbital decay or thermal/environmental changes. ODE45 may need many small steps to resolve the fast part.
+      </p>
+      <div class="equation-box">
+        fast dynamics: control response<br />
+        slow dynamics: orbit/environment drift<br />
+        stiffness appears when both must be resolved together
+      </div>
+
+      <div class="controls">
+        <div class="control-box"><label for="fastTau">Fast time constant [s]</label><input id="fastTau" type="number" value="0.08" min="0.01" max="2" step="0.01" /></div>
+        <div class="control-box"><label for="slowTau">Slow time constant [s]</label><input id="slowTau" type="number" value="80" min="5" max="500" step="5" /></div>
+        <div class="control-box"><label for="couplingStrength">Coupling strength</label><input id="couplingStrength" type="number" value="0.25" min="0" max="2" step="0.05" /></div>
+        <div class="control-box"><label for="solverTol">Adaptive tolerance</label><input id="solverTol" type="number" value="0.00001" min="0.000001" max="0.01" step="0.00001" /></div>
+        <div class="control-box"><label for="stiffTf">Simulation time [s]</label><input id="stiffTf" type="number" value="120" min="20" max="300" step="10" /></div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runStiffDemo()">Run stiffness demonstration</button>
+        <button class="ghost" onclick="setStiffCase('mild')">Mild</button>
+        <button class="ghost" onclick="setStiffCase('stiff')">Very stiff</button>
+      </div>
+
+      <div id="stiffPlot" class="plot-box"></div>
+      <div class="metric-grid">
+        <div class="metric"><span>Accepted steps</span><strong id="stiffSteps">—</strong></div>
+        <div class="metric"><span>Rejected steps</span><strong id="stiffRejected">—</strong></div>
+        <div class="metric"><span>Time-scale ratio</span><strong id="stiffRatio">—</strong></div>
+        <div class="metric"><span>Solver burden</span><strong id="stiffBurden">—</strong></div>
+      </div>
+      <div class="callout warn">
+        <strong>Insight:</strong> Solver selection is part of engineering design. Fast and slow dynamics in one model can change computational cost and reliability.
+      </div>
+    </section>
+
+    <section id="snippets" class="content-card">
+      <span class="section-title">Python / MATLAB snippets</span>
+      <h2>Engineering code patterns</h2>
+      <p>These snippets show how the same ideas translate into real engineering workflows: event functions, two-body propagation, and drag with ballistic coefficient.</p>
+
+      <div class="code-tabs">
+        <button class="tab-btn active" onclick="showCodeTab('matlabEvents', this)">MATLAB Events</button>
+        <button class="tab-btn" onclick="showCodeTab('pythonOrbit', this)">Python Orbit</button>
+        <button class="tab-btn" onclick="showCodeTab('dragBcCode', this)">Drag + BC</button>
+      </div>
+
+      <div id="matlabEvents">
+<pre><code>% MATLAB ODE45 with event detection for a distance threshold
+x0 = [120; -2];             % [relative position; relative velocity]
+threshold = 50;             % switch from APPROACH to RENDEZVOUS
+Kp = 0.04; Kd = 0.5;
+
+f = @(t,x) [x(2); -Kp*x(1) - Kd*x(2)];
+opts = odeset('Events', @(t,x) distanceEvent(t,x,threshold));
+
+[t,x,te,xe,ie] = ode45(f, [0 200], x0, opts);
+
+function [value,isterminal,direction] = distanceEvent(t,x,threshold)
+    value = abs(x(1)) - threshold;  % event when distance crosses threshold
+    isterminal = 1;                 % stop integration so mode can switch
+    direction = -1;                 % detect decreasing distance only
+end</code></pre>
+      </div>
+
+      <div id="pythonOrbit" class="hidden">
+<pre><code># Python two-body propagation using solve_ivp / RK45
+import numpy as np
+from scipy.integrate import solve_ivp
+
+mu = 398600.4418  # km^3/s^2
+
+def two_body(t, y):
+    r = y[:2]
+    v = y[2:]
+    rn = np.linalg.norm(r)
+    a = -mu * r / rn**3
+    return [v[0], v[1], a[0], a[1]]
+
+r0 = np.array([6778.0, 0.0])
+v0 = np.array([0.0, np.sqrt(mu / np.linalg.norm(r0))])
+y0 = np.r_[r0, v0]
+
+sol = solve_ivp(two_body, [0, 3*5400], y0, rtol=1e-9, atol=1e-9)
+
+r = sol.y[:2].T
+v = sol.y[2:].T
+energy = 0.5*np.sum(v*v, axis=1) - mu/np.linalg.norm(r, axis=1)</code></pre>
+      </div>
+
+      <div id="dragBcCode" class="hidden">
+<pre><code># Simplified drag acceleration using ballistic coefficient
+# BC = m / (Cd*A), so drag acceleration magnitude is 0.5*rho*v^2/BC
+
+def bc_time_varying(t, BC0, amp, period):
+    return BC0 * (1 + amp*np.sin(2*np.pi*t/period))
+
+def drag_accel(v, rho, BC):
+    vmag = np.linalg.norm(v)
+    return -0.5 * rho * vmag * v / BC</code></pre>
+      </div>
+    </section>
+
+    <section id="takeaway" class="content-card">
+      <span class="section-title">Engineering takeaway</span>
+      <h2>Simulation is more than integration</h2>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>1 · Relative control</strong><br />Integrator choice can change overshoot, convergence, and apparent stability.</div>
+        <div class="mini-card"><strong>2 · Events</strong><br />GNC systems are hybrid: continuous dynamics plus discrete mode logic.</div>
+        <div class="mini-card"><strong>3 · Orbits</strong><br />Poor numerical methods can create energy drift and false mission prediction.</div>
+        <div class="mini-card"><strong>4 · Drag + BC</strong><br />Environmental modeling and BC assumptions directly affect decay estimates.</div>
+        <div class="mini-card"><strong>5 · Stiffness</strong><br />Fast control and slow orbital dynamics can make solver selection part of design.</div>
+        <div class="mini-card"><strong>Final thought</strong><br />A good GNC simulation checks the model, events, environment, and solver together.</div>
+      </div>
+      <div class="callout good">
+        <strong>Final insight:</strong> A good simulation does not only ask “what equation should I integrate?” It also asks “when does the system change mode, how does the environment enter, and can the solver resolve the physics?”
+      </div>
+    </section>
+  </main>
+
+  <div class="back-link-row">
+    <a href="problems.html" class="back-link-pill">← Back to Problem Bank</a>
+  </div>
+
+  <footer>
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br />
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    function rk4Step(f, t, y, h) {
+      const k1 = f(t, y);
+      const k2 = f(t + h/2, y.map((v,i) => v + h*k1[i]/2));
+      const k3 = f(t + h/2, y.map((v,i) => v + h*k2[i]/2));
+      const k4 = f(t + h, y.map((v,i) => v + h*k3[i]));
+      return y.map((v,i) => v + h*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6);
+    }
+
+    function integrateAdaptive(f, y0, t0, tf, h0=0.05, tol=1e-5) {
+      let t = t0, y = y0.slice(), h = h0;
+      const ts = [t], ys = [y.slice()];
+      let steps = 0, rejected = 0;
+      const maxSteps = 120000;
+      while (t < tf && steps < maxSteps) {
+        if (t + h > tf) h = tf - t;
+        const yBig = rk4Step(f, t, y, h);
+        const yHalf = rk4Step(f, t, y, h/2);
+        const ySmall = rk4Step(f, t + h/2, yHalf, h/2);
+        const err = Math.max(...ySmall.map((v,i) => Math.abs(v - yBig[i])));
+        if (err < tol || h < 1e-7) {
+          t += h; y = ySmall;
+          ts.push(t); ys.push(y.slice()); steps++;
+          const scale = err === 0 ? 1.7 : Math.min(1.7, Math.max(0.35, 0.9*Math.pow(tol/err, 0.2)));
+          h *= scale;
+        } else { h *= 0.5; rejected++; }
+      }
+      return {t: ts, y: ys, steps, rejected};
+    }
+
+    function integrateEuler(f, y0, t0, tf, h) {
+      let t = t0, y = y0.slice();
+      const ts = [t], ys = [y.slice()];
+      while (t < tf - 1e-12) {
+        const dt = Math.min(h, tf - t);
+        const dy = f(t, y);
+        y = y.map((v,i) => v + dt*dy[i]);
+        t += dt;
+        ts.push(t); ys.push(y.slice());
+        if (Math.max(...y.map(v => Math.abs(v))) > 1e9) break;
+      }
+      return {t: ts, y: ys};
+    }
+
+    function fmt(x, d=3) { return Number.isFinite(x) ? Number(x).toFixed(d) : "—"; }
+
+    function plotLayout(title, xTitle, yTitle) {
+      return {
+        title: { text: title, font: { family: 'Times New Roman, Georgia, serif', size: 21 } },
+        margin: { l: 60, r: 25, t: 60, b: 55 },
+        xaxis: { title: xTitle, gridcolor: '#e5e7eb' },
+        yaxis: { title: yTitle, gridcolor: '#e5e7eb' },
+        paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff',
+        legend: { orientation: 'h', y: -0.22 }
+      };
+    }
+
+    function runChaserDemo() {
+      const x0 = parseFloat(document.getElementById('chaserX0').value);
+      const v0 = parseFloat(document.getElementById('chaserV0').value);
+      const Kp = parseFloat(document.getElementById('chaserKp').value);
+      const Kd = parseFloat(document.getElementById('chaserKd').value);
+      const dt = parseFloat(document.getElementById('chaserDt').value);
+      const tf = parseFloat(document.getElementById('chaserTf').value);
+      const f = (t, y) => [y[1], -Kp*y[0] - Kd*y[1]];
+      const eul = integrateEuler(f, [x0, v0], 0, tf, dt);
+      const ode = integrateAdaptive(f, [x0, v0], 0, tf, 0.08, 1e-5);
+      const eulX = eul.y.map(v => v[0]);
+      const odeX = ode.y.map(v => v[0]);
+      const interpMismatch = eulX.map((x, i) => {
+        const targetT = eul.t[i];
+        let j = 0;
+        while (j < ode.t.length-1 && ode.t[j] < targetT) j++;
+        return Math.abs(x - ode.y[j][0]);
+      });
+      const maxMismatch = Math.max(...interpMismatch);
+      document.getElementById('chaserEulerErr').textContent = fmt(Math.abs(eulX[eulX.length-1]), 2) + ' m';
+      document.getElementById('chaserOdeErr').textContent = fmt(Math.abs(odeX[odeX.length-1]), 2) + ' m';
+      document.getElementById('chaserMismatch').textContent = fmt(maxMismatch, 2) + ' m';
+      document.getElementById('chaserInterp').textContent = maxMismatch > 20 ? 'Sensitive' : 'Consistent';
+
+      Plotly.newPlot('chaserPlot', [
+        {x: eul.t, y: eulX, mode: 'lines', name: `Euler x(t), dt=${dt}`, line: {width: 2, dash: 'dot'}},
+        {x: ode.t, y: odeX, mode: 'lines', name: 'ODE45-style x(t)', line: {width: 3}},
+        {x: ode.t, y: ode.y.map(v => v[1]), mode: 'lines', name: 'ODE45-style v(t)', yaxis: 'y2', line: {width: 2, dash: 'dash'}}
+      ], {
+        ...plotLayout('Chaser-target convergence', 'Time [s]', 'Relative position x [m]'),
+        yaxis2: { title: 'Relative velocity [m/s]', overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)' }
+      }, {responsive: true, displaylogo: false});
+    }
+
+    function setChaserCase(type) {
+      if (type === 'smooth') {
+        document.getElementById('chaserKp').value = 0.12;
+        document.getElementById('chaserKd').value = 0.75;
+        document.getElementById('chaserDt').value = 0.12;
+      } else {
+        document.getElementById('chaserKp').value = 0.35;
+        document.getElementById('chaserKd').value = 0.35;
+        document.getElementById('chaserDt').value = 0.9;
+      }
+      runChaserDemo();
+    }
+
+    function runEventDemo() {
+      const x0 = parseFloat(document.getElementById('eventX0').value);
+      const approachTh = parseFloat(document.getElementById('approachThreshold').value);
+      const dockTh = parseFloat(document.getElementById('dockThreshold').value);
+      const gA = parseFloat(document.getElementById('approachGain').value);
+      const gR = parseFloat(document.getElementById('rendezvousGain').value);
+      const gD = parseFloat(document.getElementById('dockGain').value);
+      const dt = 0.08, tf = 180;
+      let t = [0], x = [x0], v = [-1.0], mode = [1];
+      let tApproach = null, tDock = null;
+      for (let i=1; i<=tf/dt; i++) {
+        const d = Math.abs(x[i-1]);
+        let kp, kd, m;
+        if (d > approachTh) { kp = gA; kd = 0.55; m = 1; }
+        else if (d > dockTh) { kp = gR; kd = 0.9; m = 2; if (tApproach === null) tApproach = t[i-1]; }
+        else { kp = gD; kd = 1.4; m = 3; if (tDock === null) tDock = t[i-1]; }
+        const a = -kp*x[i-1] - kd*v[i-1];
+        v[i] = v[i-1] + a*dt;
+        x[i] = x[i-1] + v[i]*dt;
+        if (Math.abs(x[i]) < 0.25 && Math.abs(v[i]) < 0.08) { v[i] = 0; x[i] = 0; }
+        t[i] = i*dt; mode[i] = m;
+      }
+      const distance = x.map(Math.abs);
+      document.getElementById('approachEventTime').textContent = tApproach === null ? 'not reached' : fmt(tApproach, 1) + ' s';
+      document.getElementById('dockEventTime').textContent = tDock === null ? 'not reached' : fmt(tDock, 1) + ' s';
+      document.getElementById('finalMode').textContent = mode[mode.length-1] === 3 ? 'DOCK' : mode[mode.length-1] === 2 ? 'RENDEZVOUS' : 'APPROACH';
+      document.getElementById('eventFinalDistance').textContent = fmt(distance[distance.length-1], 2) + ' m';
+
+      const shapes = [];
+      if (tApproach !== null) shapes.push({type:'line', x0:tApproach, x1:tApproach, y0:0, y1:1, yref:'paper', line:{dash:'dash', width:2}});
+      if (tDock !== null) shapes.push({type:'line', x0:tDock, x1:tDock, y0:0, y1:1, yref:'paper', line:{dash:'dot', width:2}});
+
+      Plotly.newPlot('eventPlot', [
+        {x: t, y: distance, mode: 'lines', name: 'Distance', line: {width: 3}},
+        {x: [0, tf], y: [approachTh, approachTh], mode: 'lines', name: 'Approach threshold', line: {dash: 'dash'}},
+        {x: [0, tf], y: [dockTh, dockTh], mode: 'lines', name: 'Dock threshold', line: {dash: 'dot'}}
+      ], {...plotLayout('Event detection: threshold crossings', 'Time [s]', 'Distance [m]'), shapes}, {responsive: true, displaylogo: false});
+
+      Plotly.newPlot('modePlot', [{x: t, y: mode, mode: 'lines', line: {shape: 'hv', width: 3}, name: 'Mode'}], {
+        ...plotLayout('Mode timeline', 'Time [s]', 'Mode'),
+        yaxis: {title: 'Mode', tickvals: [1,2,3], ticktext: ['APPROACH','RENDEZVOUS','DOCK'], range: [0.7,3.3], automargin: true}
+      }, {responsive: true, displaylogo: false});
+    }
+
+    function setEventCase(type) {
+      if (type === 'gentle') {
+        document.getElementById('approachGain').value = 0.035;
+        document.getElementById('rendezvousGain').value = 0.08;
+        document.getElementById('dockGain').value = 0.16;
+      } else {
+        document.getElementById('approachGain').value = 0.07;
+        document.getElementById('rendezvousGain').value = 0.16;
+        document.getElementById('dockGain').value = 0.32;
+      }
+      runEventDemo();
+    }
+
+    function runOrbitEnergyDemo() {
+      const mu = 398600.4418, Re = 6378.137;
+      const alt = parseFloat(document.getElementById('orbitAlt').value);
+      const dt = parseFloat(document.getElementById('orbitDt').value);
+      const periods = parseFloat(document.getElementById('orbitPeriods').value);
+      const r0 = Re + alt;
+      const v0 = Math.sqrt(mu/r0);
+      const T = 2*Math.PI*Math.sqrt(Math.pow(r0,3)/mu);
+      const tf = periods*T;
+      const f = (t,y) => {
+        const rx = y[0], ry = y[1], vx = y[2], vy = y[3];
+        const r = Math.sqrt(rx*rx + ry*ry);
+        return [vx, vy, -mu*rx/Math.pow(r,3), -mu*ry/Math.pow(r,3)];
+      };
+      const eul = integrateEuler(f, [r0,0,0,v0], 0, tf, dt);
+      const ode = integrateAdaptive(f, [r0,0,0,v0], 0, tf, 30, 1e-4);
+      const energy = y => {
+        const r = Math.sqrt(y[0]*y[0] + y[1]*y[1]);
+        const v2 = y[2]*y[2] + y[3]*y[3];
+        return 0.5*v2 - mu/r;
+      };
+      const eE = eul.y.map(energy), oE = ode.y.map(energy);
+      const eDrift = 100*(eE[eE.length-1]-eE[0])/Math.abs(eE[0]);
+      const oDrift = 100*(oE[oE.length-1]-oE[0])/Math.abs(oE[0]);
+      const eRadErr = Math.sqrt(eul.y[eul.y.length-1][0]**2 + eul.y[eul.y.length-1][1]**2) - r0;
+      document.getElementById('eulerEnergyDrift').textContent = fmt(eDrift, 3) + ' %';
+      document.getElementById('odeEnergyDrift').textContent = fmt(oDrift, 5) + ' %';
+      document.getElementById('eulerRadiusError').textContent = fmt(eRadErr, 2) + ' km';
+
+      Plotly.newPlot('orbitPathPlot', [
+        {x: eul.y.map(y=>y[0]), y: eul.y.map(y=>y[1]), mode:'lines', name:'Euler orbit', line:{width:2, dash:'dot'}},
+        {x: ode.y.map(y=>y[0]), y: ode.y.map(y=>y[1]), mode:'lines', name:'ODE45-style orbit', line:{width:3}},
+        {x:[0], y:[0], mode:'markers', name:'Earth center', marker:{size:10}}
+      ], {...plotLayout('Orbit path comparison', 'x [km]', 'y [km]'), yaxis: {scaleanchor:'x', scaleratio:1, title:'y [km]'}}, {responsive:true, displaylogo:false});
+
+      Plotly.newPlot('energyPlot', [
+        {x: eul.t.map(t=>t/3600), y: eE.map(e=>100*(e-eE[0])/Math.abs(eE[0])), mode:'lines', name:'Euler energy drift [%]', line:{width:2, dash:'dot'}},
+        {x: ode.t.map(t=>t/3600), y: oE.map(e=>100*(e-oE[0])/Math.abs(oE[0])), mode:'lines', name:'ODE45-style energy drift [%]', line:{width:3}}
+      ], plotLayout('Specific mechanical energy drift', 'Time [hours]', 'Energy drift [%]'), {responsive:true, displaylogo:false});
+    }
+
+    function setOrbitCase(type) {
+      document.getElementById('orbitDt').value = type === 'good' ? 10 : 120;
+      runOrbitEnergyDemo();
+    }
+
+    function runDragBcDemo() {
+      const Re = 6378.137, mu = 398600.4418;
+      const alt0 = parseFloat(document.getElementById('dragAlt').value);
+      const BC0 = parseFloat(document.getElementById('bcConst').value);
+      const amp = parseFloat(document.getElementById('bcAmp').value)/100;
+      const densityScale = parseFloat(document.getElementById('densityScale').value);
+      const days = parseFloat(document.getElementById('dragDays').value);
+      const bcPeriod = parseFloat(document.getElementById('bcPeriod').value);
+      const dt = 180;
+      const steps = Math.floor(days*86400/dt);
+      const tDays = [], altConst = [], altVar = [], bcVar = [];
+      let hC = alt0, hV = alt0;
+      for (let i=0; i<=steps; i++) {
+        const t = i*dt;
+        const day = t/86400;
+        const rhoC = densityScale * 4e-11 * Math.exp(-(hC-250)/45);
+        const rhoV = densityScale * 4e-11 * Math.exp(-(hV-250)/45);
+        const vC = Math.sqrt(mu/(Re+hC))*1000;
+        const vV = Math.sqrt(mu/(Re+hV))*1000;
+        const BCt = BC0 * (1 + amp*Math.sin(2*Math.PI*day/bcPeriod));
+        const decayC = 0.5*rhoC*vC*vC/BC0 * 86400 * 0.012;
+        const decayV = 0.5*rhoV*vV*vV/BCt * 86400 * 0.012;
+        tDays.push(day); altConst.push(hC); altVar.push(hV); bcVar.push(BCt);
+        hC = Math.max(120, hC - decayC*dt/86400);
+        hV = Math.max(120, hV - decayV*dt/86400);
+      }
+      const finalC = altConst[altConst.length-1], finalV = altVar[altVar.length-1];
+      document.getElementById('constBcFinalAlt').textContent = fmt(finalC, 2) + ' km';
+      document.getElementById('varBcFinalAlt').textContent = fmt(finalV, 2) + ' km';
+      document.getElementById('bcPredictionDiff').textContent = fmt(Math.abs(finalC-finalV), 2) + ' km';
+
+      Plotly.newPlot('dragPlot', [
+        {x:tDays, y:altConst, mode:'lines', name:'Constant BC', line:{width:3}},
+        {x:tDays, y:altVar, mode:'lines', name:'Time-varying BC', line:{width:3, dash:'dash'}}
+      ], plotLayout('Orbit decay prediction: constant vs time-varying BC', 'Time [days]', 'Altitude [km]'), {responsive:true, displaylogo:false});
+
+      Plotly.newPlot('bcPlot', [
+        {x:tDays, y:bcVar, mode:'lines', name:'Time-varying BC', line:{width:3}},
+        {x:tDays, y:tDays.map(()=>BC0), mode:'lines', name:'Constant BC', line:{width:2, dash:'dot'}}
+      ], plotLayout('Ballistic coefficient profile', 'Time [days]', 'BC [kg/m²]'), {responsive:true, displaylogo:false});
+    }
+
+    function setDragCase(type) {
+      if (type === 'low') {
+        document.getElementById('dragAlt').value = 320;
+        document.getElementById('bcConst').value = 120;
+        document.getElementById('densityScale').value = 0.7;
+      } else {
+        document.getElementById('dragAlt').value = 230;
+        document.getElementById('bcConst').value = 55;
+        document.getElementById('densityScale').value = 2.2;
+      }
+      runDragBcDemo();
+    }
+
+    function runStiffDemo() {
+      const fastTau = parseFloat(document.getElementById('fastTau').value);
+      const slowTau = parseFloat(document.getElementById('slowTau').value);
+      const coupling = parseFloat(document.getElementById('couplingStrength').value);
+      const tol = parseFloat(document.getElementById('solverTol').value);
+      const tf = parseFloat(document.getElementById('stiffTf').value);
+      const f = (t,y) => {
+        const fast = y[0], slow = y[1];
+        return [-(fast - Math.sin(0.15*t))/fastTau + coupling*slow, -slow/slowTau + 0.02*fast];
+      };
+      const sol = integrateAdaptive(f, [1, 1], 0, tf, 0.1, tol);
+      const ratio = slowTau/fastTau;
+      document.getElementById('stiffSteps').textContent = sol.steps;
+      document.getElementById('stiffRejected').textContent = sol.rejected;
+      document.getElementById('stiffRatio').textContent = fmt(ratio, 0) + ':1';
+      document.getElementById('stiffBurden').textContent = sol.steps > 3500 || sol.rejected > 800 ? 'High' : sol.steps > 1200 ? 'Medium' : 'Low';
+      Plotly.newPlot('stiffPlot', [
+        {x:sol.t, y:sol.y.map(v=>v[0]), mode:'lines', name:'Fast control state', line:{width:2}},
+        {x:sol.t, y:sol.y.map(v=>v[1]), mode:'lines', name:'Slow drift state', line:{width:3}}
+      ], plotLayout('Fast and slow dynamics in one simulation', 'Time [s]', 'State value'), {responsive:true, displaylogo:false});
+    }
+
+    function setStiffCase(type) {
+      if (type === 'mild') {
+        document.getElementById('fastTau').value = 0.8;
+        document.getElementById('slowTau').value = 40;
+        document.getElementById('solverTol').value = 0.0001;
+      } else {
+        document.getElementById('fastTau').value = 0.03;
+        document.getElementById('slowTau').value = 150;
+        document.getElementById('solverTol').value = 0.000001;
+      }
+      runStiffDemo();
+    }
+
+    function showCodeTab(id, btn) {
+      ['matlabEvents','pythonOrbit','dragBcCode'].forEach(x => document.getElementById(x).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    window.addEventListener('load', () => {
+      runChaserDemo();
+      runEventDemo();
+      runOrbitEnergyDemo();
+      runDragBcDemo();
+      runStiffDemo();
+    });
+  </script>
+</body>
+</html>
