@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HCW Relative Motion Visualizer | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{display:grid; gap:22px;}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,.card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{margin:10px 0 0 22px; padding:0;}
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{display:flex; gap:12px; margin:4px 0 18px; flex-wrap:wrap;}
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .split-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .split-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+    .field{margin-bottom:16px;}
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{font-size:0.94rem; color:#6b7280; margin-top:6px;}
+
+    .button-row{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
+
+    .cta,.ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{color:#fff; background:linear-gradient(135deg,var(--accent-2),var(--accent)); flex:1 1 240px; box-shadow:0 12px 24px rgba(37,99,235,0.18);}
+    .ghost{color:#1f2937; background:#e5e7eb; flex:1 1 160px;}
+
+    .results-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;}
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{margin:0 0 8px; font-size:0.98rem; color:#475569; line-height:1.35;}
+    .result-box .value{font-size:1.08rem; font-weight:800; color:#111827; line-height:1.35; word-break:break-word;}
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{border-left-color:var(--warn-line); background:var(--warn);}
+    .callout h3{margin-top:0; margin-bottom:8px; font-size:1.15rem;}
+    .callout p{margin:0;}
+
+    .plot-card{background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:16px;}
+    .plot-title{font-weight:800; font-size:1.08rem; margin:0 0 10px; color:#111827;}
+    .plot-box{width:100%; min-height:430px; border:1px solid #e2e8f0; border-radius:18px; overflow:hidden; background:#fff;}
+    .plot-box.short{min-height:320px;}
+
+    .back-link-row{margin-top:40px; text-align:left;}
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{text-align:center; padding:1.5rem 0; font-size:0.95rem; color:#4b5563; line-height:1.6;}
+
+    @media (max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media (max-width:760px){
+      .page-wrap{width:min(100% - 24px, 1380px);}
+      .tool-hero{padding:24px 20px 28px; border-radius:24px;}
+      .card{padding:22px 18px 24px;}
+      .split-2,.split-3,.results-grid{grid-template-columns:1fr;}
+      .plot-box{min-height:350px;}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 10 · Rendezvous &amp; Relative Motion</div>
+      <h1>HCW Relative Motion Visualizer</h1>
+      <p>
+        Visualize chaser motion around a target spacecraft in the LVLH frame using the Hill–Clohessy–Wiltshire equations.
+        Explore natural relative ellipses, along-track drift, radial motion, cross-track oscillation, and why timing matters in rendezvous design.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            The HCW equations describe the linearized relative motion of a chaser spacecraft near a target in a circular reference orbit.
+            This is one of the most important first models for rendezvous, proximity operations, formation flying, and inspection missions.
+          </p>
+          <ul>
+            <li>Relative position in the LVLH frame</li>
+            <li>Radial, along-track, and cross-track motion</li>
+            <li>Natural elliptical relative trajectories</li>
+            <li>Along-track drift caused by initial radial offset or velocity mismatch</li>
+            <li>Range and closest approach over the simulation window</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>LVLH frame convention</h2>
+          <p>
+            This page uses a standard local orbital frame around the target spacecraft:
+          </p>
+          <ul>
+            <li><strong>x:</strong> radial direction, outward from Earth</li>
+            <li><strong>y:</strong> along-track direction, approximately direction of orbital motion</li>
+            <li><strong>z:</strong> cross-track direction, normal to the orbital plane</li>
+          </ul>
+          <div class="formula-box">
+            \[
+              \mathbf\rho = [x,\ y,\ z]^T
+            \]
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>HCW equations</h2>
+          <p>
+            For a target in a circular orbit with mean motion \(n\), the linearized relative dynamics are:
+          </p>
+          <div class="formula-box">
+            \[
+              \ddot{x} - 2n\dot{y} - 3n^2x = 0
+            \]
+            \[
+              \ddot{y} + 2n\dot{x} = 0
+            \]
+            \[
+              \ddot{z} + n^2z = 0
+            \]
+          </div>
+          <p>
+            These equations show why relative motion is not simply straight-line motion. The rotating frame creates coupling between radial and along-track motion.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Engineering insight</h2>
+          <ul>
+            <li>A pure radial offset can create along-track drift.</li>
+            <li>Cross-track motion behaves like a simple harmonic oscillation.</li>
+            <li>Some initial conditions form closed relative ellipses.</li>
+            <li>Small velocity errors can grow into large along-track separation.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Important limitation</h3>
+            <p>
+              HCW is a linear model. It is most useful for small relative distances near a circular target orbit. It does not include J2, drag, eccentric target motion, finite burns, or navigation uncertainty.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive HCW visualizer</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="orbit">Target Orbit</button>
+            <button type="button" class="tab-btn" data-mode="state">Initial Relative State</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-orbit" class="mode-panel active">
+            <div class="split-2">
+              <div class="field">
+                <label for="altitudeInput">Target circular altitude (km)</label>
+                <input id="altitudeInput" type="number" value="400" step="10">
+              </div>
+              <div class="field">
+                <label for="durationInput">Simulation duration (orbits)</label>
+                <input id="durationInput" type="number" value="2" step="0.25" min="0.1">
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="muInput">μ (km³/s²)</label>
+                <input id="muInput" type="number" value="398600.4418" step="any">
+              </div>
+              <div class="field">
+                <label for="radiusInput">Earth radius (km)</label>
+                <input id="radiusInput" type="number" value="6378.137" step="any">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="samplesInput">Plot samples</label>
+              <input id="samplesInput" type="number" value="500" step="50" min="100">
+            </div>
+          </div>
+
+          <div id="mode-state" class="mode-panel">
+            <h3>Initial relative position (m)</h3>
+            <div class="split-3">
+              <div class="field"><label for="x0Input">x₀ radial</label><input id="x0Input" type="number" value="100" step="10"></div>
+              <div class="field"><label for="y0Input">y₀ along-track</label><input id="y0Input" type="number" value="0" step="10"></div>
+              <div class="field"><label for="z0Input">z₀ cross-track</label><input id="z0Input" type="number" value="0" step="10"></div>
+            </div>
+
+            <h3>Initial relative velocity (m/s)</h3>
+            <div class="split-3">
+              <div class="field"><label for="xd0Input">ẋ₀</label><input id="xd0Input" type="number" value="0" step="0.01"></div>
+              <div class="field"><label for="yd0Input">ẏ₀</label><input id="yd0Input" type="number" value="-0.11" step="0.01"></div>
+              <div class="field"><label for="zd0Input">ż₀</label><input id="zd0Input" type="number" value="0" step="0.01"></div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Relative motion preset</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="closedEllipse">Closed relative ellipse</option>
+                <option value="radialDrift">Radial offset with drift</option>
+                <option value="alongTrackDrift">Along-track drift</option>
+                <option value="crossTrack">Cross-track oscillation</option>
+                <option value="approach">Gentle approach example</option>
+              </select>
+              <div class="hint">Presets are designed to show common rendezvous behaviours.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="runBtn">Simulate Relative Motion</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Target orbital period</h4><div class="value" id="periodOut">—</div></div>
+            <div class="result-box"><h4>Mean motion n</h4><div class="value" id="nOut">—</div></div>
+            <div class="result-box"><h4>Initial range</h4><div class="value" id="range0Out">—</div></div>
+            <div class="result-box"><h4>Closest range</h4><div class="value" id="minRangeOut">—</div></div>
+            <div class="result-box"><h4>Final relative position</h4><div class="value" id="finalPosOut">—</div></div>
+            <div class="result-box"><h4>Drift indicator</h4><div class="value" id="driftOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the simulation to visualize the relative trajectory in LVLH coordinates.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">3D relative trajectory in LVLH frame</div>
+            <div id="traj3D" class="plot-box"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">In-plane relative motion: radial x vs along-track y</div>
+            <div id="xyPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Relative position history</div>
+            <div id="historyPlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This tool assumes:</h3>
+            <ul>
+              <li>Circular target orbit</li>
+              <li>Small relative distance compared with orbital radius</li>
+              <li>Linear HCW dynamics</li>
+              <li>No burns during propagation</li>
+              <li>No perturbations, drag, navigation errors, or collision constraints</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const defaults = {
+      altitudeInput:400,
+      durationInput:2,
+      muInput:398600.4418,
+      radiusInput:6378.137,
+      samplesInput:500,
+      x0Input:100,
+      y0Input:0,
+      z0Input:0,
+      xd0Input:0,
+      yd0Input:-0.11,
+      zd0Input:0,
+      presetSelect:"custom"
+    };
+
+    const presets = {
+      closedEllipse:{x0:100, y0:0, z0:0, xd0:0, yd0:-0.22, zd0:0, duration:2},
+      radialDrift:{x0:100, y0:0, z0:0, xd0:0, yd0:0, zd0:0, duration:2},
+      alongTrackDrift:{x0:0, y0:-500, z0:0, xd0:0, yd0:0.08, zd0:0, duration:2},
+      crossTrack:{x0:0, y0:0, z0:300, xd0:0, yd0:0, zd0:0, duration:2},
+      approach:{x0:-300, y0:1200, z0:0, xd0:0.03, yd0:-0.18, zd0:0, duration:1.5}
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.x0Input.value = p.x0;
+      el.y0Input.value = p.y0;
+      el.z0Input.value = p.z0;
+      el.xd0Input.value = p.xd0;
+      el.yd0Input.value = p.yd0;
+      el.zd0Input.value = p.zd0;
+      el.durationInput.value = p.duration;
+      runSimulation();
+    });
+
+    document.getElementById("runBtn").addEventListener("click", runSimulation);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([key,value]) => el[key].value = value);
+      runSimulation();
+    });
+
+    function getInputs(){
+      return {
+        h:parseFloat(el.altitudeInput.value),
+        durationOrbits:parseFloat(el.durationInput.value),
+        mu:parseFloat(el.muInput.value),
+        R:parseFloat(el.radiusInput.value),
+        samples:Math.round(parseFloat(el.samplesInput.value)),
+        x0:parseFloat(el.x0Input.value),
+        y0:parseFloat(el.y0Input.value),
+        z0:parseFloat(el.z0Input.value),
+        xd0:parseFloat(el.xd0Input.value),
+        yd0:parseFloat(el.yd0Input.value),
+        zd0:parseFloat(el.zd0Input.value)
+      };
+    }
+
+    function validate(p){
+      if (![p.h,p.durationOrbits,p.mu,p.R,p.samples,p.x0,p.y0,p.z0,p.xd0,p.yd0,p.zd0].every(Number.isFinite)) return "Please enter valid numeric inputs.";
+      if (p.h < 0 || p.mu <= 0 || p.R <= 0) return "Altitude must be non-negative, and μ/body radius must be positive.";
+      if (p.durationOrbits <= 0) return "Simulation duration must be positive.";
+      if (p.samples < 100 || p.samples > 5000) return "Plot samples should be between 100 and 5000.";
+      return null;
+    }
+
+    function showError(msg){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Input error</h3><p>${msg}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function hcwState(t,n,s){
+      const nt = n*t;
+      const c = Math.cos(nt);
+      const ss = Math.sin(nt);
+      const {x0,y0,z0,xd0,yd0,zd0} = s;
+
+      const x = (4 - 3*c)*x0 + (ss/n)*xd0 + (2/n)*(1-c)*yd0;
+      const y = 6*(ss - nt)*x0 + y0 - (2/n)*(1-c)*xd0 + (1/n)*(4*ss - 3*nt)*yd0;
+      const z = z0*c + (zd0/n)*ss;
+
+      const xd = 3*n*ss*x0 + c*xd0 + 2*ss*yd0;
+      const yd = 6*n*(c - 1)*x0 - 2*ss*xd0 + (4*c - 3)*yd0;
+      const zd = -n*z0*ss + zd0*c;
+
+      return {x,y,z,xd,yd,zd};
+    }
+
+    function simulate(p){
+      const rTarget = p.R + p.h;
+      const n = Math.sqrt(p.mu / Math.pow(rTarget,3));
+      const T = 2*Math.PI/n;
+      const tFinal = p.durationOrbits * T;
+      const t=[], x=[], y=[], z=[], range=[];
+      const state0 = {x0:p.x0,y0:p.y0,z0:p.z0,xd0:p.xd0,yd0:p.yd0,zd0:p.zd0};
+
+      for (let k=0; k<p.samples; k++){
+        const time = tFinal * k / (p.samples-1);
+        const st = hcwState(time,n,state0);
+        t.push(time/60);
+        x.push(st.x);
+        y.push(st.y);
+        z.push(st.z);
+        range.push(Math.sqrt(st.x*st.x + st.y*st.y + st.z*st.z));
+      }
+      return {n,T,t,x,y,z,range};
+    }
+
+    function fmt(v,d=3,suffix=""){
+      if (!Number.isFinite(v)) return "—";
+      return v.toFixed(d) + suffix;
+    }
+
+    function updateResults(p,d){
+      const r0 = Math.sqrt(p.x0*p.x0+p.y0*p.y0+p.z0*p.z0);
+      const minRange = Math.min(...d.range);
+      const minIndex = d.range.indexOf(minRange);
+      const xf = d.x[d.x.length-1], yf = d.y[d.y.length-1], zf = d.z[d.z.length-1];
+      const drift = yf - p.y0;
+
+      document.getElementById("periodOut").textContent = `${fmt(d.T/60,2," min")} (${fmt(d.T/3600,3," hr")})`;
+      document.getElementById("nOut").textContent = fmt(d.n,7," rad/s");
+      document.getElementById("range0Out").textContent = fmt(r0,2," m");
+      document.getElementById("minRangeOut").textContent = `${fmt(minRange,2," m")} at ${fmt(d.t[minIndex],2," min")}`;
+      document.getElementById("finalPosOut").textContent = `[${fmt(xf,1)}, ${fmt(yf,1)}, ${fmt(zf,1)}] m`;
+      document.getElementById("driftOut").textContent = `${fmt(drift,2," m along-track")}`;
+
+      let msg = "The trajectory shows bounded relative motion if the path stays near the target and repeats over the orbit period.";
+      if (Math.abs(drift) > 500) {
+        msg = "The selected initial state creates noticeable along-track drift. This is common when radial offset or velocity mismatch is not balanced by the correct HCW condition.";
+      }
+      if (Math.max(...d.range) > 5000) {
+        msg += " The relative distance becomes large, so the linear HCW approximation should be treated cautiously.";
+      }
+      document.getElementById("interpretText").textContent = msg;
+    }
+
+    function draw3D(d){
+      Plotly.newPlot("traj3D", [
+        {type:"scatter3d", mode:"lines", x:d.x, y:d.y, z:d.z, line:{color:"#2563eb", width:5}, name:"Chaser trajectory"},
+        {type:"scatter3d", mode:"markers+text", x:[0], y:[0], z:[0], text:["Target"], textposition:"top center", marker:{size:6,color:"#f97316"}, name:"Target"},
+        {type:"scatter3d", mode:"markers", x:[d.x[0]], y:[d.y[0]], z:[d.z[0]], marker:{size:5,color:"#7c3aed"}, name:"Start"}
+      ], {
+        margin:{l:0,r:0,t:0,b:0},
+        paper_bgcolor:"#ffffff",
+        scene:{
+          xaxis:{title:"x radial (m)"},
+          yaxis:{title:"y along-track (m)"},
+          zaxis:{title:"z cross-track (m)"},
+          aspectmode:"data"
+        },
+        legend:{orientation:"h", x:0.02, y:0.98}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawXY(d){
+      Plotly.newPlot("xyPlot", [
+        {type:"scatter", mode:"lines", x:d.y, y:d.x, line:{color:"#0f8b8d", width:3}, name:"Relative path"},
+        {type:"scatter", mode:"markers+text", x:[0], y:[0], text:["Target"], textposition:"top center", marker:{size:9,color:"#f97316"}, name:"Target"},
+        {type:"scatter", mode:"markers", x:[d.y[0]], y:[d.x[0]], marker:{size:8,color:"#7c3aed"}, name:"Start"}
+      ], {
+        margin:{l:60,r:20,t:10,b:55},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"Along-track y (m)", gridcolor:"#e5e7eb", zeroline:true},
+        yaxis:{title:"Radial x (m)", gridcolor:"#e5e7eb", zeroline:true, scaleanchor:"x"},
+        legend:{orientation:"h", x:0.02, y:1.12}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawHistory(d){
+      Plotly.newPlot("historyPlot", [
+        {type:"scatter", mode:"lines", x:d.t, y:d.x, line:{color:"#2563eb", width:3}, name:"x radial"},
+        {type:"scatter", mode:"lines", x:d.t, y:d.y, line:{color:"#f97316", width:3}, name:"y along-track"},
+        {type:"scatter", mode:"lines", x:d.t, y:d.z, line:{color:"#7c3aed", width:3}, name:"z cross-track"}
+      ], {
+        margin:{l:60,r:20,t:10,b:55},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"Time (min)", gridcolor:"#e5e7eb"},
+        yaxis:{title:"Relative position (m)", gridcolor:"#e5e7eb", zeroline:true},
+        legend:{orientation:"h", x:0.02, y:1.12}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function runSimulation(){
+      clearError();
+      const p = getInputs();
+      const err = validate(p);
+      if (err){ showError(err); return; }
+      const d = simulate(p);
+      updateResults(p,d);
+      draw3D(d);
+      drawXY(d);
+      drawHistory(d);
+    }
+
+    runSimulation();
+  </script>
+</body>
+</html>
