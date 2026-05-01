@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lambert Solver | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{display:grid; gap:22px;}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,.card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{margin:10px 0 0 22px; padding:0;}
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{display:flex; gap:12px; margin:4px 0 18px; flex-wrap:wrap;}
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .split-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .split-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+    .field{margin-bottom:16px;}
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{font-size:0.94rem; color:#6b7280; margin-top:6px;}
+
+    .button-row{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
+
+    .cta,.ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{color:#fff; background:linear-gradient(135deg,var(--accent-2),var(--accent)); flex:1 1 240px; box-shadow:0 12px 24px rgba(37,99,235,0.18);}
+    .ghost{color:#1f2937; background:#e5e7eb; flex:1 1 160px;}
+
+    .results-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;}
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{margin:0 0 8px; font-size:0.98rem; color:#475569; line-height:1.35;}
+    .result-box .value{font-size:1.04rem; font-weight:800; color:#111827; line-height:1.35; word-break:break-word;}
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{border-left-color:var(--warn-line); background:var(--warn);}
+    .callout h3{margin-top:0; margin-bottom:8px; font-size:1.15rem;}
+    .callout p{margin:0;}
+
+    .plot-card{background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:16px;}
+    .plot-title{font-weight:800; font-size:1.08rem; margin:0 0 10px; color:#111827;}
+    .plot-box{width:100%; min-height:440px; border:1px solid #e2e8f0; border-radius:18px; overflow:hidden; background:#fff;}
+
+    .back-link-row{margin-top:40px; text-align:left;}
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{text-align:center; padding:1.5rem 0; font-size:0.95rem; color:#4b5563; line-height:1.6;}
+
+    @media (max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media (max-width:760px){
+      .page-wrap{width:min(100% - 24px, 1380px);}
+      .tool-hero{padding:24px 20px 28px; border-radius:24px;}
+      .card{padding:22px 18px 24px;}
+      .split-2,.split-3,.results-grid{grid-template-columns:1fr;}
+      .plot-box{min-height:360px;}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 7 · Maneuver &amp; Mission Design</div>
+      <h1>Lambert Solver</h1>
+      <p>
+        Solve the two-position, time-of-flight transfer problem. Enter departure and arrival position vectors,
+        choose the transfer time, and compute the required departure and arrival velocity vectors with an
+        estimated maneuver cost relative to circular reference orbits.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            Lambert's problem asks: if a spacecraft must travel from one position vector to another in a specified
+            time, what transfer orbit connects those two points? This is one of the most important problems in
+            mission design because it connects geometry, timing, and velocity requirements.
+          </p>
+          <ul>
+            <li>Departure velocity vector \(\mathbf v_1\)</li>
+            <li>Arrival velocity vector \(\mathbf v_2\)</li>
+            <li>Transfer trajectory estimate</li>
+            <li>Departure and arrival speed</li>
+            <li>Approximate \(\Delta v\) relative to circular reference velocities</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Core mission-design idea</h2>
+          <p>
+            The inputs are the initial position \(\mathbf r_1\), the final position \(\mathbf r_2\),
+            the time of flight \(\Delta t\), and the gravitational parameter \(\mu\).
+          </p>
+          <div class="formula-box">
+            \[
+              \mathbf r_1,\ \mathbf r_2,\ \Delta t,\ \mu
+              \quad \Longrightarrow \quad
+              \mathbf v_1,\ \mathbf v_2
+            \]
+          </div>
+          <p>
+            Unlike a Hohmann transfer, a Lambert transfer is not limited to two circular coplanar orbits.
+            It is used for rendezvous, phasing, interplanetary transfers, and trajectory targeting.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Universal-variable Lambert formulation</h2>
+          <p>
+            This educational implementation uses a universal-variable style solution. The geometry is controlled by
+            the transfer angle and the Lambert parameter \(A\):
+          </p>
+          <div class="formula-box">
+            \[
+              A = \sin(\Delta \theta)
+              \sqrt{\frac{r_1 r_2}{1-\cos(\Delta \theta)}}
+            \]
+          </div>
+          <p>
+            The solver searches for the universal variable that matches the requested time of flight, then computes
+            the Lagrange coefficients and velocity vectors.
+          </p>
+          <div class="formula-box">
+            \[
+              \mathbf v_1 = \frac{\mathbf r_2 - f\mathbf r_1}{g},
+              \qquad
+              \mathbf v_2 = \frac{\dot g\mathbf r_2 - \mathbf r_1}{g}
+            \]
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>How to interpret the result</h2>
+          <ul>
+            <li>Short time of flight usually requires higher transfer speed.</li>
+            <li>Long time of flight may produce a lower-energy arc, but not always a practical mission.</li>
+            <li>Prograde and retrograde options can give very different velocity vectors.</li>
+            <li>The plotted curve is a numerical propagation from the computed departure state.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Important limitation</h3>
+            <p>
+              This is a zero-revolution educational Lambert solver. Multi-revolution Lambert solutions are not included yet.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive Lambert solver</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="vectors">Position Vectors</button>
+            <button type="button" class="tab-btn" data-mode="time">Time &amp; Model</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-vectors" class="mode-panel active">
+            <h3>Departure position \(\mathbf r_1\) in km</h3>
+            <div class="split-3">
+              <div class="field"><label for="r1x">r1x</label><input id="r1x" type="number" value="7000" step="10"></div>
+              <div class="field"><label for="r1y">r1y</label><input id="r1y" type="number" value="0" step="10"></div>
+              <div class="field"><label for="r1z">r1z</label><input id="r1z" type="number" value="0" step="10"></div>
+            </div>
+
+            <h3>Arrival position \(\mathbf r_2\) in km</h3>
+            <div class="split-3">
+              <div class="field"><label for="r2x">r2x</label><input id="r2x" type="number" value="0" step="10"></div>
+              <div class="field"><label for="r2y">r2y</label><input id="r2y" type="number" value="10000" step="10"></div>
+              <div class="field"><label for="r2z">r2z</label><input id="r2z" type="number" value="0" step="10"></div>
+            </div>
+          </div>
+
+          <div id="mode-time" class="mode-panel">
+            <div class="split-2">
+              <div class="field">
+                <label for="tofInput">Time of flight (minutes)</label>
+                <input id="tofInput" type="number" value="60" step="1" min="1">
+              </div>
+              <div class="field">
+                <label for="muInput">μ (km³/s²)</label>
+                <input id="muInput" type="number" value="398600.4418" step="any">
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="directionSelect">Transfer direction</label>
+                <select id="directionSelect">
+                  <option value="prograde">Prograde / short way</option>
+                  <option value="retrograde">Retrograde / long way</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="dtPlot">Plot step (s)</label>
+                <input id="dtPlot" type="number" value="60" step="10" min="5">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Quick example</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="leo90">LEO 90-degree transfer</option>
+                <option value="rendezvous">Rendezvous-style transfer</option>
+                <option value="higharc">Higher-energy transfer</option>
+                <option value="inclined">Inclined 3D transfer</option>
+              </select>
+              <div class="hint">Choose a preset, then adjust vectors and time manually.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="solveBtn">Solve Lambert Transfer</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Departure velocity \(\mathbf v_1\)</h4><div class="value" id="v1Out">—</div></div>
+            <div class="result-box"><h4>Arrival velocity \(\mathbf v_2\)</h4><div class="value" id="v2Out">—</div></div>
+            <div class="result-box"><h4>Departure speed</h4><div class="value" id="speed1Out">—</div></div>
+            <div class="result-box"><h4>Arrival speed</h4><div class="value" id="speed2Out">—</div></div>
+            <div class="result-box"><h4>Approx. departure Δv</h4><div class="value" id="dv1Out">—</div></div>
+            <div class="result-box"><h4>Approx. arrival Δv</h4><div class="value" id="dv2Out">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the solver to compute the transfer velocity and plot the trajectory.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Lambert transfer trajectory</div>
+            <div id="transferPlot" class="plot-box"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This tool assumes:</h3>
+            <ul>
+              <li>Two-body point-mass gravity</li>
+              <li>Impulsive departure and arrival velocity changes</li>
+              <li>Zero-revolution Lambert transfer</li>
+              <li>No drag, J2, thrust arcs, finite burns, or third-body effects</li>
+              <li>Approximate \(\Delta v\) uses local circular reference speed for interpretation only</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const defaults = {
+      r1x:7000, r1y:0, r1z:0,
+      r2x:0, r2y:10000, r2z:0,
+      tofInput:60,
+      muInput:398600.4418,
+      directionSelect:"prograde",
+      dtPlot:60,
+      presetSelect:"custom"
+    };
+
+    const presets = {
+      leo90:{r1:[7000,0,0], r2:[0,7000,0], tof:45, direction:"prograde"},
+      rendezvous:{r1:[7000,0,0], r2:[5000,6000,0], tof:55, direction:"prograde"},
+      higharc:{r1:[8000,0,0], r2:[-6000,9000,0], tof:120, direction:"prograde"},
+      inclined:{r1:[7000,0,0], r2:[0,8500,2500], tof:80, direction:"prograde"}
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.r1x.value = p.r1[0]; el.r1y.value = p.r1[1]; el.r1z.value = p.r1[2];
+      el.r2x.value = p.r2[0]; el.r2y.value = p.r2[1]; el.r2z.value = p.r2[2];
+      el.tofInput.value = p.tof;
+      el.directionSelect.value = p.direction;
+      solveAndPlot();
+    });
+
+    document.getElementById("solveBtn").addEventListener("click", solveAndPlot);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([key,value]) => el[key].value = value);
+      solveAndPlot();
+    });
+
+    function getInputs(){
+      return {
+        r1:[parseFloat(el.r1x.value), parseFloat(el.r1y.value), parseFloat(el.r1z.value)],
+        r2:[parseFloat(el.r2x.value), parseFloat(el.r2y.value), parseFloat(el.r2z.value)],
+        tof:parseFloat(el.tofInput.value) * 60,
+        mu:parseFloat(el.muInput.value),
+        direction:el.directionSelect.value,
+        dtPlot:parseFloat(el.dtPlot.value)
+      };
+    }
+
+    function norm(v){return Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);}
+    function dot(a,b){return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];}
+    function cross(a,b){return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];}
+    function add(a,b){return a.map((x,i)=>x+b[i]);}
+    function sub(a,b){return a.map((x,i)=>x-b[i]);}
+    function scale(a,s){return a.map(x=>x*s);}
+
+    function stumpffC(z){
+      if (z > 1e-8) return (1 - Math.cos(Math.sqrt(z))) / z;
+      if (z < -1e-8) return (Math.cosh(Math.sqrt(-z)) - 1) / (-z);
+      return 0.5;
+    }
+
+    function stumpffS(z){
+      if (z > 1e-8) {
+        const sz = Math.sqrt(z);
+        return (sz - Math.sin(sz)) / (sz*sz*sz);
+      }
+      if (z < -1e-8) {
+        const sz = Math.sqrt(-z);
+        return (Math.sinh(sz) - sz) / (sz*sz*sz);
+      }
+      return 1/6;
+    }
+
+    function timeOfFlightZ(z, A, r1mag, r2mag, mu){
+      const C = stumpffC(z);
+      const S = stumpffS(z);
+      if (C <= 0) return NaN;
+      const y = r1mag + r2mag + A * (z*S - 1) / Math.sqrt(C);
+      if (y < 0) return NaN;
+      const x = Math.sqrt(y / C);
+      return (x*x*x*S + A*Math.sqrt(y)) / Math.sqrt(mu);
+    }
+
+    function lambertUV(r1, r2, tof, mu, direction){
+      const r1mag = norm(r1);
+      const r2mag = norm(r2);
+      const cosDtheta = dot(r1,r2)/(r1mag*r2mag);
+      const clampedCos = Math.max(-1, Math.min(1, cosDtheta));
+      let sinDtheta = norm(cross(r1,r2))/(r1mag*r2mag);
+      if (direction === "retrograde") sinDtheta = -sinDtheta;
+
+      if (Math.abs(1 - clampedCos) < 1e-10) throw new Error("The transfer angle is too small or near 0 degrees for this simple solver.");
+
+      const A = sinDtheta * Math.sqrt((r1mag*r2mag)/(1 - clampedCos));
+      if (Math.abs(A) < 1e-10) throw new Error("Lambert geometry is singular. Try a different arrival position or direction.");
+
+      let zLow = -4*Math.PI*Math.PI;
+      let zHigh = 4*Math.PI*Math.PI;
+      let tLow = timeOfFlightZ(zLow, A, r1mag, r2mag, mu);
+      let tHigh = timeOfFlightZ(zHigh, A, r1mag, r2mag, mu);
+
+      let expand = 0;
+      while ((!Number.isFinite(tHigh) || tHigh < tof) && expand < 30) {
+        zHigh *= 1.5;
+        tHigh = timeOfFlightZ(zHigh, A, r1mag, r2mag, mu);
+        expand++;
+      }
+
+      expand = 0;
+      while ((!Number.isFinite(tLow) || tLow > tof) && expand < 30) {
+        zLow *= 1.5;
+        tLow = timeOfFlightZ(zLow, A, r1mag, r2mag, mu);
+        expand++;
+      }
+
+      let z = 0;
+      for (let k=0; k<120; k++) {
+        z = 0.5*(zLow + zHigh);
+        const t = timeOfFlightZ(z, A, r1mag, r2mag, mu);
+        if (!Number.isFinite(t)) {
+          zLow = z;
+          continue;
+        }
+        if (Math.abs(t - tof) < 1e-6) break;
+        if (t <= tof) zLow = z;
+        else zHigh = z;
+      }
+
+      const C = stumpffC(z);
+      const S = stumpffS(z);
+      const y = r1mag + r2mag + A * (z*S - 1) / Math.sqrt(C);
+      if (y < 0) throw new Error("No feasible zero-revolution transfer found for this time of flight.");
+
+      const f = 1 - y/r1mag;
+      const g = A * Math.sqrt(y/mu);
+      const gdot = 1 - y/r2mag;
+      if (Math.abs(g) < 1e-10) throw new Error("The Lagrange coefficient g is too small. Try another transfer time.");
+
+      const v1 = scale(sub(r2, scale(r1, f)), 1/g);
+      const v2 = scale(sub(scale(r2, gdot), r1), 1/g);
+      return {v1, v2, z, y, f, g, gdot, transferAngle:Math.atan2(sinDtheta, clampedCos)};
+    }
+
+    function acceleration(r, mu){
+      const rmag = norm(r);
+      return scale(r, -mu/Math.pow(rmag,3));
+    }
+
+    function rk4Step(state, dt, mu){
+      function deriv(s){
+        const r = [s[0],s[1],s[2]];
+        const v = [s[3],s[4],s[5]];
+        const a = acceleration(r,mu);
+        return [v[0],v[1],v[2],a[0],a[1],a[2]];
+      }
+      const k1 = deriv(state);
+      const s2 = state.map((x,i)=>x+0.5*dt*k1[i]);
+      const k2 = deriv(s2);
+      const s3 = state.map((x,i)=>x+0.5*dt*k2[i]);
+      const k3 = deriv(s3);
+      const s4 = state.map((x,i)=>x+dt*k3[i]);
+      const k4 = deriv(s4);
+      return state.map((x,i)=>x+dt*(k1[i]+2*k2[i]+2*k3[i]+k4[i])/6);
+    }
+
+    function propagate(r0, v0, tof, dt, mu){
+      const n = Math.max(2, Math.floor(tof/dt)+1);
+      let state = [...r0, ...v0];
+      const xs=[], ys=[], zs=[];
+      for (let i=0; i<n; i++) {
+        xs.push(state[0]); ys.push(state[1]); zs.push(state[2]);
+        if (i < n-1) state = rk4Step(state, Math.min(dt, tof - i*dt), mu);
+      }
+      return {xs,ys,zs};
+    }
+
+    function showError(msg){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Solver error</h3><p>${msg}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function fmt(x,d=4,suffix=""){
+      if (!Number.isFinite(x)) return "—";
+      return x.toFixed(d) + suffix;
+    }
+
+    function vectorFmt(v){
+      return `[${fmt(v[0],4)}, ${fmt(v[1],4)}, ${fmt(v[2],4)}] km/s`;
+    }
+
+    function validate(p){
+      if (![...p.r1, ...p.r2, p.tof, p.mu, p.dtPlot].every(Number.isFinite)) return "Please enter valid numeric values.";
+      if (norm(p.r1) <= 0 || norm(p.r2) <= 0) return "Position vector magnitudes must be positive.";
+      if (p.tof <= 0 || p.mu <= 0 || p.dtPlot <= 0) return "Time of flight, μ, and plot step must be positive.";
+      if (p.tof/p.dtPlot > 2500) return "Too many plotted steps. Increase the plot step or reduce time of flight.";
+      return null;
+    }
+
+    function updateResults(p, sol){
+      const r1mag = norm(p.r1);
+      const r2mag = norm(p.r2);
+      const vc1mag = Math.sqrt(p.mu/r1mag);
+      const vc2mag = Math.sqrt(p.mu/r2mag);
+      const speed1 = norm(sol.v1);
+      const speed2 = norm(sol.v2);
+      const dv1 = Math.abs(speed1 - vc1mag);
+      const dv2 = Math.abs(speed2 - vc2mag);
+
+      document.getElementById("v1Out").textContent = vectorFmt(sol.v1);
+      document.getElementById("v2Out").textContent = vectorFmt(sol.v2);
+      document.getElementById("speed1Out").textContent = fmt(speed1,4," km/s");
+      document.getElementById("speed2Out").textContent = fmt(speed2,4," km/s");
+      document.getElementById("dv1Out").textContent = fmt(dv1,4," km/s");
+      document.getElementById("dv2Out").textContent = fmt(dv2,4," km/s");
+
+      const angleDeg = sol.transferAngle * 180 / Math.PI;
+      document.getElementById("interpretText").textContent =
+        `The solver found a ${p.direction} zero-revolution transfer with transfer angle ${angleDeg.toFixed(2)}°. ` +
+        `The displayed Δv values are approximate speed differences relative to local circular reference speeds, useful for learning but not a full mission budget.`;
+    }
+
+    function drawPlot(p, sol, traj){
+      const maxR = Math.max(...traj.xs.map((x,i)=>Math.sqrt(x*x+traj.ys[i]*traj.ys[i]+traj.zs[i]*traj.zs[i])), norm(p.r1), norm(p.r2)) * 1.15;
+
+      const earthRadius = 6378.137;
+      const earth = makeSphere(Math.min(earthRadius, maxR*0.45));
+
+      const traces = [
+        {
+          type:"surface",
+          x:earth.x, y:earth.y, z:earth.z,
+          colorscale:[[0,"#dbeafe"],[1,"#93c5fd"]],
+          opacity:0.72,
+          showscale:false,
+          hoverinfo:"skip",
+          name:"Earth"
+        },
+        {
+          type:"scatter3d",
+          mode:"lines",
+          x:traj.xs,
+          y:traj.ys,
+          z:traj.zs,
+          line:{width:5, color:"#2563eb"},
+          name:"Transfer arc"
+        },
+        {
+          type:"scatter3d",
+          mode:"markers+text",
+          x:[p.r1[0], p.r2[0]],
+          y:[p.r1[1], p.r2[1]],
+          z:[p.r1[2], p.r2[2]],
+          text:["r1","r2"],
+          textposition:"top center",
+          marker:{size:6, color:["#f97316", "#7c3aed"]},
+          name:"Boundary points"
+        }
+      ];
+
+      Plotly.newPlot("transferPlot", traces, {
+        margin:{l:0,r:0,t:0,b:0},
+        paper_bgcolor:"#ffffff",
+        scene:{
+          xaxis:{title:"x (km)", range:[-maxR,maxR]},
+          yaxis:{title:"y (km)", range:[-maxR,maxR]},
+          zaxis:{title:"z (km)", range:[-maxR,maxR]},
+          aspectmode:"cube"
+        },
+        legend:{orientation:"h", x:0.02, y:0.98}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function makeSphere(R){
+      const uSteps=26, vSteps=14;
+      const x=[], y=[], z=[];
+      for (let i=0;i<=vSteps;i++){
+        const rowX=[], rowY=[], rowZ=[];
+        const phi=-Math.PI/2 + Math.PI*i/vSteps;
+        for (let j=0;j<=uSteps;j++){
+          const lam=2*Math.PI*j/uSteps;
+          rowX.push(R*Math.cos(phi)*Math.cos(lam));
+          rowY.push(R*Math.cos(phi)*Math.sin(lam));
+          rowZ.push(R*Math.sin(phi));
+        }
+        x.push(rowX); y.push(rowY); z.push(rowZ);
+      }
+      return {x,y,z};
+    }
+
+    function solveAndPlot(){
+      clearError();
+      const p = getInputs();
+      const err = validate(p);
+      if (err) { showError(err); return; }
+
+      try {
+        const sol = lambertUV(p.r1, p.r2, p.tof, p.mu, p.direction);
+        const traj = propagate(p.r1, sol.v1, p.tof, p.dtPlot, p.mu);
+        updateResults(p, sol);
+        drawPlot(p, sol, traj);
+      } catch (e) {
+        showError(e.message || "The solver could not find a feasible solution for these inputs.");
+      }
+    }
+
+    solveAndPlot();
+  </script>
+</body>
+</html>
