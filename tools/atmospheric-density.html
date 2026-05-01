@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atmospheric Density Tool | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--page-bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.65;}
+    .page-wrap{width:min(1380px,calc(100% - 48px));margin:20px auto 56px;}
+    .tool-hero{background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));color:#fff;padding:34px 38px 38px;border-radius:32px;box-shadow:var(--shadow);margin-bottom:22px;}
+    .tool-pill{display:inline-block;background:#e0f2fe;color:#1f2937;font-weight:700;padding:10px 20px;border-radius:999px;font-size:1.05rem;margin-bottom:14px;}
+    .tool-hero h1{margin:0 0 12px;font-size:clamp(2.4rem,5vw,4rem);line-height:1.05;font-weight:800;letter-spacing:-0.02em;}
+    .tool-hero p{margin:0;font-size:clamp(1.05rem,1.8vw,1.22rem);line-height:1.65;max-width:1120px;}
+    .grid-2{display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:start;}
+    .stack{display:grid;gap:22px;}
+    .card{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow);padding:28px 28px 30px;}
+    .card h2{margin:0 0 18px;font-size:clamp(1.8rem,2.6vw,2.55rem);line-height:1.1;letter-spacing:-0.02em;color:#0f172a;}
+    .card h3{margin:18px 0 10px;font-size:1.2rem;color:#0f172a;}
+    .card p,.card li{font-size:1.04rem;line-height:1.72;color:var(--muted);}
+    .card ul{margin:10px 0 0 22px;padding:0;}
+    .formula-box{background:var(--formula-bg);color:#fff;border-radius:20px;padding:22px 18px;margin:16px 0 18px;overflow:auto;box-shadow:inset -10px 0 0 rgba(255,255,255,.03);}
+    .tabs{display:flex;gap:12px;margin:4px 0 18px;flex-wrap:wrap;}
+    .tab-btn{border:none;border-radius:999px;padding:13px 22px;font-size:1rem;font-weight:700;cursor:pointer;background:#dbe1ea;color:#1f2937;font-family:inherit;transition:transform .15s ease,background .2s ease;}
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent));color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+    .mode-panel{display:none}.mode-panel.active{display:block}
+    .split-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.split-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    .field{margin-bottom:16px}
+    label{display:block;font-size:1rem;font-weight:700;color:#1f2937;margin:0 0 8px}
+    input,select{width:100%;padding:12px 14px;border:1.5px solid #cbd5e1;border-radius:16px;font-size:1rem;color:#111827;background:#fff;font-family:inherit}
+    input:focus,select:focus{outline:none;border-color:#5b8def;box-shadow:0 0 0 3px rgba(37,99,235,.10)}
+    .hint{font-size:.94rem;color:#6b7280;margin-top:6px}
+    .button-row{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+    .cta,.ghost{border:none;border-radius:18px;padding:16px 20px;font-size:1.06rem;font-weight:800;cursor:pointer;font-family:inherit;min-height:56px}
+    .cta{color:#fff;background:linear-gradient(135deg,var(--accent-2),var(--accent));flex:1 1 240px;box-shadow:0 12px 24px rgba(37,99,235,.18)}
+    .ghost{color:#1f2937;background:#e5e7eb;flex:1 1 160px}
+    .results-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+    .result-box{background:#f8fafc;border:1px solid #dbe3ec;border-radius:18px;padding:16px 18px;min-height:104px}
+    .result-box h4{margin:0 0 8px;font-size:.98rem;color:#475569;line-height:1.35}.result-box .value{font-size:1.04rem;font-weight:800;color:#111827;line-height:1.35;word-break:break-word}
+    .callout{border-radius:20px;padding:18px 20px;margin-top:18px;border-left:5px solid var(--accent-2);background:var(--soft)}
+    .callout.warn{border-left-color:var(--warn-line);background:var(--warn)}
+    .callout h3{margin-top:0;margin-bottom:8px;font-size:1.15rem}.callout p{margin:0}
+    .plot-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;margin-top:16px}.plot-title{font-weight:800;font-size:1.08rem;margin:0 0 10px;color:#111827}
+    .plot-box{width:100%;min-height:430px;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;background:#fff}.plot-box.short{min-height:320px}
+    .back-link-row{margin-top:40px;text-align:left}.back-link-btn{display:inline-block;text-decoration:none;border-radius:18px;padding:14px 22px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent-2),var(--accent));box-shadow:0 12px 24px rgba(37,99,235,.18)}
+    .site-footer{text-align:center;padding:1.5rem 0;font-size:.95rem;color:#4b5563;line-height:1.6}
+    @media(max-width:1100px){.grid-2{grid-template-columns:1fr}}
+    @media(max-width:760px){.page-wrap{width:min(100% - 24px,1380px)}.tool-hero{padding:24px 20px 28px;border-radius:24px}.card{padding:22px 18px 24px}.split-2,.split-3,.results-grid{grid-template-columns:1fr}.plot-box{min-height:350px}}
+  </style>
+</head>
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 18 · Space Environment &amp; Drag</div>
+      <h1>Atmospheric Density Tool</h1>
+      <p>
+        Compare atmospheric density with altitude using a simple exponential model and a simplified NRLMSISE-style profile.
+        This tool helps connect altitude, solar activity, drag force, ballistic coefficient, and orbital decay intuition.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            Atmospheric density decreases rapidly with altitude, but the upper atmosphere is not constant. Solar activity and geomagnetic
+            conditions can change thermospheric density significantly, which directly affects drag and orbital decay.
+          </p>
+          <ul>
+            <li>Density at a selected altitude</li>
+            <li>Exponential atmosphere estimate</li>
+            <li>Simplified NRLMSISE-style density estimate</li>
+            <li>Altitude versus density curve</li>
+            <li>Solar activity sensitivity comparison</li>
+            <li>Approximate drag acceleration using ballistic coefficient</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Exponential atmosphere model</h2>
+          <p>
+            The simplest model assumes density decays exponentially with height:
+          </p>
+          <div class="formula-box">
+            \[
+              \rho(h)=\rho_0\exp\left(-\frac{h-h_0}{H}\right)
+            \]
+          </div>
+          <p>
+            This model is useful for intuition, but a single scale height cannot represent the full atmosphere from sea level to LEO.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Simplified NRLMSISE-style profile</h2>
+          <p>
+            NRLMSISE-00 is a detailed empirical atmosphere model. This educational tool does not reproduce the full model; instead,
+            it uses a layered, solar-activity-sensitive approximation to show the same kind of behaviour.
+          </p>
+          <div class="formula-box">
+            \[
+              \rho_{simp}(h,F_{10.7},A_p)
+              = \rho_{base}(h)\,S(F_{10.7},A_p,h)
+            \]
+          </div>
+          <p>
+            Higher solar activity increases upper-atmosphere density, especially above roughly 180–200 km.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Drag connection</h2>
+          <p>
+            Density becomes important because aerodynamic drag acceleration can be estimated from ballistic coefficient:
+          </p>
+          <div class="formula-box">
+            \[
+              a_D \approx \frac{1}{2}\rho v^2\frac{1}{\beta}
+            \]
+          </div>
+          <p>
+            where \(\beta=m/(C_DA)\). Lower ballistic coefficient means higher drag acceleration for the same density and speed.
+          </p>
+          <div class="callout warn">
+            <h3>Educational warning</h3>
+            <p>
+              This tool is for learning and design intuition. Use real NRLMSISE-00, JB2008, or validated tools for research-grade density modeling.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive density calculator</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="altitude">Altitude</button>
+            <button type="button" class="tab-btn" data-mode="spaceweather">Space Weather</button>
+            <button type="button" class="tab-btn" data-mode="drag">Drag Inputs</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-altitude" class="mode-panel active">
+            <div class="split-3">
+              <div class="field"><label for="altitudeInput">Selected altitude (km)</label><input id="altitudeInput" type="number" value="400" step="10"></div>
+              <div class="field"><label for="hMinInput">Plot min altitude (km)</label><input id="hMinInput" type="number" value="100" step="10"></div>
+              <div class="field"><label for="hMaxInput">Plot max altitude (km)</label><input id="hMaxInput" type="number" value="800" step="10"></div>
+            </div>
+          </div>
+
+          <div id="mode-spaceweather" class="mode-panel">
+            <div class="split-3">
+              <div class="field"><label for="f107Input">F10.7 solar flux</label><input id="f107Input" type="number" value="150" step="5"></div>
+              <div class="field"><label for="apInput">Ap geomagnetic index</label><input id="apInput" type="number" value="15" step="1"></div>
+              <div class="field"><label for="activitySelect">Activity preset</label><select id="activitySelect"><option value="custom">Custom</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option><option value="storm">Storm</option></select></div>
+            </div>
+            <div class="hint">Higher F10.7 and Ap increase the simplified thermosphere density at LEO altitudes.</div>
+          </div>
+
+          <div id="mode-drag" class="mode-panel">
+            <div class="split-3">
+              <div class="field"><label for="betaInput">Ballistic coefficient β (kg/m²)</label><input id="betaInput" type="number" value="100" step="10"></div>
+              <div class="field"><label for="speedInput">Orbital speed (km/s)</label><input id="speedInput" type="number" value="7.67" step="0.01"></div>
+              <div class="field"><label for="modelSelect">Displayed density model</label><select id="modelSelect"><option value="both">Compare both</option><option value="exponential">Exponential only</option><option value="nrl">Simplified NRLMSISE-style only</option></select></div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Scenario preset</label>
+              <select id="presetSelect">
+                <option value="iss">ISS-like 400 km, moderate solar activity</option>
+                <option value="lowleo">Low LEO 250 km, high drag</option>
+                <option value="sso">SSO-like 700 km</option>
+                <option value="storm">Geomagnetic storm at 400 km</option>
+                <option value="quiet">Quiet Sun at 500 km</option>
+              </select>
+              <div class="hint">Presets adjust altitude, space-weather inputs, and plotting range.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="runBtn">Compute Density</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Exponential density</h4><div class="value" id="rhoExpOut">—</div></div>
+            <div class="result-box"><h4>Simplified NRLMSISE-style density</h4><div class="value" id="rhoNrlOut">—</div></div>
+            <div class="result-box"><h4>Density ratio</h4><div class="value" id="ratioOut">—</div></div>
+            <div class="result-box"><h4>Drag acceleration</h4><div class="value" id="dragOut">—</div></div>
+            <div class="result-box"><h4>Solar activity multiplier</h4><div class="value" id="solarOut">—</div></div>
+            <div class="result-box"><h4>Atmospheric region</h4><div class="value" id="regionOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the calculator to compare density models and drag sensitivity.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Altitude versus atmospheric density</div>
+            <div id="densityPlot" class="plot-box"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Solar activity sensitivity</div>
+            <div id="activityPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Drag acceleration versus altitude</div>
+            <div id="dragPlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This tool assumes:</h3>
+            <ul>
+              <li>Educational atmospheric density approximation</li>
+              <li>No latitude, longitude, local solar time, seasonal, or composition effects</li>
+              <li>Simplified solar/geomagnetic multiplier</li>
+              <li>Drag acceleration estimated from scalar speed and ballistic coefficient</li>
+              <li>Not a replacement for full NRLMSISE-00 or mission-analysis software</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const defaults = {
+      altitudeInput:400,
+      hMinInput:100,
+      hMaxInput:800,
+      f107Input:150,
+      apInput:15,
+      activitySelect:"custom",
+      betaInput:100,
+      speedInput:7.67,
+      modelSelect:"both",
+      presetSelect:"iss"
+    };
+
+    const presets = {
+      iss:{h:400,hmin:100,hmax:800,f107:150,ap:15,beta:100,speed:7.67},
+      lowleo:{h:250,hmin:100,hmax:500,f107:180,ap:20,beta:80,speed:7.8},
+      sso:{h:700,hmin:300,hmax:1000,f107:120,ap:8,beta:120,speed:7.5},
+      storm:{h:400,hmin:150,hmax:800,f107:220,ap:80,beta:100,speed:7.67},
+      quiet:{h:500,hmin:150,hmax:900,f107:70,ap:4,beta:120,speed:7.6}
+    };
+
+    const el = Object.fromEntries(Object.keys(defaults).map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        const mode=btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p=>p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.activitySelect.addEventListener("change",()=>{
+      const v=el.activitySelect.value;
+      if(v==="low"){el.f107Input.value=70;el.apInput.value=4;}
+      if(v==="moderate"){el.f107Input.value=150;el.apInput.value=15;}
+      if(v==="high"){el.f107Input.value=220;el.apInput.value=35;}
+      if(v==="storm"){el.f107Input.value=250;el.apInput.value=100;}
+      compute();
+    });
+
+    el.presetSelect.addEventListener("change",()=>{
+      const p=presets[el.presetSelect.value];
+      el.altitudeInput.value=p.h; el.hMinInput.value=p.hmin; el.hMaxInput.value=p.hmax;
+      el.f107Input.value=p.f107; el.apInput.value=p.ap; el.betaInput.value=p.beta; el.speedInput.value=p.speed;
+      el.activitySelect.value="custom";
+      compute();
+    });
+
+    document.getElementById("runBtn").addEventListener("click",compute);
+    document.getElementById("resetBtn").addEventListener("click",()=>{Object.entries(defaults).forEach(([id,v])=>el[id].value=v);compute();});
+
+    function getInputs(){
+      return {
+        h:+el.altitudeInput.value,
+        hMin:+el.hMinInput.value,
+        hMax:+el.hMaxInput.value,
+        f107:+el.f107Input.value,
+        ap:+el.apInput.value,
+        beta:+el.betaInput.value,
+        speed:+el.speedInput.value*1000,
+        model:el.modelSelect.value
+      };
+    }
+
+    function validate(p){
+      const vals=[p.h,p.hMin,p.hMax,p.f107,p.ap,p.beta,p.speed];
+      if(!vals.every(Number.isFinite)) return "Please enter valid numeric inputs.";
+      if(p.h<0||p.hMin<0||p.hMax<=p.hMin) return "Altitude values must be valid and plot max must exceed plot min.";
+      if(p.beta<=0||p.speed<=0) return "Ballistic coefficient and speed must be positive.";
+      if(p.f107<0||p.ap<0) return "F10.7 and Ap should be non-negative.";
+      return null;
+    }
+
+    function showError(msg){const b=document.getElementById("errorBox");b.style.display="block";b.innerHTML=`<h3>Input error</h3><p>${msg}</p>`;}
+    function clearError(){const b=document.getElementById("errorBox");b.style.display="none";b.innerHTML="";}
+
+    function expDensity(h){
+      if(h<25) return 1.225*Math.exp(-h/7.2);
+      const rho0=3.614e-13;
+      const h0=700;
+      const H=88.667;
+      return rho0*Math.exp(-(h-h0)/H);
+    }
+
+    function baseThermoDensity(h){
+      const table = [
+        [100,5.6e-7],[120,2.4e-8],[150,2.1e-9],[180,5.5e-10],[200,2.8e-10],
+        [250,7.3e-11],[300,2.5e-11],[350,9.5e-12],[400,3.9e-12],[450,1.8e-12],
+        [500,8.5e-13],[600,2.5e-13],[700,8.0e-14],[800,3.0e-14],[900,1.2e-14],[1000,5.5e-15]
+      ];
+      if(h<=table[0][0]) return table[0][1]*Math.exp(-(h-table[0][0])/7);
+      if(h>=table[table.length-1][0]) return table[table.length-1][1]*Math.exp(-(h-table[table.length-1][0])/120);
+      for(let i=0;i<table.length-1;i++){
+        const [h1,r1]=table[i], [h2,r2]=table[i+1];
+        if(h>=h1&&h<=h2){
+          const f=(h-h1)/(h2-h1);
+          return Math.exp(Math.log(r1)*(1-f)+Math.log(r2)*f);
+        }
+      }
+      return 1e-15;
+    }
+
+    function solarMultiplier(h,f107,ap){
+      const thermo = 1/(1+Math.exp(-(h-180)/45));
+      const solar = 1 + thermo*0.006*Math.max(0,f107-70);
+      const geomag = 1 + thermo*0.004*Math.max(0,ap-4);
+      return solar*geomag;
+    }
+
+    function nrlSimplified(h,f107,ap){
+      if(h<100) return expDensity(h);
+      return baseThermoDensity(h)*solarMultiplier(h,f107,ap);
+    }
+
+    function dragAccel(rho,v,beta){
+      return 0.5*rho*v*v/beta;
+    }
+
+    function region(h){
+      if(h<12) return "Troposphere";
+      if(h<50) return "Stratosphere";
+      if(h<85) return "Mesosphere";
+      if(h<600) return "Thermosphere / LEO drag region";
+      return "Exosphere / high LEO";
+    }
+
+    function fmtSci(x){
+      if(!Number.isFinite(x)) return "—";
+      return x.toExponential(3);
+    }
+    function fmt(x,d=3,suffix=""){return Number.isFinite(x)?x.toFixed(d)+suffix:"—";}
+
+    function updateResults(p){
+      const rhoE=expDensity(p.h);
+      const rhoN=nrlSimplified(p.h,p.f107,p.ap);
+      const ratio=rhoN/rhoE;
+      const aD=dragAccel(rhoN,p.speed,p.beta);
+      const mult=solarMultiplier(p.h,p.f107,p.ap);
+      document.getElementById("rhoExpOut").textContent=`${fmtSci(rhoE)} kg/m³`;
+      document.getElementById("rhoNrlOut").textContent=`${fmtSci(rhoN)} kg/m³`;
+      document.getElementById("ratioOut").textContent=`${fmt(ratio,2)} × simplified / exponential`;
+      document.getElementById("dragOut").textContent=`${fmtSci(aD)} m/s²`;
+      document.getElementById("solarOut").textContent=`${fmt(mult,2)} ×`;
+      document.getElementById("regionOut").textContent=region(p.h);
+      let msg = `At ${fmt(p.h,0," km")}, density is extremely sensitive to the atmosphere model and solar activity.`;
+      if(p.h>=180) msg += " In LEO, higher F10.7 or Ap can noticeably increase drag and accelerate orbital decay.";
+      if(p.h<250) msg += " This altitude is strongly drag-sensitive; lifetime can reduce quickly for low ballistic coefficient objects.";
+      document.getElementById("interpretText").textContent=msg;
+    }
+
+    function generateAltitudes(p){
+      const hs=[];
+      const n=180;
+      for(let i=0;i<=n;i++) hs.push(p.hMin+(p.hMax-p.hMin)*i/n);
+      return hs;
+    }
+
+    function drawDensity(p){
+      const hs=generateAltitudes(p);
+      const exp=hs.map(h=>expDensity(h));
+      const nrl=hs.map(h=>nrlSimplified(h,p.f107,p.ap));
+      const traces=[];
+      if(p.model==="both"||p.model==="exponential") traces.push({type:"scatter",mode:"lines",x:hs,y:exp,line:{color:"#f97316",width:3},name:"Exponential"});
+      if(p.model==="both"||p.model==="nrl") traces.push({type:"scatter",mode:"lines",x:hs,y:nrl,line:{color:"#2563eb",width:3},name:"Simplified NRLMSISE-style"});
+      traces.push({type:"scatter",mode:"markers",x:[p.h],y:[nrlSimplified(p.h,p.f107,p.ap)],marker:{size:10,color:"#7c3aed"},name:"Selected altitude"});
+      Plotly.newPlot("densityPlot",traces,{margin:{l:80,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Altitude (km)",gridcolor:"#e5e7eb"},yaxis:{title:"Density (kg/m³)",type:"log",gridcolor:"#e5e7eb"},legend:{orientation:"h",x:.02,y:1.12}}, {responsive:true,displaylogo:false});
+    }
+
+    function drawActivity(p){
+      const hs=generateAltitudes(p);
+      const low=hs.map(h=>nrlSimplified(h,70,4));
+      const moderate=hs.map(h=>nrlSimplified(h,150,15));
+      const storm=hs.map(h=>nrlSimplified(h,250,100));
+      Plotly.newPlot("activityPlot",[
+        {type:"scatter",mode:"lines",x:hs,y:low,line:{color:"#0f8b8d",width:3},name:"Low activity"},
+        {type:"scatter",mode:"lines",x:hs,y:moderate,line:{color:"#2563eb",width:3},name:"Moderate"},
+        {type:"scatter",mode:"lines",x:hs,y:storm,line:{color:"#ef4444",width:3},name:"Storm"}
+      ],{margin:{l:80,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Altitude (km)",gridcolor:"#e5e7eb"},yaxis:{title:"Density (kg/m³)",type:"log",gridcolor:"#e5e7eb"},legend:{orientation:"h",x:.02,y:1.12}}, {responsive:true,displaylogo:false});
+    }
+
+    function drawDrag(p){
+      const hs=generateAltitudes(p);
+      const ad=hs.map(h=>dragAccel(nrlSimplified(h,p.f107,p.ap),p.speed,p.beta));
+      Plotly.newPlot("dragPlot",[{type:"scatter",mode:"lines",x:hs,y:ad,line:{color:"#7c3aed",width:3},name:"Drag acceleration"}],{margin:{l:80,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Altitude (km)",gridcolor:"#e5e7eb"},yaxis:{title:"Drag acceleration (m/s²)",type:"log",gridcolor:"#e5e7eb"},showlegend:false}, {responsive:true,displaylogo:false});
+    }
+
+    function compute(){
+      clearError();
+      const p=getInputs();
+      const err=validate(p);
+      if(err){showError(err);return;}
+      updateResults(p);
+      drawDensity(p);
+      drawActivity(p);
+      drawDrag(p);
+    }
+
+    compute();
+  </script>
+</body>
+</html>
