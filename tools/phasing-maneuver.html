@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phasing Maneuver Calculator | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{display:grid; gap:22px;}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,.card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{margin:10px 0 0 22px; padding:0;}
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{display:flex; gap:12px; margin:4px 0 18px; flex-wrap:wrap;}
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .split-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .field{margin-bottom:16px;}
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{font-size:0.94rem; color:#6b7280; margin-top:6px;}
+
+    .button-row{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
+
+    .cta,.ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{color:#fff; background:linear-gradient(135deg,var(--accent-2),var(--accent)); flex:1 1 240px; box-shadow:0 12px 24px rgba(37,99,235,0.18);}
+    .ghost{color:#1f2937; background:#e5e7eb; flex:1 1 160px;}
+
+    .results-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;}
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{margin:0 0 8px; font-size:0.98rem; color:#475569; line-height:1.35;}
+    .result-box .value{font-size:1.08rem; font-weight:800; color:#111827; line-height:1.35; word-break:break-word;}
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{border-left-color:var(--warn-line); background:var(--warn);}
+    .callout h3{margin-top:0; margin-bottom:8px; font-size:1.15rem;}
+    .callout p{margin:0;}
+
+    .plot-card{background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:16px;}
+    .plot-title{font-weight:800; font-size:1.08rem; margin:0 0 10px; color:#111827;}
+    .plot-box{width:100%; min-height:430px; border:1px solid #e2e8f0; border-radius:18px; overflow:hidden; background:#fff;}
+    .plot-box.short{min-height:320px;}
+
+    .back-link-row{margin-top:40px; text-align:left;}
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{text-align:center; padding:1.5rem 0; font-size:0.95rem; color:#4b5563; line-height:1.6;}
+
+    @media (max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media (max-width:760px){
+      .page-wrap{width:min(100% - 24px, 1380px);}
+      .tool-hero{padding:24px 20px 28px; border-radius:24px;}
+      .card{padding:22px 18px 24px;}
+      .split-2,.results-grid{grid-template-columns:1fr;}
+      .plot-box{min-height:350px;}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 8 · Maneuver &amp; Mission Design</div>
+      <h1>Phasing Maneuver Calculator</h1>
+      <p>
+        Design a simple two-impulse phasing maneuver for catch-up or separation problems. Enter a circular reference orbit,
+        the required phase angle change, and the number of phasing revolutions to estimate the phasing orbit period,
+        semi-major axis, altitude limits, and total Δv.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            A phasing maneuver changes the spacecraft's orbital period so that it arrives back at the same reference point
+            earlier or later than another object. This is useful in rendezvous, station-keeping preparation, constellation spacing,
+            and ISS-style catch-up reasoning.
+          </p>
+          <ul>
+            <li>Reference circular orbit period</li>
+            <li>Required time lead or lag</li>
+            <li>Phasing orbit period</li>
+            <li>Phasing orbit semi-major axis</li>
+            <li>Perigee and apogee altitude estimate</li>
+            <li>Two-impulse Δv to enter and exit the phasing orbit</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Core phasing idea</h2>
+          <p>
+            If the spacecraft needs to change its relative angular position by \(\Delta\theta\), the time offset over one
+            reference orbit is connected to the target period by:
+          </p>
+          <div class="formula-box">
+            \[
+              \Delta t = \frac{\Delta\theta}{360^\circ}T_0
+            \]
+          </div>
+          <p>
+            For \(N\) phasing revolutions, the phasing orbit period is approximated as:
+          </p>
+          <div class="formula-box">
+            \[
+              T_p = T_0 \pm \frac{\Delta t}{N}
+            \]
+          </div>
+          <p>
+            A shorter phasing period makes the spacecraft move ahead. A longer phasing period makes it fall behind.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Phasing orbit size</h2>
+          <p>
+            Once the phasing period is known, Kepler's third law gives the phasing orbit semi-major axis:
+          </p>
+          <div class="formula-box">
+            \[
+              a_p = \left[\mu\left(\frac{T_p}{2\pi}\right)^2\right]^{1/3}
+            \]
+          </div>
+          <p>
+            This tool assumes the burn is made tangentially at the circular reference radius. The opposite apsis is then
+            estimated using:
+          </p>
+          <div class="formula-box">
+            \[
+              r_{opposite}=2a_p-r_0
+            \]
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>How to interpret the result</h2>
+          <ul>
+            <li><strong>Catch up / move ahead:</strong> use a shorter period phasing orbit.</li>
+            <li><strong>Fall behind:</strong> use a longer period phasing orbit.</li>
+            <li>More phasing revolutions usually reduce the required period change and Δv.</li>
+            <li>Too aggressive a phase correction can drive the phasing orbit too low or physically impossible.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Educational simplification</h3>
+            <p>
+              This calculator assumes impulsive tangential burns and coplanar two-body motion. Real rendezvous planning also needs safety corridors,
+              relative motion constraints, navigation uncertainty, and mission rules.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive phasing calculator</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="orbit">Orbit Inputs</button>
+            <button type="button" class="tab-btn" data-mode="phase">Phase Setup</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-orbit" class="mode-panel active">
+            <div class="split-2">
+              <div class="field">
+                <label for="bodySelect">Central body</label>
+                <select id="bodySelect">
+                  <option value="earth">Earth</option>
+                  <option value="mars">Mars</option>
+                  <option value="moon">Moon</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="altitudeInput">Reference circular altitude (km)</label>
+                <input id="altitudeInput" type="number" value="400" step="10">
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="muInput">μ (km³/s²)</label>
+                <input id="muInput" type="number" value="398600.4418" step="any">
+              </div>
+              <div class="field">
+                <label for="radiusInput">Body radius (km)</label>
+                <input id="radiusInput" type="number" value="6378.137" step="any">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-phase" class="mode-panel">
+            <div class="split-2">
+              <div class="field">
+                <label for="phaseAngleInput">Required phase change (deg)</label>
+                <input id="phaseAngleInput" type="number" value="30" step="1">
+                <div class="hint">Use positive angle magnitude. Direction is selected below.</div>
+              </div>
+              <div class="field">
+                <label for="revsInput">Phasing revolutions, N</label>
+                <input id="revsInput" type="number" value="1" step="1" min="1">
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="modeSelect">Maneuver objective</label>
+                <select id="modeSelect">
+                  <option value="catchup">Catch up / move ahead</option>
+                  <option value="fallbehind">Fall behind / delay arrival</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="plotRevsInput">Plot reference revolutions</label>
+                <input id="plotRevsInput" type="number" value="2" step="1" min="1">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Quick example</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="issCatchup">ISS-like 30° catch-up</option>
+                <option value="smallCorrection">Small 10° correction</option>
+                <option value="fallBehind">Fall behind 45°</option>
+                <option value="multiRev">Gentle 3-revolution phasing</option>
+              </select>
+              <div class="hint">Choose a preset, then adjust the phase angle and revolutions manually.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="calculateBtn">Calculate Phasing Maneuver</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Reference period</h4><div class="value" id="T0Out">—</div></div>
+            <div class="result-box"><h4>Required time shift</h4><div class="value" id="dtOut">—</div></div>
+            <div class="result-box"><h4>Phasing period</h4><div class="value" id="TpOut">—</div></div>
+            <div class="result-box"><h4>Phasing semi-major axis</h4><div class="value" id="apOut">—</div></div>
+            <div class="result-box"><h4>Phasing altitude range</h4><div class="value" id="altRangeOut">—</div></div>
+            <div class="result-box"><h4>Total Δv</h4><div class="value" id="dvOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the calculator to estimate the phasing orbit and maneuver cost.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Reference orbit and phasing orbit</div>
+            <div id="orbitPlot" class="plot-box"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Relative phase closure</div>
+            <div id="phasePlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This tool assumes:</h3>
+            <ul>
+              <li>Circular reference orbit</li>
+              <li>Coplanar phasing orbit</li>
+              <li>Impulsive tangential burns</li>
+              <li>Two-body gravity only</li>
+              <li>No J2, drag, finite-burn losses, or collision-avoidance constraints</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const bodyData = {
+      earth:{mu:398600.4418, R:6378.137},
+      mars:{mu:42828.375214, R:3389.5},
+      moon:{mu:4902.800066, R:1737.4}
+    };
+
+    const defaults = {
+      bodySelect:"earth",
+      altitudeInput:400,
+      muInput:398600.4418,
+      radiusInput:6378.137,
+      phaseAngleInput:30,
+      revsInput:1,
+      modeSelect:"catchup",
+      plotRevsInput:2,
+      presetSelect:"custom"
+    };
+
+    const presets = {
+      issCatchup:{altitude:400, phase:30, revs:1, mode:"catchup"},
+      smallCorrection:{altitude:500, phase:10, revs:2, mode:"catchup"},
+      fallBehind:{altitude:400, phase:45, revs:1, mode:"fallbehind"},
+      multiRev:{altitude:550, phase:60, revs:3, mode:"catchup"}
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.bodySelect.addEventListener("change", () => {
+      const body = el.bodySelect.value;
+      if (body !== "custom") {
+        el.muInput.value = bodyData[body].mu;
+        el.radiusInput.value = bodyData[body].R;
+      }
+      runCalculator();
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.bodySelect.value = "earth";
+      el.muInput.value = bodyData.earth.mu;
+      el.radiusInput.value = bodyData.earth.R;
+      el.altitudeInput.value = p.altitude;
+      el.phaseAngleInput.value = p.phase;
+      el.revsInput.value = p.revs;
+      el.modeSelect.value = p.mode;
+      runCalculator();
+    });
+
+    document.getElementById("calculateBtn").addEventListener("click", runCalculator);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([key,value]) => el[key].value = value);
+      runCalculator();
+    });
+
+    function getInputs(){
+      return {
+        mu:parseFloat(el.muInput.value),
+        R:parseFloat(el.radiusInput.value),
+        h:parseFloat(el.altitudeInput.value),
+        phaseDeg:Math.abs(parseFloat(el.phaseAngleInput.value)),
+        N:Math.round(parseFloat(el.revsInput.value)),
+        mode:el.modeSelect.value,
+        plotRevs:Math.max(1, Math.round(parseFloat(el.plotRevsInput.value)))
+      };
+    }
+
+    function validate(p){
+      if (![p.mu,p.R,p.h,p.phaseDeg,p.N,p.plotRevs].every(Number.isFinite)) return "Please enter valid numeric inputs.";
+      if (p.mu <= 0 || p.R <= 0) return "μ and body radius must be positive.";
+      if (p.h < 0) return "Reference altitude must be zero or positive.";
+      if (p.phaseDeg <= 0 || p.phaseDeg >= 360) return "Phase angle must be between 0 and 360 degrees.";
+      if (p.N < 1) return "Number of phasing revolutions must be at least 1.";
+      return null;
+    }
+
+    function calculatePhasing(p){
+      const r0 = p.R + p.h;
+      const v0 = Math.sqrt(p.mu / r0);
+      const T0 = 2 * Math.PI * Math.sqrt(Math.pow(r0,3) / p.mu);
+      const timeShift = (p.phaseDeg / 360) * T0;
+      const sign = p.mode === "catchup" ? -1 : 1;
+      const Tp = T0 + sign * timeShift / p.N;
+      if (Tp <= 0) throw new Error("The requested catch-up is too aggressive for the selected number of revolutions. Increase N or reduce the phase angle.");
+
+      const ap = Math.cbrt(p.mu * Math.pow(Tp/(2*Math.PI), 2));
+      const rOpposite = 2*ap - r0;
+      if (rOpposite <= p.R) throw new Error("The phasing orbit intersects the central body. Increase phasing revolutions or reduce phase angle.");
+
+      const vpAtBurn = Math.sqrt(p.mu * (2/r0 - 1/ap));
+      const dv1 = Math.abs(vpAtBurn - v0);
+      const dv2 = dv1;
+      const dvTotal = dv1 + dv2;
+      const hOpposite = rOpposite - p.R;
+      const hMin = Math.min(p.h, hOpposite);
+      const hMax = Math.max(p.h, hOpposite);
+      const closureRateDegPerRefOrbit = p.phaseDeg / p.N;
+
+      return {r0,v0,T0,timeShift,Tp,ap,rOpposite,hOpposite,hMin,hMax,dv1,dv2,dvTotal,closureRateDegPerRefOrbit};
+    }
+
+    function fmt(x,d=3,suffix=""){
+      if (!Number.isFinite(x)) return "—";
+      return x.toFixed(d) + suffix;
+    }
+
+    function showError(msg){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Input error</h3><p>${msg}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function updateResults(p,r){
+      document.getElementById("T0Out").textContent = `${fmt(r.T0/60,2," min")} (${fmt(r.T0/3600,3," hr")})`;
+      document.getElementById("dtOut").textContent = `${fmt(r.timeShift/60,2," min")} for ${fmt(p.phaseDeg,1,"°")}`;
+      document.getElementById("TpOut").textContent = `${fmt(r.Tp/60,2," min")} per phasing rev`;
+      document.getElementById("apOut").textContent = fmt(r.ap,2," km");
+      document.getElementById("altRangeOut").textContent = `${fmt(r.hMin,1," km")} to ${fmt(r.hMax,1," km")}`;
+      document.getElementById("dvOut").textContent = `${fmt(r.dvTotal,4," km/s")} (${fmt(r.dvTotal*1000,1," m/s")})`;
+
+      const objective = p.mode === "catchup" ? "shorter-period phasing orbit so the spacecraft moves ahead" : "longer-period phasing orbit so the spacecraft falls behind";
+      const apsis = r.hOpposite > p.h ? "apogee" : "perigee";
+      document.getElementById("interpretText").textContent =
+        `This solution uses a ${objective}. The opposite apsis becomes the phasing orbit ${apsis}, at approximately ${r.hOpposite.toFixed(1)} km altitude. ` +
+        `Using ${p.N} phasing revolution(s) spreads the phase correction to about ${r.closureRateDegPerRefOrbit.toFixed(2)}° per revolution.`;
+    }
+
+    function drawOrbitPlot(p,r){
+      const theta = [];
+      const circleX = [], circleY = [];
+      const phaseX = [], phaseY = [];
+      const rp = Math.min(r.r0, r.rOpposite);
+      const ra = Math.max(r.r0, r.rOpposite);
+      const a = r.ap;
+      const e = Math.abs(ra-rp)/(ra+rp);
+      const burnAtPerigee = r.r0 <= r.rOpposite;
+
+      for (let k=0; k<=360; k++){
+        const th = k*Math.PI/180;
+        theta.push(th);
+        circleX.push(r.r0*Math.cos(th));
+        circleY.push(r.r0*Math.sin(th));
+
+        let nu = burnAtPerigee ? th : th + Math.PI;
+        const rr = a*(1-e*e)/(1 + e*Math.cos(nu));
+        phaseX.push(rr*Math.cos(th));
+        phaseY.push(rr*Math.sin(th));
+      }
+
+      const body = makeCircle(p.R, 120);
+      const maxR = Math.max(r.r0, r.rOpposite) * 1.15;
+
+      Plotly.newPlot("orbitPlot", [
+        {type:"scatter", mode:"lines", x:body.x, y:body.y, fill:"toself", fillcolor:"#dbeafe", line:{color:"#93c5fd", width:1}, name:"Central body"},
+        {type:"scatter", mode:"lines", x:circleX, y:circleY, line:{color:"#2563eb", width:3}, name:"Reference orbit"},
+        {type:"scatter", mode:"lines", x:phaseX, y:phaseY, line:{color:"#f97316", width:3}, name:"Phasing orbit"},
+        {type:"scatter", mode:"markers+text", x:[r.r0], y:[0], text:["Burn point"], textposition:"top right", marker:{size:9,color:"#7c3aed"}, name:"Burn point"}
+      ], {
+        margin:{l:40,r:20,t:10,b:40},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"x (km)", range:[-maxR,maxR], scaleanchor:"y", gridcolor:"#e5e7eb"},
+        yaxis:{title:"y (km)", range:[-maxR,maxR], gridcolor:"#e5e7eb"},
+        legend:{orientation:"h", x:0.02, y:1.08}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawPhasePlot(p,r){
+      const x=[], y=[];
+      for (let k=0; k<=p.N; k++){
+        x.push(k);
+        y.push((p.phaseDeg/p.N)*k);
+      }
+      Plotly.newPlot("phasePlot", [{
+        type:"scatter",
+        mode:"lines+markers",
+        x:x,
+        y:y,
+        line:{color:"#0f8b8d", width:3},
+        marker:{size:8, color:"#2563eb"},
+        name:"Phase closed"
+      }], {
+        margin:{l:60,r:20,t:10,b:50},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"Completed phasing revolutions", dtick:1, gridcolor:"#e5e7eb"},
+        yaxis:{title:"Phase change achieved (deg)", gridcolor:"#e5e7eb", range:[0,p.phaseDeg*1.15]},
+        showlegend:false
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function makeCircle(R,n){
+      const x=[], y=[];
+      for (let k=0; k<=n; k++){
+        const th = 2*Math.PI*k/n;
+        x.push(R*Math.cos(th));
+        y.push(R*Math.sin(th));
+      }
+      return {x,y};
+    }
+
+    function runCalculator(){
+      clearError();
+      const p = getInputs();
+      const err = validate(p);
+      if (err){ showError(err); return; }
+      try{
+        const result = calculatePhasing(p);
+        updateResults(p,result);
+        drawOrbitPlot(p,result);
+        drawPhasePlot(p,result);
+      } catch(e){
+        showError(e.message || "Could not compute a valid phasing maneuver for these inputs.");
+      }
+    }
+
+    runCalculator();
+  </script>
+</body>
+</html>
