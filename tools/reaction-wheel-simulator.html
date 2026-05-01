@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reaction Wheel Simulator | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --bad:#fee2e2;
+      --bad-line:#ef4444;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{display:grid; gap:22px;}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,.card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{margin:10px 0 0 22px; padding:0;}
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{display:flex; gap:12px; margin:4px 0 18px; flex-wrap:wrap;}
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .split-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .split-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+    .field{margin-bottom:16px;}
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{font-size:0.94rem; color:#6b7280; margin-top:6px;}
+
+    .button-row{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
+
+    .cta,.ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{color:#fff; background:linear-gradient(135deg,var(--accent-2),var(--accent)); flex:1 1 240px; box-shadow:0 12px 24px rgba(37,99,235,0.18);}
+    .ghost{color:#1f2937; background:#e5e7eb; flex:1 1 160px;}
+
+    .results-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;}
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{margin:0 0 8px; font-size:0.98rem; color:#475569; line-height:1.35;}
+    .result-box .value{font-size:1.04rem; font-weight:800; color:#111827; line-height:1.35; word-break:break-word;}
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{border-left-color:var(--warn-line); background:var(--warn);}
+    .callout.bad{border-left-color:var(--bad-line); background:var(--bad);}
+    .callout h3{margin-top:0; margin-bottom:8px; font-size:1.15rem;}
+    .callout p{margin:0;}
+
+    .plot-card{background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:16px;}
+    .plot-title{font-weight:800; font-size:1.08rem; margin:0 0 10px; color:#111827;}
+    .plot-box{width:100%; min-height:430px; border:1px solid #e2e8f0; border-radius:18px; overflow:hidden; background:#fff;}
+    .plot-box.short{min-height:320px;}
+
+    .back-link-row{margin-top:40px; text-align:left;}
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{text-align:center; padding:1.5rem 0; font-size:0.95rem; color:#4b5563; line-height:1.6;}
+
+    @media (max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media (max-width:760px){
+      .page-wrap{width:min(100% - 24px, 1380px);}
+      .tool-hero{padding:24px 20px 28px; border-radius:24px;}
+      .card{padding:22px 18px 24px;}
+      .split-2,.split-3,.results-grid{grid-template-columns:1fr;}
+      .plot-box{min-height:350px;}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 14 · Attitude Dynamics</div>
+      <h1>Reaction Wheel Simulator</h1>
+      <p>
+        Simulate how a reaction wheel applies torque to a spacecraft, builds wheel momentum, changes attitude rate,
+        and eventually reaches speed or momentum saturation. This is a real spacecraft attitude-control problem.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            A reaction wheel changes spacecraft attitude by exchanging angular momentum with the spacecraft body.
+            When the wheel accelerates in one direction, the spacecraft responds with equal and opposite torque.
+          </p>
+          <ul>
+            <li>Wheel angular speed history</li>
+            <li>Wheel momentum buildup</li>
+            <li>Spacecraft angular velocity response</li>
+            <li>Single-axis attitude angle response</li>
+            <li>Wheel saturation warning</li>
+            <li>Simple desaturation interpretation</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Core reaction-wheel model</h2>
+          <p>
+            The wheel torque and wheel angular acceleration are connected by:
+          </p>
+          <div class="formula-box">
+            \[
+              \tau_w = I_w \dot{\omega}_w
+            \]
+          </div>
+          <p>
+            The spacecraft receives the opposite torque:
+          </p>
+          <div class="formula-box">
+            \[
+              \tau_{sc} = -\tau_w
+            \]
+          </div>
+          <p>
+            In this one-axis educational model, the spacecraft angular acceleration is:
+          </p>
+          <div class="formula-box">
+            \[
+              I_{sc}\dot{\omega}_{sc} = \tau_{sc} + \tau_{dist}
+            \]
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Momentum saturation</h2>
+          <p>
+            A wheel cannot spin forever. As external disturbances accumulate, the wheel stores angular momentum.
+            Once the wheel approaches its speed or momentum limit, it cannot keep providing control authority.
+          </p>
+          <div class="formula-box">
+            \[
+              h_w = I_w \omega_w
+            \]
+          </div>
+          <p>
+            When \(|h_w|\) approaches the allowed limit, a spacecraft usually needs momentum dumping using magnetorquers or thrusters.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Why this matters for spacecraft GNC</h2>
+          <ul>
+            <li>Reaction wheels are precise but momentum-limited actuators.</li>
+            <li>Small disturbances can build up wheel momentum over time.</li>
+            <li>Saturation means the spacecraft may lose attitude-control authority.</li>
+            <li>Momentum management is a real operational constraint, not just a control-theory detail.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Educational simplification</h3>
+            <p>
+              This is a one-axis model. Real spacecraft use three or four wheels, full 3D attitude dynamics, wheel alignment matrices, friction, jitter, and desaturation logic.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive reaction wheel simulator</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="spacecraft">Spacecraft</button>
+            <button type="button" class="tab-btn" data-mode="wheel">Wheel</button>
+            <button type="button" class="tab-btn" data-mode="command">Command</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-spacecraft" class="mode-panel active">
+            <div class="split-2">
+              <div class="field">
+                <label for="IscInput">Spacecraft inertia about axis (kg·m²)</label>
+                <input id="IscInput" type="number" value="80" step="1" min="0.001">
+              </div>
+              <div class="field">
+                <label for="theta0Input">Initial attitude angle (deg)</label>
+                <input id="theta0Input" type="number" value="0" step="1">
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="omegaSc0Input">Initial spacecraft rate (deg/s)</label>
+                <input id="omegaSc0Input" type="number" value="0" step="0.1">
+              </div>
+              <div class="field">
+                <label for="distTorqueInput">Constant disturbance torque (N·m)</label>
+                <input id="distTorqueInput" type="number" value="0.0005" step="0.0001">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-wheel" class="mode-panel">
+            <div class="split-2">
+              <div class="field">
+                <label for="IwInput">Wheel inertia (kg·m²)</label>
+                <input id="IwInput" type="number" value="0.02" step="0.001" min="0.0001">
+              </div>
+              <div class="field">
+                <label for="wheelSpeed0Input">Initial wheel speed (rpm)</label>
+                <input id="wheelSpeed0Input" type="number" value="0" step="10">
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="wheelSpeedLimitInput">Wheel speed limit (rpm)</label>
+                <input id="wheelSpeedLimitInput" type="number" value="6000" step="100" min="1">
+              </div>
+              <div class="field">
+                <label for="momentumLimitInput">Momentum limit (N·m·s)</label>
+                <input id="momentumLimitInput" type="number" value="12" step="0.1" min="0.001">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-command" class="mode-panel">
+            <div class="split-2">
+              <div class="field">
+                <label for="commandModeSelect">Command mode</label>
+                <select id="commandModeSelect">
+                  <option value="constant">Constant wheel torque</option>
+                  <option value="pdHold">PD attitude hold</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="durationInput">Simulation duration (s)</label>
+                <input id="durationInput" type="number" value="800" step="50" min="1">
+              </div>
+            </div>
+
+            <div class="split-3">
+              <div class="field">
+                <label for="wheelTorqueInput">Wheel torque command (N·m)</label>
+                <input id="wheelTorqueInput" type="number" value="0.003" step="0.001">
+              </div>
+              <div class="field">
+                <label for="kpInput">Kp attitude hold</label>
+                <input id="kpInput" type="number" value="0.004" step="0.001">
+              </div>
+              <div class="field">
+                <label for="kdInput">Kd attitude hold</label>
+                <input id="kdInput" type="number" value="0.08" step="0.01">
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="targetAngleInput">Target angle for PD hold (deg)</label>
+                <input id="targetAngleInput" type="number" value="0" step="1">
+              </div>
+              <div class="field">
+                <label for="dtInput">Time step (s)</label>
+                <input id="dtInput" type="number" value="1" step="0.1" min="0.01">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Scenario preset</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="spinup">Wheel spin-up demonstration</option>
+                <option value="disturbance">Disturbance momentum buildup</option>
+                <option value="nearSaturation">Near saturation case</option>
+                <option value="pdHold">PD attitude hold with wheel buildup</option>
+                <option value="smallSat">SmallSat reaction wheel example</option>
+              </select>
+              <div class="hint">Use presets to show wheel momentum buildup and saturation behaviour.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="runBtn">Simulate Reaction Wheel</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Final wheel speed</h4><div class="value" id="wheelSpeedOut">—</div></div>
+            <div class="result-box"><h4>Final wheel momentum</h4><div class="value" id="momentumOut">—</div></div>
+            <div class="result-box"><h4>Saturation status</h4><div class="value" id="satOut">—</div></div>
+            <div class="result-box"><h4>Final spacecraft rate</h4><div class="value" id="rateOut">—</div></div>
+            <div class="result-box"><h4>Final attitude angle</h4><div class="value" id="angleOut">—</div></div>
+            <div class="result-box"><h4>Peak wheel usage</h4><div class="value" id="usageOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the simulator to see reaction-wheel momentum buildup and saturation risk.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Wheel speed and saturation limit</div>
+            <div id="wheelPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Wheel momentum buildup</div>
+            <div id="momentumPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Spacecraft attitude response</div>
+            <div id="attitudePlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This simulator assumes:</h3>
+            <ul>
+              <li>Single-axis spacecraft rotation</li>
+              <li>One reaction wheel aligned with that axis</li>
+              <li>Ideal torque command up to saturation</li>
+              <li>No bearing friction, jitter, sensor noise, or flexible dynamics</li>
+              <li>No real momentum dumping actuator; only saturation warning</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const DEG = Math.PI / 180;
+    const RAD = 180 / Math.PI;
+    const RPM_TO_RAD = 2 * Math.PI / 60;
+    const RAD_TO_RPM = 60 / (2 * Math.PI);
+
+    const defaults = {
+      IscInput:80,
+      theta0Input:0,
+      omegaSc0Input:0,
+      distTorqueInput:0.0005,
+      IwInput:0.02,
+      wheelSpeed0Input:0,
+      wheelSpeedLimitInput:6000,
+      momentumLimitInput:12,
+      commandModeSelect:"constant",
+      durationInput:800,
+      wheelTorqueInput:0.003,
+      kpInput:0.004,
+      kdInput:0.08,
+      targetAngleInput:0,
+      dtInput:1,
+      presetSelect:"custom"
+    };
+
+    const presets = {
+      spinup:{Isc:80,theta:0,omega:0,dist:0,Iw:0.02,wheel0:0,speedLimit:6000,hLimit:12,mode:"constant",duration:600,torque:0.003,kp:0.004,kd:0.08,target:0,dt:1},
+      disturbance:{Isc:80,theta:0,omega:0,dist:0.0008,Iw:0.02,wheel0:0,speedLimit:6000,hLimit:12,mode:"pdHold",duration:1600,torque:0,kp:0.006,kd:0.12,target:0,dt:1},
+      nearSaturation:{Isc:60,theta:0,omega:0,dist:0.0015,Iw:0.015,wheel0:4000,speedLimit:6000,hLimit:8,mode:"pdHold",duration:1200,torque:0,kp:0.008,kd:0.1,target:0,dt:1},
+      pdHold:{Isc:80,theta:15,omega:0,dist:0.0004,Iw:0.02,wheel0:0,speedLimit:6000,hLimit:12,mode:"pdHold",duration:900,torque:0,kp:0.006,kd:0.11,target:0,dt:0.5},
+      smallSat:{Isc:12,theta:8,omega:0,dist:0.00008,Iw:0.004,wheel0:500,speedLimit:8000,hLimit:3,mode:"pdHold",duration:700,torque:0,kp:0.0015,kd:0.02,target:0,dt:0.5}
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.IscInput.value = p.Isc;
+      el.theta0Input.value = p.theta;
+      el.omegaSc0Input.value = p.omega;
+      el.distTorqueInput.value = p.dist;
+      el.IwInput.value = p.Iw;
+      el.wheelSpeed0Input.value = p.wheel0;
+      el.wheelSpeedLimitInput.value = p.speedLimit;
+      el.momentumLimitInput.value = p.hLimit;
+      el.commandModeSelect.value = p.mode;
+      el.durationInput.value = p.duration;
+      el.wheelTorqueInput.value = p.torque;
+      el.kpInput.value = p.kp;
+      el.kdInput.value = p.kd;
+      el.targetAngleInput.value = p.target;
+      el.dtInput.value = p.dt;
+      runSimulation();
+    });
+
+    document.getElementById("runBtn").addEventListener("click", runSimulation);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([key,value]) => el[key].value = value);
+      runSimulation();
+    });
+
+    function getInputs(){
+      return {
+        Isc:parseFloat(el.IscInput.value),
+        theta0:parseFloat(el.theta0Input.value) * DEG,
+        omegaSc0:parseFloat(el.omegaSc0Input.value) * DEG,
+        distTorque:parseFloat(el.distTorqueInput.value),
+        Iw:parseFloat(el.IwInput.value),
+        wheelSpeed0:parseFloat(el.wheelSpeed0Input.value) * RPM_TO_RAD,
+        speedLimit:Math.abs(parseFloat(el.wheelSpeedLimitInput.value) * RPM_TO_RAD),
+        momentumLimit:Math.abs(parseFloat(el.momentumLimitInput.value)),
+        commandMode:el.commandModeSelect.value,
+        duration:parseFloat(el.durationInput.value),
+        wheelTorqueCommand:parseFloat(el.wheelTorqueInput.value),
+        kp:parseFloat(el.kpInput.value),
+        kd:parseFloat(el.kdInput.value),
+        targetAngle:parseFloat(el.targetAngleInput.value) * DEG,
+        dt:parseFloat(el.dtInput.value)
+      };
+    }
+
+    function validate(p){
+      const vals = [p.Isc,p.theta0,p.omegaSc0,p.distTorque,p.Iw,p.wheelSpeed0,p.speedLimit,p.momentumLimit,p.duration,p.wheelTorqueCommand,p.kp,p.kd,p.targetAngle,p.dt];
+      if (!vals.every(Number.isFinite)) return "Please enter valid numeric inputs.";
+      if (p.Isc <= 0 || p.Iw <= 0) return "Spacecraft inertia and wheel inertia must be positive.";
+      if (p.speedLimit <= 0 || p.momentumLimit <= 0) return "Wheel speed and momentum limits must be positive.";
+      if (p.duration <= 0 || p.dt <= 0) return "Simulation duration and time step must be positive.";
+      if (Math.floor(p.duration / p.dt) > 8000) return "Too many simulation steps. Increase time step or reduce duration.";
+      return null;
+    }
+
+    function showError(msg){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Input error</h3><p>${msg}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function clamp(v,min,max){return Math.min(max, Math.max(min, v));}
+
+    function simulate(p){
+      let theta = p.theta0;
+      let omegaSc = p.omegaSc0;
+      let wheelSpeed = p.wheelSpeed0;
+      const n = Math.floor(p.duration / p.dt) + 1;
+      const t=[], thetaArr=[], omegaArr=[], wheelRpm=[], wheelMomentum=[], torqueArr=[], usageArr=[];
+      let saturated = false;
+      let saturationTime = null;
+      let maxUsage = 0;
+
+      for (let k=0; k<n; k++){
+        const time = k * p.dt;
+        const hWheel = p.Iw * wheelSpeed;
+        const speedUsage = Math.abs(wheelSpeed) / p.speedLimit;
+        const momentumUsage = Math.abs(hWheel) / p.momentumLimit;
+        const usage = Math.max(speedUsage, momentumUsage);
+        maxUsage = Math.max(maxUsage, usage);
+
+        t.push(time);
+        thetaArr.push(theta * RAD);
+        omegaArr.push(omegaSc * RAD);
+        wheelRpm.push(wheelSpeed * RAD_TO_RPM);
+        wheelMomentum.push(hWheel);
+        usageArr.push(usage * 100);
+
+        if (usage >= 1 && !saturated) {
+          saturated = true;
+          saturationTime = time;
+        }
+
+        if (k === n-1) break;
+
+        let wheelTorque;
+        if (p.commandMode === "constant") {
+          wheelTorque = p.wheelTorqueCommand;
+        } else {
+          const err = p.targetAngle - theta;
+          const scTorqueDesired = p.kp * err - p.kd * omegaSc;
+          wheelTorque = -scTorqueDesired;
+        }
+
+        if (usage >= 1) {
+          const sign = Math.sign(wheelTorque || wheelSpeed || 1);
+          if (Math.sign(wheelSpeed + (wheelTorque / p.Iw) * p.dt) === Math.sign(wheelSpeed) && Math.abs(wheelSpeed) >= p.speedLimit*0.999) {
+            wheelTorque = 0;
+          }
+          if (Math.abs(hWheel) >= p.momentumLimit*0.999 && Math.sign(wheelTorque) === sign) {
+            wheelTorque = 0;
+          }
+        }
+
+        const scTorque = -wheelTorque + p.distTorque;
+        const alphaSc = scTorque / p.Isc;
+        const alphaWheel = wheelTorque / p.Iw;
+
+        omegaSc += alphaSc * p.dt;
+        theta += omegaSc * p.dt;
+        wheelSpeed += alphaWheel * p.dt;
+
+        if (Math.abs(wheelSpeed) > p.speedLimit) wheelSpeed = Math.sign(wheelSpeed) * p.speedLimit;
+        const hNew = p.Iw * wheelSpeed;
+        if (Math.abs(hNew) > p.momentumLimit) wheelSpeed = Math.sign(wheelSpeed) * p.momentumLimit / p.Iw;
+
+        torqueArr.push(wheelTorque);
+      }
+
+      torqueArr.push(torqueArr.length ? torqueArr[torqueArr.length-1] : 0);
+      return {t,thetaArr,omegaArr,wheelRpm,wheelMomentum,torqueArr,usageArr,saturated,saturationTime,maxUsage,final:{theta,omegaSc,wheelSpeed,hWheel:p.Iw*wheelSpeed}};
+    }
+
+    function fmt(v,d=3,suffix=""){
+      if (!Number.isFinite(v)) return "—";
+      return v.toFixed(d) + suffix;
+    }
+
+    function updateResults(p,d){
+      const finalRpm = d.final.wheelSpeed * RAD_TO_RPM;
+      const finalMomentum = d.final.hWheel;
+      const finalRate = d.final.omegaSc * RAD;
+      const finalAngle = d.final.theta * RAD;
+      const satText = d.saturated ? `Saturated at ${fmt(d.saturationTime,1," s")}` : "Not saturated";
+
+      document.getElementById("wheelSpeedOut").textContent = fmt(finalRpm,1," rpm");
+      document.getElementById("momentumOut").textContent = fmt(finalMomentum,4," N·m·s");
+      document.getElementById("satOut").textContent = satText;
+      document.getElementById("rateOut").textContent = fmt(finalRate,4," deg/s");
+      document.getElementById("angleOut").textContent = fmt(finalAngle,3," deg");
+      document.getElementById("usageOut").textContent = fmt(d.maxUsage*100,1," %");
+
+      const box = document.getElementById("interpretBox");
+      box.classList.remove("warn","bad");
+      let msg = "The wheel remains within its momentum and speed limits. The plots show how wheel speed changes as the spacecraft responds to torque.";
+      if (d.maxUsage > 0.8 && d.maxUsage < 1) {
+        box.classList.add("warn");
+        msg = "The wheel approaches saturation. A real spacecraft would monitor this and may schedule momentum dumping before control authority is lost.";
+      }
+      if (d.saturated) {
+        box.classList.add("bad");
+        msg = "The wheel reaches saturation. After saturation, the wheel cannot continue increasing stored momentum in that direction, so attitude-control authority becomes limited.";
+      }
+      if (Math.abs(p.distTorque) > 0 && p.commandMode === "pdHold") {
+        msg += " The disturbance torque causes long-term momentum buildup even while the attitude controller tries to hold pointing.";
+      }
+      document.getElementById("interpretText").textContent = msg;
+
+      drawWheelPlot(p,d);
+      drawMomentumPlot(p,d);
+      drawAttitudePlot(d);
+    }
+
+    function drawWheelPlot(p,d){
+      const limitRpm = p.speedLimit * RAD_TO_RPM;
+      Plotly.newPlot("wheelPlot", [
+        {type:"scatter", mode:"lines", x:d.t, y:d.wheelRpm, line:{color:"#2563eb", width:3}, name:"Wheel speed"},
+        {type:"scatter", mode:"lines", x:d.t, y:d.t.map(()=>limitRpm), line:{color:"#ef4444", width:2, dash:"dash"}, name:"+ limit"},
+        {type:"scatter", mode:"lines", x:d.t, y:d.t.map(()=>-limitRpm), line:{color:"#ef4444", width:2, dash:"dash"}, name:"- limit"}
+      ], {
+        margin:{l:70,r:20,t:10,b:55}, paper_bgcolor:"#fff", plot_bgcolor:"#fff",
+        xaxis:{title:"Time (s)", gridcolor:"#e5e7eb"},
+        yaxis:{title:"Wheel speed (rpm)", gridcolor:"#e5e7eb", zeroline:true},
+        legend:{orientation:"h", x:0.02, y:1.12}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawMomentumPlot(p,d){
+      Plotly.newPlot("momentumPlot", [
+        {type:"scatter", mode:"lines", x:d.t, y:d.wheelMomentum, line:{color:"#0f8b8d", width:3}, name:"Wheel momentum"},
+        {type:"scatter", mode:"lines", x:d.t, y:d.t.map(()=>p.momentumLimit), line:{color:"#ef4444", width:2, dash:"dash"}, name:"+ limit"},
+        {type:"scatter", mode:"lines", x:d.t, y:d.t.map(()=>-p.momentumLimit), line:{color:"#ef4444", width:2, dash:"dash"}, name:"- limit"},
+        {type:"scatter", mode:"lines", x:d.t, y:d.usageArr, yaxis:"y2", line:{color:"#7c3aed", width:2, dash:"dot"}, name:"Usage %"}
+      ], {
+        margin:{l:70,r:60,t:10,b:55}, paper_bgcolor:"#fff", plot_bgcolor:"#fff",
+        xaxis:{title:"Time (s)", gridcolor:"#e5e7eb"},
+        yaxis:{title:"Momentum (N·m·s)", gridcolor:"#e5e7eb", zeroline:true},
+        yaxis2:{title:"Usage (%)", overlaying:"y", side:"right", range:[0,120]},
+        legend:{orientation:"h", x:0.02, y:1.12}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawAttitudePlot(d){
+      Plotly.newPlot("attitudePlot", [
+        {type:"scatter", mode:"lines", x:d.t, y:d.thetaArr, line:{color:"#2563eb", width:3}, name:"Attitude angle"},
+        {type:"scatter", mode:"lines", x:d.t, y:d.omegaArr, yaxis:"y2", line:{color:"#f97316", width:3}, name:"Spacecraft rate"}
+      ], {
+        margin:{l:70,r:60,t:10,b:55}, paper_bgcolor:"#fff", plot_bgcolor:"#fff",
+        xaxis:{title:"Time (s)", gridcolor:"#e5e7eb"},
+        yaxis:{title:"Angle (deg)", gridcolor:"#e5e7eb", zeroline:true},
+        yaxis2:{title:"Rate (deg/s)", overlaying:"y", side:"right", zeroline:true},
+        legend:{orientation:"h", x:0.02, y:1.12}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function runSimulation(){
+      clearError();
+      const p = getInputs();
+      const err = validate(p);
+      if (err){ showError(err); return; }
+      try{
+        const d = simulate(p);
+        updateResults(p,d);
+      } catch(e){
+        showError(e.message || "Simulation failed. Check inputs and reduce the time step.");
+      }
+    }
+
+    runSimulation();
+  </script>
+</body>
+</html>
