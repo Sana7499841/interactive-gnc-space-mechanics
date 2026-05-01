@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orbit Propagator | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+      --radius-lg:20px;
+      --radius-md:16px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{
+      display:grid;
+      gap:22px;
+    }
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,
+    .card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{
+      margin:10px 0 0 22px;
+      padding:0;
+    }
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{
+      display:flex;
+      gap:12px;
+      margin:4px 0 18px;
+      flex-wrap:wrap;
+    }
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      color:#fff;
+    }
+
+    .tab-btn:hover{ transform:translateY(-1px); }
+
+    .mode-panel{ display:none; }
+    .mode-panel.active{ display:block; }
+
+    .split-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+    }
+
+    .split-3{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:16px;
+    }
+
+    .field{ margin-bottom:16px; }
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,
+    select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,
+    select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{
+      font-size:0.94rem;
+      color:#6b7280;
+      margin-top:6px;
+    }
+
+    .button-row{
+      display:flex;
+      gap:12px;
+      margin-top:8px;
+      flex-wrap:wrap;
+    }
+
+    .cta,
+    .ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      flex:1 1 240px;
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .ghost{
+      color:#1f2937;
+      background:#e5e7eb;
+      flex:1 1 160px;
+    }
+
+    .results-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:16px;
+      margin-top:14px;
+    }
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{
+      margin:0 0 8px;
+      font-size:0.98rem;
+      color:#475569;
+      line-height:1.35;
+    }
+
+    .result-box .value{
+      font-size:1.12rem;
+      font-weight:800;
+      color:#111827;
+      line-height:1.35;
+    }
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{
+      border-left-color:var(--warn-line);
+      background:var(--warn);
+    }
+
+    .callout h3{
+      margin-top:0;
+      margin-bottom:8px;
+      font-size:1.15rem;
+    }
+
+    .callout p{ margin:0; }
+
+    .plot-card{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:22px;
+      padding:18px;
+      margin-top:16px;
+    }
+
+    .plot-title{
+      font-weight:800;
+      font-size:1.08rem;
+      margin:0 0 10px;
+      color:#111827;
+    }
+
+    .plot-box{
+      width:100%;
+      min-height:420px;
+      border:1px solid #e2e8f0;
+      border-radius:18px;
+      overflow:hidden;
+      background:#fff;
+    }
+
+    .plot-box.short{ min-height:320px; }
+
+    .small-note{
+      font-size:0.95rem;
+      color:#64748b;
+      margin-top:10px;
+    }
+
+    .back-link-row{
+      margin-top:40px;
+      text-align:left;
+    }
+
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{
+      text-align:center;
+      padding:1.5rem 0;
+      font-size:0.95rem;
+      color:#4b5563;
+      line-height:1.6;
+    }
+
+    @media (max-width: 1100px){
+      .grid-2{ grid-template-columns:1fr; }
+    }
+
+    @media (max-width: 760px){
+      .page-wrap{ width:min(100% - 24px, 1380px); }
+      .tool-hero{ padding:24px 20px 28px; border-radius:24px; }
+      .card{ padding:22px 18px 24px; }
+      .split-2,
+      .split-3,
+      .results-grid{ grid-template-columns:1fr; }
+      .plot-box{ min-height:340px; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 6 · Orbit Dynamics</div>
+      <h1>Orbit Propagator</h1>
+      <p>
+        Propagate a spacecraft orbit from classical orbital elements, visualize the 3D trajectory,
+        inspect the ground track, and check specific mechanical energy. This tool connects the COE converter
+        to real orbital motion and introduces the difference between ideal two-body motion and J2-perturbed motion.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            This module starts from classical orbital elements and converts them into an inertial position-velocity state.
+            It then numerically propagates the orbit forward in time and draws the resulting trajectory.
+          </p>
+          <ul>
+            <li>Initial ECI state vector from COEs</li>
+            <li>3D inertial orbit trajectory</li>
+            <li>Latitude-longitude ground track</li>
+            <li>Specific mechanical energy history</li>
+            <li>Optional J2 perturbation effect on RAAN and argument of perigee</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Core orbital model</h2>
+          <p>
+            In the two-body model, spacecraft acceleration depends only on the central body's gravity:
+          </p>
+          <div class="formula-box">
+            \[
+              \ddot{\mathbf r} = -\frac{\mu}{r^3}\mathbf r
+            \]
+          </div>
+          <p>
+            The propagated state is checked using specific mechanical energy:
+          </p>
+          <div class="formula-box">
+            \[
+              \varepsilon = \frac{v^2}{2} - \frac{\mu}{r}
+            \]
+          </div>
+          <p>
+            For ideal two-body motion, this energy should remain nearly constant. If numerical step size is too large,
+            the orbit may appear to gain or lose energy even when the physical model says it should not.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>J2 perturbation option</h2>
+          <p>
+            The optional J2 mode adds the leading oblateness perturbation of the central body. This is useful for seeing
+            how real Earth orbits slowly rotate in space rather than repeating perfectly.
+          </p>
+          <div class="formula-box">
+            \[
+              J_2 \rightarrow \dot{\Omega},\ \dot{\omega}
+            \]
+          </div>
+          <ul>
+            <li>RAAN drift shows nodal precession.</li>
+            <li>Argument of perigee drift shows rotation of the line of apsides.</li>
+            <li>Ground tracks shift because Earth rotates under the inertial orbit.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Learning note</h3>
+            <p>
+              This is still an educational propagator. It is not a replacement for STK, Orekit, GMAT, or flight-dynamics validation tools.
+            </p>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>How to read the plots</h2>
+          <ul>
+            <li><strong>3D orbit:</strong> shows the inertial trajectory around Earth.</li>
+            <li><strong>Ground track:</strong> shows where the spacecraft passes over the rotating Earth.</li>
+            <li><strong>Energy plot:</strong> checks whether the numerical integration is physically consistent.</li>
+            <li><strong>RAAN / argument drift:</strong> becomes meaningful when J2 is enabled.</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive propagator</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="orbit">Orbit Inputs</button>
+            <button type="button" class="tab-btn" data-mode="propagation">Propagation</button>
+            <button type="button" class="tab-btn" data-mode="model">Model</button>
+          </div>
+
+          <div id="mode-orbit" class="mode-panel active">
+            <div class="split-2">
+              <div class="field">
+                <label for="aInput">Semi-major axis, a (km)</label>
+                <input type="number" id="aInput" value="7000" step="10" />
+              </div>
+              <div class="field">
+                <label for="eInput">Eccentricity, e</label>
+                <input type="number" id="eInput" value="0.001" step="0.001" min="0" />
+              </div>
+            </div>
+
+            <div class="split-3">
+              <div class="field">
+                <label for="iInput">Inclination, i (deg)</label>
+                <input type="number" id="iInput" value="51.6" step="0.1" />
+              </div>
+              <div class="field">
+                <label for="raanInput">RAAN, Ω (deg)</label>
+                <input type="number" id="raanInput" value="0" step="1" />
+              </div>
+              <div class="field">
+                <label for="argpInput">Arg. perigee, ω (deg)</label>
+                <input type="number" id="argpInput" value="0" step="1" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="taInput">True anomaly, ν (deg)</label>
+              <input type="number" id="taInput" value="0" step="1" />
+            </div>
+          </div>
+
+          <div id="mode-propagation" class="mode-panel">
+            <div class="split-2">
+              <div class="field">
+                <label for="durationInput">Duration (hours)</label>
+                <input type="number" id="durationInput" value="6" step="0.5" min="0.1" />
+              </div>
+              <div class="field">
+                <label for="dtInput">Time step (s)</label>
+                <input type="number" id="dtInput" value="60" step="10" min="1" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="presetSelect">Quick orbit preset</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="leo">LEO example</option>
+                <option value="iss">ISS-like orbit</option>
+                <option value="polar">Polar orbit</option>
+                <option value="molniya">Molniya-like orbit</option>
+                <option value="geo">GEO-like orbit</option>
+              </select>
+              <div class="hint">Use presets for fast demonstrations, then adjust the inputs manually.</div>
+            </div>
+          </div>
+
+          <div id="mode-model" class="mode-panel">
+            <div class="split-2">
+              <div class="field">
+                <label for="muInput">μ (km³/s²)</label>
+                <input type="number" id="muInput" value="398600.4418" step="any" />
+              </div>
+              <div class="field">
+                <label for="earthRadiusInput">Earth radius (km)</label>
+                <input type="number" id="earthRadiusInput" value="6378.137" step="any" />
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="j2Select">Force model</label>
+                <select id="j2Select">
+                  <option value="twoBody">Two-body only</option>
+                  <option value="j2">Two-body + J2</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="theta0Input">Initial Greenwich angle (deg)</label>
+                <input type="number" id="theta0Input" value="0" step="1" />
+              </div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="runBtn">Propagate Orbit</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box">
+              <h4>Orbital period</h4>
+              <div class="value" id="periodOut">—</div>
+            </div>
+            <div class="result-box">
+              <h4>Perigee / Apogee altitude</h4>
+              <div class="value" id="altOut">—</div>
+            </div>
+            <div class="result-box">
+              <h4>Initial speed</h4>
+              <div class="value" id="speedOut">—</div>
+            </div>
+            <div class="result-box">
+              <h4>Energy drift</h4>
+              <div class="value" id="energyOut">—</div>
+            </div>
+            <div class="result-box">
+              <h4>RAAN change</h4>
+              <div class="value" id="raanOut">—</div>
+            </div>
+            <div class="result-box">
+              <h4>Argument change</h4>
+              <div class="value" id="argpOut">—</div>
+            </div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the propagator to generate the 3D orbit, ground track, and energy check.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">3D orbit in ECI frame</div>
+            <div id="orbit3D" class="plot-box"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Ground track</div>
+            <div id="groundTrack" class="plot-box short"></div>
+            <div class="small-note">Longitude wraps at ±180°. Sharp jumps usually indicate dateline crossing, not a physical jump.</div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Specific mechanical energy history</div>
+            <div id="energyPlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This tool assumes:</h3>
+            <ul>
+              <li>Earth-centered inertial propagation</li>
+              <li>RK4 numerical integration</li>
+              <li>Two-body gravity, with optional J2</li>
+              <li>No atmospheric drag, SRP, third-body gravity, thrust, or maneuvers</li>
+              <li>Simplified Earth rotation for ground-track visualization</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const DEG = Math.PI / 180;
+    const RAD = 180 / Math.PI;
+    const OMEGA_EARTH = 7.2921159e-5; // rad/s
+    const J2_EARTH = 1.08262668e-3;
+
+    const defaults = {
+      aInput:7000,
+      eInput:0.001,
+      iInput:51.6,
+      raanInput:0,
+      argpInput:0,
+      taInput:0,
+      durationInput:6,
+      dtInput:60,
+      presetSelect:"custom",
+      muInput:398600.4418,
+      earthRadiusInput:6378.137,
+      j2Select:"twoBody",
+      theta0Input:0
+    };
+
+    const presets = {
+      leo:{ a:7000, e:0.001, i:28.5, raan:0, argp:0, ta:0, duration:5, dt:45, j2:"twoBody" },
+      iss:{ a:6796, e:0.0007, i:51.6, raan:25, argp:40, ta:0, duration:6, dt:45, j2:"twoBody" },
+      polar:{ a:7200, e:0.002, i:98.0, raan:0, argp:0, ta:0, duration:8, dt:60, j2:"j2" },
+      molniya:{ a:26560, e:0.72, i:63.4, raan:0, argp:270, ta:0, duration:24, dt:180, j2:"j2" },
+      geo:{ a:42164, e:0.0001, i:0.1, raan:0, argp:0, ta:0, duration:24, dt:300, j2:"twoBody" }
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.aInput.value = p.a;
+      el.eInput.value = p.e;
+      el.iInput.value = p.i;
+      el.raanInput.value = p.raan;
+      el.argpInput.value = p.argp;
+      el.taInput.value = p.ta;
+      el.durationInput.value = p.duration;
+      el.dtInput.value = p.dt;
+      el.j2Select.value = p.j2;
+      runPropagation();
+    });
+
+    document.getElementById("runBtn").addEventListener("click", runPropagation);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([key, value]) => el[key].value = value);
+      runPropagation();
+    });
+
+    function getInputs(){
+      return {
+        a:parseFloat(el.aInput.value),
+        e:parseFloat(el.eInput.value),
+        inc:parseFloat(el.iInput.value) * DEG,
+        raan:parseFloat(el.raanInput.value) * DEG,
+        argp:parseFloat(el.argpInput.value) * DEG,
+        ta:parseFloat(el.taInput.value) * DEG,
+        duration:parseFloat(el.durationInput.value) * 3600,
+        dt:parseFloat(el.dtInput.value),
+        mu:parseFloat(el.muInput.value),
+        Re:parseFloat(el.earthRadiusInput.value),
+        forceModel:el.j2Select.value,
+        theta0:parseFloat(el.theta0Input.value) * DEG
+      };
+    }
+
+    function showError(message){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Input error</h3><p>${message}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function validate(p){
+      if (!Object.values(p).every(v => typeof v !== "number" || Number.isFinite(v))) return "Please enter valid numeric inputs.";
+      if (p.mu <= 0 || p.Re <= 0) return "μ and Earth radius must be positive.";
+      if (p.a <= p.Re) return "Semi-major axis must be larger than Earth radius.";
+      if (p.e < 0 || p.e >= 1) return "This educational tool currently supports elliptical orbits only: 0 ≤ e < 1.";
+      if (p.a * (1 - p.e) <= p.Re) return "Perigee radius is inside Earth. Increase a or reduce eccentricity.";
+      if (p.duration <= 0 || p.dt <= 0) return "Duration and time step must be positive.";
+      if (Math.floor(p.duration / p.dt) > 3500) return "Too many time steps. Increase the time step or reduce duration for browser performance.";
+      return null;
+    }
+
+    function norm(v){ return Math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]); }
+    function dot(a,b){ return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+    function cross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+
+    function matVec(M, v){
+      return [
+        M[0][0]*v[0] + M[0][1]*v[1] + M[0][2]*v[2],
+        M[1][0]*v[0] + M[1][1]*v[1] + M[1][2]*v[2],
+        M[2][0]*v[0] + M[2][1]*v[1] + M[2][2]*v[2]
+      ];
+    }
+
+    function perifocalToECI(raan, inc, argp){
+      const cO = Math.cos(raan), sO = Math.sin(raan);
+      const ci = Math.cos(inc), si = Math.sin(inc);
+      const cw = Math.cos(argp), sw = Math.sin(argp);
+      return [
+        [cO*cw - sO*sw*ci, -cO*sw - sO*cw*ci, sO*si],
+        [sO*cw + cO*sw*ci, -sO*sw + cO*cw*ci, -cO*si],
+        [sw*si, cw*si, ci]
+      ];
+    }
+
+    function coeToState(p){
+      const {a,e,inc,raan,argp,ta,mu} = p;
+      const h = Math.sqrt(mu * a * (1 - e*e));
+      const rmag = (h*h / mu) / (1 + e * Math.cos(ta));
+      const rPQW = [rmag * Math.cos(ta), rmag * Math.sin(ta), 0];
+      const vPQW = [-(mu/h) * Math.sin(ta), (mu/h) * (e + Math.cos(ta)), 0];
+      const Q = perifocalToECI(raan, inc, argp);
+      return { r:matVec(Q, rPQW), v:matVec(Q, vPQW) };
+    }
+
+    function acceleration(r, p){
+      const rmag = norm(r);
+      const mu = p.mu;
+      let ax = -mu * r[0] / Math.pow(rmag,3);
+      let ay = -mu * r[1] / Math.pow(rmag,3);
+      let az = -mu * r[2] / Math.pow(rmag,3);
+
+      if (p.forceModel === "j2") {
+        const x = r[0], y = r[1], z = r[2];
+        const z2 = z*z;
+        const r2 = rmag*rmag;
+        const factor = 1.5 * J2_EARTH * mu * p.Re*p.Re / Math.pow(rmag,5);
+        ax += factor * x * (5*z2/r2 - 1);
+        ay += factor * y * (5*z2/r2 - 1);
+        az += factor * z * (5*z2/r2 - 3);
+      }
+      return [ax, ay, az];
+    }
+
+    function derivative(state, p){
+      const r = [state[0], state[1], state[2]];
+      const v = [state[3], state[4], state[5]];
+      const a = acceleration(r, p);
+      return [v[0], v[1], v[2], a[0], a[1], a[2]];
+    }
+
+    function rk4Step(state, dt, p){
+      const k1 = derivative(state, p);
+      const s2 = state.map((x,i) => x + 0.5*dt*k1[i]);
+      const k2 = derivative(s2, p);
+      const s3 = state.map((x,i) => x + 0.5*dt*k2[i]);
+      const k3 = derivative(s3, p);
+      const s4 = state.map((x,i) => x + dt*k3[i]);
+      const k4 = derivative(s4, p);
+      return state.map((x,i) => x + dt*(k1[i] + 2*k2[i] + 2*k3[i] + k4[i])/6);
+    }
+
+    function stateToCOE(r, v, mu){
+      const rmag = norm(r), vmag = norm(v);
+      const hVec = cross(r,v);
+      const h = norm(hVec);
+      const nVec = cross([0,0,1], hVec);
+      const n = norm(nVec);
+      const eVec = [
+        ((vmag*vmag - mu/rmag)*r[0] - dot(r,v)*v[0]) / mu,
+        ((vmag*vmag - mu/rmag)*r[1] - dot(r,v)*v[1]) / mu,
+        ((vmag*vmag - mu/rmag)*r[2] - dot(r,v)*v[2]) / mu
+      ];
+      const e = norm(eVec);
+      const inc = Math.acos(Math.max(-1, Math.min(1, hVec[2]/h)));
+      let raan = 0;
+      if (n > 1e-10) {
+        raan = Math.acos(Math.max(-1, Math.min(1, nVec[0]/n)));
+        if (nVec[1] < 0) raan = 2*Math.PI - raan;
+      }
+      let argp = 0;
+      if (n > 1e-10 && e > 1e-10) {
+        argp = Math.acos(Math.max(-1, Math.min(1, dot(nVec,eVec)/(n*e))));
+        if (eVec[2] < 0) argp = 2*Math.PI - argp;
+      }
+      return { inc, raan, argp, e };
+    }
+
+    function eciToLatLon(r, t, p){
+      const theta = p.theta0 + OMEGA_EARTH * t;
+      const c = Math.cos(theta), s = Math.sin(theta);
+      const x = c*r[0] + s*r[1];
+      const y = -s*r[0] + c*r[1];
+      const z = r[2];
+      const rr = Math.sqrt(x*x + y*y + z*z);
+      const lat = Math.asin(z/rr) * RAD;
+      let lon = Math.atan2(y,x) * RAD;
+      lon = ((lon + 180) % 360 + 360) % 360 - 180;
+      return { lat, lon };
+    }
+
+    function propagate(p){
+      const initial = coeToState(p);
+      let state = [...initial.r, ...initial.v];
+      const n = Math.floor(p.duration / p.dt) + 1;
+      const t = [], xs = [], ys = [], zs = [], lats = [], lons = [], energy = [], raanArr = [], argpArr = [];
+
+      for (let k=0; k<n; k++) {
+        const time = k * p.dt;
+        const r = [state[0], state[1], state[2]];
+        const v = [state[3], state[4], state[5]];
+        const rr = norm(r);
+        const vv = norm(v);
+        const eps = 0.5*vv*vv - p.mu/rr;
+        const ll = eciToLatLon(r, time, p);
+        const coe = stateToCOE(r, v, p.mu);
+
+        t.push(time/3600);
+        xs.push(r[0]); ys.push(r[1]); zs.push(r[2]);
+        lats.push(ll.lat); lons.push(ll.lon);
+        energy.push(eps);
+        raanArr.push(coe.raan * RAD);
+        argpArr.push(coe.argp * RAD);
+
+        if (k < n-1) state = rk4Step(state, p.dt, p);
+      }
+
+      return { t, xs, ys, zs, lats, lons, energy, raanArr, argpArr, initial };
+    }
+
+    function fmt(x, d=3, suffix=""){
+      if (!Number.isFinite(x)) return "—";
+      return x.toFixed(d) + suffix;
+    }
+
+    function angleDeltaDeg(arr){
+      if (arr.length < 2) return 0;
+      let d = arr[arr.length-1] - arr[0];
+      while (d > 180) d -= 360;
+      while (d < -180) d += 360;
+      return d;
+    }
+
+    function updateResults(p, data){
+      const period = 2*Math.PI*Math.sqrt(Math.pow(p.a,3)/p.mu);
+      const hp = p.a*(1-p.e) - p.Re;
+      const ha = p.a*(1+p.e) - p.Re;
+      const v0 = norm(data.initial.v);
+      const e0 = data.energy[0];
+      const eEnd = data.energy[data.energy.length-1];
+      const driftPct = Math.abs((eEnd - e0) / Math.abs(e0)) * 100;
+      const raanChange = angleDeltaDeg(data.raanArr);
+      const argpChange = angleDeltaDeg(data.argpArr);
+
+      document.getElementById("periodOut").textContent = fmt(period/60, 2, " min");
+      document.getElementById("altOut").textContent = `${fmt(hp,1," km")} / ${fmt(ha,1," km")}`;
+      document.getElementById("speedOut").textContent = fmt(v0, 4, " km/s");
+      document.getElementById("energyOut").textContent = fmt(driftPct, 5, " %");
+      document.getElementById("raanOut").textContent = fmt(raanChange, 4, " deg");
+      document.getElementById("argpOut").textContent = fmt(argpChange, 4, " deg");
+
+      let msg = "The orbit has been propagated using RK4. In two-body mode, the energy drift should remain very small if the time step is appropriate.";
+      if (p.forceModel === "j2") {
+        msg = "J2 mode is enabled. The 3D orbit remains close to Keplerian, but RAAN and argument of perigee can drift over time, especially for inclined or eccentric orbits.";
+      }
+      if (driftPct > 0.05) {
+        msg += " The energy drift is noticeable, so reduce the time step for a cleaner numerical result.";
+      }
+      document.getElementById("interpretText").textContent = msg;
+    }
+
+    function makeEarthSphere(Re){
+      const uSteps = 28, vSteps = 14;
+      const x = [], y = [], z = [];
+      for (let i=0; i<=vSteps; i++) {
+        const rowX=[], rowY=[], rowZ=[];
+        const phi = -Math.PI/2 + Math.PI*i/vSteps;
+        for (let j=0; j<=uSteps; j++) {
+          const lam = 2*Math.PI*j/uSteps;
+          rowX.push(Re*Math.cos(phi)*Math.cos(lam));
+          rowY.push(Re*Math.cos(phi)*Math.sin(lam));
+          rowZ.push(Re*Math.sin(phi));
+        }
+        x.push(rowX); y.push(rowY); z.push(rowZ);
+      }
+      return {x,y,z};
+    }
+
+    function drawOrbit3D(p, data){
+      const earth = makeEarthSphere(p.Re);
+      const maxR = Math.max(...data.xs.map((x,i) => Math.sqrt(x*x + data.ys[i]*data.ys[i] + data.zs[i]*data.zs[i]))) * 1.12;
+
+      const traceOrbit = {
+        type:"scatter3d",
+        mode:"lines",
+        x:data.xs,
+        y:data.ys,
+        z:data.zs,
+        line:{ width:5, color:"#2563eb" },
+        name:"Orbit"
+      };
+
+      const traceStart = {
+        type:"scatter3d",
+        mode:"markers",
+        x:[data.xs[0]], y:[data.ys[0]], z:[data.zs[0]],
+        marker:{ size:5, color:"#f97316" },
+        name:"Start"
+      };
+
+      const traceEarth = {
+        type:"surface",
+        x:earth.x, y:earth.y, z:earth.z,
+        colorscale:[[0,"#dbeafe"],[1,"#93c5fd"]],
+        opacity:0.75,
+        showscale:false,
+        name:"Earth",
+        hoverinfo:"skip"
+      };
+
+      Plotly.newPlot("orbit3D", [traceEarth, traceOrbit, traceStart], {
+        margin:{l:0,r:0,t:0,b:0},
+        paper_bgcolor:"#ffffff",
+        scene:{
+          xaxis:{title:"x (km)", range:[-maxR,maxR]},
+          yaxis:{title:"y (km)", range:[-maxR,maxR]},
+          zaxis:{title:"z (km)", range:[-maxR,maxR]},
+          aspectmode:"cube"
+        },
+        legend:{orientation:"h", x:0.02, y:0.98}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawGroundTrack(data){
+      const segments = [];
+      let currentLon = [data.lons[0]], currentLat = [data.lats[0]];
+      for (let i=1; i<data.lons.length; i++) {
+        if (Math.abs(data.lons[i] - data.lons[i-1]) > 180) {
+          segments.push({lon:currentLon, lat:currentLat});
+          currentLon = [data.lons[i]];
+          currentLat = [data.lats[i]];
+        } else {
+          currentLon.push(data.lons[i]);
+          currentLat.push(data.lats[i]);
+        }
+      }
+      segments.push({lon:currentLon, lat:currentLat});
+
+      const traces = segments.map((seg, idx) => ({
+        type:"scattergeo",
+        mode:"lines",
+        lon:seg.lon,
+        lat:seg.lat,
+        line:{width:3, color:"#2563eb"},
+        name:idx === 0 ? "Ground track" : "",
+        showlegend:idx === 0
+      }));
+
+      traces.push({
+        type:"scattergeo",
+        mode:"markers",
+        lon:[data.lons[0]],
+        lat:[data.lats[0]],
+        marker:{size:8, color:"#f97316"},
+        name:"Start"
+      });
+
+      Plotly.newPlot("groundTrack", traces, {
+        margin:{l:0,r:0,t:0,b:0},
+        paper_bgcolor:"#ffffff",
+        geo:{
+          projection:{type:"equirectangular"},
+          showland:true,
+          landcolor:"#eef2ff",
+          showocean:true,
+          oceancolor:"#f8fafc",
+          showcountries:true,
+          countrycolor:"#cbd5e1",
+          lonaxis:{range:[-180,180]},
+          lataxis:{range:[-90,90]},
+          bgcolor:"#ffffff"
+        },
+        legend:{orientation:"h", x:0.02, y:0.98}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawEnergy(data){
+      const e0 = data.energy[0];
+      const drift = data.energy.map(e => ((e - e0) / Math.abs(e0)) * 100);
+      Plotly.newPlot("energyPlot", [{
+        type:"scatter",
+        mode:"lines",
+        x:data.t,
+        y:drift,
+        line:{width:3, color:"#0f8b8d"},
+        name:"Energy drift"
+      }], {
+        margin:{l:60,r:20,t:10,b:50},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"Time (hours)", gridcolor:"#e5e7eb"},
+        yaxis:{title:"Energy drift (%)", gridcolor:"#e5e7eb", zeroline:true},
+        showlegend:false
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function runPropagation(){
+      clearError();
+      const p = getInputs();
+      const err = validate(p);
+      if (err) {
+        showError(err);
+        return;
+      }
+
+      const data = propagate(p);
+      updateResults(p, data);
+      drawOrbit3D(p, data);
+      drawGroundTrack(data);
+      drawEnergy(data);
+    }
+
+    runPropagation();
+  </script>
+</body>
+</html>
