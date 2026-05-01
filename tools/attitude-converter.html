@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quaternion / Euler / DCM Converter | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{display:grid; gap:22px;}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,.card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{margin:10px 0 0 22px; padding:0;}
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{display:flex; gap:12px; margin:4px 0 18px; flex-wrap:wrap;}
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .split-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .split-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+    .split-4{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px;}
+    .field{margin-bottom:16px;}
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{font-size:0.94rem; color:#6b7280; margin-top:6px;}
+
+    .button-row{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
+
+    .cta,.ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{color:#fff; background:linear-gradient(135deg,var(--accent-2),var(--accent)); flex:1 1 240px; box-shadow:0 12px 24px rgba(37,99,235,0.18);}
+    .ghost{color:#1f2937; background:#e5e7eb; flex:1 1 160px;}
+
+    .results-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;}
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{margin:0 0 8px; font-size:0.98rem; color:#475569; line-height:1.35;}
+    .result-box .value{font-size:1.02rem; font-weight:800; color:#111827; line-height:1.45; word-break:break-word;}
+
+    .matrix-table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:14px;
+      border-radius:16px;
+      overflow:hidden;
+      background:#fff;
+    }
+
+    .matrix-table td{
+      border:1px solid #e2e8f0;
+      padding:12px;
+      text-align:center;
+      font-weight:800;
+      color:#111827;
+      font-size:0.98rem;
+    }
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{border-left-color:var(--warn-line); background:var(--warn);}
+    .callout h3{margin-top:0; margin-bottom:8px; font-size:1.15rem;}
+    .callout p{margin:0;}
+
+    .plot-card{background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:16px;}
+    .plot-title{font-weight:800; font-size:1.08rem; margin:0 0 10px; color:#111827;}
+    .plot-box{width:100%; min-height:430px; border:1px solid #e2e8f0; border-radius:18px; overflow:hidden; background:#fff;}
+    .plot-box.short{min-height:320px;}
+
+    .back-link-row{margin-top:40px; text-align:left;}
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{text-align:center; padding:1.5rem 0; font-size:0.95rem; color:#4b5563; line-height:1.6;}
+
+    @media (max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media (max-width:760px){
+      .page-wrap{width:min(100% - 24px, 1380px);}
+      .tool-hero{padding:24px 20px 28px; border-radius:24px;}
+      .card{padding:22px 18px 24px;}
+      .split-2,.split-3,.split-4,.results-grid{grid-template-columns:1fr;}
+      .plot-box{min-height:350px;}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 12 · Attitude Dynamics</div>
+      <h1>Quaternion / Euler / DCM Converter</h1>
+      <p>
+        Convert spacecraft attitude between Euler angles, quaternions, and direction cosine matrices. This tool also
+        shows the gimbal-lock risk that appears when Euler pitch approaches ±90°, making it useful for GNC and 6DOF simulation work.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            Attitude can be represented in several mathematically equivalent ways. This converter uses a 3-2-1 yaw-pitch-roll convention
+            and computes the equivalent quaternion and DCM.
+          </p>
+          <ul>
+            <li>Euler angles: yaw \(\psi\), pitch \(\theta\), roll \(\phi\)</li>
+            <li>Quaternion \([q_0, q_1, q_2, q_3]\)</li>
+            <li>Direction cosine matrix</li>
+            <li>Gimbal-lock warning for Euler-angle singularity</li>
+            <li>Simple 3D body-axis visualization</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Euler angles</h2>
+          <p>
+            Euler angles are intuitive because they resemble yaw, pitch, and roll commands. However, they are sequence-dependent
+            and can become singular.
+          </p>
+          <div class="formula-box">
+            \[
+              C = R_x(\phi)R_y(\theta)R_z(\psi)
+            \]
+          </div>
+          <p>
+            In a 3-2-1 convention, pitch near \(\pm 90^\circ\) causes yaw and roll to lose independent meaning.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Quaternion attitude</h2>
+          <p>
+            Quaternions avoid Euler-angle singularities and are widely used in spacecraft simulation, estimation, and control.
+          </p>
+          <div class="formula-box">
+            \[
+              \mathbf q = [q_0, q_1, q_2, q_3]^T,
+              \qquad
+              \|\mathbf q\|=1
+            \]
+          </div>
+          <p>
+            The scalar-first convention is used here: \(q_0\) is the scalar component and \(q_1,q_2,q_3\) are vector components.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Why this matters for GNC</h2>
+          <ul>
+            <li>Euler angles are useful for interpretation and display.</li>
+            <li>DCMs are useful for frame transformations.</li>
+            <li>Quaternions are preferred for propagation and onboard control.</li>
+            <li>Gimbal lock explains why a simulation may fail even when the physics is correct.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Convention warning</h3>
+            <p>
+              Attitude conventions vary across textbooks and software. Always state rotation order, frame direction, and quaternion ordering.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive converter</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="euler">Euler Input</button>
+            <button type="button" class="tab-btn" data-mode="quat">Quaternion Input</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-euler" class="mode-panel active">
+            <div class="split-3">
+              <div class="field">
+                <label for="yawInput">Yaw ψ (deg)</label>
+                <input id="yawInput" type="number" value="30" step="1">
+              </div>
+              <div class="field">
+                <label for="pitchInput">Pitch θ (deg)</label>
+                <input id="pitchInput" type="number" value="20" step="1">
+              </div>
+              <div class="field">
+                <label for="rollInput">Roll φ (deg)</label>
+                <input id="rollInput" type="number" value="10" step="1">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-quat" class="mode-panel">
+            <div class="split-4">
+              <div class="field"><label for="q0Input">q0</label><input id="q0Input" type="number" value="0.9515" step="0.0001"></div>
+              <div class="field"><label for="q1Input">q1</label><input id="q1Input" type="number" value="0.0381" step="0.0001"></div>
+              <div class="field"><label for="q2Input">q2</label><input id="q2Input" type="number" value="0.1893" step="0.0001"></div>
+              <div class="field"><label for="q3Input">q3</label><input id="q3Input" type="number" value="0.2393" step="0.0001"></div>
+            </div>
+            <div class="hint">Quaternion uses scalar-first convention: [q0, q1, q2, q3].</div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Attitude preset</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="identity">Identity attitude</option>
+                <option value="smallAngles">Small-angle spacecraft attitude</option>
+                <option value="yaw90">90° yaw rotation</option>
+                <option value="pitchNearLock">Near gimbal lock</option>
+                <option value="roll180">180° roll rotation</option>
+              </select>
+              <div class="hint">Use the gimbal-lock preset to see why Euler angles can become dangerous near ±90° pitch.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="convertEulerBtn">Convert from Euler</button>
+            <button class="ghost" id="convertQuatBtn">Convert from Quaternion</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Euler angles</h4><div class="value" id="eulerOut">—</div></div>
+            <div class="result-box"><h4>Quaternion</h4><div class="value" id="quatOut">—</div></div>
+            <div class="result-box"><h4>Quaternion norm</h4><div class="value" id="normOut">—</div></div>
+            <div class="result-box"><h4>Gimbal-lock status</h4><div class="value" id="lockOut">—</div></div>
+          </div>
+
+          <h3>Direction Cosine Matrix</h3>
+          <table class="matrix-table" id="dcmTable">
+            <tbody>
+              <tr><td>—</td><td>—</td><td>—</td></tr>
+              <tr><td>—</td><td>—</td><td>—</td></tr>
+              <tr><td>—</td><td>—</td><td>—</td></tr>
+            </tbody>
+          </table>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Convert an attitude to inspect equivalent representations and singularity risk.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Body axes after rotation</div>
+            <div id="axisPlot" class="plot-box"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This converter assumes:</h3>
+            <ul>
+              <li>3-2-1 yaw-pitch-roll Euler sequence</li>
+              <li>Scalar-first quaternion convention</li>
+              <li>Passive/active convention is kept internally consistent for visualization</li>
+              <li>No attitude dynamics are propagated on this page</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const DEG = Math.PI/180;
+    const RAD = 180/Math.PI;
+
+    const defaults = {
+      yawInput:30,
+      pitchInput:20,
+      rollInput:10,
+      q0Input:0.9515,
+      q1Input:0.0381,
+      q2Input:0.1893,
+      q3Input:0.2393,
+      presetSelect:"custom"
+    };
+
+    const presets = {
+      identity:{yaw:0,pitch:0,roll:0},
+      smallAngles:{yaw:8,pitch:-5,roll:3},
+      yaw90:{yaw:90,pitch:0,roll:0},
+      pitchNearLock:{yaw:30,pitch:89.5,roll:15},
+      roll180:{yaw:0,pitch:0,roll:180}
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.yawInput.value = p.yaw;
+      el.pitchInput.value = p.pitch;
+      el.rollInput.value = p.roll;
+      convertFromEuler();
+    });
+
+    document.getElementById("convertEulerBtn").addEventListener("click", convertFromEuler);
+    document.getElementById("convertQuatBtn").addEventListener("click", convertFromQuat);
+
+    function showError(msg){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Input error</h3><p>${msg}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function eulerToQuat(yawDeg,pitchDeg,rollDeg){
+      const yaw = yawDeg*DEG;
+      const pitch = pitchDeg*DEG;
+      const roll = rollDeg*DEG;
+      const cy = Math.cos(yaw/2), sy = Math.sin(yaw/2);
+      const cp = Math.cos(pitch/2), sp = Math.sin(pitch/2);
+      const cr = Math.cos(roll/2), sr = Math.sin(roll/2);
+      const q0 = cr*cp*cy + sr*sp*sy;
+      const q1 = sr*cp*cy - cr*sp*sy;
+      const q2 = cr*sp*cy + sr*cp*sy;
+      const q3 = cr*cp*sy - sr*sp*cy;
+      return normalizeQuat([q0,q1,q2,q3]);
+    }
+
+    function quatToEuler(q){
+      q = normalizeQuat(q);
+      const [q0,q1,q2,q3] = q;
+      const sinr_cosp = 2*(q0*q1 + q2*q3);
+      const cosr_cosp = 1 - 2*(q1*q1 + q2*q2);
+      const roll = Math.atan2(sinr_cosp, cosr_cosp);
+      const sinp = 2*(q0*q2 - q3*q1);
+      let pitch;
+      if (Math.abs(sinp) >= 1) pitch = Math.sign(sinp)*Math.PI/2;
+      else pitch = Math.asin(sinp);
+      const siny_cosp = 2*(q0*q3 + q1*q2);
+      const cosy_cosp = 1 - 2*(q2*q2 + q3*q3);
+      const yaw = Math.atan2(siny_cosp, cosy_cosp);
+      return {yaw:yaw*RAD, pitch:pitch*RAD, roll:roll*RAD};
+    }
+
+    function quatToDCM(q){
+      q = normalizeQuat(q);
+      const [q0,q1,q2,q3] = q;
+      return [
+        [1-2*(q2*q2+q3*q3), 2*(q1*q2-q0*q3), 2*(q1*q3+q0*q2)],
+        [2*(q1*q2+q0*q3), 1-2*(q1*q1+q3*q3), 2*(q2*q3-q0*q1)],
+        [2*(q1*q3-q0*q2), 2*(q2*q3+q0*q1), 1-2*(q1*q1+q2*q2)]
+      ];
+    }
+
+    function normalizeQuat(q){
+      const n = Math.sqrt(q.reduce((s,x)=>s+x*x,0));
+      if (!Number.isFinite(n) || n < 1e-12) throw new Error("Quaternion norm is zero or invalid.");
+      return q.map(x=>x/n);
+    }
+
+    function quatNorm(q){
+      return Math.sqrt(q.reduce((s,x)=>s+x*x,0));
+    }
+
+    function fmt(x,d=4){
+      if (!Number.isFinite(x)) return "—";
+      return x.toFixed(d);
+    }
+
+    function updateUI(euler,q){
+      const dcm = quatToDCM(q);
+      const normBefore = quatNorm(q);
+      const lockRisk = Math.abs(Math.abs(euler.pitch)-90);
+      let lockText = "Safe";
+      let msg = "This attitude is away from the Euler pitch singularity. Quaternion and DCM forms are suitable for propagation and transformation.";
+      if (lockRisk < 0.5) {
+        lockText = "Very high risk";
+        msg = "Pitch is extremely close to ±90°. Yaw and roll become poorly separated, so Euler angles are not reliable for propagation or control here.";
+      } else if (lockRisk < 5) {
+        lockText = "Near gimbal lock";
+        msg = "Pitch is close to ±90°. Use quaternions for propagation and treat Euler-angle interpretation carefully.";
+      }
+
+      document.getElementById("eulerOut").textContent = `yaw=${fmt(euler.yaw,3)}°, pitch=${fmt(euler.pitch,3)}°, roll=${fmt(euler.roll,3)}°`;
+      document.getElementById("quatOut").textContent = `[${fmt(q[0],5)}, ${fmt(q[1],5)}, ${fmt(q[2],5)}, ${fmt(q[3],5)}]`;
+      document.getElementById("normOut").textContent = fmt(normBefore,6);
+      document.getElementById("lockOut").textContent = lockText;
+      document.getElementById("interpretText").textContent = msg;
+
+      const tbody = document.querySelector("#dcmTable tbody");
+      tbody.innerHTML = dcm.map(row => `<tr>${row.map(v => `<td>${fmt(v,5)}</td>`).join("")}</tr>`).join("");
+
+      drawAxes(dcm);
+    }
+
+    function convertFromEuler(){
+      clearError();
+      const yaw = parseFloat(el.yawInput.value);
+      const pitch = parseFloat(el.pitchInput.value);
+      const roll = parseFloat(el.rollInput.value);
+      if (![yaw,pitch,roll].every(Number.isFinite)){ showError("Please enter valid Euler angles."); return; }
+      try{
+        const q = eulerToQuat(yaw,pitch,roll);
+        el.q0Input.value = fmt(q[0],5);
+        el.q1Input.value = fmt(q[1],5);
+        el.q2Input.value = fmt(q[2],5);
+        el.q3Input.value = fmt(q[3],5);
+        updateUI({yaw,pitch,roll},q);
+      } catch(e){ showError(e.message || "Conversion failed."); }
+    }
+
+    function convertFromQuat(){
+      clearError();
+      const qRaw = [parseFloat(el.q0Input.value), parseFloat(el.q1Input.value), parseFloat(el.q2Input.value), parseFloat(el.q3Input.value)];
+      if (!qRaw.every(Number.isFinite)){ showError("Please enter a valid quaternion."); return; }
+      try{
+        const q = normalizeQuat(qRaw);
+        const euler = quatToEuler(q);
+        el.yawInput.value = fmt(euler.yaw,3);
+        el.pitchInput.value = fmt(euler.pitch,3);
+        el.rollInput.value = fmt(euler.roll,3);
+        updateUI(euler,q);
+      } catch(e){ showError(e.message || "Conversion failed."); }
+    }
+
+    function drawAxes(C){
+      const L = 1.2;
+      const axes = [
+        {name:"Body x-axis", color:"#2563eb", v:[C[0][0],C[1][0],C[2][0]]},
+        {name:"Body y-axis", color:"#f97316", v:[C[0][1],C[1][1],C[2][1]]},
+        {name:"Body z-axis", color:"#7c3aed", v:[C[0][2],C[1][2],C[2][2]]}
+      ];
+      const traces = axes.map(a => ({
+        type:"scatter3d",
+        mode:"lines+markers",
+        x:[0,L*a.v[0]],
+        y:[0,L*a.v[1]],
+        z:[0,L*a.v[2]],
+        line:{color:a.color,width:7},
+        marker:{size:3,color:a.color},
+        name:a.name
+      }));
+      traces.push({type:"scatter3d", mode:"markers+text", x:[0], y:[0], z:[0], text:["Origin"], textposition:"top center", marker:{size:4,color:"#111827"}, name:"Origin"});
+      Plotly.newPlot("axisPlot", traces, {
+        margin:{l:0,r:0,t:0,b:0},
+        paper_bgcolor:"#ffffff",
+        scene:{
+          xaxis:{title:"X", range:[-1.4,1.4]},
+          yaxis:{title:"Y", range:[-1.4,1.4]},
+          zaxis:{title:"Z", range:[-1.4,1.4]},
+          aspectmode:"cube"
+        },
+        legend:{orientation:"h", x:0.02, y:0.98}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    convertFromEuler();
+  </script>
+</body>
+</html>
