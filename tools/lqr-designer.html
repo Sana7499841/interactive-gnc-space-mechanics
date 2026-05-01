@@ -397,7 +397,8 @@
     function validate(p){
       const vals = [p.A[0][0],p.A[0][1],p.A[1][0],p.A[1][1],...p.B,p.Q[0][0],p.Q[1][1],p.R,...p.x0,p.duration,p.dt];
       if (!vals.every(Number.isFinite)) return "Please enter valid numeric inputs.";
-      if (p.Q[0][0] < 0 || p.Q[1][1] < 0 || p.R <= 0) return "Q weights must be non-negative and R must be positive.";
+     
+      if (p.Q[0][0] <= 0 || p.Q[1][1] <= 0 || p.R <= 0)return "Q weights must be non-negative and R must be positive.";
       if (p.duration <= 0 || p.dt <= 0) return "Duration and time step must be positive.";
       if (Math.floor(p.duration/p.dt) > 10000) return "Too many simulation steps. Increase time step or reduce duration.";
       if (Math.abs(p.B[0]) + Math.abs(p.B[1]) < 1e-12) return "B cannot be zero; the system must be controllable.";
@@ -421,27 +422,47 @@
     function PB(P,B){ return [P[0][0]*B[0]+P[0][1]*B[1], P[1][0]*B[0]+P[1][1]*B[1]]; }
     function BTP(P,B){ const pb=PB(P,B); return [pb[0],pb[1]]; }
 
-    function riccatiSolve(p){
-      let P = [[p.Q[0][0],0],[0,p.Q[1][1]]];
-      const AT = transpose(p.A);
-      const dtau = 0.001;
-      for (let k=0; k<80000; k++){
-        const ATP = matMul(AT,P);
-        const PA = matMul(P,p.A);
-        const pb = PB(P,p.B);
-        const term = scale(outer(pb,pb),1/p.R);
-        const dP = add(sub(add(ATP,PA),term),p.Q);
-        const next = sub(P, scale(dP,dtau));
-        next[0][1] = next[1][0] = 0.5*(next[0][1]+next[1][0]);
-        const diff = Math.max(Math.abs(next[0][0]-P[0][0]),Math.abs(next[0][1]-P[0][1]),Math.abs(next[1][0]-P[1][0]),Math.abs(next[1][1]-P[1][1]));
-        P = next;
-        if (diff < 1e-9) break;
-        if (!P.flat().every(Number.isFinite)) throw new Error("Riccati iteration diverged. Try different weights or a controllable system.");
-      }
-      const btP = BTP(P,p.B);
-      const K = [btP[0]/p.R, btP[1]/p.R];
-      return {P,K};
+function riccatiSolve(p){
+  let P = [[p.Q[0][0], 0], [0, p.Q[1][1]]];
+  const AT = transpose(p.A);
+  const dtau = 0.0001;
+
+  for (let k = 0; k < 200000; k++){
+    const ATP = matMul(AT, P);
+    const PA = matMul(P, p.A);
+    const pb = PB(P, p.B);
+    const term = scale(outer(pb, pb), 1 / p.R);
+
+    // Continuous-time CARE:
+    // A'P + PA - PBR^-1B'P + Q = 0
+    const dP = add(sub(add(ATP, PA), term), p.Q);
+
+    // Correct stabilizing iteration direction
+    const next = add(P, scale(dP, dtau));
+
+    next[0][1] = next[1][0] = 0.5 * (next[0][1] + next[1][0]);
+
+    const diff = Math.max(
+      Math.abs(next[0][0] - P[0][0]),
+      Math.abs(next[0][1] - P[0][1]),
+      Math.abs(next[1][0] - P[1][0]),
+      Math.abs(next[1][1] - P[1][1])
+    );
+
+    P = next;
+
+    if (!P.flat().every(Number.isFinite)) {
+      throw new Error("Riccati iteration diverged. Try smaller Q/R values.");
     }
+
+    if (diff < 1e-9) break;
+  }
+
+  const btP = BTP(P, p.B);
+  const K = [btP[0] / p.R, btP[1] / p.R];
+
+  return {P, K};
+}
 
     function closedLoopA(A,B,K){ return [[A[0][0]-B[0]*K[0], A[0][1]-B[0]*K[1]], [A[1][0]-B[1]*K[0], A[1][1]-B[1]*K[1]]]; }
     function eig2(A){
