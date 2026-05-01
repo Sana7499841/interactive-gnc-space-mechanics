@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rigid Body Rotation Simulator | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{display:grid; gap:22px;}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,.card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{margin:10px 0 0 22px; padding:0;}
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{display:flex; gap:12px; margin:4px 0 18px; flex-wrap:wrap;}
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .split-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .split-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+    .split-4{display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:16px;}
+    .field{margin-bottom:16px;}
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{font-size:0.94rem; color:#6b7280; margin-top:6px;}
+
+    .button-row{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
+
+    .cta,.ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{color:#fff; background:linear-gradient(135deg,var(--accent-2),var(--accent)); flex:1 1 240px; box-shadow:0 12px 24px rgba(37,99,235,0.18);}
+    .ghost{color:#1f2937; background:#e5e7eb; flex:1 1 160px;}
+
+    .results-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;}
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{margin:0 0 8px; font-size:0.98rem; color:#475569; line-height:1.35;}
+    .result-box .value{font-size:1.03rem; font-weight:800; color:#111827; line-height:1.35; word-break:break-word;}
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{border-left-color:var(--warn-line); background:var(--warn);}
+    .callout h3{margin-top:0; margin-bottom:8px; font-size:1.15rem;}
+    .callout p{margin:0;}
+
+    .plot-card{background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:16px;}
+    .plot-title{font-weight:800; font-size:1.08rem; margin:0 0 10px; color:#111827;}
+    .plot-box{width:100%; min-height:430px; border:1px solid #e2e8f0; border-radius:18px; overflow:hidden; background:#fff;}
+    .plot-box.short{min-height:320px;}
+
+    .back-link-row{margin-top:40px; text-align:left;}
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{text-align:center; padding:1.5rem 0; font-size:0.95rem; color:#4b5563; line-height:1.6;}
+
+    @media (max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media (max-width:760px){
+      .page-wrap{width:min(100% - 24px, 1380px);}
+      .tool-hero{padding:24px 20px 28px; border-radius:24px;}
+      .card{padding:22px 18px 24px;}
+      .split-2,.split-3,.split-4,.results-grid{grid-template-columns:1fr;}
+      .plot-box{min-height:350px;}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 13 · Attitude Dynamics</div>
+      <h1>Rigid Body Rotation Simulator</h1>
+      <p>
+        Simulate spacecraft rotational motion using inertia, applied torque, Euler rotational dynamics, and quaternion attitude propagation.
+        This tool links directly to 6DOF flight dynamics work by showing how torque changes angular velocity and how angular velocity evolves attitude.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            This simulator models a rigid body with principal moments of inertia and body-frame torque. It integrates angular velocity
+            and quaternion attitude through time, then visualizes the attitude evolution using body axes.
+          </p>
+          <ul>
+            <li>Body angular velocity \([\omega_x,\omega_y,\omega_z]\)</li>
+            <li>Quaternion attitude history</li>
+            <li>Euler-angle display for interpretation</li>
+            <li>Rotational kinetic energy</li>
+            <li>Angular momentum magnitude</li>
+            <li>3D final body-axis orientation</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Euler rotational dynamics</h2>
+          <p>
+            In the body frame, rigid-body rotational motion is governed by:
+          </p>
+          <div class="formula-box">
+            \[
+              \mathbf I\dot{\boldsymbol\omega}
+              + \boldsymbol\omega \times (\mathbf I\boldsymbol\omega)
+              = \boldsymbol\tau
+            \]
+          </div>
+          <p>
+            For a diagonal inertia matrix, the coupling terms show why rotation about one axis can influence the others when the body is not symmetric.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Quaternion attitude propagation</h2>
+          <p>
+            The attitude is propagated using quaternion kinematics:
+          </p>
+          <div class="formula-box">
+            \[
+              \dot{\mathbf q}
+              = \frac{1}{2}\Omega(\boldsymbol\omega)\mathbf q
+            \]
+          </div>
+          <p>
+            Quaternions are normalized during integration to prevent numerical drift. Euler angles are shown only as an interpretation layer.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Why this matters for GNC</h2>
+          <ul>
+            <li>Torque does not always create simple one-axis rotation.</li>
+            <li>Inertia ratios strongly affect rotational response.</li>
+            <li>Quaternion propagation avoids Euler-angle singularities.</li>
+            <li>This is the attitude-dynamics core behind reaction wheels, thrusters, and TVC torque models.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Educational simplification</h3>
+            <p>
+              This page uses a diagonal inertia tensor and simple RK4 integration. Real spacecraft also include flexible modes, actuator dynamics, sensor noise, external disturbances, and control laws.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive simulator</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="inertia">Inertia</button>
+            <button type="button" class="tab-btn" data-mode="state">Initial State</button>
+            <button type="button" class="tab-btn" data-mode="torque">Torque &amp; Time</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-inertia" class="mode-panel active">
+            <div class="split-3">
+              <div class="field"><label for="IxInput">Ix (kg·m²)</label><input id="IxInput" type="number" value="120" step="1" min="0.001"></div>
+              <div class="field"><label for="IyInput">Iy (kg·m²)</label><input id="IyInput" type="number" value="90" step="1" min="0.001"></div>
+              <div class="field"><label for="IzInput">Iz (kg·m²)</label><input id="IzInput" type="number" value="70" step="1" min="0.001"></div>
+            </div>
+          </div>
+
+          <div id="mode-state" class="mode-panel">
+            <h3>Initial angular velocity (deg/s)</h3>
+            <div class="split-3">
+              <div class="field"><label for="wxInput">ωx</label><input id="wxInput" type="number" value="0" step="0.1"></div>
+              <div class="field"><label for="wyInput">ωy</label><input id="wyInput" type="number" value="0" step="0.1"></div>
+              <div class="field"><label for="wzInput">ωz</label><input id="wzInput" type="number" value="2" step="0.1"></div>
+            </div>
+
+            <h3>Initial attitude quaternion</h3>
+            <div class="split-4">
+              <div class="field"><label for="q0Input">q0</label><input id="q0Input" type="number" value="1" step="0.0001"></div>
+              <div class="field"><label for="q1Input">q1</label><input id="q1Input" type="number" value="0" step="0.0001"></div>
+              <div class="field"><label for="q2Input">q2</label><input id="q2Input" type="number" value="0" step="0.0001"></div>
+              <div class="field"><label for="q3Input">q3</label><input id="q3Input" type="number" value="0" step="0.0001"></div>
+            </div>
+          </div>
+
+          <div id="mode-torque" class="mode-panel">
+            <h3>Constant body-frame torque (N·m)</h3>
+            <div class="split-3">
+              <div class="field"><label for="txInput">τx</label><input id="txInput" type="number" value="0.02" step="0.01"></div>
+              <div class="field"><label for="tyInput">τy</label><input id="tyInput" type="number" value="0" step="0.01"></div>
+              <div class="field"><label for="tzInput">τz</label><input id="tzInput" type="number" value="0" step="0.01"></div>
+            </div>
+
+            <div class="split-2">
+              <div class="field"><label for="durationInput">Simulation duration (s)</label><input id="durationInput" type="number" value="120" step="10" min="1"></div>
+              <div class="field"><label for="dtInput">Time step (s)</label><input id="dtInput" type="number" value="0.2" step="0.05" min="0.001"></div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Scenario preset</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="singleAxis">Single-axis spin-up</option>
+                <option value="coupled">Coupled asymmetric rotation</option>
+                <option value="noTorque">Torque-free rotation</option>
+                <option value="slew">Simple attitude slew</option>
+                <option value="fastBody">Fast tumbling body</option>
+              </select>
+              <div class="hint">Presets show how inertia, torque, and initial spin affect attitude evolution.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="runBtn">Simulate Rotation</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Final angular velocity</h4><div class="value" id="wFinalOut">—</div></div>
+            <div class="result-box"><h4>Final Euler angles</h4><div class="value" id="eulerOut">—</div></div>
+            <div class="result-box"><h4>Final quaternion</h4><div class="value" id="qFinalOut">—</div></div>
+            <div class="result-box"><h4>Max angular speed</h4><div class="value" id="wMaxOut">—</div></div>
+            <div class="result-box"><h4>Final rotational energy</h4><div class="value" id="energyOut">—</div></div>
+            <div class="result-box"><h4>Final angular momentum</h4><div class="value" id="hOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the simulation to see angular velocity and attitude evolution.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Angular velocity history</div>
+            <div id="omegaPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Euler-angle display history</div>
+            <div id="eulerPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Final body-axis orientation</div>
+            <div id="axisPlot" class="plot-box"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This simulator assumes:</h3>
+            <ul>
+              <li>Rigid body with diagonal inertia matrix</li>
+              <li>Constant body-frame torque</li>
+              <li>No external disturbances unless entered as torque</li>
+              <li>No actuator saturation or controller logic</li>
+              <li>Quaternion propagation with numerical normalization</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const DEG = Math.PI/180;
+    const RAD = 180/Math.PI;
+
+    const defaults = {
+      IxInput:120, IyInput:90, IzInput:70,
+      wxInput:0, wyInput:0, wzInput:2,
+      q0Input:1, q1Input:0, q2Input:0, q3Input:0,
+      txInput:0.02, tyInput:0, tzInput:0,
+      durationInput:120, dtInput:0.2,
+      presetSelect:"custom"
+    };
+
+    const presets = {
+      singleAxis:{Ix:120,Iy:90,Iz:70, wx:0,wy:0,wz:0, q:[1,0,0,0], tau:[0,0,0.04], duration:120, dt:0.2},
+      coupled:{Ix:120,Iy:80,Iz:45, wx:0.8,wy:0.3,wz:2.0, q:[1,0,0,0], tau:[0.02,0.01,0], duration:160, dt:0.2},
+      noTorque:{Ix:130,Iy:85,Iz:60, wx:1.2,wy:0.4,wz:2.0, q:[1,0,0,0], tau:[0,0,0], duration:180, dt:0.2},
+      slew:{Ix:100,Iy:100,Iz:80, wx:0,wy:0,wz:0, q:[1,0,0,0], tau:[0.04,0.02,0], duration:90, dt:0.1},
+      fastBody:{Ix:40,Iy:60,Iz:85, wx:5,wy:2,wz:1, q:[1,0,0,0], tau:[0,0,0], duration:80, dt:0.05}
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.IxInput.value = p.Ix; el.IyInput.value = p.Iy; el.IzInput.value = p.Iz;
+      el.wxInput.value = p.wx; el.wyInput.value = p.wy; el.wzInput.value = p.wz;
+      el.q0Input.value = p.q[0]; el.q1Input.value = p.q[1]; el.q2Input.value = p.q[2]; el.q3Input.value = p.q[3];
+      el.txInput.value = p.tau[0]; el.tyInput.value = p.tau[1]; el.tzInput.value = p.tau[2];
+      el.durationInput.value = p.duration; el.dtInput.value = p.dt;
+      runSimulation();
+    });
+
+    document.getElementById("runBtn").addEventListener("click", runSimulation);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([key,value]) => el[key].value = value);
+      runSimulation();
+    });
+
+    function getInputs(){
+      return {
+        I:[parseFloat(el.IxInput.value), parseFloat(el.IyInput.value), parseFloat(el.IzInput.value)],
+        w:[parseFloat(el.wxInput.value)*DEG, parseFloat(el.wyInput.value)*DEG, parseFloat(el.wzInput.value)*DEG],
+        q:[parseFloat(el.q0Input.value), parseFloat(el.q1Input.value), parseFloat(el.q2Input.value), parseFloat(el.q3Input.value)],
+        tau:[parseFloat(el.txInput.value), parseFloat(el.tyInput.value), parseFloat(el.tzInput.value)],
+        duration:parseFloat(el.durationInput.value),
+        dt:parseFloat(el.dtInput.value)
+      };
+    }
+
+    function validate(p){
+      const vals = [...p.I,...p.w,...p.q,...p.tau,p.duration,p.dt];
+      if (!vals.every(Number.isFinite)) return "Please enter valid numeric inputs.";
+      if (p.I.some(v => v <= 0)) return "All principal moments of inertia must be positive.";
+      if (p.duration <= 0 || p.dt <= 0) return "Simulation duration and time step must be positive.";
+      if (Math.floor(p.duration/p.dt) > 6000) return "Too many integration steps. Increase time step or reduce duration.";
+      if (quatNorm(p.q) < 1e-10) return "Initial quaternion cannot have zero norm.";
+      return null;
+    }
+
+    function showError(msg){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Input error</h3><p>${msg}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function quatNorm(q){return Math.sqrt(q.reduce((s,x)=>s+x*x,0));}
+    function normalizeQuat(q){
+      const n = quatNorm(q);
+      return q.map(x=>x/n);
+    }
+
+    function dynamics(state,p){
+      const I = p.I;
+      const tau = p.tau;
+      const wx = state[0], wy = state[1], wz = state[2];
+      const q = [state[3],state[4],state[5],state[6]];
+
+      const wdotX = (tau[0] - (I[2]-I[1])*wy*wz)/I[0];
+      const wdotY = (tau[1] - (I[0]-I[2])*wz*wx)/I[1];
+      const wdotZ = (tau[2] - (I[1]-I[0])*wx*wy)/I[2];
+
+      const q0=q[0], q1=q[1], q2=q[2], q3=q[3];
+      const qdot0 = -0.5*(q1*wx + q2*wy + q3*wz);
+      const qdot1 = 0.5*(q0*wx + q2*wz - q3*wy);
+      const qdot2 = 0.5*(q0*wy - q1*wz + q3*wx);
+      const qdot3 = 0.5*(q0*wz + q1*wy - q2*wx);
+
+      return [wdotX,wdotY,wdotZ,qdot0,qdot1,qdot2,qdot3];
+    }
+
+    function rk4Step(state,dt,p){
+      const k1 = dynamics(state,p);
+      const s2 = state.map((x,i)=>x+0.5*dt*k1[i]);
+      const k2 = dynamics(s2,p);
+      const s3 = state.map((x,i)=>x+0.5*dt*k2[i]);
+      const k3 = dynamics(s3,p);
+      const s4 = state.map((x,i)=>x+dt*k3[i]);
+      const k4 = dynamics(s4,p);
+      const next = state.map((x,i)=>x+dt*(k1[i]+2*k2[i]+2*k3[i]+k4[i])/6);
+      const q = normalizeQuat([next[3],next[4],next[5],next[6]]);
+      next[3]=q[0]; next[4]=q[1]; next[5]=q[2]; next[6]=q[3];
+      return next;
+    }
+
+    function simulate(p){
+      const q0 = normalizeQuat(p.q);
+      let state = [p.w[0],p.w[1],p.w[2],q0[0],q0[1],q0[2],q0[3]];
+      const n = Math.floor(p.duration/p.dt)+1;
+      const t=[], wx=[], wy=[], wz=[], speed=[], yaw=[], pitch=[], roll=[], energy=[], hmag=[];
+      let maxSpeed = 0;
+
+      for (let k=0; k<n; k++){
+        const time = k*p.dt;
+        const w = [state[0],state[1],state[2]];
+        const q = [state[3],state[4],state[5],state[6]];
+        const e = quatToEuler(q);
+        const sp = Math.sqrt(w[0]*w[0]+w[1]*w[1]+w[2]*w[2]);
+        maxSpeed = Math.max(maxSpeed,sp);
+        const E = 0.5*(p.I[0]*w[0]*w[0]+p.I[1]*w[1]*w[1]+p.I[2]*w[2]*w[2]);
+        const H = Math.sqrt(Math.pow(p.I[0]*w[0],2)+Math.pow(p.I[1]*w[1],2)+Math.pow(p.I[2]*w[2],2));
+
+        t.push(time);
+        wx.push(w[0]*RAD); wy.push(w[1]*RAD); wz.push(w[2]*RAD); speed.push(sp*RAD);
+        yaw.push(e.yaw); pitch.push(e.pitch); roll.push(e.roll);
+        energy.push(E); hmag.push(H);
+
+        if (k < n-1) state = rk4Step(state,p.dt,p);
+      }
+
+      return {t,wx,wy,wz,speed,yaw,pitch,roll,energy,hmag,finalState:state,maxSpeed:maxSpeed*RAD};
+    }
+
+    function quatToEuler(q){
+      q = normalizeQuat(q);
+      const [q0,q1,q2,q3] = q;
+      const sinr_cosp = 2*(q0*q1 + q2*q3);
+      const cosr_cosp = 1 - 2*(q1*q1 + q2*q2);
+      const roll = Math.atan2(sinr_cosp, cosr_cosp);
+      const sinp = 2*(q0*q2 - q3*q1);
+      let pitch;
+      if (Math.abs(sinp) >= 1) pitch = Math.sign(sinp)*Math.PI/2;
+      else pitch = Math.asin(sinp);
+      const siny_cosp = 2*(q0*q3 + q1*q2);
+      const cosy_cosp = 1 - 2*(q2*q2 + q3*q3);
+      const yaw = Math.atan2(siny_cosp, cosy_cosp);
+      return {yaw:yaw*RAD,pitch:pitch*RAD,roll:roll*RAD};
+    }
+
+    function quatToDCM(q){
+      q = normalizeQuat(q);
+      const [q0,q1,q2,q3] = q;
+      return [
+        [1-2*(q2*q2+q3*q3), 2*(q1*q2-q0*q3), 2*(q1*q3+q0*q2)],
+        [2*(q1*q2+q0*q3), 1-2*(q1*q1+q3*q3), 2*(q2*q3-q0*q1)],
+        [2*(q1*q3-q0*q2), 2*(q2*q3+q0*q1), 1-2*(q1*q1+q2*q2)]
+      ];
+    }
+
+    function fmt(v,d=3,suffix=""){
+      if (!Number.isFinite(v)) return "—";
+      return v.toFixed(d)+suffix;
+    }
+
+    function vectorFmt(v,d=3,suffix=""){
+      return `[${fmt(v[0],d)}, ${fmt(v[1],d)}, ${fmt(v[2],d)}]${suffix}`;
+    }
+
+    function updateResults(p,d){
+      const fs = d.finalState;
+      const wf = [fs[0]*RAD,fs[1]*RAD,fs[2]*RAD];
+      const qf = [fs[3],fs[4],fs[5],fs[6]];
+      const ef = quatToEuler(qf);
+      const E = d.energy[d.energy.length-1];
+      const H = d.hmag[d.hmag.length-1];
+
+      document.getElementById("wFinalOut").textContent = vectorFmt(wf,3," deg/s");
+      document.getElementById("eulerOut").textContent = `yaw=${fmt(ef.yaw,2)}°, pitch=${fmt(ef.pitch,2)}°, roll=${fmt(ef.roll,2)}°`;
+      document.getElementById("qFinalOut").textContent = `[${fmt(qf[0],5)}, ${fmt(qf[1],5)}, ${fmt(qf[2],5)}, ${fmt(qf[3],5)}]`;
+      document.getElementById("wMaxOut").textContent = fmt(d.maxSpeed,3," deg/s");
+      document.getElementById("energyOut").textContent = fmt(E,5," J");
+      document.getElementById("hOut").textContent = fmt(H,5," N·m·s");
+
+      const torqueMag = Math.sqrt(p.tau[0]*p.tau[0]+p.tau[1]*p.tau[1]+p.tau[2]*p.tau[2]);
+      let msg = torqueMag > 0
+        ? "A nonzero body-frame torque changes the angular momentum and drives attitude evolution. Watch how inertia ratios affect the angular velocity response."
+        : "Torque-free motion preserves angular momentum, but angular velocity components can still exchange due to inertia coupling in the body frame.";
+      if (Math.max(...d.speed) > 20) msg += " The angular speed is high; reduce the time step if the plots look noisy.";
+      document.getElementById("interpretText").textContent = msg;
+
+      drawOmega(d);
+      drawEuler(d);
+      drawAxes(quatToDCM(qf));
+    }
+
+    function drawOmega(d){
+      Plotly.newPlot("omegaPlot", [
+        {type:"scatter",mode:"lines",x:d.t,y:d.wx,line:{color:"#2563eb",width:3},name:"ωx"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.wy,line:{color:"#f97316",width:3},name:"ωy"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.wz,line:{color:"#7c3aed",width:3},name:"ωz"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.speed,line:{color:"#0f8b8d",width:2,dash:"dash"},name:"|ω|"}
+      ], {
+        margin:{l:60,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",
+        xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},
+        yaxis:{title:"Angular velocity (deg/s)",gridcolor:"#e5e7eb",zeroline:true},
+        legend:{orientation:"h",x:0.02,y:1.12}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawEuler(d){
+      Plotly.newPlot("eulerPlot", [
+        {type:"scatter",mode:"lines",x:d.t,y:d.yaw,line:{color:"#2563eb",width:3},name:"Yaw"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.pitch,line:{color:"#f97316",width:3},name:"Pitch"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.roll,line:{color:"#7c3aed",width:3},name:"Roll"}
+      ], {
+        margin:{l:60,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",
+        xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},
+        yaxis:{title:"Euler display angle (deg)",gridcolor:"#e5e7eb",zeroline:true},
+        legend:{orientation:"h",x:0.02,y:1.12}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawAxes(C){
+      const L = 1.2;
+      const axes = [
+        {name:"Body x-axis", color:"#2563eb", v:[C[0][0],C[1][0],C[2][0]]},
+        {name:"Body y-axis", color:"#f97316", v:[C[0][1],C[1][1],C[2][1]]},
+        {name:"Body z-axis", color:"#7c3aed", v:[C[0][2],C[1][2],C[2][2]]}
+      ];
+      const traces = axes.map(a => ({
+        type:"scatter3d", mode:"lines+markers",
+        x:[0,L*a.v[0]], y:[0,L*a.v[1]], z:[0,L*a.v[2]],
+        line:{color:a.color,width:7}, marker:{size:3,color:a.color}, name:a.name
+      }));
+      traces.push({type:"scatter3d",mode:"markers+text",x:[0],y:[0],z:[0],text:["Origin"],textposition:"top center",marker:{size:4,color:"#111827"},name:"Origin"});
+      Plotly.newPlot("axisPlot", traces, {
+        margin:{l:0,r:0,t:0,b:0},paper_bgcolor:"#fff",
+        scene:{xaxis:{title:"X",range:[-1.4,1.4]},yaxis:{title:"Y",range:[-1.4,1.4]},zaxis:{title:"Z",range:[-1.4,1.4]},aspectmode:"cube"},
+        legend:{orientation:"h",x:0.02,y:0.98}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function runSimulation(){
+      clearError();
+      const p = getInputs();
+      const err = validate(p);
+      if (err){ showError(err); return; }
+      try{
+        const d = simulate(p);
+        updateResults(p,d);
+      } catch(e){
+        showError(e.message || "Simulation failed. Check inputs and reduce the time step.");
+      }
+    }
+
+    runSimulation();
+  </script>
+</body>
+</html>
