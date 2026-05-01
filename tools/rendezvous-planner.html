@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rendezvous Planner | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{display:grid; gap:22px;}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,.card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{margin:10px 0 0 22px; padding:0;}
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{display:flex; gap:12px; margin:4px 0 18px; flex-wrap:wrap;}
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .split-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .split-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+    .field{margin-bottom:16px;}
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{font-size:0.94rem; color:#6b7280; margin-top:6px;}
+
+    .button-row{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
+
+    .cta,.ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{color:#fff; background:linear-gradient(135deg,var(--accent-2),var(--accent)); flex:1 1 240px; box-shadow:0 12px 24px rgba(37,99,235,0.18);}
+    .ghost{color:#1f2937; background:#e5e7eb; flex:1 1 160px;}
+
+    .results-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;}
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{margin:0 0 8px; font-size:0.98rem; color:#475569; line-height:1.35;}
+    .result-box .value{font-size:1.04rem; font-weight:800; color:#111827; line-height:1.35; word-break:break-word;}
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{border-left-color:var(--warn-line); background:var(--warn);}
+    .callout h3{margin-top:0; margin-bottom:8px; font-size:1.15rem;}
+    .callout p{margin:0;}
+
+    .plot-card{background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:16px;}
+    .plot-title{font-weight:800; font-size:1.08rem; margin:0 0 10px; color:#111827;}
+    .plot-box{width:100%; min-height:430px; border:1px solid #e2e8f0; border-radius:18px; overflow:hidden; background:#fff;}
+    .plot-box.short{min-height:320px;}
+
+    .back-link-row{margin-top:40px; text-align:left;}
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{text-align:center; padding:1.5rem 0; font-size:0.95rem; color:#4b5563; line-height:1.6;}
+
+    @media (max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media (max-width:760px){
+      .page-wrap{width:min(100% - 24px, 1380px);}
+      .tool-hero{padding:24px 20px 28px; border-radius:24px;}
+      .card{padding:22px 18px 24px;}
+      .split-2,.split-3,.results-grid{grid-template-columns:1fr;}
+      .plot-box{min-height:350px;}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 11 · Rendezvous &amp; Relative Motion</div>
+      <h1>Rendezvous Planner</h1>
+      <p>
+        Plan a simple impulsive rendezvous in the LVLH frame using HCW targeting. Enter the chaser's initial relative
+        position, choose a desired final point near the target, select a transfer time, and compute the burn required
+        to arrive at that point.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            This planner uses the Hill–Clohessy–Wiltshire equations as a linear targeting model. Instead of only showing
+            natural drift, it solves for the initial velocity change needed to move the chaser from its current relative
+            position to a desired final relative position after a selected transfer time.
+          </p>
+          <ul>
+            <li>Required initial relative velocity after burn</li>
+            <li>Required burn vector \(\Delta\mathbf v_1\)</li>
+            <li>Arrival relative velocity at the final point</li>
+            <li>Optional stopping burn \(\Delta\mathbf v_2\)</li>
+            <li>Total two-impulse rendezvous cost</li>
+            <li>3D LVLH transfer path and range history</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Targeting idea</h2>
+          <p>
+            HCW propagation can be written in state-transition form:
+          </p>
+          <div class="formula-box">
+            \[
+              \begin{bmatrix}\mathbf r_f \\ \mathbf v_f\end{bmatrix}
+              =
+              \begin{bmatrix}\Phi_{rr} & \Phi_{rv} \\ \Phi_{vr} & \Phi_{vv}\end{bmatrix}
+              \begin{bmatrix}\mathbf r_0 \\ \mathbf v_0\end{bmatrix}
+            \]
+          </div>
+          <p>
+            To hit a desired final position, solve the position equation for the required initial velocity:
+          </p>
+          <div class="formula-box">
+            \[
+              \mathbf v_0 = \Phi_{rv}^{-1}\left(\mathbf r_f - \Phi_{rr}\mathbf r_0\right)
+            \]
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Rendezvous interpretation</h2>
+          <p>
+            The first burn places the chaser onto a relative trajectory that reaches the desired final point at the chosen time.
+            If the goal is to stop relative to the target at arrival, a second burn removes the arrival relative velocity.
+          </p>
+          <ul>
+            <li><strong>Burn 1:</strong> inject into the targeted relative transfer path.</li>
+            <li><strong>Coast:</strong> follow HCW relative dynamics.</li>
+            <li><strong>Burn 2:</strong> optional braking burn to reduce final relative velocity.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Safety insight</h2>
+          <p>
+            A mathematically valid HCW transfer is not automatically a safe rendezvous. Real missions use approach corridors,
+            keep-out zones, abort logic, navigation uncertainty bounds, and plume/sensor constraints.
+          </p>
+          <div class="callout warn">
+            <h3>Educational simplification</h3>
+            <p>
+              This planner is for learning targeting logic. It does not enforce collision avoidance, line-of-sight cones, docking corridors, or operational safety rules.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive rendezvous planner</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="orbit">Target Orbit</button>
+            <button type="button" class="tab-btn" data-mode="state">Chaser &amp; Goal</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-orbit" class="mode-panel active">
+            <div class="split-2">
+              <div class="field">
+                <label for="altitudeInput">Target circular altitude (km)</label>
+                <input id="altitudeInput" type="number" value="400" step="10">
+              </div>
+              <div class="field">
+                <label for="tofInput">Transfer time (minutes)</label>
+                <input id="tofInput" type="number" value="45" step="1" min="1">
+              </div>
+            </div>
+
+            <div class="split-2">
+              <div class="field">
+                <label for="muInput">μ (km³/s²)</label>
+                <input id="muInput" type="number" value="398600.4418" step="any">
+              </div>
+              <div class="field">
+                <label for="radiusInput">Earth radius (km)</label>
+                <input id="radiusInput" type="number" value="6378.137" step="any">
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="samplesInput">Plot samples</label>
+              <input id="samplesInput" type="number" value="500" step="50" min="100">
+            </div>
+          </div>
+
+          <div id="mode-state" class="mode-panel">
+            <h3>Current chaser relative position (m)</h3>
+            <div class="split-3">
+              <div class="field"><label for="x0Input">x₀ radial</label><input id="x0Input" type="number" value="-300" step="10"></div>
+              <div class="field"><label for="y0Input">y₀ along-track</label><input id="y0Input" type="number" value="1200" step="10"></div>
+              <div class="field"><label for="z0Input">z₀ cross-track</label><input id="z0Input" type="number" value="0" step="10"></div>
+            </div>
+
+            <h3>Current chaser relative velocity before burn (m/s)</h3>
+            <div class="split-3">
+              <div class="field"><label for="xdInitInput">ẋ initial</label><input id="xdInitInput" type="number" value="0" step="0.01"></div>
+              <div class="field"><label for="ydInitInput">ẏ initial</label><input id="ydInitInput" type="number" value="0" step="0.01"></div>
+              <div class="field"><label for="zdInitInput">ż initial</label><input id="zdInitInput" type="number" value="0" step="0.01"></div>
+            </div>
+
+            <h3>Desired final relative position (m)</h3>
+            <div class="split-3">
+              <div class="field"><label for="xfInput">xf radial</label><input id="xfInput" type="number" value="0" step="10"></div>
+              <div class="field"><label for="yfInput">yf along-track</label><input id="yfInput" type="number" value="100" step="10"></div>
+              <div class="field"><label for="zfInput">zf cross-track</label><input id="zfInput" type="number" value="0" step="10"></div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Rendezvous scenario preset</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="vbarApproach">V-bar approach</option>
+                <option value="rbarApproach">R-bar style approach</option>
+                <option value="crossTrackCorrection">Cross-track correction</option>
+                <option value="holdPoint">Transfer to hold point</option>
+                <option value="closeIn">Close-in final approach</option>
+              </select>
+              <div class="hint">Presets demonstrate common relative targeting ideas, not certified approach rules.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="planBtn">Compute Rendezvous Burns</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Required velocity after Burn 1</h4><div class="value" id="vReqOut">—</div></div>
+            <div class="result-box"><h4>Burn 1 vector</h4><div class="value" id="dv1VecOut">—</div></div>
+            <div class="result-box"><h4>Burn 1 magnitude</h4><div class="value" id="dv1Out">—</div></div>
+            <div class="result-box"><h4>Arrival relative velocity</h4><div class="value" id="vFinalOut">—</div></div>
+            <div class="result-box"><h4>Stopping burn magnitude</h4><div class="value" id="dv2Out">—</div></div>
+            <div class="result-box"><h4>Total Δv</h4><div class="value" id="dvTotalOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the planner to compute a targeted HCW rendezvous transfer.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">3D rendezvous trajectory in LVLH frame</div>
+            <div id="traj3D" class="plot-box"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">In-plane path: radial x vs along-track y</div>
+            <div id="xyPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Range to target over time</div>
+            <div id="rangePlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This tool assumes:</h3>
+            <ul>
+              <li>Circular target orbit</li>
+              <li>Linear HCW relative dynamics</li>
+              <li>Impulsive burns</li>
+              <li>No collision-avoidance or keep-out-zone enforcement</li>
+              <li>No J2, drag, eccentric target orbit, finite burns, or navigation uncertainty</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const defaults = {
+      altitudeInput:400,
+      tofInput:45,
+      muInput:398600.4418,
+      radiusInput:6378.137,
+      samplesInput:500,
+      x0Input:-300,
+      y0Input:1200,
+      z0Input:0,
+      xdInitInput:0,
+      ydInitInput:0,
+      zdInitInput:0,
+      xfInput:0,
+      yfInput:100,
+      zfInput:0,
+      presetSelect:"custom"
+    };
+
+    const presets = {
+      vbarApproach:{x0:0,y0:1500,z0:0,xd:0,yd:0,zd:0,xf:0,yf:100,zf:0,tof:45},
+      rbarApproach:{x0:-800,y0:0,z0:0,xd:0,yd:0,zd:0,xf:-100,yf:0,zf:0,tof:40},
+      crossTrackCorrection:{x0:-200,y0:800,z0:300,xd:0,yd:0,zd:0,xf:0,yf:100,zf:0,tof:50},
+      holdPoint:{x0:-500,y0:1500,z0:0,xd:0,yd:0,zd:0,xf:-100,yf:300,zf:0,tof:60},
+      closeIn:{x0:-80,y0:250,z0:20,xd:0,yd:0,zd:0,xf:0,yf:30,zf:0,tof:20}
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.x0Input.value = p.x0;
+      el.y0Input.value = p.y0;
+      el.z0Input.value = p.z0;
+      el.xdInitInput.value = p.xd;
+      el.ydInitInput.value = p.yd;
+      el.zdInitInput.value = p.zd;
+      el.xfInput.value = p.xf;
+      el.yfInput.value = p.yf;
+      el.zfInput.value = p.zf;
+      el.tofInput.value = p.tof;
+      runPlanner();
+    });
+
+    document.getElementById("planBtn").addEventListener("click", runPlanner);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([key,value]) => el[key].value = value);
+      runPlanner();
+    });
+
+    function getInputs(){
+      return {
+        h:parseFloat(el.altitudeInput.value),
+        tof:parseFloat(el.tofInput.value) * 60,
+        mu:parseFloat(el.muInput.value),
+        R:parseFloat(el.radiusInput.value),
+        samples:Math.round(parseFloat(el.samplesInput.value)),
+        r0:[parseFloat(el.x0Input.value), parseFloat(el.y0Input.value), parseFloat(el.z0Input.value)],
+        vInitial:[parseFloat(el.xdInitInput.value), parseFloat(el.ydInitInput.value), parseFloat(el.zdInitInput.value)],
+        rf:[parseFloat(el.xfInput.value), parseFloat(el.yfInput.value), parseFloat(el.zfInput.value)]
+      };
+    }
+
+    function validate(p){
+      const values = [p.h,p.tof,p.mu,p.R,p.samples,...p.r0,...p.vInitial,...p.rf];
+      if (!values.every(Number.isFinite)) return "Please enter valid numeric inputs.";
+      if (p.h < 0 || p.tof <= 0 || p.mu <= 0 || p.R <= 0) return "Altitude, transfer time, μ, and radius must be physically valid.";
+      if (p.samples < 100 || p.samples > 5000) return "Plot samples should be between 100 and 5000.";
+      return null;
+    }
+
+    function showError(msg){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Input error</h3><p>${msg}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function hcwMatrices(t,n){
+      const nt = n*t;
+      const c = Math.cos(nt);
+      const s = Math.sin(nt);
+
+      const Phi_rr = [
+        [4 - 3*c, 0, 0],
+        [6*(s - nt), 1, 0],
+        [0, 0, c]
+      ];
+
+      const Phi_rv = [
+        [s/n, 2*(1-c)/n, 0],
+        [-2*(1-c)/n, (4*s - 3*nt)/n, 0],
+        [0, 0, s/n]
+      ];
+
+      const Phi_vr = [
+        [3*n*s, 0, 0],
+        [6*n*(c-1), 0, 0],
+        [0, 0, -n*s]
+      ];
+
+      const Phi_vv = [
+        [c, 2*s, 0],
+        [-2*s, 4*c - 3, 0],
+        [0, 0, c]
+      ];
+
+      return {Phi_rr,Phi_rv,Phi_vr,Phi_vv};
+    }
+
+    function matVec(M,v){
+      return M.map(row => row[0]*v[0] + row[1]*v[1] + row[2]*v[2]);
+    }
+
+    function add(a,b){return a.map((x,i)=>x+b[i]);}
+    function sub(a,b){return a.map((x,i)=>x-b[i]);}
+    function norm(v){return Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]);}
+
+    function inv3(M){
+      const a=M[0][0], b=M[0][1], c=M[0][2];
+      const d=M[1][0], e=M[1][1], f=M[1][2];
+      const g=M[2][0], h=M[2][1], i=M[2][2];
+      const det = a*(e*i-f*h) - b*(d*i-f*g) + c*(d*h-e*g);
+      if (Math.abs(det) < 1e-8) throw new Error("The selected transfer time makes the targeting matrix nearly singular. Try a different transfer time.");
+      return [
+        [(e*i-f*h)/det, (c*h-b*i)/det, (b*f-c*e)/det],
+        [(f*g-d*i)/det, (a*i-c*g)/det, (c*d-a*f)/det],
+        [(d*h-e*g)/det, (b*g-a*h)/det, (a*e-b*d)/det]
+      ];
+    }
+
+    function solveTargeting(p){
+      const rTarget = p.R + p.h;
+      const n = Math.sqrt(p.mu / Math.pow(rTarget,3));
+      const T = 2*Math.PI/n;
+      const mats = hcwMatrices(p.tof,n);
+      const naturalFinalFromR = matVec(mats.Phi_rr,p.r0);
+      const needed = sub(p.rf,naturalFinalFromR);
+      const vRequired = matVec(inv3(mats.Phi_rv),needed);
+      const dv1 = sub(vRequired,p.vInitial);
+      const vf = add(matVec(mats.Phi_vr,p.r0), matVec(mats.Phi_vv,vRequired));
+      const dv2 = vf.map(v => -v);
+      return {n,T,vRequired,dv1,vf,dv2,dv1Mag:norm(dv1),dv2Mag:norm(dv2),totalDv:norm(dv1)+norm(dv2)};
+    }
+
+    function hcwState(t,n,r0,v0){
+      const mats = hcwMatrices(t,n);
+      const r = add(matVec(mats.Phi_rr,r0), matVec(mats.Phi_rv,v0));
+      const v = add(matVec(mats.Phi_vr,r0), matVec(mats.Phi_vv,v0));
+      return {r,v};
+    }
+
+    function propagate(p,sol){
+      const t=[], x=[], y=[], z=[], range=[];
+      for (let k=0; k<p.samples; k++){
+        const time = p.tof * k / (p.samples-1);
+        const st = hcwState(time,sol.n,p.r0,sol.vRequired);
+        t.push(time/60);
+        x.push(st.r[0]);
+        y.push(st.r[1]);
+        z.push(st.r[2]);
+        range.push(norm(st.r));
+      }
+      return {t,x,y,z,range};
+    }
+
+    function fmt(v,d=3,suffix=""){
+      if (!Number.isFinite(v)) return "—";
+      return v.toFixed(d) + suffix;
+    }
+
+    function vectorFmt(v,d=3,suffix=""){
+      return `[${fmt(v[0],d)}, ${fmt(v[1],d)}, ${fmt(v[2],d)}]${suffix}`;
+    }
+
+    function updateResults(p,sol,d){
+      document.getElementById("vReqOut").textContent = vectorFmt(sol.vRequired,4," m/s");
+      document.getElementById("dv1VecOut").textContent = vectorFmt(sol.dv1,4," m/s");
+      document.getElementById("dv1Out").textContent = fmt(sol.dv1Mag,4," m/s");
+      document.getElementById("vFinalOut").textContent = vectorFmt(sol.vf,4," m/s");
+      document.getElementById("dv2Out").textContent = fmt(sol.dv2Mag,4," m/s");
+      document.getElementById("dvTotalOut").textContent = fmt(sol.totalDv,4," m/s");
+
+      const minRange = Math.min(...d.range);
+      let msg = `The transfer reaches the selected final point after ${fmt(p.tof/60,2," minutes")}. Burn 1 targets the path; Burn 2 removes arrival relative velocity if a near-stop rendezvous is desired.`;
+      if (sol.totalDv > 5) msg += " The total Δv is relatively high for a close-proximity example; try increasing transfer time or using a less aggressive final point.";
+      if (minRange < 20) msg += " The path passes very close to the target, so a real mission would require strict safety corridor checks.";
+      document.getElementById("interpretText").textContent = msg;
+    }
+
+    function draw3D(p,d){
+      Plotly.newPlot("traj3D", [
+        {type:"scatter3d", mode:"lines", x:d.x, y:d.y, z:d.z, line:{color:"#2563eb", width:5}, name:"Targeted path"},
+        {type:"scatter3d", mode:"markers+text", x:[0], y:[0], z:[0], text:["Target"], textposition:"top center", marker:{size:6,color:"#f97316"}, name:"Target"},
+        {type:"scatter3d", mode:"markers+text", x:[p.r0[0]], y:[p.r0[1]], z:[p.r0[2]], text:["Start"], textposition:"top center", marker:{size:5,color:"#7c3aed"}, name:"Start"},
+        {type:"scatter3d", mode:"markers+text", x:[p.rf[0]], y:[p.rf[1]], z:[p.rf[2]], text:["Goal"], textposition:"top center", marker:{size:5,color:"#0f8b8d"}, name:"Goal"}
+      ], {
+        margin:{l:0,r:0,t:0,b:0},
+        paper_bgcolor:"#ffffff",
+        scene:{
+          xaxis:{title:"x radial (m)"},
+          yaxis:{title:"y along-track (m)"},
+          zaxis:{title:"z cross-track (m)"},
+          aspectmode:"data"
+        },
+        legend:{orientation:"h", x:0.02, y:0.98}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawXY(p,d){
+      Plotly.newPlot("xyPlot", [
+        {type:"scatter", mode:"lines", x:d.y, y:d.x, line:{color:"#0f8b8d", width:3}, name:"Targeted path"},
+        {type:"scatter", mode:"markers+text", x:[0], y:[0], text:["Target"], textposition:"top center", marker:{size:9,color:"#f97316"}, name:"Target"},
+        {type:"scatter", mode:"markers+text", x:[p.r0[1]], y:[p.r0[0]], text:["Start"], textposition:"top center", marker:{size:8,color:"#7c3aed"}, name:"Start"},
+        {type:"scatter", mode:"markers+text", x:[p.rf[1]], y:[p.rf[0]], text:["Goal"], textposition:"top center", marker:{size:8,color:"#0f8b8d"}, name:"Goal"}
+      ], {
+        margin:{l:60,r:20,t:10,b:55},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"Along-track y (m)", gridcolor:"#e5e7eb", zeroline:true},
+        yaxis:{title:"Radial x (m)", gridcolor:"#e5e7eb", zeroline:true, scaleanchor:"x"},
+        legend:{orientation:"h", x:0.02, y:1.12}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawRange(d){
+      Plotly.newPlot("rangePlot", [{
+        type:"scatter",
+        mode:"lines",
+        x:d.t,
+        y:d.range,
+        line:{color:"#2563eb", width:3},
+        name:"Range"
+      }], {
+        margin:{l:60,r:20,t:10,b:55},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"Time (min)", gridcolor:"#e5e7eb"},
+        yaxis:{title:"Range to target (m)", gridcolor:"#e5e7eb"},
+        showlegend:false
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function runPlanner(){
+      clearError();
+      const p = getInputs();
+      const err = validate(p);
+      if (err){ showError(err); return; }
+      try{
+        const sol = solveTargeting(p);
+        const d = propagate(p,sol);
+        updateResults(p,sol,d);
+        draw3D(p,d);
+        drawXY(p,d);
+        drawRange(d);
+      } catch(e){
+        showError(e.message || "Could not compute a targeted rendezvous transfer for these inputs.");
+      }
+    }
+
+    runPlanner();
+  </script>
+</body>
+</html>
