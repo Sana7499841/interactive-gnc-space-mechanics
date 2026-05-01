@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kalman Filter Visualizer | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--page-bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.65;}
+    .page-wrap{width:min(1380px,calc(100% - 48px));margin:20px auto 56px;}
+    .tool-hero{background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));color:#fff;padding:34px 38px 38px;border-radius:32px;box-shadow:var(--shadow);margin-bottom:22px;}
+    .tool-pill{display:inline-block;background:#e0f2fe;color:#1f2937;font-weight:700;padding:10px 20px;border-radius:999px;font-size:1.05rem;margin-bottom:14px;}
+    .tool-hero h1{margin:0 0 12px;font-size:clamp(2.4rem,5vw,4rem);line-height:1.05;font-weight:800;letter-spacing:-0.02em;}
+    .tool-hero p{margin:0;font-size:clamp(1.05rem,1.8vw,1.22rem);line-height:1.65;max-width:1120px;}
+    .grid-2{display:grid;grid-template-columns:1.05fr 0.95fr;gap:22px;align-items:start;}
+    .stack{display:grid;gap:22px;}
+    .card{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow);padding:28px 28px 30px;}
+    .card h2{margin:0 0 18px;font-size:clamp(1.8rem,2.6vw,2.55rem);line-height:1.1;letter-spacing:-0.02em;color:#0f172a;}
+    .card h3{margin:18px 0 10px;font-size:1.2rem;color:#0f172a;}
+    .card p,.card li{font-size:1.04rem;line-height:1.72;color:var(--muted);}
+    .card ul{margin:10px 0 0 22px;padding:0;}
+    .formula-box{background:var(--formula-bg);color:#fff;border-radius:20px;padding:22px 18px;margin:16px 0 18px;overflow:auto;box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);}
+    .tabs{display:flex;gap:12px;margin:4px 0 18px;flex-wrap:wrap;}
+    .tab-btn{border:none;border-radius:999px;padding:13px 22px;font-size:1rem;font-weight:700;cursor:pointer;background:#dbe1ea;color:#1f2937;font-family:inherit;transition:transform .15s ease,background .2s ease;}
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent));color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+    .mode-panel{display:none;}.mode-panel.active{display:block;}
+    .split-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}.split-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+    .field{margin-bottom:16px;}
+    label{display:block;font-size:1rem;font-weight:700;color:#1f2937;margin:0 0 8px;}
+    input,select{width:100%;padding:12px 14px;border:1.5px solid #cbd5e1;border-radius:16px;font-size:1rem;color:#111827;background:#fff;font-family:inherit;}
+    input:focus,select:focus{outline:none;border-color:#5b8def;box-shadow:0 0 0 3px rgba(37,99,235,.10);}
+    .hint{font-size:.94rem;color:#6b7280;margin-top:6px;}
+    .button-row{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;}
+    .cta,.ghost{border:none;border-radius:18px;padding:16px 20px;font-size:1.06rem;font-weight:800;cursor:pointer;font-family:inherit;min-height:56px;}
+    .cta{color:#fff;background:linear-gradient(135deg,var(--accent-2),var(--accent));flex:1 1 240px;box-shadow:0 12px 24px rgba(37,99,235,.18);}
+    .ghost{color:#1f2937;background:#e5e7eb;flex:1 1 160px;}
+    .results-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px;}
+    .result-box{background:#f8fafc;border:1px solid #dbe3ec;border-radius:18px;padding:16px 18px;min-height:104px;}
+    .result-box h4{margin:0 0 8px;font-size:.98rem;color:#475569;line-height:1.35;}
+    .result-box .value{font-size:1.04rem;font-weight:800;color:#111827;line-height:1.35;word-break:break-word;}
+    .callout{border-radius:20px;padding:18px 20px;margin-top:18px;border-left:5px solid var(--accent-2);background:var(--soft);}
+    .callout.warn{border-left-color:var(--warn-line);background:var(--warn);}
+    .callout h3{margin-top:0;margin-bottom:8px;font-size:1.15rem;}.callout p{margin:0;}
+    .plot-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;margin-top:16px;}
+    .plot-title{font-weight:800;font-size:1.08rem;margin:0 0 10px;color:#111827;}
+    .plot-box{width:100%;min-height:430px;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;background:#fff;}.plot-box.short{min-height:320px;}
+    .back-link-row{margin-top:40px;text-align:left;}.back-link-btn{display:inline-block;text-decoration:none;border-radius:18px;padding:14px 22px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent-2),var(--accent));box-shadow:0 12px 24px rgba(37,99,235,.18);}
+    .site-footer{text-align:center;padding:1.5rem 0;font-size:.95rem;color:#4b5563;line-height:1.6;}
+    @media(max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media(max-width:760px){.page-wrap{width:min(100% - 24px,1380px);}.tool-hero{padding:24px 20px 28px;border-radius:24px;}.card{padding:22px 18px 24px;}.split-2,.split-3,.results-grid{grid-template-columns:1fr;}.plot-box{min-height:350px;}}
+  </style>
+</head>
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 16 · Advanced Control Systems</div>
+      <h1>Kalman Filter Visualizer</h1>
+      <p>
+        Visualize how a Kalman filter estimates true motion from noisy measurements. Tune process noise and measurement noise,
+        compare truth, sensor readings, and estimated state, and see how uncertainty evolves over time.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            This page uses a simple one-dimensional constant-velocity tracking model. The true object moves with position and velocity,
+            the sensor measures noisy position, and the Kalman filter estimates both position and velocity.
+          </p>
+          <ul>
+            <li>True position and velocity</li>
+            <li>Noisy position measurements</li>
+            <li>Kalman-estimated position and velocity</li>
+            <li>Position uncertainty band</li>
+            <li>Kalman gain history</li>
+            <li>RMSE comparison between raw sensor and filtered estimate</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Prediction step</h2>
+          <p>The filter first predicts the next state using a dynamics model:</p>
+          <div class="formula-box">
+            \[
+              \hat{x}_{k|k-1}=F\hat{x}_{k-1|k-1}
+            \]
+            \[
+              P_{k|k-1}=FP_{k-1|k-1}F^T+Q
+            \]
+          </div>
+          <p>
+            The process noise matrix \(Q\) represents uncertainty in the model, such as unmodeled acceleration or disturbance forces.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Measurement update</h2>
+          <p>The filter then corrects the prediction using the noisy sensor measurement:</p>
+          <div class="formula-box">
+            \[
+              K_k=P_{k|k-1}H^T(HP_{k|k-1}H^T+R)^{-1}
+            \]
+            \[
+              \hat{x}_{k|k}=\hat{x}_{k|k-1}+K_k(z_k-H\hat{x}_{k|k-1})
+            \]
+          </div>
+          <p>
+            The measurement noise \(R\) tells the filter how much to trust the sensor.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Engineering interpretation</h2>
+          <ul>
+            <li>High measurement noise makes the filter trust the model more.</li>
+            <li>High process noise makes the filter adapt faster to measurements.</li>
+            <li>Too little process noise can make the filter sluggish.</li>
+            <li>Too little measurement noise can make the estimate chase sensor noise.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Why this matters</h3>
+            <p>
+              Kalman filters are central to spacecraft navigation, orbit determination, sensor fusion, attitude estimation, and tracking systems.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive Kalman filter</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="truth">Truth Motion</button>
+            <button type="button" class="tab-btn" data-mode="noise">Noise & Filter</button>
+            <button type="button" class="tab-btn" data-mode="sim">Simulation</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-truth" class="mode-panel active">
+            <div class="split-3">
+              <div class="field"><label for="x0Input">Initial position</label><input id="x0Input" type="number" value="0" step="1"></div>
+              <div class="field"><label for="v0Input">Initial velocity</label><input id="v0Input" type="number" value="2" step="0.1"></div>
+              <div class="field"><label for="accelInput">True acceleration</label><input id="accelInput" type="number" value="0.03" step="0.01"></div>
+            </div>
+            <div class="hint">The filter model assumes constant velocity, so nonzero true acceleration acts like an unmodeled disturbance.</div>
+          </div>
+
+          <div id="mode-noise" class="mode-panel">
+            <div class="split-3">
+              <div class="field"><label for="measurementStdInput">Measurement noise σ</label><input id="measurementStdInput" type="number" value="8" step="0.5" min="0.001"></div>
+              <div class="field"><label for="processStdInput">Process noise σ</label><input id="processStdInput" type="number" value="0.4" step="0.05" min="0"></div>
+              <div class="field"><label for="initialUncertaintyInput">Initial uncertainty</label><input id="initialUncertaintyInput" type="number" value="50" step="1" min="0.001"></div>
+            </div>
+          </div>
+
+          <div id="mode-sim" class="mode-panel">
+            <div class="split-3">
+              <div class="field"><label for="durationInput">Duration (s)</label><input id="durationInput" type="number" value="80" step="5" min="1"></div>
+              <div class="field"><label for="dtInput">Time step (s)</label><input id="dtInput" type="number" value="1" step="0.1" min="0.01"></div>
+              <div class="field"><label for="seedInput">Noise seed</label><input id="seedInput" type="number" value="7" step="1"></div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Estimator scenario</label>
+              <select id="presetSelect">
+                <option value="balanced">Balanced tracking</option>
+                <option value="noisySensor">Very noisy sensor</option>
+                <option value="trustSensor">Trust sensor strongly</option>
+                <option value="modelMismatch">Model mismatch / acceleration</option>
+                <option value="slowFilter">Too little process noise</option>
+              </select>
+              <div class="hint">Presets show how Q and R tuning changes estimator behaviour.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="runBtn">Run Kalman Filter</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Measurement RMSE</h4><div class="value" id="measRmseOut">—</div></div>
+            <div class="result-box"><h4>Filter RMSE</h4><div class="value" id="filterRmseOut">—</div></div>
+            <div class="result-box"><h4>Final position estimate</h4><div class="value" id="posOut">—</div></div>
+            <div class="result-box"><h4>Final velocity estimate</h4><div class="value" id="velOut">—</div></div>
+            <div class="result-box"><h4>Final Kalman gain</h4><div class="value" id="gainOut">—</div></div>
+            <div class="result-box"><h4>Final uncertainty σ</h4><div class="value" id="sigmaOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the visualizer to compare truth, noisy measurements, and filtered estimate.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Position: truth, noisy measurements, and Kalman estimate</div>
+            <div id="positionPlot" class="plot-box"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Velocity estimate</div>
+            <div id="velocityPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Kalman gain and uncertainty</div>
+            <div id="gainPlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This visualizer assumes:</h3>
+            <ul>
+              <li>One-dimensional constant-velocity filter model</li>
+              <li>Position-only noisy measurements</li>
+              <li>Gaussian-like random noise for demonstration</li>
+              <li>No nonlinear measurement model</li>
+              <li>No sensor bias, outlier rejection, or multi-sensor fusion</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const defaults = {
+      x0Input:0,
+      v0Input:2,
+      accelInput:0.03,
+      measurementStdInput:8,
+      processStdInput:0.4,
+      initialUncertaintyInput:50,
+      durationInput:80,
+      dtInput:1,
+      seedInput:7,
+      presetSelect:"balanced"
+    };
+
+    const presets = {
+      balanced:{x0:0,v0:2,a:0.03,meas:8,proc:0.4,P0:50,dur:80,dt:1,seed:7},
+      noisySensor:{x0:0,v0:2,a:0.02,meas:20,proc:0.5,P0:80,dur:100,dt:1,seed:4},
+      trustSensor:{x0:0,v0:2,a:0.01,meas:3,proc:1.2,P0:30,dur:70,dt:1,seed:3},
+      modelMismatch:{x0:0,v0:1.5,a:0.12,meas:8,proc:1.0,P0:60,dur:80,dt:1,seed:10},
+      slowFilter:{x0:0,v0:2,a:0.08,meas:8,proc:0.02,P0:30,dur:80,dt:1,seed:12}
+    };
+
+    const el = Object.fromEntries(Object.keys(defaults).map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const p = presets[el.presetSelect.value];
+      el.x0Input.value = p.x0;
+      el.v0Input.value = p.v0;
+      el.accelInput.value = p.a;
+      el.measurementStdInput.value = p.meas;
+      el.processStdInput.value = p.proc;
+      el.initialUncertaintyInput.value = p.P0;
+      el.durationInput.value = p.dur;
+      el.dtInput.value = p.dt;
+      el.seedInput.value = p.seed;
+      runFilter();
+    });
+
+    document.getElementById("runBtn").addEventListener("click", runFilter);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([id,value]) => el[id].value = value);
+      runFilter();
+    });
+
+    function getInputs(){
+      return {
+        x0:parseFloat(el.x0Input.value),
+        v0:parseFloat(el.v0Input.value),
+        a:parseFloat(el.accelInput.value),
+        measStd:parseFloat(el.measurementStdInput.value),
+        procStd:parseFloat(el.processStdInput.value),
+        P0:parseFloat(el.initialUncertaintyInput.value),
+        duration:parseFloat(el.durationInput.value),
+        dt:parseFloat(el.dtInput.value),
+        seed:parseInt(el.seedInput.value,10)
+      };
+    }
+
+    function validate(p){
+      const vals = [p.x0,p.v0,p.a,p.measStd,p.procStd,p.P0,p.duration,p.dt,p.seed];
+      if (!vals.every(Number.isFinite)) return "Please enter valid numeric inputs.";
+      if (p.measStd <= 0 || p.procStd < 0 || p.P0 <= 0) return "Measurement noise and initial uncertainty must be positive; process noise must be non-negative.";
+      if (p.duration <= 0 || p.dt <= 0) return "Duration and time step must be positive.";
+      if (Math.floor(p.duration/p.dt) > 5000) return "Too many samples. Increase time step or reduce duration.";
+      return null;
+    }
+
+    function showError(msg){
+      const box=document.getElementById("errorBox");
+      box.style.display="block";
+      box.innerHTML=`<h3>Input error</h3><p>${msg}</p>`;
+    }
+    function clearError(){const box=document.getElementById("errorBox");box.style.display="none";box.innerHTML="";}
+
+    function rng(seed){
+      let s = Math.abs(seed) || 1;
+      return function(){
+        s = (s * 16807) % 2147483647;
+        return (s - 1) / 2147483646;
+      };
+    }
+
+    function randn(random){
+      const u1 = Math.max(random(), 1e-12);
+      const u2 = random();
+      return Math.sqrt(-2*Math.log(u1)) * Math.cos(2*Math.PI*u2);
+    }
+
+    function matMul2(A,B){
+      return [
+        [A[0][0]*B[0][0]+A[0][1]*B[1][0], A[0][0]*B[0][1]+A[0][1]*B[1][1]],
+        [A[1][0]*B[0][0]+A[1][1]*B[1][0], A[1][0]*B[0][1]+A[1][1]*B[1][1]]
+      ];
+    }
+    function matTrans2(A){return [[A[0][0],A[1][0]],[A[0][1],A[1][1]]];}
+    function matAdd2(A,B){return [[A[0][0]+B[0][0],A[0][1]+B[0][1]],[A[1][0]+B[1][0],A[1][1]+B[1][1]]];}
+    function matVec2(A,x){return [A[0][0]*x[0]+A[0][1]*x[1],A[1][0]*x[0]+A[1][1]*x[1]];}
+
+    function runKalman(p){
+      const random = rng(p.seed);
+      const n = Math.floor(p.duration/p.dt)+1;
+      const F = [[1,p.dt],[0,1]];
+      const Ft = matTrans2(F);
+      const q = p.procStd*p.procStd;
+      const Q = [[0.25*Math.pow(p.dt,4)*q,0.5*Math.pow(p.dt,3)*q],[0.5*Math.pow(p.dt,3)*q,p.dt*p.dt*q]];
+      const R = p.measStd*p.measStd;
+
+      let xTrue = p.x0;
+      let vTrue = p.v0;
+      let xhat = [p.x0 + p.measStd*randn(random), p.v0*0.5];
+      let P = [[p.P0*p.P0,0],[0,p.P0*p.P0]];
+
+      const t=[], truth=[], trueVel=[], meas=[], est=[], estVel=[], sig=[], gain=[], residual=[];
+
+      for(let k=0;k<n;k++){
+        const time = k*p.dt;
+        const z = xTrue + p.measStd*randn(random);
+
+        const xPred = matVec2(F,xhat);
+        const PPred = matAdd2(matMul2(matMul2(F,P),Ft),Q);
+        const S = PPred[0][0] + R;
+        const K = [PPred[0][0]/S, PPred[1][0]/S];
+        const y = z - xPred[0];
+        xhat = [xPred[0] + K[0]*y, xPred[1] + K[1]*y];
+        P = [
+          [(1-K[0])*PPred[0][0], (1-K[0])*PPred[0][1]],
+          [PPred[1][0]-K[1]*PPred[0][0], PPred[1][1]-K[1]*PPred[0][1]]
+        ];
+        P[0][0] = Math.max(P[0][0],0);
+
+        t.push(time);
+        truth.push(xTrue);
+        trueVel.push(vTrue);
+        meas.push(z);
+        est.push(xhat[0]);
+        estVel.push(xhat[1]);
+        sig.push(Math.sqrt(P[0][0]));
+        gain.push(K[0]);
+        residual.push(y);
+
+        xTrue = xTrue + vTrue*p.dt + 0.5*p.a*p.dt*p.dt;
+        vTrue = vTrue + p.a*p.dt;
+      }
+      return {t,truth,trueVel,meas,est,estVel,sig,gain,residual};
+    }
+
+    function rmse(a,b){
+      let s=0;
+      for(let i=0;i<a.length;i++) s += Math.pow(a[i]-b[i],2);
+      return Math.sqrt(s/a.length);
+    }
+
+    function fmt(v,d=3,suffix=""){
+      if(!Number.isFinite(v)) return "—";
+      return v.toFixed(d)+suffix;
+    }
+
+    function updateResults(p,d){
+      const measRmse = rmse(d.meas,d.truth);
+      const filterRmse = rmse(d.est,d.truth);
+      const last = d.t.length-1;
+      document.getElementById("measRmseOut").textContent = fmt(measRmse,3);
+      document.getElementById("filterRmseOut").textContent = fmt(filterRmse,3);
+      document.getElementById("posOut").textContent = fmt(d.est[last],3);
+      document.getElementById("velOut").textContent = fmt(d.estVel[last],3);
+      document.getElementById("gainOut").textContent = fmt(d.gain[last],4);
+      document.getElementById("sigmaOut").textContent = fmt(d.sig[last],3);
+
+      let msg = filterRmse < measRmse
+        ? "The filter estimate is smoother and more accurate than the raw measurement in this run. The model and sensor are being balanced effectively."
+        : "The filter is not improving over the raw measurements in this run. Try increasing process noise if the model is mismatched, or increasing measurement noise if the sensor is very noisy.";
+      if (p.procStd < 0.05 && Math.abs(p.a) > 0.03) msg += " The process noise is very low while true acceleration exists, so the filter may lag behind the real motion.";
+      document.getElementById("interpretText").textContent = msg;
+      drawPosition(d); drawVelocity(d); drawGain(d);
+    }
+
+    function drawPosition(d){
+      const upper = d.est.map((v,i)=>v+2*d.sig[i]);
+      const lower = d.est.map((v,i)=>v-2*d.sig[i]);
+      Plotly.newPlot("positionPlot", [
+        {type:"scatter",mode:"lines",x:d.t,y:upper,line:{color:"rgba(15,139,141,0.15)",width:0},showlegend:false,hoverinfo:"skip"},
+        {type:"scatter",mode:"lines",x:d.t,y:lower,fill:"tonexty",fillcolor:"rgba(15,139,141,0.15)",line:{color:"rgba(15,139,141,0.15)",width:0},name:"±2σ band"},
+        {type:"scatter",mode:"markers",x:d.t,y:d.meas,marker:{color:"#cbd5e1",size:5},name:"Noisy measurement"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.truth,line:{color:"#111827",width:3},name:"Truth"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.est,line:{color:"#2563eb",width:3},name:"Kalman estimate"}
+      ], {margin:{l:60,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},yaxis:{title:"Position",gridcolor:"#e5e7eb"},legend:{orientation:"h",x:0.02,y:1.12}}, {responsive:true,displaylogo:false});
+    }
+
+    function drawVelocity(d){
+      Plotly.newPlot("velocityPlot", [
+        {type:"scatter",mode:"lines",x:d.t,y:d.trueVel,line:{color:"#111827",width:3},name:"True velocity"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.estVel,line:{color:"#f97316",width:3},name:"Estimated velocity"}
+      ], {margin:{l:60,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},yaxis:{title:"Velocity",gridcolor:"#e5e7eb"},legend:{orientation:"h",x:0.02,y:1.12}}, {responsive:true,displaylogo:false});
+    }
+
+    function drawGain(d){
+      Plotly.newPlot("gainPlot", [
+        {type:"scatter",mode:"lines",x:d.t,y:d.gain,line:{color:"#0f8b8d",width:3},name:"Position Kalman gain"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.sig,yaxis:"y2",line:{color:"#7c3aed",width:3},name:"Position σ"}
+      ], {margin:{l:60,r:60,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},yaxis:{title:"Kalman gain",gridcolor:"#e5e7eb"},yaxis2:{title:"Uncertainty σ",overlaying:"y",side:"right"},legend:{orientation:"h",x:0.02,y:1.12}}, {responsive:true,displaylogo:false});
+    }
+
+    function runFilter(){
+      clearError();
+      const p=getInputs();
+      const err=validate(p);
+      if(err){showError(err);return;}
+      try{
+        const d=runKalman(p);
+        updateResults(p,d);
+      }catch(e){showError(e.message || "Kalman filter simulation failed.");}
+    }
+
+    runFilter();
+  </script>
+</body>
+</html>
