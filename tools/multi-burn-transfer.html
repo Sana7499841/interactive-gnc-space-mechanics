@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Burn Transfer Planner | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+
+    body{
+      margin:0;
+      background:var(--page-bg);
+      color:var(--ink);
+      font-family: Georgia, "Times New Roman", serif;
+      line-height:1.65;
+    }
+
+    .page-wrap{
+      width:min(1380px, calc(100% - 48px));
+      margin:20px auto 56px;
+    }
+
+    .tool-hero{
+      background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));
+      color:#fff;
+      padding:34px 38px 38px;
+      border-radius:32px;
+      box-shadow:var(--shadow);
+      margin-bottom:22px;
+    }
+
+    .tool-pill{
+      display:inline-block;
+      background:#e0f2fe;
+      color:#1f2937;
+      font-weight:700;
+      padding:10px 20px;
+      border-radius:999px;
+      font-size:1.05rem;
+      margin-bottom:14px;
+    }
+
+    .tool-hero h1{
+      margin:0 0 12px;
+      font-size:clamp(2.4rem, 5vw, 4rem);
+      line-height:1.05;
+      font-weight:800;
+      letter-spacing:-0.02em;
+    }
+
+    .tool-hero p{
+      margin:0;
+      font-size:clamp(1.05rem, 1.8vw, 1.22rem);
+      line-height:1.65;
+      max-width:1120px;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns:1.05fr 0.95fr;
+      gap:22px;
+      align-items:start;
+    }
+
+    .stack{display:grid; gap:22px;}
+
+    .card{
+      background:var(--card-bg);
+      border:1px solid var(--line);
+      border-radius:var(--radius-xl);
+      box-shadow:var(--shadow);
+      padding:28px 28px 30px;
+    }
+
+    .card h2{
+      margin:0 0 18px;
+      font-size:clamp(1.8rem, 2.6vw, 2.55rem);
+      line-height:1.1;
+      letter-spacing:-0.02em;
+      color:#0f172a;
+    }
+
+    .card h3{
+      margin:18px 0 10px;
+      font-size:1.2rem;
+      color:#0f172a;
+    }
+
+    .card p,.card li{
+      font-size:1.04rem;
+      line-height:1.72;
+      color:var(--muted);
+    }
+
+    .card ul{margin:10px 0 0 22px; padding:0;}
+
+    .formula-box{
+      background:var(--formula-bg);
+      color:#fff;
+      border-radius:20px;
+      padding:22px 18px;
+      margin:16px 0 18px;
+      overflow:auto;
+      box-shadow:inset -10px 0 0 rgba(255,255,255,0.03);
+    }
+
+    .tabs{display:flex; gap:12px; margin:4px 0 18px; flex-wrap:wrap;}
+
+    .tab-btn{
+      border:none;
+      border-radius:999px;
+      padding:13px 22px;
+      font-size:1rem;
+      font-weight:700;
+      cursor:pointer;
+      background:#dbe1ea;
+      color:#1f2937;
+      font-family:inherit;
+      transition:transform 0.15s ease, background 0.2s ease;
+    }
+
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent)); color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+
+    .mode-panel{display:none;}
+    .mode-panel.active{display:block;}
+
+    .split-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+    .split-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+    .field{margin-bottom:16px;}
+
+    label{
+      display:block;
+      font-size:1rem;
+      font-weight:700;
+      color:#1f2937;
+      margin:0 0 8px;
+    }
+
+    input,select{
+      width:100%;
+      padding:12px 14px;
+      border:1.5px solid #cbd5e1;
+      border-radius:16px;
+      font-size:1rem;
+      color:#111827;
+      background:#fff;
+      font-family:inherit;
+    }
+
+    input:focus,select:focus{
+      outline:none;
+      border-color:#5b8def;
+      box-shadow:0 0 0 3px rgba(37,99,235,0.10);
+    }
+
+    .hint{font-size:0.94rem; color:#6b7280; margin-top:6px;}
+
+    .button-row{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
+
+    .cta,.ghost{
+      border:none;
+      border-radius:18px;
+      padding:16px 20px;
+      font-size:1.06rem;
+      font-weight:800;
+      cursor:pointer;
+      font-family:inherit;
+      min-height:56px;
+    }
+
+    .cta{color:#fff; background:linear-gradient(135deg,var(--accent-2),var(--accent)); flex:1 1 240px; box-shadow:0 12px 24px rgba(37,99,235,0.18);}
+    .ghost{color:#1f2937; background:#e5e7eb; flex:1 1 160px;}
+
+    .results-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:14px;}
+
+    .result-box{
+      background:#f8fafc;
+      border:1px solid #dbe3ec;
+      border-radius:18px;
+      padding:16px 18px;
+      min-height:104px;
+    }
+
+    .result-box h4{margin:0 0 8px; font-size:0.98rem; color:#475569; line-height:1.35;}
+    .result-box .value{font-size:1.08rem; font-weight:800; color:#111827; line-height:1.35; word-break:break-word;}
+
+    .callout{
+      border-radius:20px;
+      padding:18px 20px;
+      margin-top:18px;
+      border-left:5px solid var(--accent-2);
+      background:var(--soft);
+    }
+
+    .callout.warn{border-left-color:var(--warn-line); background:var(--warn);}
+    .callout h3{margin-top:0; margin-bottom:8px; font-size:1.15rem;}
+    .callout p{margin:0;}
+
+    .plot-card{background:#fff; border:1px solid var(--line); border-radius:22px; padding:18px; margin-top:16px;}
+    .plot-title{font-weight:800; font-size:1.08rem; margin:0 0 10px; color:#111827;}
+    .plot-box{width:100%; min-height:430px; border:1px solid #e2e8f0; border-radius:18px; overflow:hidden; background:#fff;}
+    .plot-box.short{min-height:320px;}
+
+    .summary-table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:16px;
+      border-radius:16px;
+      overflow:hidden;
+      background:#fff;
+    }
+
+    .summary-table th,
+    .summary-table td{
+      border:1px solid #e2e8f0;
+      padding:12px;
+      text-align:left;
+      color:#334155;
+      font-size:0.98rem;
+    }
+
+    .summary-table th{
+      background:#f8fafc;
+      color:#0f172a;
+      font-weight:800;
+    }
+
+    .back-link-row{margin-top:40px; text-align:left;}
+    .back-link-btn{
+      display:inline-block;
+      text-decoration:none;
+      border-radius:18px;
+      padding:14px 22px;
+      font-weight:800;
+      color:#fff;
+      background:linear-gradient(135deg,var(--accent-2),var(--accent));
+      box-shadow:0 12px 24px rgba(37,99,235,0.18);
+    }
+
+    .site-footer{text-align:center; padding:1.5rem 0; font-size:0.95rem; color:#4b5563; line-height:1.6;}
+
+    @media (max-width:1100px){.grid-2{grid-template-columns:1fr;}}
+    @media (max-width:760px){
+      .page-wrap{width:min(100% - 24px, 1380px);}
+      .tool-hero{padding:24px 20px 28px; border-radius:24px;}
+      .card{padding:22px 18px 24px;}
+      .split-2,.split-3,.results-grid{grid-template-columns:1fr;}
+      .plot-box{min-height:350px;}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 11 · Maneuver &amp; Mission Design</div>
+      <h1>Multi-Burn Transfer Planner</h1>
+      <p>
+        Compare a direct Hohmann transfer with a staged multi-burn strategy using one intermediate circular orbit.
+        This tool introduces optimization thinking: sometimes an intermediate orbit is useful for mission design,
+        even when it is not the lowest theoretical Δv solution.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            A basic Hohmann transfer moves directly from one circular orbit to another using two burns. A multi-burn
+            plan breaks the maneuver into two transfer legs through an intermediate orbit. This page compares both
+            strategies side by side.
+          </p>
+          <ul>
+            <li>Direct two-burn Hohmann transfer cost</li>
+            <li>Leg 1 transfer: initial orbit to intermediate orbit</li>
+            <li>Leg 2 transfer: intermediate orbit to final orbit</li>
+            <li>Total staged Δv and total transfer time</li>
+            <li>Simple sweep over intermediate altitude to find low-cost options</li>
+            <li>Orbit sketch and Δv trade curve</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Core maneuver model</h2>
+          <p>
+            Each leg uses the same Hohmann transfer equations. For one transfer between radii \(r_a\) and \(r_b\):
+          </p>
+          <div class="formula-box">
+            \[
+              a_t = \frac{r_a+r_b}{2}
+            \]
+            \[
+              v_c = \sqrt{\frac{\mu}{r}},
+              \qquad
+              v_t = \sqrt{\mu\left(\frac{2}{r}-\frac{1}{a_t}\right)}
+            \]
+          </div>
+          <p>
+            The staged transfer is treated as two connected Hohmann-style legs:
+          </p>
+          <div class="formula-box">
+            \[
+              r_1 \rightarrow r_m \rightarrow r_2
+            \]
+            \[
+              \Delta v_{multi} = \Delta v_{1m}+\Delta v_{m2}
+            \]
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Why multi-burn planning matters</h2>
+          <p>
+            A direct transfer is not always the whole story. Real mission planning may include intermediate parking orbits,
+            operational waiting time, phasing needs, visibility constraints, launch-window constraints, or staged checkout.
+          </p>
+          <ul>
+            <li>Intermediate orbits can support payload checkout or rendezvous timing.</li>
+            <li>Higher intermediate orbits may be used for mission geometry, not only Δv.</li>
+            <li>Sweeping the intermediate orbit teaches trade-space thinking.</li>
+            <li>The lowest Δv solution may not be the most operationally useful plan.</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>How to interpret the result</h2>
+          <ul>
+            <li>If multi-burn Δv is higher than direct Hohmann, that is expected for many simple circular cases.</li>
+            <li>If the intermediate altitude is close to the initial or final orbit, one leg becomes small.</li>
+            <li>The sweep plot shows how sensitive total Δv is to the chosen intermediate orbit.</li>
+            <li>The tool is best read as a mission-design comparison, not only a calculator.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Important limitation</h3>
+            <p>
+              This educational planner does not solve a true optimal-control problem. It compares ideal impulsive coplanar transfer legs.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive transfer planner</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="orbits">Orbit Inputs</button>
+            <button type="button" class="tab-btn" data-mode="model">Model &amp; Sweep</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-orbits" class="mode-panel active">
+            <div class="split-3">
+              <div class="field">
+                <label for="h1Input">Initial altitude h₁ (km)</label>
+                <input id="h1Input" type="number" value="300" step="10">
+              </div>
+              <div class="field">
+                <label for="hmInput">Intermediate altitude hm (km)</label>
+                <input id="hmInput" type="number" value="10000" step="100">
+              </div>
+              <div class="field">
+                <label for="h2Input">Final altitude h₂ (km)</label>
+                <input id="h2Input" type="number" value="35786" step="100">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-model" class="mode-panel">
+            <div class="split-2">
+              <div class="field">
+                <label for="bodySelect">Central body</label>
+                <select id="bodySelect">
+                  <option value="earth">Earth</option>
+                  <option value="mars">Mars</option>
+                  <option value="moon">Moon</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="muInput">μ (km³/s²)</label>
+                <input id="muInput" type="number" value="398600.4418" step="any">
+              </div>
+            </div>
+
+            <div class="split-3">
+              <div class="field">
+                <label for="radiusInput">Body radius (km)</label>
+                <input id="radiusInput" type="number" value="6378.137" step="any">
+              </div>
+              <div class="field">
+                <label for="sweepMinInput">Sweep min altitude (km)</label>
+                <input id="sweepMinInput" type="number" value="500" step="100">
+              </div>
+              <div class="field">
+                <label for="sweepMaxInput">Sweep max altitude (km)</label>
+                <input id="sweepMaxInput" type="number" value="40000" step="100">
+              </div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Quick example</label>
+              <select id="presetSelect">
+                <option value="custom">Custom</option>
+                <option value="leoGeo">LEO → intermediate → GEO</option>
+                <option value="leoMEO">LEO → MEO staging</option>
+                <option value="lowering">High orbit → intermediate → low orbit</option>
+                <option value="moonExample">Lunar low orbit transfer example</option>
+              </select>
+              <div class="hint">Choose a preset, then adjust the intermediate orbit manually.</div>
+            </div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="calculateBtn">Plan Multi-Burn Transfer</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Direct Hohmann Δv</h4><div class="value" id="directDvOut">—</div></div>
+            <div class="result-box"><h4>Direct transfer time</h4><div class="value" id="directTimeOut">—</div></div>
+            <div class="result-box"><h4>Multi-burn total Δv</h4><div class="value" id="multiDvOut">—</div></div>
+            <div class="result-box"><h4>Multi-burn transfer time</h4><div class="value" id="multiTimeOut">—</div></div>
+            <div class="result-box"><h4>Δv difference</h4><div class="value" id="diffOut">—</div></div>
+            <div class="result-box"><h4>Best sweep altitude</h4><div class="value" id="bestOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run the planner to compare direct and staged transfer options.</p>
+          </div>
+
+          <table class="summary-table" id="burnTable">
+            <thead>
+              <tr><th>Burn / Leg</th><th>Δv</th><th>Time</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Leg 1</td><td>—</td><td>—</td></tr>
+              <tr><td>Leg 2</td><td>—</td><td>—</td></tr>
+            </tbody>
+          </table>
+
+          <div class="plot-card">
+            <div class="plot-title">Orbit layout</div>
+            <div id="orbitPlot" class="plot-box"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Intermediate altitude sweep</div>
+            <div id="sweepPlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This tool assumes:</h3>
+            <ul>
+              <li>Circular initial, intermediate, and final orbits</li>
+              <li>Coplanar impulsive Hohmann-style transfer legs</li>
+              <li>No plane change, drag, J2, finite-burn losses, or phasing wait time</li>
+              <li>Intermediate orbit is selected by the user, not optimized by a full trajectory optimizer</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const bodyData = {
+      earth:{mu:398600.4418, R:6378.137},
+      mars:{mu:42828.375214, R:3389.5},
+      moon:{mu:4902.800066, R:1737.4}
+    };
+
+    const defaults = {
+      h1Input:300,
+      hmInput:10000,
+      h2Input:35786,
+      bodySelect:"earth",
+      muInput:398600.4418,
+      radiusInput:6378.137,
+      sweepMinInput:500,
+      sweepMaxInput:40000,
+      presetSelect:"custom"
+    };
+
+    const presets = {
+      leoGeo:{body:"earth", h1:300, hm:10000, h2:35786, sweepMin:500, sweepMax:40000},
+      leoMEO:{body:"earth", h1:500, hm:6000, h2:20200, sweepMin:800, sweepMax:25000},
+      lowering:{body:"earth", h1:20000, hm:10000, h2:600, sweepMin:700, sweepMax:22000},
+      moonExample:{body:"moon", h1:100, hm:600, h2:1500, sweepMin:150, sweepMax:2500}
+    };
+
+    const ids = Object.keys(defaults);
+    const el = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    el.bodySelect.addEventListener("change", () => {
+      const body = el.bodySelect.value;
+      if (body !== "custom") {
+        el.muInput.value = bodyData[body].mu;
+        el.radiusInput.value = bodyData[body].R;
+      }
+      runPlanner();
+    });
+
+    el.presetSelect.addEventListener("change", () => {
+      const key = el.presetSelect.value;
+      if (key === "custom") return;
+      const p = presets[key];
+      el.bodySelect.value = p.body;
+      el.muInput.value = bodyData[p.body].mu;
+      el.radiusInput.value = bodyData[p.body].R;
+      el.h1Input.value = p.h1;
+      el.hmInput.value = p.hm;
+      el.h2Input.value = p.h2;
+      el.sweepMinInput.value = p.sweepMin;
+      el.sweepMaxInput.value = p.sweepMax;
+      runPlanner();
+    });
+
+    document.getElementById("calculateBtn").addEventListener("click", runPlanner);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      Object.entries(defaults).forEach(([key,value]) => el[key].value = value);
+      runPlanner();
+    });
+
+    function getInputs(){
+      return {
+        h1:parseFloat(el.h1Input.value),
+        hm:parseFloat(el.hmInput.value),
+        h2:parseFloat(el.h2Input.value),
+        mu:parseFloat(el.muInput.value),
+        R:parseFloat(el.radiusInput.value),
+        sweepMin:parseFloat(el.sweepMinInput.value),
+        sweepMax:parseFloat(el.sweepMaxInput.value)
+      };
+    }
+
+    function validate(p){
+      if (![p.h1,p.hm,p.h2,p.mu,p.R,p.sweepMin,p.sweepMax].every(Number.isFinite)) return "Please enter valid numeric inputs.";
+      if (p.mu <= 0 || p.R <= 0) return "μ and body radius must be positive.";
+      if (p.h1 < 0 || p.hm < 0 || p.h2 < 0 || p.sweepMin < 0 || p.sweepMax < 0) return "Altitudes must be zero or positive.";
+      if (p.sweepMax <= p.sweepMin) return "Sweep max altitude must be larger than sweep min altitude.";
+      return null;
+    }
+
+    function hohmann(mu, ra, rb){
+      const vca = Math.sqrt(mu/ra);
+      const vcb = Math.sqrt(mu/rb);
+      const at = 0.5*(ra+rb);
+      const vta = Math.sqrt(mu*(2/ra - 1/at));
+      const vtb = Math.sqrt(mu*(2/rb - 1/at));
+      const dv1 = Math.abs(vta - vca);
+      const dv2 = Math.abs(vcb - vtb);
+      const tof = Math.PI * Math.sqrt(Math.pow(at,3)/mu);
+      return {dv1,dv2,dvTotal:dv1+dv2,tof,at,vca,vcb,vta,vtb};
+    }
+
+    function multiBurn(p){
+      const r1 = p.R + p.h1;
+      const rm = p.R + p.hm;
+      const r2 = p.R + p.h2;
+      const direct = hohmann(p.mu,r1,r2);
+      const leg1 = hohmann(p.mu,r1,rm);
+      const leg2 = hohmann(p.mu,rm,r2);
+      const multiDv = leg1.dvTotal + leg2.dvTotal;
+      const multiTime = leg1.tof + leg2.tof;
+      return {r1,rm,r2,direct,leg1,leg2,multiDv,multiTime};
+    }
+
+    function sweep(p){
+      const hs=[], dvs=[];
+      let best = {h:null, dv:Infinity};
+      const steps = 80;
+      for (let k=0; k<=steps; k++){
+        const h = p.sweepMin + (p.sweepMax-p.sweepMin)*k/steps;
+        const test = {...p, hm:h};
+        const m = multiBurn(test);
+        hs.push(h);
+        dvs.push(m.multiDv);
+        if (m.multiDv < best.dv) best = {h, dv:m.multiDv};
+      }
+      return {hs,dvs,best};
+    }
+
+    function fmt(x,d=3,suffix=""){
+      if (!Number.isFinite(x)) return "—";
+      return x.toFixed(d) + suffix;
+    }
+
+    function timeFmt(s){
+      return `${fmt(s/3600,3," hr")} (${fmt(s/60,1," min")})`;
+    }
+
+    function showError(msg){
+      const box = document.getElementById("errorBox");
+      box.style.display = "block";
+      box.innerHTML = `<h3>Input error</h3><p>${msg}</p>`;
+    }
+
+    function clearError(){
+      const box = document.getElementById("errorBox");
+      box.style.display = "none";
+      box.innerHTML = "";
+    }
+
+    function updateResults(p,m,s){
+      const diff = m.multiDv - m.direct.dvTotal;
+      document.getElementById("directDvOut").textContent = `${fmt(m.direct.dvTotal,4," km/s")} (${fmt(m.direct.dvTotal*1000,1," m/s")})`;
+      document.getElementById("directTimeOut").textContent = timeFmt(m.direct.tof);
+      document.getElementById("multiDvOut").textContent = `${fmt(m.multiDv,4," km/s")} (${fmt(m.multiDv*1000,1," m/s")})`;
+      document.getElementById("multiTimeOut").textContent = timeFmt(m.multiTime);
+      document.getElementById("diffOut").textContent = `${diff >= 0 ? "+" : ""}${fmt(diff,4," km/s")}`;
+      document.getElementById("bestOut").textContent = `${fmt(s.best.h,1," km")} → ${fmt(s.best.dv,4," km/s")}`;
+
+      const directBetter = diff > 0;
+      document.getElementById("interpretText").textContent = directBetter
+        ? `For this ideal circular coplanar case, the direct Hohmann transfer is lower by ${Math.abs(diff).toFixed(4)} km/s. The intermediate orbit may still be useful for operational timing, checkout, or mission constraints.`
+        : `For this selected intermediate orbit, the staged plan is comparable to or lower than the direct case. Check whether the intermediate orbit is physically meaningful for the mission.`;
+
+      const tbody = document.querySelector("#burnTable tbody");
+      tbody.innerHTML = `
+        <tr><td>Leg 1: h₁ → hm</td><td>${fmt(m.leg1.dvTotal,4," km/s")}</td><td>${timeFmt(m.leg1.tof)}</td></tr>
+        <tr><td>Leg 2: hm → h₂</td><td>${fmt(m.leg2.dvTotal,4," km/s")}</td><td>${timeFmt(m.leg2.tof)}</td></tr>
+      `;
+    }
+
+    function makeCircle(R,n=240){
+      const x=[], y=[];
+      for (let k=0; k<=n; k++){
+        const th = 2*Math.PI*k/n;
+        x.push(R*Math.cos(th));
+        y.push(R*Math.sin(th));
+      }
+      return {x,y};
+    }
+
+    function makeTransferArc(rA,rB,side=1,n=160){
+      const a = 0.5*(rA+rB);
+      const e = Math.abs(rB-rA)/(rA+rB);
+      const startAtPerigee = rA <= rB;
+      const x=[], y=[];
+      for (let k=0; k<=n; k++){
+        const th = Math.PI*k/n;
+        const nu = startAtPerigee ? th : th + Math.PI;
+        const rr = a*(1-e*e)/(1+e*Math.cos(nu));
+        const plotTh = side * th;
+        x.push(rr*Math.cos(plotTh));
+        y.push(rr*Math.sin(plotTh));
+      }
+      return {x,y};
+    }
+
+    function drawOrbitPlot(p,m){
+      const body = makeCircle(p.R,160);
+      const c1 = makeCircle(m.r1);
+      const cm = makeCircle(m.rm);
+      const c2 = makeCircle(m.r2);
+      const arc1 = makeTransferArc(m.r1,m.rm,1);
+      const arc2 = makeTransferArc(m.rm,m.r2,-1);
+      const maxR = Math.max(m.r1,m.rm,m.r2)*1.12;
+
+      Plotly.newPlot("orbitPlot", [
+        {type:"scatter", mode:"lines", x:body.x, y:body.y, fill:"toself", fillcolor:"#dbeafe", line:{color:"#93c5fd", width:1}, name:"Central body"},
+        {type:"scatter", mode:"lines", x:c1.x, y:c1.y, line:{color:"#2563eb", width:2}, name:"Initial orbit"},
+        {type:"scatter", mode:"lines", x:cm.x, y:cm.y, line:{color:"#f97316", width:2, dash:"dash"}, name:"Intermediate orbit"},
+        {type:"scatter", mode:"lines", x:c2.x, y:c2.y, line:{color:"#7c3aed", width:2}, name:"Final orbit"},
+        {type:"scatter", mode:"lines", x:arc1.x, y:arc1.y, line:{color:"#0f8b8d", width:4}, name:"Transfer leg 1"},
+        {type:"scatter", mode:"lines", x:arc2.x, y:arc2.y, line:{color:"#ef4444", width:4}, name:"Transfer leg 2"}
+      ], {
+        margin:{l:40,r:20,t:10,b:40},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"x (km)", range:[-maxR,maxR], scaleanchor:"y", gridcolor:"#e5e7eb"},
+        yaxis:{title:"y (km)", range:[-maxR,maxR], gridcolor:"#e5e7eb"},
+        legend:{orientation:"h", x:0.02, y:1.14}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function drawSweepPlot(p,m,s){
+      const directLine = s.hs.map(() => m.direct.dvTotal);
+      Plotly.newPlot("sweepPlot", [
+        {type:"scatter", mode:"lines", x:s.hs, y:s.dvs, line:{color:"#2563eb", width:3}, name:"Staged Δv"},
+        {type:"scatter", mode:"lines", x:s.hs, y:directLine, line:{color:"#f97316", width:3, dash:"dash"}, name:"Direct Hohmann Δv"},
+        {type:"scatter", mode:"markers", x:[p.hm], y:[m.multiDv], marker:{size:10, color:"#7c3aed"}, name:"Selected hm"}
+      ], {
+        margin:{l:65,r:20,t:10,b:55},
+        paper_bgcolor:"#ffffff",
+        plot_bgcolor:"#ffffff",
+        xaxis:{title:"Intermediate altitude hm (km)", gridcolor:"#e5e7eb"},
+        yaxis:{title:"Total Δv (km/s)", gridcolor:"#e5e7eb"},
+        legend:{orientation:"h", x:0.02, y:1.15}
+      }, {responsive:true, displaylogo:false});
+    }
+
+    function runPlanner(){
+      clearError();
+      const p = getInputs();
+      const err = validate(p);
+      if (err){ showError(err); return; }
+      try{
+        const m = multiBurn(p);
+        const s = sweep(p);
+        updateResults(p,m,s);
+        drawOrbitPlot(p,m);
+        drawSweepPlot(p,m,s);
+      } catch(e){
+        showError(e.message || "Could not compute the selected multi-burn transfer.");
+      }
+    }
+
+    runPlanner();
+  </script>
+</body>
+</html>
