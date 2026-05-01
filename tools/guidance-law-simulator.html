@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guidance Law Simulator | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-tools.css">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']]
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root{
+      --page-bg:#f3f4f6;
+      --card-bg:#ffffff;
+      --ink:#1f2937;
+      --muted:#4b5563;
+      --line:#d7dce3;
+      --hero-a:#0f1f5c;
+      --hero-b:#2563eb;
+      --hero-c:#0f8b8d;
+      --formula-bg:#07163f;
+      --accent:#2563eb;
+      --accent-2:#0f8b8d;
+      --soft:#eef8f7;
+      --warn:#fff7ed;
+      --warn-line:#f97316;
+      --bad:#fee2e2;
+      --bad-line:#ef4444;
+      --shadow:0 10px 30px rgba(15,23,42,0.08);
+      --radius-xl:26px;
+    }
+
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--page-bg);color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.65;}
+    .page-wrap{width:min(1380px,calc(100% - 48px));margin:20px auto 56px;}
+    .tool-hero{background:linear-gradient(135deg,var(--hero-a),var(--hero-b),var(--hero-c));color:#fff;padding:34px 38px 38px;border-radius:32px;box-shadow:var(--shadow);margin-bottom:22px;}
+    .tool-pill{display:inline-block;background:#e0f2fe;color:#1f2937;font-weight:700;padding:10px 20px;border-radius:999px;font-size:1.05rem;margin-bottom:14px;}
+    .tool-hero h1{margin:0 0 12px;font-size:clamp(2.4rem,5vw,4rem);line-height:1.05;font-weight:800;letter-spacing:-0.02em;}
+    .tool-hero p{margin:0;font-size:clamp(1.05rem,1.8vw,1.22rem);line-height:1.65;max-width:1120px;}
+    .grid-2{display:grid;grid-template-columns:1.05fr .95fr;gap:22px;align-items:start;}
+    .stack{display:grid;gap:22px;}
+    .card{background:var(--card-bg);border:1px solid var(--line);border-radius:var(--radius-xl);box-shadow:var(--shadow);padding:28px 28px 30px;}
+    .card h2{margin:0 0 18px;font-size:clamp(1.8rem,2.6vw,2.55rem);line-height:1.1;letter-spacing:-0.02em;color:#0f172a;}
+    .card h3{margin:18px 0 10px;font-size:1.2rem;color:#0f172a;}
+    .card p,.card li{font-size:1.04rem;line-height:1.72;color:var(--muted);}
+    .card ul{margin:10px 0 0 22px;padding:0;}
+    .formula-box{background:var(--formula-bg);color:#fff;border-radius:20px;padding:22px 18px;margin:16px 0 18px;overflow:auto;box-shadow:inset -10px 0 0 rgba(255,255,255,.03);}
+    .tabs{display:flex;gap:12px;margin:4px 0 18px;flex-wrap:wrap;}
+    .tab-btn{border:none;border-radius:999px;padding:13px 22px;font-size:1rem;font-weight:700;cursor:pointer;background:#dbe1ea;color:#1f2937;font-family:inherit;transition:transform .15s ease,background .2s ease;}
+    .tab-btn.active{background:linear-gradient(135deg,var(--accent-2),var(--accent));color:#fff;}
+    .tab-btn:hover{transform:translateY(-1px);}
+    .mode-panel{display:none}.mode-panel.active{display:block}
+    .split-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}.split-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+    .field{margin-bottom:16px}
+    label{display:block;font-size:1rem;font-weight:700;color:#1f2937;margin:0 0 8px}
+    input,select{width:100%;padding:12px 14px;border:1.5px solid #cbd5e1;border-radius:16px;font-size:1rem;color:#111827;background:#fff;font-family:inherit}
+    input:focus,select:focus{outline:none;border-color:#5b8def;box-shadow:0 0 0 3px rgba(37,99,235,.10)}
+    .hint{font-size:.94rem;color:#6b7280;margin-top:6px}
+    .button-row{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+    .cta,.ghost{border:none;border-radius:18px;padding:16px 20px;font-size:1.06rem;font-weight:800;cursor:pointer;font-family:inherit;min-height:56px}
+    .cta{color:#fff;background:linear-gradient(135deg,var(--accent-2),var(--accent));flex:1 1 240px;box-shadow:0 12px 24px rgba(37,99,235,.18)}
+    .ghost{color:#1f2937;background:#e5e7eb;flex:1 1 160px}
+    .results-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:14px}
+    .result-box{background:#f8fafc;border:1px solid #dbe3ec;border-radius:18px;padding:16px 18px;min-height:104px}
+    .result-box h4{margin:0 0 8px;font-size:.98rem;color:#475569;line-height:1.35}.result-box .value{font-size:1.04rem;font-weight:800;color:#111827;line-height:1.35;word-break:break-word}
+    .callout{border-radius:20px;padding:18px 20px;margin-top:18px;border-left:5px solid var(--accent-2);background:var(--soft)}
+    .callout.warn{border-left-color:var(--warn-line);background:var(--warn)}.callout.bad{border-left-color:var(--bad-line);background:var(--bad)}
+    .callout h3{margin-top:0;margin-bottom:8px;font-size:1.15rem}.callout p{margin:0}
+    .plot-card{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;margin-top:16px}.plot-title{font-weight:800;font-size:1.08rem;margin:0 0 10px;color:#111827}
+    .plot-box{width:100%;min-height:430px;border:1px solid #e2e8f0;border-radius:18px;overflow:hidden;background:#fff}.plot-box.short{min-height:320px}
+    .back-link-row{margin-top:40px;text-align:left}.back-link-btn{display:inline-block;text-decoration:none;border-radius:18px;padding:14px 22px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent-2),var(--accent));box-shadow:0 12px 24px rgba(37,99,235,.18)}
+    .site-footer{text-align:center;padding:1.5rem 0;font-size:.95rem;color:#4b5563;line-height:1.6}
+    @media(max-width:1100px){.grid-2{grid-template-columns:1fr}}
+    @media(max-width:760px){.page-wrap{width:min(100% - 24px,1380px)}.tool-hero{padding:24px 20px 28px;border-radius:24px}.card{padding:22px 18px 24px}.split-2,.split-3,.results-grid{grid-template-columns:1fr}.plot-box{min-height:350px}}
+  </style>
+</head>
+<body>
+  <main class="page-wrap">
+    <section class="tool-hero">
+      <div class="tool-pill">Tool 17 · Advanced Control Systems</div>
+      <h1>Guidance Law Simulator</h1>
+      <p>
+        Explore two important guidance ideas: proportional navigation for intercept problems and gravity-turn guidance for launch/ascent intuition.
+        This tool connects control laws to trajectory shaping, closing speed, commanded acceleration, pitch program, and flight-path evolution.
+      </p>
+    </section>
+
+    <section class="grid-2">
+      <div class="stack">
+        <article class="card">
+          <h2>What this tool computes</h2>
+          <p>
+            Guidance laws convert mission objectives into steering commands. This page provides two educational modes: an intercept problem using
+            proportional navigation and a simplified launch gravity-turn simulation.
+          </p>
+          <ul>
+            <li>Proportional navigation intercept trajectory</li>
+            <li>Line-of-sight rate and commanded lateral acceleration</li>
+            <li>Miss distance and intercept time</li>
+            <li>Gravity-turn trajectory and altitude history</li>
+            <li>Pitch angle, velocity, and downrange evolution</li>
+          </ul>
+        </article>
+
+        <article class="card">
+          <h2>Proportional navigation</h2>
+          <p>
+            Proportional navigation commands acceleration proportional to closing speed and line-of-sight rate:
+          </p>
+          <div class="formula-box">
+            \[
+              a_c = N V_c \dot{\lambda}
+            \]
+          </div>
+          <p>
+            The navigation constant \(N\) usually controls how aggressively the chaser turns toward the intercept geometry.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Gravity-turn intuition</h2>
+          <p>
+            A gravity turn begins with a vertical climb, then a small pitch-over allows gravity and velocity direction to bend the trajectory naturally.
+          </p>
+          <div class="formula-box">
+            \[
+              \dot{v} \approx \frac{T-D}{m}-g\sin\gamma
+            \]
+            \[
+              \dot{\gamma} \approx -\frac{g\cos\gamma}{v}
+            \]
+          </div>
+          <p>
+            The simulator is simplified, but it shows why pitch-over timing strongly affects downrange distance, altitude, and flight-path angle.
+          </p>
+        </article>
+
+        <article class="card">
+          <h2>Engineering interpretation</h2>
+          <ul>
+            <li>Guidance laws shape trajectory; controllers execute the commands.</li>
+            <li>PN is useful for intercept and pursuit-style guidance concepts.</li>
+            <li>Gravity-turn planning links launch trajectory, pitch program, and energy management.</li>
+            <li>Both examples show why timing matters in GNC.</li>
+          </ul>
+          <div class="callout warn">
+            <h3>Educational simplification</h3>
+            <p>
+              This page is for learning. It does not include full 6DOF aerodynamics, actuator limits, sensor noise, Earth rotation, staging, orbital insertion constraints, or certified flight software logic.
+            </p>
+          </div>
+        </article>
+      </div>
+
+      <div class="stack">
+        <article class="card">
+          <h2>Interactive guidance simulator</h2>
+
+          <div class="tabs">
+            <button type="button" class="tab-btn active" data-mode="mode">Mode</button>
+            <button type="button" class="tab-btn" data-mode="pn">PN Inputs</button>
+            <button type="button" class="tab-btn" data-mode="gt">Gravity Turn Inputs</button>
+            <button type="button" class="tab-btn" data-mode="preset">Presets</button>
+          </div>
+
+          <div id="mode-mode" class="mode-panel active">
+            <div class="field">
+              <label for="guidanceModeSelect">Guidance mode</label>
+              <select id="guidanceModeSelect">
+                <option value="pn">Proportional Navigation Intercept</option>
+                <option value="gt">Gravity Turn Launch</option>
+              </select>
+              <div class="hint">Select PN for intercept guidance or gravity turn for launch/ascent guidance intuition.</div>
+            </div>
+          </div>
+
+          <div id="mode-pn" class="mode-panel">
+            <h3>Chaser and target initial states</h3>
+            <div class="split-2">
+              <div class="field"><label for="chaserXInput">Chaser x (m)</label><input id="chaserXInput" type="number" value="0" step="100"></div>
+              <div class="field"><label for="chaserYInput">Chaser y (m)</label><input id="chaserYInput" type="number" value="0" step="100"></div>
+            </div>
+            <div class="split-2">
+              <div class="field"><label for="targetXInput">Target x (m)</label><input id="targetXInput" type="number" value="12000" step="100"></div>
+              <div class="field"><label for="targetYInput">Target y (m)</label><input id="targetYInput" type="number" value="3000" step="100"></div>
+            </div>
+            <div class="split-3">
+              <div class="field"><label for="chaserSpeedInput">Chaser speed (m/s)</label><input id="chaserSpeedInput" type="number" value="450" step="10"></div>
+              <div class="field"><label for="targetVxInput">Target vx (m/s)</label><input id="targetVxInput" type="number" value="120" step="10"></div>
+              <div class="field"><label for="targetVyInput">Target vy (m/s)</label><input id="targetVyInput" type="number" value="0" step="10"></div>
+            </div>
+            <div class="split-3">
+              <div class="field"><label for="navConstInput">Navigation constant N</label><input id="navConstInput" type="number" value="3" step="0.25" min="0.1"></div>
+              <div class="field"><label for="maxAccelInput">Max lateral accel (m/s²)</label><input id="maxAccelInput" type="number" value="60" step="5" min="1"></div>
+              <div class="field"><label for="headingInput">Initial heading (deg)</label><input id="headingInput" type="number" value="10" step="1"></div>
+            </div>
+          </div>
+
+          <div id="mode-gt" class="mode-panel">
+            <div class="split-3">
+              <div class="field"><label for="thrustInput">Thrust (kN)</label><input id="thrustInput" type="number" value="900" step="10"></div>
+              <div class="field"><label for="massInput">Initial mass (kg)</label><input id="massInput" type="number" value="42000" step="100"></div>
+              <div class="field"><label for="burnRateInput">Mass flow (kg/s)</label><input id="burnRateInput" type="number" value="120" step="5"></div>
+            </div>
+            <div class="split-3">
+              <div class="field"><label for="pitchKickInput">Pitch kick (deg)</label><input id="pitchKickInput" type="number" value="6" step="1"></div>
+              <div class="field"><label for="kickTimeInput">Pitch kick time (s)</label><input id="kickTimeInput" type="number" value="12" step="1"></div>
+              <div class="field"><label for="dragCoeffInput">Drag strength</label><input id="dragCoeffInput" type="number" value="0.00003" step="0.00001"></div>
+            </div>
+            <div class="split-2">
+              <div class="field"><label for="launchDurationInput">Launch duration (s)</label><input id="launchDurationInput" type="number" value="160" step="10"></div>
+              <div class="field"><label for="gInput">Gravity (m/s²)</label><input id="gInput" type="number" value="9.81" step="0.01"></div>
+            </div>
+          </div>
+
+          <div id="mode-preset" class="mode-panel">
+            <div class="field">
+              <label for="presetSelect">Scenario preset</label>
+              <select id="presetSelect">
+                <option value="pnBalanced">PN balanced intercept</option>
+                <option value="pnAggressive">PN aggressive intercept</option>
+                <option value="pnLowN">PN low-N miss case</option>
+                <option value="gtNominal">Gravity turn nominal</option>
+                <option value="gtLateKick">Gravity turn late pitch-over</option>
+                <option value="gtEarlyKick">Gravity turn early pitch-over</option>
+              </select>
+              <div class="hint">Presets switch the mode and fill relevant inputs automatically.</div>
+            </div>
+          </div>
+
+          <div class="split-2">
+            <div class="field"><label for="durationInput">PN simulation duration (s)</label><input id="durationInput" type="number" value="80" step="5"></div>
+            <div class="field"><label for="dtInput">Time step (s)</label><input id="dtInput" type="number" value="0.05" step="0.01"></div>
+          </div>
+
+          <div class="button-row">
+            <button class="cta" id="runBtn">Run Guidance Simulation</button>
+            <button class="ghost" id="resetBtn">Reset Defaults</button>
+          </div>
+
+          <div id="errorBox" class="callout warn" style="display:none;"></div>
+
+          <h3 style="margin-top:22px;">Results</h3>
+          <div class="results-grid">
+            <div class="result-box"><h4>Primary outcome</h4><div class="value" id="outcomeOut">—</div></div>
+            <div class="result-box"><h4>Final / closest range</h4><div class="value" id="rangeOut">—</div></div>
+            <div class="result-box"><h4>Peak command</h4><div class="value" id="commandOut">—</div></div>
+            <div class="result-box"><h4>Final speed</h4><div class="value" id="speedOut">—</div></div>
+            <div class="result-box"><h4>Final altitude</h4><div class="value" id="altOut">—</div></div>
+            <div class="result-box"><h4>Final flight path / heading</h4><div class="value" id="angleOut">—</div></div>
+          </div>
+
+          <div class="callout" id="interpretBox">
+            <h3>Interpretation</h3>
+            <p id="interpretText">Run a guidance simulation to see trajectory shaping and command history.</p>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Trajectory</div>
+            <div id="trajPlot" class="plot-box"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Guidance command / pitch history</div>
+            <div id="commandPlot" class="plot-box short"></div>
+          </div>
+
+          <div class="plot-card">
+            <div class="plot-title">Range or altitude history</div>
+            <div id="historyPlot" class="plot-box short"></div>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Assumptions and limitations</h2>
+          <div class="callout warn" style="margin-top:0;">
+            <h3>This simulator assumes:</h3>
+            <ul>
+              <li>2D planar guidance examples</li>
+              <li>Simplified point-mass dynamics</li>
+              <li>Ideal command response</li>
+              <li>No sensor delay, actuator dynamics, or closed-loop autopilot lag</li>
+              <li>Gravity-turn model is conceptual, not launch-vehicle design software</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="../tools.html" class="back-link-btn">← Back to Tools</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.<br>
+      Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const DEG = Math.PI/180;
+    const RAD = 180/Math.PI;
+
+    const defaults = {
+      guidanceModeSelect:"pn",
+      chaserXInput:0,chaserYInput:0,targetXInput:12000,targetYInput:3000,chaserSpeedInput:450,targetVxInput:120,targetVyInput:0,navConstInput:3,maxAccelInput:60,headingInput:10,
+      thrustInput:900,massInput:42000,burnRateInput:120,pitchKickInput:6,kickTimeInput:12,dragCoeffInput:0.00003,launchDurationInput:160,gInput:9.81,
+      durationInput:80,dtInput:0.05,presetSelect:"pnBalanced"
+    };
+
+    const el = Object.fromEntries(Object.keys(defaults).map(id => [id, document.getElementById(id)]));
+
+    document.querySelectorAll(".tab-btn").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        const mode=btn.dataset.mode;
+        document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+        document.querySelectorAll(".mode-panel").forEach(p=>p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById(`mode-${mode}`).classList.add("active");
+      });
+    });
+
+    document.getElementById("runBtn").addEventListener("click", runSimulation);
+    document.getElementById("resetBtn").addEventListener("click",()=>{Object.entries(defaults).forEach(([id,v])=>el[id].value=v); runSimulation();});
+
+    el.presetSelect.addEventListener("change",()=>{
+      const p=el.presetSelect.value;
+      if(p==="pnBalanced"){el.guidanceModeSelect.value="pn"; setPN(0,0,12000,3000,450,120,0,3,60,10,80,0.05);}
+      if(p==="pnAggressive"){el.guidanceModeSelect.value="pn"; setPN(0,0,14000,5000,520,150,-20,4.5,90,15,75,0.05);}
+      if(p==="pnLowN"){el.guidanceModeSelect.value="pn"; setPN(0,0,12000,4500,420,140,20,1.2,35,0,90,0.05);}
+      if(p==="gtNominal"){el.guidanceModeSelect.value="gt"; setGT(900,42000,120,6,12,0.00003,160,9.81,0.1);}
+      if(p==="gtLateKick"){el.guidanceModeSelect.value="gt"; setGT(900,42000,120,5,35,0.00003,160,9.81,0.1);}
+      if(p==="gtEarlyKick"){el.guidanceModeSelect.value="gt"; setGT(900,42000,120,9,6,0.00003,160,9.81,0.1);}
+      runSimulation();
+    });
+
+    function setPN(cx,cy,tx,ty,cs,tvx,tvy,N,aMax,head,dur,dt){
+      el.chaserXInput.value=cx;el.chaserYInput.value=cy;el.targetXInput.value=tx;el.targetYInput.value=ty;el.chaserSpeedInput.value=cs;el.targetVxInput.value=tvx;el.targetVyInput.value=tvy;el.navConstInput.value=N;el.maxAccelInput.value=aMax;el.headingInput.value=head;el.durationInput.value=dur;el.dtInput.value=dt;
+    }
+    function setGT(T,m,mdot,kick,kickTime,drag,dur,g,dt){
+      el.thrustInput.value=T;el.massInput.value=m;el.burnRateInput.value=mdot;el.pitchKickInput.value=kick;el.kickTimeInput.value=kickTime;el.dragCoeffInput.value=drag;el.launchDurationInput.value=dur;el.gInput.value=g;el.dtInput.value=dt;
+    }
+
+    function getInputs(){
+      return {
+        mode:el.guidanceModeSelect.value,
+        pn:{cx:+el.chaserXInput.value,cy:+el.chaserYInput.value,tx:+el.targetXInput.value,ty:+el.targetYInput.value,cs:+el.chaserSpeedInput.value,tvx:+el.targetVxInput.value,tvy:+el.targetVyInput.value,N:+el.navConstInput.value,aMax:+el.maxAccelInput.value,head:+el.headingInput.value*DEG,dur:+el.durationInput.value,dt:+el.dtInput.value},
+        gt:{T:+el.thrustInput.value*1000,m:+el.massInput.value,mdot:+el.burnRateInput.value,kick:+el.pitchKickInput.value*DEG,kickTime:+el.kickTimeInput.value,drag:+el.dragCoeffInput.value,dur:+el.launchDurationInput.value,g:+el.gInput.value,dt:+el.dtInput.value}
+      };
+    }
+
+    function showError(msg){const b=document.getElementById("errorBox");b.style.display="block";b.innerHTML=`<h3>Input error</h3><p>${msg}</p>`;}
+    function clearError(){const b=document.getElementById("errorBox");b.style.display="none";b.innerHTML="";}
+    function norm(x,y){return Math.sqrt(x*x+y*y)}
+    function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+    function fmt(v,d=3,suffix=""){return Number.isFinite(v)?v.toFixed(d)+suffix:"—"}
+
+    function simulatePN(p){
+      if([p.cx,p.cy,p.tx,p.ty,p.cs,p.tvx,p.tvy,p.N,p.aMax,p.head,p.dur,p.dt].some(v=>!Number.isFinite(v))) throw new Error("Please enter valid PN inputs.");
+      if(p.cs<=0||p.N<=0||p.aMax<=0||p.dur<=0||p.dt<=0) throw new Error("Speed, N, max acceleration, duration, and dt must be positive.");
+      let cx=p.cx, cy=p.cy, cvx=p.cs*Math.cos(p.head), cvy=p.cs*Math.sin(p.head), tx=p.tx, ty=p.ty;
+      const chx=[],chy=[],tgx=[],tgy=[],t=[],range=[],cmd=[],losRate=[];
+      let minR=Infinity,minT=0,peakA=0,hit=false,hitT=null;
+      const steps=Math.floor(p.dur/p.dt)+1;
+      for(let k=0;k<steps;k++){
+        const time=k*p.dt;
+        const rx=tx-cx, ry=ty-cy, rvx=p.tvx-cvx, rvy=p.tvy-cvy;
+        const r2=rx*rx+ry*ry, r=Math.sqrt(r2);
+        const closing=-(rx*rvx+ry*rvy)/Math.max(r,1e-9);
+        const lamdot=(rx*rvy-ry*rvx)/Math.max(r2,1e-9);
+        let aCmd=p.N*closing*lamdot;
+        aCmd=clamp(aCmd,-p.aMax,p.aMax);
+        peakA=Math.max(peakA,Math.abs(aCmd));
+        const speed=norm(cvx,cvy);
+        const nx=-cvy/Math.max(speed,1e-9), ny=cvx/Math.max(speed,1e-9);
+        chx.push(cx); chy.push(cy); tgx.push(tx); tgy.push(ty); t.push(time); range.push(r); cmd.push(aCmd); losRate.push(lamdot*RAD);
+        if(r<minR){minR=r;minT=time;}
+        if(r<25&&!hit){hit=true;hitT=time;}
+        if(k<steps-1&&!hit){
+          cvx += nx*aCmd*p.dt; cvy += ny*aCmd*p.dt;
+          cx += cvx*p.dt; cy += cvy*p.dt;
+          tx += p.tvx*p.dt; ty += p.tvy*p.dt;
+        }
+      }
+      return {type:"pn",chx,chy,tgx,tgy,t,range,cmd,losRate,minR,minT,peakA,hit,hitT,finalSpeed:norm(cvx,cvy),finalHeading:Math.atan2(cvy,cvx)*RAD};
+    }
+
+    function simulateGT(p){
+      if([p.T,p.m,p.mdot,p.kick,p.kickTime,p.drag,p.dur,p.g,p.dt].some(v=>!Number.isFinite(v))) throw new Error("Please enter valid gravity-turn inputs.");
+      if(p.T<=0||p.m<=0||p.mdot<0||p.dur<=0||p.g<=0||p.dt<=0) throw new Error("Thrust, mass, duration, gravity, and dt must be physically valid.");
+      let x=0,y=0,v=1,gamma=Math.PI/2,m=p.m;
+      const xs=[],ys=[],ts=[],vs=[],gammas=[],pitch=[],mass=[],q=[];
+      let maxQ=0;
+      const steps=Math.floor(p.dur/p.dt)+1;
+      for(let k=0;k<steps;k++){
+        const time=k*p.dt;
+        let pitchCmd = Math.PI/2;
+        if(time>=p.kickTime) pitchCmd = Math.PI/2 - p.kick;
+        const rho=Math.exp(-Math.max(y,0)/8500);
+        const drag=p.drag*rho*v*v;
+        maxQ=Math.max(maxQ,0.5*rho*v*v);
+        xs.push(x); ys.push(y); ts.push(time); vs.push(v); gammas.push(gamma*RAD); pitch.push(pitchCmd*RAD); mass.push(m); q.push(0.5*rho*v*v);
+        if(k<steps-1){
+          const thrustAcc=p.T/Math.max(m,1);
+          const gammaBlend = time>=p.kickTime ? 0.18*(pitchCmd-gamma) : 0;
+          const vdot=thrustAcc - drag/Math.max(m,1) - p.g*Math.sin(gamma);
+          const gammadot = gammaBlend - (p.g*Math.cos(gamma))/Math.max(v,10);
+          v=Math.max(1,v+vdot*p.dt);
+          gamma += gammadot*p.dt;
+          x += v*Math.cos(gamma)*p.dt;
+          y = Math.max(0,y + v*Math.sin(gamma)*p.dt);
+          m=Math.max(0.15*p.m,m-p.mdot*p.dt);
+        }
+      }
+      return {type:"gt",x:xs,y:ys,t:ts,v:vs,gamma:gammas,pitch,mass,q,maxQ,finalSpeed:v,finalAltitude:y,finalDownrange:x,finalGamma:gamma*RAD};
+    }
+
+    function updateResults(d){
+      const box=document.getElementById("interpretBox"); box.classList.remove("warn","bad");
+      if(d.type==="pn"){
+        document.getElementById("outcomeOut").textContent=d.hit?`Intercept at ${fmt(d.hitT,2," s")}`:"No intercept";
+        document.getElementById("rangeOut").textContent=`${fmt(d.minR,2," m")} at ${fmt(d.minT,2," s")}`;
+        document.getElementById("commandOut").textContent=fmt(d.peakA,2," m/s²");
+        document.getElementById("speedOut").textContent=fmt(d.finalSpeed,2," m/s");
+        document.getElementById("altOut").textContent="—";
+        document.getElementById("angleOut").textContent=fmt(d.finalHeading,2,"° heading");
+        let msg=d.hit?"Proportional navigation guides the chaser to intercept by reacting to line-of-sight rotation and closing speed.":"The selected navigation gain, acceleration limit, or initial geometry does not produce intercept within the simulation time.";
+        if(!d.hit) box.classList.add("warn");
+        document.getElementById("interpretText").textContent=msg;
+        drawPNTrajectory(d); drawPNCommand(d); drawPNHistory(d);
+      } else {
+        document.getElementById("outcomeOut").textContent=`Downrange ${fmt(d.finalDownrange/1000,2," km")}`;
+        document.getElementById("rangeOut").textContent="—";
+        document.getElementById("commandOut").textContent=fmt(d.maxQ/1000,2," kPa max q proxy");
+        document.getElementById("speedOut").textContent=fmt(d.finalSpeed,2," m/s");
+        document.getElementById("altOut").textContent=fmt(d.finalAltitude/1000,2," km");
+        document.getElementById("angleOut").textContent=fmt(d.finalGamma,2,"° flight path");
+        document.getElementById("interpretText").textContent="The pitch kick starts the gravity turn. Earlier pitch-over increases downrange motion sooner; later pitch-over keeps the vehicle more vertical for longer.";
+        drawGTTrajectory(d); drawGTCommand(d); drawGTHistory(d);
+      }
+    }
+
+    function drawPNTrajectory(d){
+      Plotly.newPlot("trajPlot",[
+        {type:"scatter",mode:"lines",x:d.chx,y:d.chy,line:{color:"#2563eb",width:3},name:"Chaser"},
+        {type:"scatter",mode:"lines",x:d.tgx,y:d.tgy,line:{color:"#f97316",width:3},name:"Target"},
+        {type:"scatter",mode:"markers",x:[d.chx[0],d.tgx[0]],y:[d.chy[0],d.tgy[0]],marker:{size:8,color:["#2563eb","#f97316"]},name:"Start"}
+      ],{margin:{l:60,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"x (m)",gridcolor:"#e5e7eb"},yaxis:{title:"y (m)",gridcolor:"#e5e7eb",scaleanchor:"x"},legend:{orientation:"h",x:.02,y:1.12}},{responsive:true,displaylogo:false});
+    }
+    function drawPNCommand(d){
+      Plotly.newPlot("commandPlot",[
+        {type:"scatter",mode:"lines",x:d.t,y:d.cmd,line:{color:"#0f8b8d",width:3},name:"Commanded accel"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.losRate,yaxis:"y2",line:{color:"#7c3aed",width:2,dash:"dash"},name:"LOS rate"}
+      ],{margin:{l:70,r:60,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},yaxis:{title:"Accel (m/s²)",gridcolor:"#e5e7eb",zeroline:true},yaxis2:{title:"LOS rate (deg/s)",overlaying:"y",side:"right"},legend:{orientation:"h",x:.02,y:1.12}},{responsive:true,displaylogo:false});
+    }
+    function drawPNHistory(d){
+      Plotly.newPlot("historyPlot",[{type:"scatter",mode:"lines",x:d.t,y:d.range,line:{color:"#2563eb",width:3},name:"Range"}],{margin:{l:70,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},yaxis:{title:"Range (m)",gridcolor:"#e5e7eb"},showlegend:false},{responsive:true,displaylogo:false});
+    }
+    function drawGTTrajectory(d){
+      Plotly.newPlot("trajPlot",[{type:"scatter",mode:"lines",x:d.x.map(v=>v/1000),y:d.y.map(v=>v/1000),line:{color:"#2563eb",width:4},name:"Launch path"}],{margin:{l:70,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Downrange (km)",gridcolor:"#e5e7eb"},yaxis:{title:"Altitude (km)",gridcolor:"#e5e7eb"},showlegend:false},{responsive:true,displaylogo:false});
+    }
+    function drawGTCommand(d){
+      Plotly.newPlot("commandPlot",[
+        {type:"scatter",mode:"lines",x:d.t,y:d.pitch,line:{color:"#0f8b8d",width:3},name:"Pitch command"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.gamma,line:{color:"#f97316",width:3},name:"Flight-path angle"}
+      ],{margin:{l:70,r:20,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},yaxis:{title:"Angle (deg)",gridcolor:"#e5e7eb"},legend:{orientation:"h",x:.02,y:1.12}},{responsive:true,displaylogo:false});
+    }
+    function drawGTHistory(d){
+      Plotly.newPlot("historyPlot",[
+        {type:"scatter",mode:"lines",x:d.t,y:d.y.map(v=>v/1000),line:{color:"#2563eb",width:3},name:"Altitude"},
+        {type:"scatter",mode:"lines",x:d.t,y:d.v,yaxis:"y2",line:{color:"#7c3aed",width:3},name:"Speed"}
+      ],{margin:{l:70,r:60,t:10,b:55},paper_bgcolor:"#fff",plot_bgcolor:"#fff",xaxis:{title:"Time (s)",gridcolor:"#e5e7eb"},yaxis:{title:"Altitude (km)",gridcolor:"#e5e7eb"},yaxis2:{title:"Speed (m/s)",overlaying:"y",side:"right"},legend:{orientation:"h",x:.02,y:1.12}},{responsive:true,displaylogo:false});
+    }
+
+    function runSimulation(){
+      clearError();
+      const p=getInputs();
+      try{
+        const data = p.mode==="pn" ? simulatePN(p.pn) : simulateGT(p.gt);
+        updateResults(data);
+      }catch(e){showError(e.message||"Guidance simulation failed.");}
+    }
+
+    runSimulation();
+  </script>
+</body>
+</html>
