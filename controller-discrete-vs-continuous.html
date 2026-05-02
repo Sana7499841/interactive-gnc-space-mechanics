@@ -432,7 +432,7 @@ and the state update at the same known timestep.
     <br>
 
     <button class="lab-button" onclick="runSimulation()">Run Simulation</button>
-    <div class="feedback">
+    <div id="feedback" class="feedback">
   Select a mode and run the simulation to generate results.
 </div>
   </div>
@@ -574,6 +574,78 @@ and the state update at the same known timestep.
     software unless the real controller is also continuous.
   </p>
 </section>
+  <section class="lab-card" id="reality">
+  <span class="section-pill">Reality Check</span>
+
+  <h2>Why This Controller Still Fails in Real Systems</h2>
+
+<p>
+Even after fixing the simulation timing, the controller is still based on a
+simplified assumption: that torque can be applied instantly and without limits.
+</p>
+
+<p>
+In a real spacecraft, control is implemented through actuators such as reaction
+wheels or control moment gyros. These introduce constraints that fundamentally
+change how the controller behaves.
+</p>
+
+<h3>Actuator Limits</h3>
+
+<p>
+The commanded torque cannot exceed actuator capability:
+</p>
+
+<div class="equation-box">
+$$ |\tau| \leq \tau_{max} $$
+</div>
+
+<p>
+If the controller demands more torque than available, the system saturates.
+This removes damping and can lead to overshoot or oscillation.
+</p>
+
+<h3>Momentum Buildup</h3>
+
+<p>
+Reaction wheels accumulate angular momentum over time:
+</p>
+
+<div class="equation-box">
+$$ H = I_w \omega_w $$
+</div>
+
+<p>
+Without momentum dumping, the actuator eventually reaches its limit and can no
+longer produce control torque.
+</p>
+
+<h3>Sensor and Estimation Delay</h3>
+
+<p>
+The controller does not receive the true state instantly. There is always delay
+due to sensing and estimation:
+</p>
+
+<div class="equation-box">
+$$ \theta_{measured}(t) = \theta(t - \Delta t_{delay}) $$
+</div>
+
+<p>
+This delay reduces effective damping and can destabilize otherwise stable gains.
+</p>
+
+<h3>Key Engineering Insight</h3>
+
+<div class="equation-box">
+A controller that works in ideal simulation may fail once actuator limits and delays are introduced.
+</div>
+
+<p>
+This is why controller design must always be validated against physical constraints,
+not just numerical behaviour.
+</p>
+    </section>
   <section class="lab-card">
   <span class="section-pill">Python Implementation</span>
 
@@ -609,7 +681,8 @@ sol = solve_ivp(dynamics, t_span, y0, method='RK45')
     This produces behaviour similar to the adaptive simulation shown earlier.
     The controller is evaluated at solver-selected time points, not at a fixed rate.
   </p>
-</section>
+
+  </section>
 
 <section class="lab-card" id="takeaway">
   <span class="section-pill">Takeaway</span>
@@ -661,68 +734,78 @@ sol = solve_ivp(dynamics, t_span, y0, method='RK45')
 <script>
 function runSimulation() {
 
-  const mode = document.querySelector('input[name="mode"]:checked').value;
+ const mode = document.querySelector('input[name="mode"]:checked').value;
 
-  const kp = parseFloat(document.getElementById("kpSlider").value);
-  const kd = parseFloat(document.getElementById("kdSlider").value);
-  const thetaTarget = parseFloat(document.getElementById("targetSlider").value);
+const kp = parseFloat(document.getElementById("kpSlider").value);
+const kd = parseFloat(document.getElementById("kdSlider").value);
+const thetaTarget = parseFloat(document.getElementById("targetSlider").value);
 
-  const tFinal = 25;
-  const fixedDt = 0.05;
-  const controlDt = 0.20;
+const tFinal = 25;
+const fixedDt = 0.05;
+const controlDt = 0.20;
 
-  let t = [0];
-  let theta = [0];
-  let omega = [0];
-  let torque = [0];
-  let dtHistory = [fixedDt];
-  let target = [thetaTarget];
+// Actuator limit
+const tauMax = 2;
+const useSaturation = true;
 
-  let currentTorque = 0;
-  let nextControlUpdate = 0;
+let t = [0];
+let theta = [0];
+let omega = [0];
+let torque = [0];
+let dtHistory = [fixedDt];
+let target = [thetaTarget];
 
-  let i = 0;
+let currentTorque = 0;
+let nextControlUpdate = 0;
 
-  while (t[i] < tFinal) {
+let i = 0;
 
-    let dt;
+while (t[i] < tFinal) {
 
-    if (mode === "fixed") {
-      dt = fixedDt;
-    }
+  let dt;
 
-    else if (mode === "adaptive") {
-      dt = 0.015 + 0.10 * Math.abs(Math.sin(0.75 * t[i] + 0.5));
-    }
-
-    else if (mode === "samplehold") {
-      dt = 0.015 + 0.10 * Math.abs(Math.sin(0.75 * t[i] + 0.5));
-    }
-
-    let error = thetaTarget - theta[i];
-
-    if (mode === "samplehold") {
-      if (t[i] >= nextControlUpdate) {
-        currentTorque = kp * error - kd * omega[i];
-        nextControlUpdate += controlDt;
-      }
-    } else {
-      currentTorque = kp * error - kd * omega[i];
-    }
-
-    const newOmega = omega[i] + currentTorque * dt;
-    const newTheta = theta[i] + newOmega * dt;
-    const newTime = t[i] + dt;
-
-    i++;
-
-    t[i] = newTime;
-    theta[i] = newTheta;
-    omega[i] = newOmega;
-    torque[i] = currentTorque;
-    dtHistory[i] = dt;
-    target[i] = thetaTarget;
+  if (mode === "fixed") {
+    dt = fixedDt;
+  } else {
+    dt = 0.015 + 0.10 * Math.abs(Math.sin(0.75 * t[i] + 0.5));
   }
+
+  let error = thetaTarget - theta[i];
+
+  if (mode === "samplehold") {
+
+    if (t[i] >= nextControlUpdate) {
+      currentTorque = kp * error - kd * omega[i];
+
+      if (useSaturation) {
+        currentTorque = Math.max(Math.min(currentTorque, tauMax), -tauMax);
+      }
+
+      nextControlUpdate += controlDt;
+    }
+
+  } else {
+
+    currentTorque = kp * error - kd * omega[i];
+
+    if (useSaturation) {
+      currentTorque = Math.max(Math.min(currentTorque, tauMax), -tauMax);
+    }
+  }
+
+  const newOmega = omega[i] + currentTorque * dt;
+  const newTheta = theta[i] + newOmega * dt;
+  const newTime = t[i] + dt;
+
+  i++;
+
+  t[i] = newTime;
+  theta[i] = newTheta;
+  omega[i] = newOmega;
+  torque[i] = currentTorque;
+  dtHistory[i] = dt;
+  target[i] = thetaTarget;
+}
 document.getElementById("attitudePlot").style.display = "block";
 document.getElementById("omegaPlot").style.display = "block";
 document.getElementById("torquePlot").style.display = "block";
