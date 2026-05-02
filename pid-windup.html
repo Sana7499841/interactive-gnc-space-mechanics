@@ -478,10 +478,21 @@ engineering risks such as actuator saturation and windup.
   </div>
 
   <div id="attitudePlot" class="plot-box"></div>
-  <div id="errorPlot" class="plot-box"></div>
-  <div id="torquePlot" class="plot-box"></div>
-  <div id="integralPlot" class="plot-box"></div>
+<div id="errorPlot" class="plot-box"></div>
+<div id="torquePlot" class="plot-box"></div>
+<div id="integralPlot" class="plot-box"></div>
 
+<h3>Compare Controllers</h3>
+<p>
+  This overlay runs PD, PID, and PID with anti-windup using the same gains and disturbance.
+  It helps show how the three controllers behave differently under the same physical limits.
+</p>
+
+<div id="comparisonPlot" class="plot-box"></div>
+
+<div id="insightPanel" class="feedback">
+  Engineering insights will appear here after the simulation runs.
+</div>
 </section>
 
 <section class="lab-card" id="fix">
@@ -563,21 +574,12 @@ engineering risks such as actuator saturation and windup.
     and guidance–navigation–control systems.
   </p>
 </footer>
-
 <script>
 function saturate(value, limit) {
   return Math.max(Math.min(value, limit), -limit);
 }
 
-function runSimulation() {
-  const mode = document.querySelector('input[name="mode"]:checked').value;
-
-  const kp = parseFloat(document.getElementById("kpSlider").value);
-  const ki = parseFloat(document.getElementById("kiSlider").value);
-  const kd = parseFloat(document.getElementById("kdSlider").value);
-  const disturbance = parseFloat(document.getElementById("distSlider").value);
-  const tauMax = parseFloat(document.getElementById("tauSlider").value);
-
+function simulateController(mode, kp, ki, kd, disturbance, tauMax) {
   const thetaTarget = 1.0;
   const tFinal = 30;
   const dt = 0.02;
@@ -618,7 +620,6 @@ function runSimulation() {
     }
 
     const angularAcceleration = appliedTorque + disturbance;
-
     const newOmega = omega[i] + angularAcceleration * dt;
     const newTheta = theta[i] + newOmega * dt;
     const newTime = t[i] + dt;
@@ -635,14 +636,37 @@ function runSimulation() {
     target[i] = thetaTarget;
   }
 
+  return {
+    t,
+    theta,
+    omega,
+    errorHistory,
+    torqueCommand,
+    torqueApplied,
+    integralHistory,
+    target
+  };
+}
+
+function runSimulation() {
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+
+  const kp = parseFloat(document.getElementById("kpSlider").value);
+  const ki = parseFloat(document.getElementById("kiSlider").value);
+  const kd = parseFloat(document.getElementById("kdSlider").value);
+  const disturbance = parseFloat(document.getElementById("distSlider").value);
+  const tauMax = parseFloat(document.getElementById("tauSlider").value);
+
+  const result = simulateController(mode, kp, ki, kd, disturbance, tauMax);
+
   document.getElementById("attitudePlot").style.display = "block";
   document.getElementById("errorPlot").style.display = "block";
   document.getElementById("torquePlot").style.display = "block";
   document.getElementById("integralPlot").style.display = "block";
 
   Plotly.newPlot("attitudePlot", [
-    { x: t, y: theta, mode: "lines", name: "Actual θ" },
-    { x: t, y: target, mode: "lines", name: "Target θ" }
+    { x: result.t, y: result.theta, mode: "lines", name: "Actual θ" },
+    { x: result.t, y: result.target, mode: "lines", name: "Target θ" }
   ], {
     title: "Attitude Response",
     xaxis: { title: "Time (s)" },
@@ -651,7 +675,7 @@ function runSimulation() {
   }, { responsive: true });
 
   Plotly.newPlot("errorPlot", [
-    { x: t, y: errorHistory, mode: "lines", name: "Attitude error" }
+    { x: result.t, y: result.errorHistory, mode: "lines", name: "Attitude error" }
   ], {
     title: "Pointing Error",
     xaxis: { title: "Time (s)" },
@@ -660,8 +684,8 @@ function runSimulation() {
   }, { responsive: true });
 
   Plotly.newPlot("torquePlot", [
-    { x: t, y: torqueCommand, mode: "lines", name: "Commanded torque" },
-    { x: t, y: torqueApplied, mode: "lines", name: "Applied torque after saturation" }
+    { x: result.t, y: result.torqueCommand, mode: "lines", name: "Commanded torque" },
+    { x: result.t, y: result.torqueApplied, mode: "lines", name: "Applied torque after saturation" }
   ], {
     title: "Torque Command vs Applied Torque",
     xaxis: { title: "Time (s)" },
@@ -670,13 +694,16 @@ function runSimulation() {
   }, { responsive: true });
 
   Plotly.newPlot("integralPlot", [
-    { x: t, y: integralHistory, mode: "lines", name: "Integral term" }
+    { x: result.t, y: result.integralHistory, mode: "lines", name: "Integral term" }
   ], {
     title: "Integral Error Growth",
     xaxis: { title: "Time (s)" },
     yaxis: { title: "Integral error" },
     margin: { l: 70, r: 30, t: 60, b: 60 }
   }, { responsive: true });
+
+  runComparison(kp, ki, kd, disturbance, tauMax);
+  updateInsights(result.errorHistory, result.integralHistory, result.torqueCommand, tauMax);
 
   const feedback = document.getElementById("feedback");
 
@@ -698,8 +725,57 @@ function runSimulation() {
       "<strong>PID with anti-windup:</strong> the controller uses integral action, but prevents unrealistic integral growth during saturation.";
   }
 }
-</script>
-<script>
+
+function runComparison(kp, ki, kd, disturbance, tauMax) {
+  const pd = simulateController("pd", kp, ki, kd, disturbance, tauMax);
+  const pid = simulateController("pid", kp, ki, kd, disturbance, tauMax);
+  const antiwindup = simulateController("antiwindup", kp, ki, kd, disturbance, tauMax);
+
+  document.getElementById("comparisonPlot").style.display = "block";
+
+  Plotly.newPlot("comparisonPlot", [
+    { x: pd.t, y: pd.theta, mode: "lines", name: "PD" },
+    { x: pid.t, y: pid.theta, mode: "lines", name: "PID without anti-windup" },
+    { x: antiwindup.t, y: antiwindup.theta, mode: "lines", name: "PID with anti-windup" }
+  ], {
+    title: "Controller Comparison: Attitude Response",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "θ (rad)" },
+    margin: { l: 70, r: 30, t: 60, b: 60 }
+  }, { responsive: true });
+}
+
+function updateInsights(errorHistory, integralHistory, torqueCommand, tauMax) {
+  const insightPanel = document.getElementById("insightPanel");
+
+  let finalError = Math.abs(errorHistory[errorHistory.length - 1]);
+  let maxIntegral = Math.max(...integralHistory.map(Math.abs));
+  let maxCommandedTorque = Math.max(...torqueCommand.map(Math.abs));
+
+  let insight = "<strong>Engineering Insights:</strong><br>";
+
+  if (finalError > 0.05) {
+    insight += "⚠️ Steady-state pointing error detected.<br>";
+  }
+
+  if (maxIntegral > 5) {
+    insight += "⚠️ Integral windup is likely. The integral term is growing significantly.<br>";
+  }
+
+  if (maxCommandedTorque > tauMax) {
+    insight += "⚠️ Actuator saturation is active. The commanded torque exceeds the torque limit.<br>";
+  }
+
+  if (finalError <= 0.05 && maxIntegral <= 5 && maxCommandedTorque <= tauMax) {
+    insight += "✅ Response looks controlled for the selected gains and torque limit.";
+    insightPanel.className = "feedback good";
+  } else {
+    insightPanel.className = "feedback warn";
+  }
+
+  insightPanel.innerHTML = insight;
+}
+
 window.addEventListener("load", runSimulation);
 </script>
 </body>
