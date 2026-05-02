@@ -538,7 +538,17 @@ input[type="range"] {
       oninput="document.getElementById('rVal').textContent=this.value; runLQRDemo();">
       <span id="rVal">2</span>
     </label>
+<br><br>
 
+<strong>Constraint awareness:</strong>
+
+<br><br>
+
+<label>Actuator torque limit:
+  <input type="range" id="torqueLimitSlider" min="0.5" max="10" step="0.1" value="4"
+  oninput="document.getElementById('torqueLimitVal').textContent=this.value; runLQRDemo();">
+  <span id="torqueLimitVal">4</span>
+</label>
     <br>
 
     <button class="lab-button" onclick="runLQRDemo()">Run Comparison</button>
@@ -552,6 +562,19 @@ input[type="range"] {
   <div id="torquePlot" class="plot-box"></div>
   <div id="costPlot" class="plot-box"></div>
 
+  <h3>Constraint Awareness: Ideal vs Saturated LQR</h3>
+
+<p>
+  This plot compares the ideal LQR torque demand with the torque that a real actuator
+  can actually deliver after saturation.
+</p>
+
+<div id="constraintPlot" class="plot-box"></div>
+
+<div id="constraintInsight" class="feedback">
+  Constraint insights will appear after the simulation runs.
+</div>
+  
   <div class="result-grid">
     <div class="result-card">
       <strong>Manual PD Gain</strong>
@@ -642,27 +665,13 @@ input[type="range"] {
 
 <script>
 function getLQRGain(qTheta, qOmega, r) {
-  /*
-    Continuous-time LQR for:
-    xdot = Ax + Bu
-    A = [0 1; 0 0]
-    B = [0; 1]
-    Q = diag(qTheta, qOmega)
-    R = r
-
-    For this simple double-integrator model:
-    p12 = sqrt(qTheta * r)
-    p22 = sqrt(r * (qOmega + 2*p12))
-    K = [p12/r, p22/r]
-  */
-
   const p12 = Math.sqrt(qTheta * r);
   const p22 = Math.sqrt(r * (qOmega + 2 * p12));
 
-  const kp = p12 / r;
-  const kd = p22 / r;
-
-  return { kp, kd };
+  return {
+    kp: p12 / r,
+    kd: p22 / r
+  };
 }
 
 function simulateFeedback(kp, kd, qTheta, qOmega, r) {
@@ -685,11 +694,8 @@ function simulateFeedback(kp, kd, qTheta, qOmega, r) {
     const error = theta[i] - thetaTarget;
     const u = -kp * error - kd * omega[i];
 
-    const thetaDot = omega[i];
-    const omegaDot = u;
-
-    const newOmega = omega[i] + omegaDot * dt;
-    const newTheta = theta[i] + thetaDot * dt;
+    const newOmega = omega[i] + u * dt;
+    const newTheta = theta[i] + omega[i] * dt;
     const newTime = t[i] + dt;
 
     attitudeCost += qTheta * error * error * dt;
@@ -723,6 +729,7 @@ function runLQRDemo() {
   const qTheta = parseFloat(document.getElementById("qThetaSlider").value);
   const qOmega = parseFloat(document.getElementById("qOmegaSlider").value);
   const r = parseFloat(document.getElementById("rSlider").value);
+  const torqueLimit = parseFloat(document.getElementById("torqueLimitSlider").value);
 
   const lqr = getLQRGain(qTheta, qOmega, r);
 
@@ -732,6 +739,7 @@ function runLQRDemo() {
   document.getElementById("comparisonPlot").style.display = "block";
   document.getElementById("torquePlot").style.display = "block";
   document.getElementById("costPlot").style.display = "block";
+  document.getElementById("constraintPlot").style.display = "block";
 
   Plotly.newPlot("comparisonPlot", [
     { x: manualResult.t, y: manualResult.theta, mode: "lines", name: "Manual PD θ" },
@@ -782,6 +790,8 @@ function runLQRDemo() {
     margin: { l: 70, r: 30, t: 60, b: 80 }
   }, { responsive: true });
 
+  runConstraintAwareness(lqr.kp, lqr.kd, torqueLimit);
+
   document.getElementById("manualGainText").innerHTML =
     "Kp = " + manualKp.toFixed(2) + "<br>Kd = " + manualKd.toFixed(2);
 
@@ -810,7 +820,7 @@ function updateInsights(manualResult, lqrResult, lqr, manualKp, manualKd, r) {
   if (manualResult.totalCost > lqrResult.totalCost) {
     insight += "✅ LQR has a lower total cost for the selected Q and R weights.<br>";
   } else {
-    insight += "⚠️ Manual PD has a lower cost here, which means your manual gains happen to match this cost choice well.<br>";
+    insight += "⚠️ Manual PD has a lower cost here, meaning the manual gains match this cost choice well.<br>";
   }
 
   if (manualMaxTorque > 8 || lqrMaxTorque > 8) {
@@ -843,6 +853,87 @@ function updateInsights(manualResult, lqrResult, lqr, manualKp, manualKd, r) {
     "<strong>Computed LQR gains:</strong> Kp = " + lqr.kp.toFixed(2) +
     ", Kd = " + lqr.kd.toFixed(2) +
     ". These gains come from the selected Qθ, Qω, and R weights.";
+}
+
+function runConstraintAwareness(kp, kd, torqueLimit) {
+  const dt = 0.02;
+  const tFinal = 12;
+
+  let t = [0];
+
+  let thetaIdeal = [1.0];
+  let omegaIdeal = [0.0];
+
+  let thetaSat = [1.0];
+  let omegaSat = [0.0];
+
+  let torqueCommand = [0.0];
+  let torqueApplied = [0.0];
+
+  let i = 0;
+
+  while (t[i] < tFinal) {
+    const uIdeal = -kp * thetaIdeal[i] - kd * omegaIdeal[i];
+
+    const newOmegaIdeal = omegaIdeal[i] + uIdeal * dt;
+    const newThetaIdeal = thetaIdeal[i] + omegaIdeal[i] * dt;
+
+    const uCommand = -kp * thetaSat[i] - kd * omegaSat[i];
+    const uApplied = Math.max(Math.min(uCommand, torqueLimit), -torqueLimit);
+
+    const newOmegaSat = omegaSat[i] + uApplied * dt;
+    const newThetaSat = thetaSat[i] + omegaSat[i] * dt;
+
+    i++;
+
+    t[i] = t[i - 1] + dt;
+
+    thetaIdeal[i] = newThetaIdeal;
+    omegaIdeal[i] = newOmegaIdeal;
+
+    thetaSat[i] = newThetaSat;
+    omegaSat[i] = newOmegaSat;
+
+    torqueCommand[i] = uCommand;
+    torqueApplied[i] = uApplied;
+  }
+
+  Plotly.newPlot("constraintPlot", [
+    { x: t, y: thetaIdeal, mode: "lines", name: "Ideal LQR θ" },
+    { x: t, y: thetaSat, mode: "lines", name: "Saturated LQR θ" },
+    { x: t, y: torqueCommand, mode: "lines", name: "Commanded torque" },
+    { x: t, y: torqueApplied, mode: "lines", name: "Applied clipped torque" }
+  ], {
+    title: "Constraint Awareness: Ideal LQR vs Saturated LQR",
+    xaxis: { title: "Time (s)" },
+    yaxis: { title: "Response / Torque" },
+    margin: { l: 70, r: 30, t: 60, b: 60 }
+  }, { responsive: true });
+
+  const maxCommand = Math.max(...torqueCommand.map(Math.abs));
+  const finalIdeal = Math.abs(thetaIdeal[thetaIdeal.length - 1]);
+  const finalSat = Math.abs(thetaSat[thetaSat.length - 1]);
+
+  const constraintInsight = document.getElementById("constraintInsight");
+
+  let text = "<strong>Constraint Insight:</strong><br>";
+
+  if (maxCommand > torqueLimit) {
+    text += "⚠️ The ideal LQR demands more torque than the actuator can deliver.<br>";
+    text += "The saturated response may become slower, less accurate, or more oscillatory.<br>";
+    constraintInsight.className = "feedback warn";
+  } else {
+    text += "✅ The actuator limit is high enough for this LQR design.<br>";
+    constraintInsight.className = "feedback good";
+  }
+
+  if (finalSat > finalIdeal + 0.05) {
+    text += "⚠️ Saturation has degraded final pointing performance.<br>";
+  }
+
+  text += "This shows why an optimal gain from LQR still needs a real actuator-limit check.";
+
+  constraintInsight.innerHTML = text;
 }
 
 window.addEventListener("load", runLQRDemo);
