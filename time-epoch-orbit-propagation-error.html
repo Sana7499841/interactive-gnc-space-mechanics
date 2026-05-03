@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Time & Epoch Errors in Orbit Propagation | Interactive GNC</title>
+
+  <link rel="stylesheet" href="styles-home.css" />
+  <link rel="icon" type="image/png" href="favicon1.png" />
+
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)'], ['$', '$']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --ink: #111827;
+      --muted: #526173;
+      --soft: #f8fafc;
+      --soft-blue: #eff6ff;
+      --border: #dbeafe;
+      --card: #ffffff;
+      --code-bg: #0f172a;
+      --good: #16a34a;
+      --warn: #d97706;
+      --bad: #dc2626;
+      --purple: #7c3aed;
+      --shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: "Times New Roman", Georgia, serif;
+      line-height: 1.12;
+      color: #111827;
+    }
+
+    h2 { font-size: clamp(2rem, 3.2vw, 2.65rem); margin: 0 0 1.1rem; }
+    h3 { font-size: 1.45rem; margin: 1.2rem 0 0.7rem; }
+    p { margin: 0 0 1rem; }
+
+    .problem-hero {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      color: #ffffff;
+      padding: 4rem 1.5rem 3.2rem;
+    }
+
+    .problem-hero-inner {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .problem-hero h1 {
+      color: #ffffff;
+      font-size: clamp(2.55rem, 5vw, 3.7rem);
+      line-height: 1.1;
+      margin: 0 0 1.2rem;
+      max-width: 1050px;
+    }
+
+    .problem-hero p {
+      max-width: 900px;
+      color: #ffffff;
+      font-size: 1.10rem;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .hero-subtitle {
+      font-size: 1.32rem !important;
+      font-weight: 800;
+      margin-bottom: 1rem !important;
+      color: #ffffff !important;
+    }
+
+    .hero-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-top: 1.35rem;
+    }
+
+    .hero-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.42rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.38);
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 0.9rem;
+    }
+
+    .page-main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3.5rem;
+    }
+
+    .content-card,
+    .interactive-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 2.5rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(191, 219, 254, 0.65);
+      font-size: 1.08rem;
+    }
+
+    .section-title {
+      display: inline-block;
+      background: #dbeafe;
+      padding: 0.6rem 1.2rem;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--blue-dark);
+      margin-bottom: 1.2rem;
+      letter-spacing: 0.01em;
+    }
+
+    .subtopic-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin: 0 0 2rem;
+      justify-content: center;
+    }
+
+    .subtopic-nav a,
+    .back-link-pill {
+      text-decoration: none;
+      padding: 0.65rem 1.15rem;
+      border-radius: 999px;
+      background: var(--soft-blue);
+      border: 1px solid #bfdbfe;
+      color: var(--blue-dark);
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .subtopic-nav a:hover,
+    .back-link-pill:hover {
+      background: var(--blue);
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .equation-box {
+      background: var(--code-bg);
+      color: #f8fafc;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .math-light {
+      background: #f8fbff;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      border-radius: 16px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    .callout {
+      margin: 1.2rem 0;
+      padding: 1rem 1.2rem;
+      border-radius: 14px;
+      background: #eff6ff;
+      border-left: 5px solid var(--blue);
+    }
+
+    .callout.good { background: #f0fdf4; border-left-color: var(--good); }
+    .callout.warn { background: #fff7ed; border-left-color: var(--warn); }
+    .callout.bad { background: #fef2f2; border-left-color: var(--bad); }
+    .callout.purple { background: #f5f3ff; border-left-color: var(--purple); }
+
+    .roadmap-grid,
+    .two-col,
+    .metric-grid,
+    .element-grid,
+    .result-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .roadmap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 1rem; }
+    .element-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .result-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 1rem; }
+
+    @media (max-width: 820px) {
+      .roadmap-grid,
+      .two-col,
+      .metric-grid,
+      .element-grid,
+      .result-grid { grid-template-columns: 1fr; }
+      .content-card,
+      .interactive-card { padding: 1.4rem; }
+    }
+
+    .mini-card,
+    .metric,
+    .control-box,
+    .diagnostic-card {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 1rem;
+    }
+
+    .mini-card strong,
+    .metric strong,
+    .diagnostic-card strong { color: #123e83; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin: 1.1rem 0;
+    }
+
+    @media (max-width: 900px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 620px) { .controls { grid-template-columns: 1fr; } }
+
+    label {
+      display: block;
+      color: #1e3a8a;
+      font-weight: 800;
+      font-size: 0.94rem;
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="number"], input[type="range"], select { width: 100%; }
+
+    input[type="number"], select {
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 0.65rem 0.75rem;
+      font-size: 1rem;
+      background: #ffffff;
+      color: var(--ink);
+    }
+
+    input[type="range"] { accent-color: var(--blue); }
+
+    .range-readout {
+      display: inline-flex;
+      margin-top: 0.45rem;
+      padding: 0.32rem 0.75rem;
+      border-radius: 999px;
+      background: #dbeafe;
+      color: #1d4ed8;
+      font-weight: 800;
+      font-size: 0.85rem;
+    }
+
+    .checkbox-list {
+      display: grid;
+      gap: 0.7rem;
+      margin: 1rem 0;
+    }
+
+    .checkbox-list label {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      background: #ffffff;
+      border: 1px solid #dbeafe;
+      border-radius: 14px;
+      padding: 0.7rem 0.85rem;
+      color: #172033;
+      margin: 0;
+      cursor: pointer;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    button {
+      border: none;
+      padding: 0.75rem 1.2rem;
+      border-radius: 999px;
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--blue-dark); }
+    button.secondary { background: #0f172a; }
+    button.ghost {
+      background: var(--soft-blue);
+      color: var(--blue-dark);
+      border: 1px solid #bfdbfe;
+    }
+    button.ghost:hover { background: var(--blue); color: #fff; }
+
+    .plot-box {
+      width: 100%;
+      min-height: 430px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .plot-box.small { min-height: 330px; }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.2rem;
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: #e5e7eb;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 0.92rem;
+    }
+
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .code-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .tab-btn { background: #0f172a; }
+    .tab-btn.active { background: var(--blue); }
+    .hidden { display: none; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      background: #e0f2fe;
+      color: #075985;
+      margin: 0.15rem 0.2rem 0.15rem 0;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: 16px;
+      border: 1px solid #dbeafe;
+      margin-top: 1rem;
+    }
+
+    table {
+      width: 100%;
+      min-width: 680px;
+      border-collapse: collapse;
+      background: #ffffff;
+    }
+
+    th, td {
+      padding: 0.9rem 1rem;
+      text-align: left;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eff6ff;
+      color: #1d4ed8;
+      font-weight: 900;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .back-link-row {
+      text-align: center;
+      margin-top: 2.5rem;
+    }
+
+    .back-link {
+      display: inline-block;
+      text-decoration: none;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      padding: 0.75rem 1.25rem;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .back-link:hover {
+      background: #2563eb;
+      color: white;
+    }
+
+    .site-footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: #64748b;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="problem-hero">
+    <div class="problem-hero-inner">
+      <h1>Time & Epoch Errors in Orbit Propagation</h1>
+      <p class="hero-subtitle">Same orbit, different time, completely different state</p>
+      <p>
+        A spacecraft state vector is only valid at a specific instant. If the epoch, start time,
+        propagation duration, or time system is wrong, the propagated position can be far from
+        the expected state even when the orbit model is correct.
+      </p>
+      <div class="hero-pills">
+        <span class="hero-pill">Epoch</span>
+        <span class="hero-pill">TLE Time</span>
+        <span class="hero-pill">UTC</span>
+        <span class="hero-pill">Propagation Start</span>
+        <span class="hero-pill">Phase Error</span>
+        <span class="hero-pill">Along-Track Drift</span>
+        <span class="hero-pill">MATLAB vs STK</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <nav class="subtopic-nav" aria-label="Page sections">
+      <a href="#setup">Setup</a>
+      <a href="#concept">Core Concept</a>
+      <a href="#seconds">Few Seconds</a>
+      <a href="#epoch-lab">Epoch Lab</a>
+      <a href="#stk-lab">MATLAB vs STK</a>
+      <a href="#classifier">Classifier</a>
+      <a href="#checklist">Checklist</a>
+      <a href="#symptoms">Symptoms</a>
+      <a href="#code">Code</a>
+      <a href="#mission">Mission Meaning</a>
+      <a href="#takeaway">Takeaway</a>
+    </nav>
+
+    <!-- 2. Problem setup -->
+    <section id="setup" class="content-card">
+      <span class="section-title">1 · Problem Setup</span>
+      <h2>Same orbit, different time, completely different state</h2>
+      <p>
+        You load a TLE into MATLAB and propagate the orbit. Then you compare the position with STK.
+      </p>
+
+      <div class="two-col">
+        <div class="mini-card">
+          <strong>What looks correct</strong><br />
+          The orbital elements look correct. The altitude looks correct. The inclination looks correct.
+          The frame conversion looks correct.
+        </div>
+        <div class="mini-card">
+          <strong>What looks wrong</strong><br />
+          The spacecraft is ahead or behind along the orbit. The ground track appears shifted in time.
+          The position error is large even though the orbit shape is right.
+        </div>
+      </div>
+
+      <div class="callout warn">
+        <strong>Debugging question:</strong> Is the orbit wrong? Or are you comparing the right orbit at the wrong time?
+      </div>
+    </section>
+
+    <!-- 3. Core concept -->
+    <section id="concept" class="content-card">
+      <span class="section-title">2 · Core Concept</span>
+      <h2>An Orbit Is Not Frozen in Space</h2>
+      <p>
+        A satellite state is not just an orbit shape. It is the spacecraft location on that orbit at a particular time.
+      </p>
+
+      <div class="element-grid">
+        <div class="mini-card"><strong>Epoch</strong><br />The reference time at which the orbital data is valid.</div>
+        <div class="mini-card"><strong>Start time</strong><br />The time at which propagation begins.</div>
+        <div class="mini-card"><strong>Propagation duration</strong><br />How long the state is advanced from the epoch.</div>
+        <div class="mini-card"><strong>Time system</strong><br />UTC, UT1, TT, TAI, GPS time.</div>
+        <div class="mini-card"><strong>Sampling time</strong><br />The exact output time requested from the propagator.</div>
+        <div class="mini-card"><strong>Mean anomaly / phase</strong><br />The spacecraft’s location along the orbit.</div>
+      </div>
+
+      <div class="equation-box">
+        Same orbital elements + different epoch → different spacecraft position
+      </div>
+
+      <div class="callout purple">
+        <strong>Key line:</strong> The same orbital elements at two different epochs do not represent the same spacecraft position.
+      </div>
+    </section>
+
+    <!-- 4. Time error explanation -->
+    <section id="seconds" class="content-card">
+      <span class="section-title">3 · Why a Few Seconds Matter</span>
+      <h2>LEO motion is fast</h2>
+      <p>
+        In low Earth orbit, a typical spacecraft speed is approximately <strong>7.5 km/s</strong>.
+        That means a small timing mistake can become a large along-track position error.
+      </p>
+
+      <div class="math-light">
+        \[\text{Along-track error} \approx v\,\Delta t\]
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric"><span>1 s error</span><strong>≈ 7.5 km</strong></div>
+        <div class="metric"><span>10 s error</span><strong>≈ 75 km</strong></div>
+        <div class="metric"><span>60 s error</span><strong>≈ 450 km</strong></div>
+        <div class="metric"><span>5 min error</span><strong>≈ 2250 km</strong></div>
+      </div>
+
+      <div class="callout bad">
+        <strong>Important:</strong> The orbit path can still look correct. The spacecraft is simply at the wrong point on that path.
+      </div>
+    </section>
+
+    <!-- 5. Interactive section 1 -->
+    <section id="epoch-lab" class="interactive-card">
+      <span class="section-title">4 · Interactive Epoch Offset Explorer</span>
+      <h2>Move the spacecraft forward or backward in time</h2>
+      <p>
+        Adjust the orbit and time offset. The plots compare the correct state with the time-offset state.
+      </p>
+
+      <div class="controls">
+        <div class="control-box">
+          <label for="orbitType">Orbit type</label>
+          <select id="orbitType">
+            <option value="leo" selected>LEO circular</option>
+            <option value="iss">ISS-like</option>
+            <option value="polar">Polar LEO</option>
+            <option value="meo">MEO</option>
+            <option value="geo">GEO</option>
+          </select>
+        </div>
+
+        <div class="control-box">
+          <label for="altitudeSlider">Orbit altitude</label>
+          <input id="altitudeSlider" type="range" min="300" max="1200" step="25" value="500" />
+          <span class="range-readout" id="altitudeReadout">500 km</span>
+        </div>
+
+        <div class="control-box">
+          <label for="offsetSlider">Time offset</label>
+          <input id="offsetSlider" type="range" min="-600" max="600" step="5" value="60" />
+          <span class="range-readout" id="offsetReadout">+60 s</span>
+        </div>
+
+        <div class="control-box">
+          <label for="inclinationSlider">Inclination</label>
+          <input id="inclinationSlider" type="range" min="0" max="98" step="1" value="51" />
+          <span class="range-readout" id="inclinationReadout">51°</span>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="updateEpochLab()">Run epoch offset explorer</button>
+        <button class="ghost" onclick="setOrbitPreset('iss')">ISS-like</button>
+        <button class="ghost" onclick="setOrbitPreset('polar')">Polar LEO</button>
+        <button class="ghost" onclick="setOrbitPreset('geo')">GEO</button>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric"><span>Orbital speed</span><strong id="speedMetric">—</strong></div>
+        <div class="metric"><span>Time offset</span><strong id="offsetMetric">—</strong></div>
+        <div class="metric"><span>Approx. along-track error</span><strong id="alongTrackMetric">—</strong></div>
+        <div class="metric"><span>Phase angle error</span><strong id="phaseMetric">—</strong></div>
+      </div>
+
+      <div id="orbitPathPlot" class="plot-box"></div>
+      <div id="alongTrackPlot" class="plot-box small"></div>
+      <div id="phasePlot" class="plot-box small"></div>
+
+      <div class="callout good">
+        <strong>Main lesson:</strong> The orbit shape may be identical, but the spacecraft point on that orbit changes rapidly with time.
+      </div>
+    </section>
+
+    <!-- 6. Interactive section 2 -->
+    <section id="stk-lab" class="interactive-card">
+      <span class="section-title">5 · MATLAB vs STK Timing Mismatch Simulator</span>
+      <h2>Why MATLAB and STK Disagree Even with the Same Orbit</h2>
+      <p>
+        A comparison can fail even when the orbit, frame, and propagator are reasonable. Toggle the assumptions below.
+      </p>
+
+      <div class="two-col">
+        <div class="control-box">
+          <div class="checkbox-list">
+            <label><input type="checkbox" id="sameTleEpoch" checked /> Same TLE epoch</label>
+            <label><input type="checkbox" id="sameStartTime" checked /> Same propagation start time</label>
+            <label><input type="checkbox" id="sameOutputTime" /> Same output request time</label>
+            <label><input type="checkbox" id="sameTimeSystem" checked /> Same time system</label>
+            <label><input type="checkbox" id="sameSample" checked /> Same timestep/sample spacing</label>
+            <label><input type="checkbox" id="sameLeap" checked /> Same leap-second/UTC handling</label>
+          </div>
+        </div>
+
+        <div id="timingDiagnostic" class="diagnostic-card">
+          <strong>Likely error source: output request time mismatch</strong>
+          <p>Expected symptom: large position error despite matching orbit shape.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Interactive section 3 -->
+    <section id="classifier" class="interactive-card">
+      <span class="section-title">6 · Error Type Classifier</span>
+      <h2>Classify the timing symptom</h2>
+      <p>
+        Select the observed symptom and use the diagnostic cards to decide what to check first.
+      </p>
+
+      <div class="controls">
+        <div class="control-box">
+          <label for="symptomSelector">Observed symptom</label>
+          <select id="symptomSelector">
+            <option value="ahead" selected>State is ahead along orbit</option>
+            <option value="behind">State is behind along orbit</option>
+            <option value="linear">Position error grows almost linearly with time</option>
+            <option value="jump">Error jumps at start</option>
+            <option value="ground">Ground track is shifted but shape is similar</option>
+            <option value="diverge">MATLAB and STK agree at epoch but differ later</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="updateClassifier()">Classify symptom</button>
+      </div>
+
+      <div class="result-grid">
+        <div class="metric"><span>Likely cause</span><strong id="causeCard">—</strong></div>
+        <div class="metric"><span>Timing mechanism</span><strong id="mechanismCard">—</strong></div>
+        <div class="metric"><span>What to check first</span><strong id="checkCard">—</strong></div>
+        <div class="metric"><span>How to verify</span><strong id="verifyCard">—</strong></div>
+      </div>
+
+      <div id="classifierInterpretation" class="callout warn">
+        <strong>Example:</strong> Ahead/behind along orbit usually points to an epoch or start-time offset.
+      </div>
+    </section>
+
+    <!-- 8. Epoch debugging workflow -->
+    <section id="checklist" class="content-card">
+      <span class="section-title">7 · Time & Epoch Debugging Checklist</span>
+      <h2>Debug time before blaming the propagator</h2>
+
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>1. Read the TLE epoch carefully</strong><br />Do not assume the file date is the orbit epoch.</div>
+        <div class="mini-card"><strong>2. Confirm the propagation start time</strong><br />MATLAB and STK must start from the same instant.</div>
+        <div class="mini-card"><strong>3. Confirm the output comparison time</strong><br />Compare state A(t) with state B(t), not state B(t + Δt).</div>
+        <div class="mini-card"><strong>4. Confirm the time system</strong><br />UTC, UT1, TT, TAI, GPS time may differ.</div>
+        <div class="mini-card"><strong>5. Check seconds, minutes, and days</strong><br />Many mistakes come from unit conversion in time.</div>
+        <div class="mini-card"><strong>6. Compare at epoch first</strong><br />If states disagree at epoch, initial condition or frame is wrong.</div>
+        <div class="mini-card"><strong>7. Compare short propagation next</strong><br />If epoch agrees but 10 minutes later does not, check model and timestep.</div>
+        <div class="mini-card"><strong>8. Compare R/T/N error</strong><br />Epoch errors usually show strongly along-track.</div>
+      </div>
+    </section>
+
+    <!-- 9. Symptom table -->
+    <section id="symptoms" class="content-card">
+      <span class="section-title">8 · Symptom → Cause Diagnostic Table</span>
+      <h2>Use the error pattern</h2>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Symptom</th>
+              <th>Likely cause</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Correct orbit shape but satellite ahead</td><td>Positive time offset</td></tr>
+            <tr><td>Correct orbit shape but satellite behind</td><td>Negative time offset</td></tr>
+            <tr><td>Large along-track error</td><td>Epoch/start-time mismatch</td></tr>
+            <tr><td>Error jumps immediately at t = 0</td><td>Wrong initial epoch</td></tr>
+            <tr><td>Error grows nearly linearly</td><td>Clock rate or sample spacing mismatch</td></tr>
+            <tr><td>Ground track shape correct but shifted</td><td>Output time mismatch</td></tr>
+            <tr><td>MATLAB/STK agree at epoch but diverge later</td><td>Propagation model or force-model mismatch</td></tr>
+            <tr><td>Same TLE gives different state</td><td>Different epoch interpretation or time scale</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 10. Python/MATLAB code blocks -->
+    <section id="code" class="content-card">
+      <span class="section-title">9 · Python / MATLAB Code Pitfalls</span>
+      <h2>Compare states at the exact same instant</h2>
+
+      <div class="code-tabs">
+        <button class="tab-btn active" onclick="showCodeTab('pythonCode', this)">Python-style</button>
+        <button class="tab-btn" onclick="showCodeTab('matlabCode', this)">MATLAB-style</button>
+      </div>
+
+      <div id="pythonCode">
+<pre><code># Wrong idea:
+# Comparing states at different times
+r_matlab = propagate(tle, start_time="2026-05-04T00:00:00Z")
+r_stk    = stk_output(time="2026-05-04T00:01:00Z")
+
+error = norm(r_matlab - r_stk)
+
+# Better idea:
+# Compare both states at the exact same epoch/time
+comparison_time = "2026-05-04T00:00:00Z"
+
+r_matlab = propagate(tle, output_time=comparison_time)
+r_stk    = stk_output(time=comparison_time)
+
+error = norm(r_matlab - r_stk)</code></pre>
+      </div>
+
+      <div id="matlabCode" class="hidden">
+<pre><code>% Wrong:
+tMatlab = datetime(2026,5,4,0,0,0);
+tSTK    = datetime(2026,5,4,0,1,0);
+
+r1 = propagateTLE(tle, tMatlab);
+r2 = stkState(tSTK);
+
+err = norm(r1 - r2);
+
+% Correct idea:
+% 1. read the TLE epoch
+% 2. choose one comparison time
+% 3. request MATLAB and STK state at that exact time
+% 4. only then compute position error</code></pre>
+      </div>
+    </section>
+
+    <!-- 11. Engineering interpretation -->
+    <section id="mission" class="content-card">
+      <span class="section-title">10 · Engineering Interpretation</span>
+      <h2>Why This Matters in Real Mission Analysis</h2>
+
+      <div class="element-grid">
+        <div class="mini-card"><strong>Ground station access</strong><br />A one-minute timing error can shift the predicted pass by hundreds of kilometres.</div>
+        <div class="mini-card"><strong>Sensor pointing</strong><br />The spacecraft may point to where the target was, not where it is.</div>
+        <div class="mini-card"><strong>Conjunction analysis</strong><br />Timing errors can create false close approaches or hide real ones.</div>
+        <div class="mini-card"><strong>Orbit validation</strong><br />A good propagator can look wrong if compared at the wrong instant.</div>
+        <div class="mini-card"><strong>TLE usage</strong><br />The TLE epoch is not just metadata. It defines the reference state.</div>
+        <div class="mini-card"><strong>Mission operations</strong><br />Command timing depends on comparing the correct state at the correct time.</div>
+      </div>
+    </section>
+
+    <!-- 12. Final takeaway -->
+    <section id="takeaway" class="content-card">
+      <span class="section-title">11 · Final Takeaway</span>
+      <h2>An orbit is not only a path</h2>
+      <p>It is:</p>
+      <div class="equation-box">
+        path + spacecraft phase + epoch + time system + propagation duration
+      </div>
+      <div class="callout good">
+        <strong>Final message:</strong> If the time is wrong, the state is wrong.
+      </div>
+      <div class="callout purple">
+        <strong>Best interview line:</strong> Before asking why the position error is large,
+        first check whether both tools are reporting the spacecraft state at the exact same instant.
+      </div>
+    </section>
+
+    <section class="content-card">
+      <span class="section-title">12 · Complete Page Flow</span>
+      <h2>All planned sections included</h2>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>1. Hero</strong><br />Title, subtitle, message, and topic pills.</div>
+        <div class="mini-card"><strong>2. Problem setup</strong><br />MATLAB/STK timing mismatch scenario.</div>
+        <div class="mini-card"><strong>3. Core concept</strong><br />Epoch, start time, duration, time system, sampling, phase.</div>
+        <div class="mini-card"><strong>4. Few seconds matter</strong><br />LEO speed and timing-error cards.</div>
+        <div class="mini-card"><strong>5. Epoch offset explorer</strong><br />Sliders, orbit plots, error plots, phase plots.</div>
+        <div class="mini-card"><strong>6. Timing mismatch simulator</strong><br />MATLAB/STK checkboxes and diagnostic card.</div>
+        <div class="mini-card"><strong>7. Error classifier</strong><br />Symptom selector and diagnostic cards.</div>
+        <div class="mini-card"><strong>8. Debugging workflow</strong><br />Eight numbered checklist cards.</div>
+        <div class="mini-card"><strong>9. Symptom table</strong><br />Symptom to likely cause table.</div>
+        <div class="mini-card"><strong>10. Code</strong><br />Python and MATLAB pseudo-code blocks.</div>
+        <div class="mini-card"><strong>11. Mission meaning</strong><br />Ground access, pointing, conjunction, validation.</div>
+        <div class="mini-card"><strong>12. Takeaway</strong><br />Path + phase + epoch + time system + duration.</div>
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="problems.html" class="back-link">← Back to Problem Bank</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const MU = 398600.4418;
+    const RE = 6378.137;
+    const DEG = Math.PI / 180;
+    const RAD = 180 / Math.PI;
+
+    function fmt(x, d = 2) {
+      return Number.isFinite(x) ? Number(x).toFixed(d) : "—";
+    }
+
+    function getOrbitParams() {
+      const type = document.getElementById("orbitType").value;
+      let altitude = parseFloat(document.getElementById("altitudeSlider").value);
+      let inclination = parseFloat(document.getElementById("inclinationSlider").value);
+
+      if (type === "iss") { altitude = 420; inclination = 51.6; }
+      if (type === "polar") { altitude = 700; inclination = 98; }
+      if (type === "meo") { altitude = 20200; inclination = 55; }
+      if (type === "geo") { altitude = 35786; inclination = 0; }
+
+      const offset = parseFloat(document.getElementById("offsetSlider").value);
+      return { type, altitude, inclination, offset };
+    }
+
+    function circularStateAtTime(tSec, altitude, incDeg) {
+      const r = RE + altitude;
+      const n = Math.sqrt(MU / Math.pow(r, 3));
+      const theta = n * tSec;
+      const inc = incDeg * DEG;
+
+      return {
+        x: r * Math.cos(theta),
+        y: r * Math.sin(theta) * Math.cos(inc),
+        z: r * Math.sin(theta) * Math.sin(inc),
+        theta,
+        r,
+        n,
+        speed: Math.sqrt(MU / r)
+      };
+    }
+
+    function orbitTrace(altitude, incDeg, name) {
+      const xs = [];
+      const ys = [];
+      const zs = [];
+      const r = RE + altitude;
+      const inc = incDeg * DEG;
+
+      for (let k = 0; k <= 240; k++) {
+        const theta = 2 * Math.PI * k / 240;
+        xs.push(r * Math.cos(theta));
+        ys.push(r * Math.sin(theta) * Math.cos(inc));
+        zs.push(r * Math.sin(theta) * Math.sin(inc));
+      }
+
+      return {
+        type: "scatter3d",
+        mode: "lines",
+        x: xs,
+        y: ys,
+        z: zs,
+        name,
+        line: { width: 4 }
+      };
+    }
+
+    function updateEpochLab() {
+      const p = getOrbitParams();
+      document.getElementById("altitudeReadout").textContent = p.altitude + " km";
+      document.getElementById("offsetReadout").textContent = (p.offset >= 0 ? "+" : "") + p.offset + " s";
+      document.getElementById("inclinationReadout").textContent = fmt(p.inclination, 1) + "°";
+
+      const correct = circularStateAtTime(0, p.altitude, p.inclination);
+      const offsetState = circularStateAtTime(p.offset, p.altitude, p.inclination);
+      const alongTrack = Math.abs(correct.speed * p.offset);
+      const phaseDeg = Math.abs(offsetState.theta * RAD);
+
+      document.getElementById("speedMetric").textContent = fmt(correct.speed, 3) + " km/s";
+      document.getElementById("offsetMetric").textContent = (p.offset >= 0 ? "+" : "") + p.offset + " s";
+      document.getElementById("alongTrackMetric").textContent = fmt(alongTrack, 1) + " km";
+      document.getElementById("phaseMetric").textContent = fmt(phaseDeg, 3) + " deg";
+
+      Plotly.newPlot("orbitPathPlot", [
+        orbitTrace(p.altitude, p.inclination, "Orbit path"),
+        {
+          type: "scatter3d",
+          mode: "markers+text",
+          x: [correct.x], y: [correct.y], z: [correct.z],
+          text: ["Correct time"],
+          textposition: "top center",
+          marker: { size: 7 },
+          name: "Correct state"
+        },
+        {
+          type: "scatter3d",
+          mode: "markers+text",
+          x: [offsetState.x], y: [offsetState.y], z: [offsetState.z],
+          text: ["Offset time"],
+          textposition: "bottom center",
+          marker: { size: 8, symbol: "diamond" },
+          name: "Offset state"
+        },
+        {
+          type: "scatter3d",
+          mode: "markers",
+          x: [0], y: [0], z: [0],
+          marker: { size: 5 },
+          name: "Earth center"
+        }
+      ], {
+        title: { text: "Orbit path with correct and time-offset state", font: { family: "Times New Roman, Georgia, serif", size: 21 } },
+        margin: { l: 0, r: 0, t: 60, b: 0 },
+        scene: {
+          xaxis: { title: "x [km]" },
+          yaxis: { title: "y [km]" },
+          zaxis: { title: "z [km]" },
+          aspectmode: "data"
+        },
+        paper_bgcolor: "#ffffff",
+        legend: { orientation: "h", y: -0.05 }
+      }, { responsive: true, displaylogo: false });
+
+      const offsets = [];
+      const errors = [];
+      const phases = [];
+      for (let dt = -600; dt <= 600; dt += 20) {
+        offsets.push(dt);
+        errors.push(Math.abs(correct.speed * dt));
+        phases.push(Math.abs(circularStateAtTime(dt, p.altitude, p.inclination).theta * RAD));
+      }
+
+      Plotly.newPlot("alongTrackPlot", [{
+        type: "scatter",
+        mode: "lines",
+        x: offsets,
+        y: errors,
+        name: "Along-track error"
+      }, {
+        type: "scatter",
+        mode: "markers",
+        x: [p.offset],
+        y: [alongTrack],
+        name: "Current offset"
+      }], {
+        title: { text: "Along-track error vs time offset", font: { family: "Times New Roman, Georgia, serif", size: 21 } },
+        margin: { l: 65, r: 25, t: 60, b: 55 },
+        xaxis: { title: "Time offset [s]", gridcolor: "#e5e7eb" },
+        yaxis: { title: "Error [km]", gridcolor: "#e5e7eb" },
+        paper_bgcolor: "#ffffff",
+        plot_bgcolor: "#ffffff"
+      }, { responsive: true, displaylogo: false });
+
+      Plotly.newPlot("phasePlot", [{
+        type: "scatter",
+        mode: "lines",
+        x: offsets,
+        y: phases,
+        name: "Phase angle error"
+      }, {
+        type: "scatter",
+        mode: "markers",
+        x: [p.offset],
+        y: [phaseDeg],
+        name: "Current phase"
+      }], {
+        title: { text: "Phase angle error vs time offset", font: { family: "Times New Roman, Georgia, serif", size: 21 } },
+        margin: { l: 65, r: 25, t: 60, b: 55 },
+        xaxis: { title: "Time offset [s]", gridcolor: "#e5e7eb" },
+        yaxis: { title: "Phase error [deg]", gridcolor: "#e5e7eb" },
+        paper_bgcolor: "#ffffff",
+        plot_bgcolor: "#ffffff"
+      }, { responsive: true, displaylogo: false });
+    }
+
+    function setOrbitPreset(type) {
+      document.getElementById("orbitType").value = type;
+      if (type === "iss") {
+        document.getElementById("altitudeSlider").value = 420;
+        document.getElementById("inclinationSlider").value = 52;
+        document.getElementById("offsetSlider").value = 60;
+      }
+      if (type === "polar") {
+        document.getElementById("altitudeSlider").value = 700;
+        document.getElementById("inclinationSlider").value = 98;
+        document.getElementById("offsetSlider").value = 120;
+      }
+      if (type === "geo") {
+        document.getElementById("altitudeSlider").value = 1200;
+        document.getElementById("inclinationSlider").value = 0;
+        document.getElementById("offsetSlider").value = 300;
+      }
+      updateEpochLab();
+    }
+
+    function updateTimingDiagnostic() {
+      const sameTleEpoch = document.getElementById("sameTleEpoch").checked;
+      const sameStartTime = document.getElementById("sameStartTime").checked;
+      const sameOutputTime = document.getElementById("sameOutputTime").checked;
+      const sameTimeSystem = document.getElementById("sameTimeSystem").checked;
+      const sameSample = document.getElementById("sameSample").checked;
+      const sameLeap = document.getElementById("sameLeap").checked;
+      const box = document.getElementById("timingDiagnostic");
+
+      let title = "Timing assumptions look consistent";
+      let body = "If the comparison still fails, check frames, force models, interpolation, and output sampling.";
+      let color = "#16a34a";
+
+      if (!sameTleEpoch) {
+        title = "Likely error source: TLE epoch mismatch";
+        body = "Propagating from the wrong TLE reference epoch. Expected symptom: spacecraft appears ahead or behind along the orbit.";
+        color = "#dc2626";
+      } else if (!sameStartTime) {
+        title = "Likely error source: propagation start-time mismatch";
+        body = "MATLAB and STK begin propagation at different times. Expected symptom: correct orbit but phase-shifted state.";
+        color = "#dc2626";
+      } else if (!sameOutputTime) {
+        title = "Likely error source: output request time mismatch";
+        body = "Comparing states from different output timestamps. Expected symptom: large position error despite matching orbit shape.";
+        color = "#dc2626";
+      } else if (!sameSample) {
+        title = "Likely error source: timestep/sample-grid mismatch";
+        body = "Interpolation or sample-grid mismatch. Expected symptom: small but systematic comparison error.";
+        color = "#d97706";
+      } else if (!sameTimeSystem) {
+        title = "Likely error source: time-system mismatch";
+        body = "UTC, UT1, TT, TAI, or GPS time differences may create offsets in propagation or frame conversion.";
+        color = "#d97706";
+      } else if (!sameLeap) {
+        title = "Likely error source: leap-second / UTC handling mismatch";
+        body = "One tool may handle leap seconds differently. Expected symptom: small timing offset that becomes a position error.";
+        color = "#d97706";
+      }
+
+      box.style.borderLeft = "5px solid " + color;
+      box.innerHTML = "<strong>" + title + "</strong><p>" + body + "</p>";
+    }
+
+    function updateClassifier() {
+      const s = document.getElementById("symptomSelector").value;
+      const cause = document.getElementById("causeCard");
+      const mechanism = document.getElementById("mechanismCard");
+      const check = document.getElementById("checkCard");
+      const verify = document.getElementById("verifyCard");
+      const interp = document.getElementById("classifierInterpretation");
+
+      const data = {
+        ahead: ["Positive time offset", "State evaluated too late", "Start/output time", "Compare both states at same timestamp"],
+        behind: ["Negative time offset", "State evaluated too early", "Start/output time", "Check sign of Δt"],
+        linear: ["Clock/sample mismatch", "Error accumulates with time", "Sample spacing", "Plot error vs time"],
+        jump: ["Wrong initial epoch", "Initial state begins at wrong instant", "TLE epoch", "Compare at epoch before propagation"],
+        ground: ["Output time mismatch", "Same path, shifted pass timing", "Output timestamp", "Overlay ground tracks using identical UTC"],
+        diverge: ["Model/timestep mismatch", "Propagation differs after epoch", "Force model and timestep", "Compare 0, 10, 60 minute errors"]
+      };
+
+      cause.textContent = data[s][0];
+      mechanism.textContent = data[s][1];
+      check.textContent = data[s][2];
+      verify.textContent = data[s][3];
+      interp.className = s === "diverge" ? "callout warn" : "callout good";
+      interp.innerHTML = "<strong>Diagnostic:</strong> " + data[s][0] + " is the first thing to test for this symptom.";
+    }
+
+    function showCodeTab(id, btn) {
+      ["pythonCode", "matlabCode"].forEach(x => document.getElementById(x).classList.add("hidden"));
+      document.getElementById(id).classList.remove("hidden");
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    }
+
+    document.querySelectorAll("#orbitType, #altitudeSlider, #offsetSlider, #inclinationSlider")
+      .forEach(el => el.addEventListener("input", updateEpochLab));
+
+    document.querySelectorAll("#sameTleEpoch, #sameStartTime, #sameOutputTime, #sameTimeSystem, #sameSample, #sameLeap")
+      .forEach(el => el.addEventListener("input", updateTimingDiagnostic));
+
+    document.getElementById("symptomSelector").addEventListener("input", updateClassifier);
+
+    window.addEventListener("load", () => {
+      updateEpochLab();
+      updateTimingDiagnostic();
+      updateClassifier();
+    });
+  </script>
+</body>
+</html>
