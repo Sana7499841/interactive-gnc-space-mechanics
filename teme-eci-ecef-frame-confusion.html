@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TEME vs ECI vs ECEF Frame Confusion | Interactive GNC</title>
+
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root {
+      --blue-dark: #0b1f4d;
+      --blue-mid: #1646a3;
+      --blue-light: #eaf1ff;
+      --ink: #172033;
+      --muted: #5f6b7a;
+      --card: #ffffff;
+      --line: #d9e2f2;
+      --soft: #f6f9ff;
+      --accent: #246bfe;
+      --danger: #b3261e;
+      --success: #137333;
+      --warning: #9a6700;
+      --shadow: 0 14px 35px rgba(16, 46, 110, 0.12);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f7faff 0%, #ffffff 36%, #f8fbff 100%);
+      line-height: 1.65;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .notes-hero {
+      background: radial-gradient(circle at top left, rgba(255,255,255,0.26), transparent 34%),
+                  linear-gradient(135deg, #081b44 0%, #123f91 52%, #1f74ff 100%);
+      color: white;
+      padding: 58px 22px 46px;
+      border-bottom-left-radius: 34px;
+      border-bottom-right-radius: 34px;
+      box-shadow: 0 18px 42px rgba(8, 31, 77, 0.22);
+    }
+
+    .hero-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+
+    .hero-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      border: 1px solid rgba(255,255,255,0.38);
+      background: rgba(255,255,255,0.12);
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 650;
+      margin-bottom: 18px;
+      backdrop-filter: blur(8px);
+    }
+
+    h1, h2, h3 {
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.15;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: clamp(2.25rem, 5vw, 4.65rem);
+      letter-spacing: -0.045em;
+      max-width: 940px;
+    }
+
+    .hero-subtitle {
+      margin: 16px 0 0;
+      font-size: clamp(1.18rem, 2.2vw, 1.65rem);
+      font-weight: 650;
+      color: #dce8ff;
+      max-width: 900px;
+    }
+
+    .hero-message {
+      margin: 20px 0 0;
+      max-width: 860px;
+      color: #edf4ff;
+      font-size: 1.04rem;
+    }
+
+    .hero-pills, .subtopic-nav, .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .hero-pills {
+      margin-top: 25px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 7px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.14);
+      border: 1px solid rgba(255,255,255,0.34);
+      color: white;
+      font-weight: 700;
+      font-size: 0.88rem;
+      letter-spacing: 0.01em;
+    }
+
+    .page-main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 28px 20px 70px;
+    }
+
+    .notes-intro-card,
+    .problems-card,
+    .tool-card,
+    .callout,
+    .next-domain-card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .notes-intro-card {
+      padding: 24px;
+      margin-top: -8px;
+    }
+
+    .notes-intro-card strong {
+      color: var(--blue-mid);
+    }
+
+    .subtopic-nav {
+      margin: 24px 0;
+      padding: 14px;
+      background: #edf4ff;
+      border: 1px solid #d8e5ff;
+      border-radius: 999px;
+      justify-content: center;
+      box-shadow: 0 8px 18px rgba(16, 46, 110, 0.08);
+    }
+
+    .subtopic-nav a {
+      padding: 9px 15px;
+      border-radius: 999px;
+      background: white;
+      color: #15396f;
+      border: 1px solid #d7e3f7;
+      font-weight: 750;
+      font-size: 0.9rem;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+
+    .subtopic-nav a:hover {
+      transform: translateY(-2px);
+      background: #f8fbff;
+      box-shadow: 0 8px 18px rgba(16, 46, 110, 0.12);
+    }
+
+    article.notes-content {
+      display: grid;
+      gap: 24px;
+    }
+
+    .problems-card,
+    .tool-card,
+    .next-domain-card {
+      padding: 26px;
+    }
+
+    .problems-section-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: #eaf1ff;
+      color: #174394;
+      font-size: 0.86rem;
+      font-weight: 800;
+      margin-bottom: 14px;
+      letter-spacing: 0.01em;
+    }
+
+    .problems-card h2,
+    .tool-card h2,
+    .next-domain-card h2 {
+      font-size: clamp(1.55rem, 3vw, 2.35rem);
+      color: #102a61;
+      margin-bottom: 12px;
+    }
+
+    .problems-card h3,
+    .tool-card h3 {
+      font-size: 1.42rem;
+      color: #142b58;
+      margin: 18px 0 10px;
+    }
+
+    .problems-subnote {
+      color: var(--muted);
+      margin: 8px 0 0;
+    }
+
+    .grid-2,
+    .grid-3,
+    .grid-4,
+    .result-grid {
+      display: grid;
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .result-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .concept-card,
+    .diagnostic-card,
+    .metric-card,
+    .workflow-card,
+    .impact-card {
+      background: var(--soft);
+      border: 1px solid #dfe8f8;
+      border-radius: 18px;
+      padding: 17px;
+    }
+
+    .concept-card strong,
+    .diagnostic-card strong,
+    .workflow-card strong,
+    .impact-card strong {
+      display: block;
+      color: #143c86;
+      font-size: 1.02rem;
+      margin-bottom: 6px;
+    }
+
+    .metric-card {
+      background: white;
+      text-align: center;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 0.84rem;
+      font-weight: 750;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-value {
+      display: block;
+      margin-top: 6px;
+      font-size: 1.45rem;
+      font-weight: 850;
+      color: #143c86;
+    }
+
+    .callout {
+      padding: 20px 22px;
+      border-left: 7px solid var(--accent);
+      box-shadow: 0 10px 24px rgba(16, 46, 110, 0.08);
+      background: #fbfdff;
+    }
+
+    .callout.warning {
+      border-left-color: #d18a00;
+      background: #fffaf0;
+    }
+
+    .callout.danger {
+      border-left-color: #b3261e;
+      background: #fff7f6;
+    }
+
+    .callout.success {
+      border-left-color: #137333;
+      background: #f5fff7;
+    }
+
+    .math-block {
+      margin: 16px 0;
+      padding: 18px 20px;
+      border-radius: 18px;
+      background: #0e1b33;
+      color: white;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      overflow-x: auto;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      min-width: 760px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 14px 15px;
+      border-bottom: 1px solid #e7edf8;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eef5ff;
+      color: #143c86;
+      font-weight: 850;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .control-panel {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 18px;
+      margin-top: 18px;
+      align-items: start;
+    }
+
+    .controls {
+      background: #f8fbff;
+      border: 1px solid #dfe8f8;
+      border-radius: 20px;
+      padding: 18px;
+    }
+
+    .control-group {
+      margin-bottom: 18px;
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+
+    label,
+    .control-title {
+      display: block;
+      font-weight: 800;
+      color: #173b7d;
+      margin-bottom: 7px;
+      font-size: 0.94rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #cddbf2;
+      background: white;
+      color: var(--ink);
+      font-weight: 650;
+    }
+
+    .radio-row,
+    .checkbox-row {
+      display: grid;
+      gap: 8px;
+    }
+
+    .radio-row label,
+    .checkbox-row label {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0;
+      padding: 9px 10px;
+      border: 1px solid #dbe6f7;
+      border-radius: 12px;
+      background: white;
+      cursor: pointer;
+      font-weight: 700;
+      color: #24324a;
+    }
+
+    .range-readout {
+      display: inline-flex;
+      margin-top: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: #eaf1ff;
+      color: #174394;
+      font-weight: 800;
+      font-size: 0.83rem;
+    }
+
+    .plot-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .plot-box {
+      min-height: 340px;
+      border: 1px solid #dfe8f8;
+      border-radius: 20px;
+      overflow: hidden;
+      background: white;
+    }
+
+    .plot-box.small {
+      min-height: 285px;
+    }
+
+    .toggle-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      border: 1px solid #dbe6f7;
+      background: white;
+      font-weight: 800;
+      color: #24324a;
+      cursor: pointer;
+    }
+
+    .code-tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 16px 0 12px;
+    }
+
+    .code-pill {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid #cfdcf3;
+      background: #eef5ff;
+      color: #163e86;
+      font-weight: 850;
+      cursor: pointer;
+    }
+
+    .code-pill.active {
+      background: #102a61;
+      color: white;
+      border-color: #102a61;
+    }
+
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+    }
+
+    .code-panel {
+      display: none;
+    }
+
+    .code-panel.active {
+      display: block;
+    }
+
+    .problem-link,
+    .back-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding: 11px 18px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #133f91, #1f74ff);
+      color: white;
+      font-weight: 850;
+      box-shadow: 0 10px 20px rgba(31, 116, 255, 0.22);
+    }
+
+    .footer {
+      margin-top: 34px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .footer .back-pill {
+      margin-bottom: 14px;
+    }
+
+    .takeaway-line {
+      font-size: clamp(1.35rem, 2.6vw, 2rem);
+      font-family: Georgia, "Times New Roman", serif;
+      color: #102a61;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .formula-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .formula-strip span {
+      padding: 9px 13px;
+      border-radius: 999px;
+      background: #eaf1ff;
+      color: #174394;
+      border: 1px solid #d5e3fb;
+      font-weight: 850;
+    }
+
+    @media (max-width: 920px) {
+      .grid-2,
+      .grid-3,
+      .grid-4,
+      .result-grid,
+      .control-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .subtopic-nav {
+        border-radius: 22px;
+      }
+
+      .plot-box {
+        min-height: 300px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="notes-hero">
+    <div class="hero-inner">
+      <div class="hero-kicker">Problem Bank · Orbit Propagation · Frame Debugging</div>
+      <h1>TEME vs ECI vs ECEF Frame Confusion</h1>
+      <p class="hero-subtitle">Why your orbit looks wrong in MATLAB but correct in STK</p>
+      <p class="hero-message">
+        Orbit propagation is not only about equations. A state vector is meaningless unless you know
+        which frame it belongs to, at what epoch it was defined, and how Earth rotation has been handled.
+      </p>
+      <div class="hero-pills">
+        <span class="pill">Frames</span>
+        <span class="pill">TLE</span>
+        <span class="pill">SGP4</span>
+        <span class="pill">STK</span>
+        <span class="pill">MATLAB</span>
+        <span class="pill">Ground Tracks</span>
+        <span class="pill">Debugging</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section class="notes-intro-card">
+      <strong>Core message:</strong>
+      A propagated state only makes sense when the coordinate frame, epoch, time system,
+      units, and Earth-rotation model are handled consistently. This page turns that idea
+      into an interactive debugging problem.
+    </section>
+
+    <nav class="subtopic-nav" aria-label="Page sections">
+      <a href="#setup">Problem Setup</a>
+      <a href="#concept">Core Concept</a>
+      <a href="#frames">Frames</a>
+      <a href="#viewer">Frame Viewer</a>
+      <a href="#mismatch">MATLAB vs STK</a>
+      <a href="#error-growth">Error Growth</a>
+      <a href="#checklist">Checklist</a>
+      <a href="#code">Code</a>
+      <a href="#takeaway">Takeaway</a>
+    </nav>
+
+    <article class="notes-content">
+
+      <!-- 2. Problem setup -->
+      <section class="problems-card" id="setup">
+        <div class="problems-section-title">1 · Mission-Style Problem Setup</div>
+        <h2>Why does the same satellite appear over the wrong longitude?</h2>
+        <p>
+          You propagate a satellite from a TLE in MATLAB using SGP4. Then you compare the result with STK.
+        </p>
+
+        <div class="grid-2">
+          <div class="concept-card">
+            <strong>What looks correct</strong>
+            <p>The altitude looks reasonable. The orbital period looks reasonable. The 3D orbit shape looks reasonable.</p>
+          </div>
+          <div class="concept-card">
+            <strong>What looks wrong</strong>
+            <p>The ground track is shifted. The position error grows strangely. The satellite appears over the wrong longitude.</p>
+          </div>
+        </div>
+
+        <div class="callout warning">
+          <strong>The debugging question:</strong>
+          Is the propagator wrong? Is STK wrong? Or are you comparing different frames?
+        </div>
+      </section>
+
+      <!-- 3. Core concept -->
+      <section class="problems-card" id="concept">
+        <div class="problems-section-title">2 · Core Concept</div>
+        <h2>The Same Vector Can Mean Different Things</h2>
+        <p>
+          A state vector <strong>[r, v]</strong> is not complete information by itself. You must also know
+          the frame, epoch, time scale, Earth model, and units.
+        </p>
+
+        <div class="grid-3">
+          <div class="concept-card">
+            <strong>Frame</strong>
+            <p>TEME, ECI, ECEF, GCRF, ITRF. The numbers only become meaningful after the frame is known.</p>
+          </div>
+          <div class="concept-card">
+            <strong>Epoch</strong>
+            <p>The exact time the state is valid. Even a small timing offset can create an along-track error.</p>
+          </div>
+          <div class="concept-card">
+            <strong>Time Scale</strong>
+            <p>UTC, UT1, TT, TAI. Orbit tools may use different time standards internally.</p>
+          </div>
+          <div class="concept-card">
+            <strong>Earth Model</strong>
+            <p>Precession, nutation, polar motion, Earth rotation, and Earth orientation parameters affect transformations.</p>
+          </div>
+          <div class="concept-card">
+            <strong>Units</strong>
+            <p>km versus m, km/s versus m/s, degrees versus radians. Unit mistakes can destroy a simulation instantly.</p>
+          </div>
+          <div class="concept-card">
+            <strong>Software Convention</strong>
+            <p>STK, MATLAB, GMAT, SPICE, and custom scripts may name or output frames differently.</p>
+          </div>
+        </div>
+
+        <div class="callout danger">
+          <strong>Key line:</strong>
+          A 7000 km vector in TEME is not automatically the same physical direction as a 7000 km vector in ECEF.
+        </div>
+      </section>
+
+      <!-- 4. Frame comparison table -->
+      <section class="problems-card" id="frames">
+        <div class="problems-section-title">3 · Frame Comparison Table</div>
+        <h2>TEME, ECI, ECEF, and Local Frames</h2>
+        <p>
+          The table below is the minimum frame literacy needed before comparing MATLAB, STK, TLE, or ground-track outputs.
+        </p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Frame</th>
+                <th>Rotates with Earth?</th>
+                <th>Common use</th>
+                <th>Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>TEME</strong></td>
+                <td>No, but tied to true-equator / mean-equinox convention</td>
+                <td>SGP4 / TLE output</td>
+                <td>Often treated incorrectly as generic ECI</td>
+              </tr>
+              <tr>
+                <td><strong>ECI / GCRF</strong></td>
+                <td>No</td>
+                <td>Inertial dynamics and orbit propagation</td>
+                <td>Must know the exact inertial definition</td>
+              </tr>
+              <tr>
+                <td><strong>ECEF / ITRF</strong></td>
+                <td>Yes</td>
+                <td>Latitude, longitude, ground stations, Earth-fixed geometry</td>
+                <td>Cannot propagate two-body motion directly without rotating-frame terms</td>
+              </tr>
+              <tr>
+                <td><strong>Local ENU / NED</strong></td>
+                <td>Yes, local surface frame</td>
+                <td>Antenna pointing, elevation, azimuth, local navigation</td>
+                <td>Valid only for the selected ground site</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 5. Interactive section 1 -->
+      <section class="tool-card" id="viewer">
+        <div class="problems-section-title">4 · Interactive Frame Selector</div>
+        <h2>Frame Viewer: Inertial Orbit vs Rotating Earth</h2>
+        <p>
+          Use the controls to see how an inertial-looking satellite position maps to an Earth-fixed ground track.
+          The simplified model is educational: it isolates the Earth-rotation effect instead of implementing a full TEME-to-ITRF pipeline.
+        </p>
+
+        <div class="control-panel">
+          <aside class="controls">
+            <div class="control-group">
+              <div class="control-title">State source</div>
+              <div class="radio-row">
+                <label><input type="radio" name="stateSource" value="tle" checked> TLE-style LEO state</label>
+                <label><input type="radio" name="stateSource" value="manual"> Manual circular orbit</label>
+              </div>
+            </div>
+
+            <div class="control-group">
+              <label for="displayFrame">Display frame</label>
+              <select id="displayFrame">
+                <option value="inertial">TEME-like inertial</option>
+                <option value="ecef">ECEF rotating Earth</option>
+                <option value="compare" selected>Compare both</option>
+              </select>
+            </div>
+
+            <div class="control-group">
+              <label for="timeSlider">Time after epoch</label>
+              <input id="timeSlider" type="range" min="0" max="24" step="0.25" value="1" />
+              <span class="range-readout" id="timeReadout">1.00 h</span>
+            </div>
+
+            <div class="control-group">
+              <label for="viewerAltitude">Manual orbit altitude</label>
+              <input id="viewerAltitude" type="range" min="300" max="1400" step="25" value="500" />
+              <span class="range-readout" id="viewerAltitudeReadout">500 km</span>
+            </div>
+
+            <div class="control-group">
+              <label for="viewerInclination">Manual orbit inclination</label>
+              <input id="viewerInclination" type="range" min="0" max="98" step="1" value="51" />
+              <span class="range-readout" id="viewerInclinationReadout">51°</span>
+            </div>
+
+            <div class="control-group">
+              <label class="toggle-chip"><input id="earthRotationToggle" type="checkbox" checked> Earth rotation ON</label>
+            </div>
+          </aside>
+
+          <div class="plot-grid">
+            <div class="plot-box" id="orbitPlot"></div>
+            <div class="grid-2">
+              <div class="plot-box small" id="groundTrackPlot"></div>
+              <div class="plot-box small" id="longitudePlot"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="result-grid">
+          <div class="metric-card">
+            <span class="metric-label">Earth rotation angle</span>
+            <span class="metric-value" id="rotationMetric">15.0°</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Apparent longitude shift</span>
+            <span class="metric-value" id="longitudeMetric">15.0°</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Frame risk</span>
+            <span class="metric-value" id="frameRiskMetric">High</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Debug clue</span>
+            <span class="metric-value" id="debugClueMetric">Ground track</span>
+          </div>
+        </div>
+
+        <div class="callout success">
+          <strong>Main lesson:</strong>
+          After only one hour, Earth rotates by about 15 degrees. If an inertial vector is plotted as if it were Earth-fixed,
+          the ground location will be wrong even when the orbit itself looks reasonable.
+        </div>
+      </section>
+
+      <!-- 6. Interactive section 2 -->
+      <section class="tool-card" id="mismatch">
+        <div class="problems-section-title">5 · MATLAB vs STK Mismatch Simulator</div>
+        <h2>Why MATLAB and STK Disagree</h2>
+        <p>
+          A mismatch does not automatically mean one tool is wrong. Toggle the assumptions and inspect the diagnostic card.
+        </p>
+
+        <div class="control-panel">
+          <aside class="controls">
+            <div class="checkbox-row">
+              <label><input type="checkbox" class="matchCheck" id="sameEpoch" checked> Same TLE epoch</label>
+              <label><input type="checkbox" class="matchCheck" id="sameGravity" checked> Same gravity model</label>
+              <label><input type="checkbox" class="matchCheck" id="samePropagator" checked> Same propagator</label>
+              <label><input type="checkbox" class="matchCheck" id="sameFrame"> Same output frame</label>
+              <label><input type="checkbox" class="matchCheck" id="sameTime" checked> Same time system</label>
+              <label><input type="checkbox" class="matchCheck" id="sameUnits" checked> Same units</label>
+            </div>
+          </aside>
+
+          <div class="diagnostic-card" id="mismatchDiagnostic">
+            <strong>Likely error source: output frame mismatch</strong>
+            <p>
+              TEME may be interpreted as ECEF or generic ECI. Expected symptom: correct orbit shape but wrong longitude or ground track.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. Interactive section 3 -->
+      <section class="tool-card" id="error-growth">
+        <div class="problems-section-title">6 · Error Growth from the Wrong Frame</div>
+        <h2>Error Symptom Explorer</h2>
+        <p>
+          Select a common mistake and observe the approximate error signature. This does not replace high-fidelity validation,
+          but it teaches what type of symptom each mistake usually creates.
+        </p>
+
+        <div class="control-panel">
+          <aside class="controls">
+            <div class="control-group">
+              <label for="errorTime">Propagation time</label>
+              <input id="errorTime" type="range" min="0" max="12" step="0.25" value="3" />
+              <span class="range-readout" id="errorTimeReadout">3.00 h</span>
+            </div>
+
+            <div class="control-group">
+              <label for="errorAltitude">Altitude</label>
+              <input id="errorAltitude" type="range" min="300" max="1200" step="25" value="500" />
+              <span class="range-readout" id="errorAltitudeReadout">500 km</span>
+            </div>
+
+            <div class="control-group">
+              <label for="errorInclination">Inclination</label>
+              <input id="errorInclination" type="range" min="0" max="98" step="1" value="51" />
+              <span class="range-readout" id="errorInclinationReadout">51°</span>
+            </div>
+
+            <div class="control-group">
+              <label for="mistakeType">Frame mistake selector</label>
+              <select id="mistakeType">
+                <option value="inertialAsEcef" selected>Inertial treated as ECEF</option>
+                <option value="ecefAsInertial">ECEF treated as inertial</option>
+                <option value="epochOffset">Epoch offset</option>
+                <option value="degreeRadian">Degree/radian mistake</option>
+                <option value="kmMeter">km/m mistake</option>
+              </select>
+            </div>
+          </aside>
+
+          <div>
+            <div class="result-grid">
+              <div class="metric-card">
+                <span class="metric-label">Apparent position error</span>
+                <span class="metric-value" id="positionErrorMetric">?</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Longitude shift</span>
+                <span class="metric-value" id="shiftErrorMetric">?</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Ground-track error type</span>
+                <span class="metric-value" id="trackTypeMetric">?</span>
+              </div>
+              <div class="metric-card">
+                <span class="metric-label">Likely debugging cause</span>
+                <span class="metric-value" id="causeMetric">?</span>
+              </div>
+            </div>
+
+            <div class="plot-box" id="errorPlot" style="margin-top:16px;"></div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="concept-card"><strong>Large longitude shift but realistic altitude</strong><p>Usually a frame or Earth-rotation problem.</p></div>
+          <div class="concept-card"><strong>Large along-track offset</strong><p>Usually an epoch, mean anomaly, or propagation-start-time problem.</p></div>
+          <div class="concept-card"><strong>Orbit explodes</strong><p>Usually a unit or dynamics problem.</p></div>
+          <div class="concept-card"><strong>Wrong inclination appearance</strong><p>Usually an axis convention or frame definition problem.</p></div>
+        </div>
+      </section>
+
+      <!-- 8. Debugging workflow -->
+      <section class="problems-card" id="checklist">
+        <div class="problems-section-title">7 · Frame Debugging Checklist</div>
+        <h2>How to Debug the Problem Systematically</h2>
+
+        <div class="grid-4">
+          <div class="workflow-card"><strong>1. Identify the source frame</strong><p>Is the state from TLE/SGP4, STK, MATLAB, GMAT, SPICE, or another source?</p></div>
+          <div class="workflow-card"><strong>2. Identify the output frame</strong><p>TEME, GCRF, J2000, ITRF, ECEF, LVLH, or local topocentric?</p></div>
+          <div class="workflow-card"><strong>3. Match the epoch exactly</strong><p>Do not compare states at slightly different times.</p></div>
+          <div class="workflow-card"><strong>4. Match units</strong><p>Check km/m, km/s/m/s, degrees/radians, and time units.</p></div>
+          <div class="workflow-card"><strong>5. Convert before comparing</strong><p>Never compare TEME directly with ECEF.</p></div>
+          <div class="workflow-card"><strong>6. Compare simple quantities first</strong><p>Altitude, semi-major axis, period, and inclination.</p></div>
+          <div class="workflow-card"><strong>7. Then compare vector quantities</strong><p>Position, velocity, RAAN, argument of perigee, and anomaly.</p></div>
+          <div class="workflow-card"><strong>8. Finally compare ground track</strong><p>Ground track is highly frame-sensitive.</p></div>
+        </div>
+      </section>
+
+      <!-- 9. Symptom table -->
+      <section class="problems-card" id="symptoms">
+        <div class="problems-section-title">8 · Symptom → Cause Diagnostic Table</div>
+        <h2>What the Error Pattern Usually Means</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Symptom</th>
+                <th>Likely cause</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Orbit shape looks correct but longitude is shifted</td><td>Inertial / ECEF mismatch</td></tr>
+              <tr><td>Altitude is correct but ground track is wrong</td><td>Earth rotation not applied</td></tr>
+              <tr><td>Error grows mostly along-track</td><td>Epoch or mean anomaly mismatch</td></tr>
+              <tr><td>Orbit appears rotated</td><td>Frame convention mismatch</td></tr>
+              <tr><td>Orbit explodes immediately</td><td>Unit error</td></tr>
+              <tr><td>STK and MATLAB agree at epoch but diverge later</td><td>Propagator or model mismatch</td></tr>
+              <tr><td>Latitude seems reasonable but longitude is wrong</td><td>ECI / ECEF conversion issue</td></tr>
+              <tr><td>Ground station access times differ</td><td>Frame, Earth orientation, or time-system mismatch</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- 10. Code blocks -->
+      <section class="problems-card" id="code">
+        <div class="problems-section-title">9 · Code Pitfalls</div>
+        <h2>Python and MATLAB Pseudo-Code</h2>
+        <p>
+          The mistake is usually not in the plotting command. The mistake is treating a vector from one frame as if it already belonged to another frame.
+        </p>
+
+        <div class="code-tabs">
+          <button class="code-pill active" onclick="showCode('pythonCode', this)">Python-style</button>
+          <button class="code-pill" onclick="showCode('matlabCode', this)">MATLAB-style</button>
+        </div>
+
+        <div class="math-block code-panel active" id="pythonCode">
+<pre># Wrong idea:
+# Treating TEME position directly as ECEF
+lat, lon, alt = ecef_to_lla(r_teme)
+
+# Better idea:
+# Convert TEME -> inertial/reference frame -> ECEF/ITRF first
+r_ecef = teme_to_ecef(r_teme, epoch, earth_orientation)
+lat, lon, alt = ecef_to_lla(r_ecef)</pre>
+        </div>
+
+        <div class="math-block code-panel" id="matlabCode">
+<pre>% Wrong:
+lla = ecef2lla(r_teme');
+
+% Correct idea:
+% 1. propagate TLE with SGP4
+% 2. keep track of TEME frame
+% 3. convert TEME to ECEF/ITRF at the same epoch
+% 4. then compute latitude/longitude/altitude</pre>
+        </div>
+      </section>
+
+      <!-- 11. Engineering interpretation -->
+      <section class="problems-card" id="engineering">
+        <div class="problems-section-title">10 · Engineering Interpretation</div>
+        <h2>Why This Matters in Real GNC and Mission Analysis</h2>
+        <p>Frame mistakes can cause false conclusions about mission performance, sensor pointing, or software validation.</p>
+
+        <div class="grid-3">
+          <div class="impact-card"><strong>Ground station access</strong><p>A satellite may appear visible or invisible at the wrong time.</p></div>
+          <div class="impact-card"><strong>Sensor pointing</strong><p>A camera or antenna may point to the wrong Earth location.</p></div>
+          <div class="impact-card"><strong>Orbit determination</strong><p>Residuals may look like model error when they are actually frame error.</p></div>
+          <div class="impact-card"><strong>SSA and conjunction analysis</strong><p>Wrong frame handling can create misleading position differences.</p></div>
+          <div class="impact-card"><strong>MATLAB/STK validation</strong><p>A mismatch does not always mean the propagator is wrong.</p></div>
+          <div class="impact-card"><strong>Interview-level reasoning</strong><p>The strongest answer is to ask what frame, epoch, time system, and model are being compared.</p></div>
+        </div>
+      </section>
+
+      <!-- 12. Final takeaway -->
+      <section class="next-domain-card" id="takeaway">
+        <div class="problems-section-title">11 · Final Takeaway</div>
+        <p class="takeaway-line">A state vector is not just numbers.</p>
+        <p>It is:</p>
+        <div class="formula-strip">
+          <span>position</span>
+          <span>velocity</span>
+          <span>frame</span>
+          <span>epoch</span>
+          <span>time system</span>
+          <span>Earth model</span>
+        </div>
+        <div class="callout success">
+          If any one of these is missing, the orbit may look mathematically correct but physically wrong.
+        </div>
+        <div class="callout warning">
+          <strong>Best interview line:</strong>
+          When MATLAB and STK disagree, the first question is not “which software is wrong?”
+          The first question is “are we comparing the same physical quantity in the same frame at the same epoch?”
+        </div>
+      </section>
+
+      <!-- 12th explicit page structure recap -->
+      <section class="problems-card">
+        <div class="problems-section-title">12 · Page Structure Recap</div>
+        <h2>Complete Problem Flow</h2>
+        <p>This page follows the full problem-bank storyline:</p>
+        <div class="formula-strip">
+          <span>Hero</span>
+          <span>Problem Scenario</span>
+          <span>Core Concept</span>
+          <span>Frame Table</span>
+          <span>Interactive Viewer</span>
+          <span>MATLAB vs STK</span>
+          <span>Error Explorer</span>
+          <span>Checklist</span>
+          <span>Symptom Table</span>
+          <span>Code</span>
+          <span>Engineering Meaning</span>
+          <span>Takeaway</span>
+        </div>
+      </section>
+
+    </article>
+
+    <footer class="footer">
+      <a class="back-pill" href="problems.html">← Back to Problem Bank</a>
+      <p>Interactive GNC & Space Mechanics · Frame-aware orbit propagation problem</p>
+    </footer>
+  </main>
+
+  <script>
+    const Re = 6378.137;
+    const mu = 398600.4418;
+    const earthRateDegPerHour = 360 / 23.9344696;
+
+    function deg2rad(d) { return d * Math.PI / 180; }
+    function rad2deg(r) { return r * 180 / Math.PI; }
+    function wrapLon(lon) {
+      return ((lon + 180) % 360 + 360) % 360 - 180;
+    }
+
+    function orbitPosition(tHours, altitudeKm, incDeg) {
+      const r = Re + altitudeKm;
+      const n = Math.sqrt(mu / Math.pow(r, 3));
+      const theta = n * tHours * 3600;
+      const inc = deg2rad(incDeg);
+      return {
+        x: r * Math.cos(theta),
+        y: r * Math.sin(theta) * Math.cos(inc),
+        z: r * Math.sin(theta) * Math.sin(inc)
+      };
+    }
+
+    function rotateZ(vec, angleDeg) {
+      const a = deg2rad(angleDeg);
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      return {
+        x: c * vec.x - s * vec.y,
+        y: s * vec.x + c * vec.y,
+        z: vec.z
+      };
+    }
+
+    function latLonFromVec(vec) {
+      const r = Math.sqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+      return {
+        lat: rad2deg(Math.asin(vec.z / r)),
+        lon: wrapLon(rad2deg(Math.atan2(vec.y, vec.x)))
+      };
+    }
+
+    function makeEarthWireframe() {
+      const lon = [];
+      const lat = [];
+      const x = [];
+      const y = [];
+      const z = [];
+      for (let i = -180; i <= 180; i += 10) lon.push(i);
+      for (let j = -90; j <= 90; j += 10) lat.push(j);
+      for (let a of lat) {
+        const rowX = [], rowY = [], rowZ = [];
+        for (let b of lon) {
+          rowX.push(Re * Math.cos(deg2rad(a)) * Math.cos(deg2rad(b)));
+          rowY.push(Re * Math.cos(deg2rad(a)) * Math.sin(deg2rad(b)));
+          rowZ.push(Re * Math.sin(deg2rad(a)));
+        }
+        x.push(rowX); y.push(rowY); z.push(rowZ);
+      }
+      return { x, y, z };
+    }
+
+    function getViewerInputs() {
+      const source = document.querySelector('input[name="stateSource"]:checked').value;
+      const timeH = Number(document.getElementById('timeSlider').value);
+      let alt = Number(document.getElementById('viewerAltitude').value);
+      let inc = Number(document.getElementById('viewerInclination').value);
+      if (source === 'tle') {
+        alt = 420;
+        inc = 51.6;
+      }
+      const display = document.getElementById('displayFrame').value;
+      const rotationOn = document.getElementById('earthRotationToggle').checked;
+      return { source, timeH, alt, inc, display, rotationOn };
+    }
+
+    function updateViewer() {
+      const { timeH, alt, inc, display, rotationOn } = getViewerInputs();
+      document.getElementById('timeReadout').textContent = timeH.toFixed(2) + ' h';
+      document.getElementById('viewerAltitudeReadout').textContent = document.getElementById('viewerAltitude').value + ' km';
+      document.getElementById('viewerInclinationReadout').textContent = document.getElementById('viewerInclination').value + '°';
+
+      const rotAngle = rotationOn ? earthRateDegPerHour * timeH : 0;
+      const inertial = orbitPosition(timeH, alt, inc);
+      const ecef = rotateZ(inertial, -rotAngle);
+      const inertialLL = latLonFromVec(inertial);
+      const ecefLL = latLonFromVec(ecef);
+      const shift = Math.abs(wrapLon(inertialLL.lon - ecefLL.lon));
+
+      document.getElementById('rotationMetric').textContent = rotAngle.toFixed(1) + '°';
+      document.getElementById('longitudeMetric').textContent = shift.toFixed(1) + '°';
+      document.getElementById('frameRiskMetric').textContent = shift > 5 ? 'High' : 'Low';
+      document.getElementById('debugClueMetric').textContent = shift > 5 ? 'Ground track' : 'Small shift';
+
+      const earth = makeEarthWireframe();
+      const earthTrace = {
+        type: 'surface', x: earth.x, y: earth.y, z: earth.z,
+        opacity: 0.18, showscale: false, hoverinfo: 'skip'
+      };
+
+      const traces = [earthTrace];
+      if (display === 'inertial' || display === 'compare') {
+        traces.push({ type: 'scatter3d', mode: 'markers+text', x: [inertial.x], y: [inertial.y], z: [inertial.z], text: ['Inertial/TEME-like'], textposition: 'top center', marker: { size: 6 }, name: 'Inertial/TEME-like' });
+      }
+      if (display === 'ecef' || display === 'compare') {
+        traces.push({ type: 'scatter3d', mode: 'markers+text', x: [ecef.x], y: [ecef.y], z: [ecef.z], text: ['ECEF mapped'], textposition: 'bottom center', marker: { size: 6 }, name: 'ECEF mapped' });
+      }
+
+      Plotly.react('orbitPlot', traces, {
+        title: '3D Earth + Satellite Position',
+        margin: { l: 0, r: 0, t: 42, b: 0 },
+        scene: { aspectmode: 'data', xaxis: { title: 'x km' }, yaxis: { title: 'y km' }, zaxis: { title: 'z km' } },
+        paper_bgcolor: 'white', plot_bgcolor: 'white'
+      }, { responsive: true, displayModeBar: false });
+
+      const times = [];
+      const lonInertial = [];
+      const lonEcef = [];
+      const latVals = [];
+      const shifts = [];
+      for (let t = 0; t <= 24; t += 0.5) {
+        const p = orbitPosition(t, alt, inc);
+        const e = rotateZ(p, rotationOn ? -earthRateDegPerHour * t : 0);
+        const pll = latLonFromVec(p);
+        const ell = latLonFromVec(e);
+        times.push(t);
+        lonInertial.push(pll.lon);
+        lonEcef.push(ell.lon);
+        latVals.push(ell.lat);
+        shifts.push(Math.abs(wrapLon(pll.lon - ell.lon)));
+      }
+
+      Plotly.react('groundTrackPlot', [
+        { type: 'scatter', mode: 'lines', x: lonEcef, y: latVals, name: 'ECEF ground track' },
+        { type: 'scatter', mode: 'markers', x: [ecefLL.lon], y: [ecefLL.lat], name: 'Current point' }
+      ], {
+        title: 'Ground Track Longitude / Latitude',
+        margin: { l: 48, r: 20, t: 42, b: 42 },
+        xaxis: { title: 'Longitude deg', range: [-180, 180] },
+        yaxis: { title: 'Latitude deg', range: [-90, 90] }
+      }, { responsive: true, displayModeBar: false });
+
+      Plotly.react('longitudePlot', [
+        { type: 'scatter', mode: 'lines', x: times, y: shifts, name: 'Longitude shift' }
+      ], {
+        title: 'Longitude Shift vs Time',
+        margin: { l: 48, r: 20, t: 42, b: 42 },
+        xaxis: { title: 'Time after epoch h' },
+        yaxis: { title: 'Shift deg' }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function updateMismatchDiagnostic() {
+      const sameEpoch = document.getElementById('sameEpoch').checked;
+      const sameGravity = document.getElementById('sameGravity').checked;
+      const samePropagator = document.getElementById('samePropagator').checked;
+      const sameFrame = document.getElementById('sameFrame').checked;
+      const sameTime = document.getElementById('sameTime').checked;
+      const sameUnits = document.getElementById('sameUnits').checked;
+      const box = document.getElementById('mismatchDiagnostic');
+
+      let title = 'Tools are mostly consistent';
+      let body = 'If all major assumptions match, remaining error may come from higher-order force models, numerical settings, Earth orientation parameters, or output sampling.';
+      let border = '#137333';
+
+      if (!sameUnits) {
+        title = 'Likely error source: unit mismatch';
+        body = 'km vs m or km/s vs m/s. Expected symptom: orbit explodes, altitude becomes unrealistic, or velocity scale is impossible.';
+        border = '#b3261e';
+      } else if (!sameFrame) {
+        title = 'Likely error source: output frame mismatch';
+        body = 'TEME may be interpreted as ECEF or generic ECI. Expected symptom: correct orbit shape but wrong longitude or ground track.';
+        border = '#b3261e';
+      } else if (!sameEpoch) {
+        title = 'Likely error source: epoch mismatch';
+        body = 'The two tools may start from slightly different times. Expected symptom: along-track phase error that grows with propagation time.';
+        border = '#d18a00';
+      } else if (!sameTime) {
+        title = 'Likely error source: time-system mismatch';
+        body = 'UTC, UT1, TT, or internal time conversions may differ. Expected symptom: small but confusing frame or longitude offsets.';
+        border = '#d18a00';
+      } else if (!samePropagator) {
+        title = 'Likely error source: propagator mismatch';
+        body = 'SGP4, high-precision numerical propagation, and two-body propagation will not match over time.';
+        border = '#d18a00';
+      } else if (!sameGravity) {
+        title = 'Likely error source: gravity model mismatch';
+        body = 'Two-body, J2, and higher-order gravity models create different secular drift, especially in RAAN and argument of perigee.';
+        border = '#d18a00';
+      }
+
+      box.style.borderLeft = '7px solid ' + border;
+      box.innerHTML = '<strong>' + title + '</strong><p>' + body + '</p>';
+    }
+
+    function updateErrorExplorer() {
+      const t = Number(document.getElementById('errorTime').value);
+      const alt = Number(document.getElementById('errorAltitude').value);
+      const inc = Number(document.getElementById('errorInclination').value);
+      const type = document.getElementById('mistakeType').value;
+      document.getElementById('errorTimeReadout').textContent = t.toFixed(2) + ' h';
+      document.getElementById('errorAltitudeReadout').textContent = alt + ' km';
+      document.getElementById('errorInclinationReadout').textContent = inc + '°';
+
+      const r = Re + alt;
+      let posErr = 0;
+      let shift = 0;
+      let track = '';
+      let cause = '';
+
+      if (type === 'inertialAsEcef' || type === 'ecefAsInertial') {
+        shift = earthRateDegPerHour * t;
+        posErr = 2 * r * Math.sin(deg2rad(Math.min(180, shift)) / 2);
+        track = 'Longitude shift';
+        cause = 'Frame';
+      } else if (type === 'epochOffset') {
+        const velocity = Math.sqrt(mu / r);
+        const offsetSeconds = Math.min(600, 40 * t + 20);
+        posErr = velocity * offsetSeconds;
+        shift = Math.min(180, rad2deg(posErr / r));
+        track = 'Along-track';
+        cause = 'Epoch';
+      } else if (type === 'degreeRadian') {
+        posErr = r * Math.abs(Math.sin(deg2rad(inc) - inc));
+        shift = Math.min(180, Math.abs(inc - rad2deg(inc)) % 180);
+        track = 'Rotated orbit';
+        cause = 'Angle units';
+      } else if (type === 'kmMeter') {
+        posErr = r * 999;
+        shift = 180;
+        track = 'Exploding orbit';
+        cause = 'Units';
+      }
+
+      document.getElementById('positionErrorMetric').textContent = posErr > 50000 ? '> 50,000 km' : posErr.toFixed(0) + ' km';
+      document.getElementById('shiftErrorMetric').textContent = shift.toFixed(1) + '°';
+      document.getElementById('trackTypeMetric').textContent = track;
+      document.getElementById('causeMetric').textContent = cause;
+
+      const xs = [];
+      const ys = [];
+      for (let i = 0; i <= 12; i += 0.25) {
+        let y = 0;
+        if (type === 'inertialAsEcef' || type === 'ecefAsInertial') {
+          const s = earthRateDegPerHour * i;
+          y = 2 * r * Math.sin(deg2rad(Math.min(180, s)) / 2);
+        } else if (type === 'epochOffset') {
+          const velocity = Math.sqrt(mu / r);
+          y = velocity * Math.min(600, 40 * i + 20);
+        } else if (type === 'degreeRadian') {
+          y = r * Math.abs(Math.sin(deg2rad(inc) - inc));
+        } else if (type === 'kmMeter') {
+          y = r * 999;
+        }
+        xs.push(i);
+        ys.push(y);
+      }
+
+      Plotly.react('errorPlot', [
+        { type: 'scatter', mode: 'lines', x: xs, y: ys, name: 'Approximate apparent error' },
+        { type: 'scatter', mode: 'markers', x: [t], y: [posErr], name: 'Current setting' }
+      ], {
+        title: 'Approximate Error Signature',
+        margin: { l: 60, r: 20, t: 42, b: 48 },
+        xaxis: { title: 'Propagation time h' },
+        yaxis: { title: 'Apparent position error km' }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function showCode(id, button) {
+      document.querySelectorAll('.code-panel').forEach(panel => panel.classList.remove('active'));
+      document.querySelectorAll('.code-pill').forEach(pill => pill.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      button.classList.add('active');
+    }
+
+    document.querySelectorAll('input[name="stateSource"], #displayFrame, #timeSlider, #viewerAltitude, #viewerInclination, #earthRotationToggle')
+      .forEach(el => el.addEventListener('input', updateViewer));
+
+    document.querySelectorAll('.matchCheck').forEach(el => el.addEventListener('input', updateMismatchDiagnostic));
+
+    document.querySelectorAll('#errorTime, #errorAltitude, #errorInclination, #mistakeType')
+      .forEach(el => el.addEventListener('input', updateErrorExplorer));
+
+    window.addEventListener('resize', () => {
+      updateViewer();
+      updateErrorExplorer();
+    });
+
+    updateViewer();
+    updateMismatchDiagnostic();
+    updateErrorExplorer();
+  </script>
+</body>
+</html>
