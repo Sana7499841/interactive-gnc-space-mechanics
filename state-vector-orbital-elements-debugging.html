@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>State Vector ↔ Orbital Elements Debugging | Interactive GNC</title>
+
+  <link rel="stylesheet" href="styles-home.css" />
+  <link rel="icon" type="image/png" href="favicon1.png" />
+
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['\\(', '\\)'], ['$', '$']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-dark: #1d4ed8;
+      --ink: #111827;
+      --muted: #526173;
+      --soft: #f8fafc;
+      --soft-blue: #eff6ff;
+      --border: #dbeafe;
+      --card: #ffffff;
+      --code-bg: #0f172a;
+      --good: #16a34a;
+      --warn: #d97706;
+      --bad: #dc2626;
+      --purple: #7c3aed;
+      --shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    h1, h2, h3, h4 {
+      font-family: "Times New Roman", Georgia, serif;
+      line-height: 1.12;
+      color: #111827;
+    }
+
+    h2 { font-size: clamp(2rem, 3.2vw, 2.65rem); margin: 0 0 1.1rem; }
+    h3 { font-size: 1.45rem; margin: 1.2rem 0 0.7rem; }
+    p { margin: 0 0 1rem; }
+
+    .problem-hero {
+      background: linear-gradient(135deg, #1d4ed8, #2563eb);
+      color: #ffffff;
+      padding: 4rem 1.5rem 3.2rem;
+    }
+
+    .problem-hero-inner {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .problem-hero h1 {
+      color: #ffffff;
+      font-size: clamp(2.55rem, 5vw, 3.7rem);
+      line-height: 1.1;
+      margin: 0 0 1.2rem;
+      max-width: 1050px;
+    }
+
+    .problem-hero p {
+      max-width: 900px;
+      color: #ffffff;
+      font-size: 1.10rem;
+      line-height: 1.7;
+      margin: 0;
+    }
+
+    .page-main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3.5rem;
+    }
+
+    .content-card,
+    .interactive-card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 2.5rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(191, 219, 254, 0.65);
+      font-size: 1.08rem;
+    }
+
+    .section-title {
+      display: inline-block;
+      background: #dbeafe;
+      padding: 0.6rem 1.2rem;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--blue-dark);
+      margin-bottom: 1.2rem;
+      letter-spacing: 0.01em;
+    }
+
+    .subtopic-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      margin: 0 0 2rem;
+      justify-content: center;
+    }
+
+    .subtopic-nav a,
+    .back-link-pill {
+      text-decoration: none;
+      padding: 0.65rem 1.15rem;
+      border-radius: 999px;
+      background: var(--soft-blue);
+      border: 1px solid #bfdbfe;
+      color: var(--blue-dark);
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .subtopic-nav a:hover,
+    .back-link-pill:hover {
+      background: var(--blue);
+      color: #ffffff;
+      text-decoration: none;
+    }
+
+    .equation-box {
+      background: var(--code-bg);
+      color: #f8fafc;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      overflow-x: auto;
+      font-size: 1rem;
+      text-align: center;
+    }
+
+    .math-light {
+      background: #f8fbff;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      border-radius: 16px;
+      padding: 1rem 1.2rem;
+      margin: 1rem 0;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    .callout {
+      margin: 1.2rem 0;
+      padding: 1rem 1.2rem;
+      border-radius: 14px;
+      background: #eff6ff;
+      border-left: 5px solid var(--blue);
+    }
+
+    .callout.good { background: #f0fdf4; border-left-color: var(--good); }
+    .callout.warn { background: #fff7ed; border-left-color: var(--warn); }
+    .callout.bad { background: #fef2f2; border-left-color: var(--bad); }
+    .callout.purple { background: #f5f3ff; border-left-color: var(--purple); }
+
+    .roadmap-grid,
+    .two-col,
+    .metric-grid,
+    .element-grid {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .roadmap-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .two-col { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 1rem; }
+    .element-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    @media (max-width: 820px) {
+      .roadmap-grid,
+      .two-col,
+      .metric-grid,
+      .element-grid { grid-template-columns: 1fr; }
+      .content-card,
+      .interactive-card { padding: 1.4rem; }
+    }
+
+    .mini-card,
+    .metric,
+    .control-box {
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 1rem;
+    }
+
+    .mini-card strong,
+    .metric strong { color: #123e83; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.85rem;
+      margin: 1.1rem 0;
+    }
+
+    @media (max-width: 900px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 620px) { .controls { grid-template-columns: 1fr; } }
+
+    label {
+      display: block;
+      color: #1e3a8a;
+      font-weight: 800;
+      font-size: 0.94rem;
+      margin-bottom: 0.35rem;
+    }
+
+    input[type="number"], input[type="range"], select { width: 100%; }
+
+    input[type="number"], select {
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 0.65rem 0.75rem;
+      font-size: 1rem;
+      background: #ffffff;
+      color: var(--ink);
+    }
+
+    input[type="range"] { accent-color: var(--blue); }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+
+    button {
+      border: none;
+      padding: 0.75rem 1.2rem;
+      border-radius: 999px;
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    button:hover { background: var(--blue-dark); }
+    button.secondary { background: #0f172a; }
+    button.ghost {
+      background: var(--soft-blue);
+      color: var(--blue-dark);
+      border: 1px solid #bfdbfe;
+    }
+    button.ghost:hover { background: var(--blue); color: #fff; }
+
+    .plot-box {
+      width: 100%;
+      min-height: 430px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
+      background: #ffffff;
+      overflow: hidden;
+      margin-top: 1rem;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 0.2rem;
+    }
+
+    pre {
+      background: var(--code-bg);
+      color: #e5e7eb;
+      border-radius: 14px;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 0.92rem;
+    }
+
+    code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+
+    .code-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.7rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .tab-btn { background: #0f172a; }
+    .tab-btn.active { background: var(--blue); }
+    .hidden { display: none; }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.35rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      background: #e0f2fe;
+      color: #075985;
+      margin: 0.15rem 0.2rem 0.15rem 0;
+    }
+
+    .back-link-row {
+      text-align: center;
+      margin-top: 2.5rem;
+    }
+
+    .back-link {
+      display: inline-block;
+      text-decoration: none;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      padding: 0.75rem 1.25rem;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .back-link:hover {
+      background: #2563eb;
+      color: white;
+    }
+
+    .site-footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: #64748b;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="problem-hero">
+    <div class="problem-hero-inner">
+      <h1>State Vector ↔ Orbital Elements Debugging</h1>
+      <p>
+        When the orbit is wrong but the equations are right. This interactive debugging lab shows how angle units,
+        orbital-element conventions, and singular cases can produce a completely different spacecraft state.
+      </p>
+    </div>
+  </header>
+
+  <main class="page-main">
+    <section id="why" class="content-card">
+      <span class="section-title">Why this matters</span>
+      <h3>Even perfect control fails if your state is wrong</h3>
+      <p>
+        A spacecraft orbit can be represented by classical orbital elements or by a Cartesian state vector.
+        Both are correct, but the conversion is fragile. A degree/radian mistake, a swapped angle, or a singular
+        element near circular/equatorial conditions can make the simulation look physically wrong.
+      </p>
+      <div class="equation-box">
+        correct equations + wrong interpretation → wrong orbit<br />
+        wrong orbit + perfect controller → wrong correction
+      </div>
+      <div class="callout purple">
+        <strong>Core message:</strong> A small mistake in angle convention, units, or orbital-element interpretation can produce a completely different orbit.
+      </div>
+    </section>
+
+    <nav class="subtopic-nav" aria-label="Page sections">
+      <a href="#roadmap">Roadmap</a>
+      <a href="#elements">Elements</a>
+      <a href="#lab">Debug lab</a>
+      <a href="#conversion">A: Conversion</a>
+      <a href="#degrad">B: Deg/rad</a>
+      <a href="#omega-nu">C: ω vs ν</a>
+      <a href="#raan-omega">D: Ω vs ω</a>
+      <a href="#singularities">E/F: Singularities</a>
+      <a href="#diagnostics">Diagnostics</a>
+      <a href="#snippets">Snippets</a>
+      <a href="#takeaway">Takeaway</a>
+    </nav>
+
+    <section id="roadmap" class="content-card">
+      <span class="section-title">Problem roadmap</span>
+      <h3>Debug the representation before blaming the solver</h3>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>A · Correct COE → state conversion</strong><br />Convert orbital elements into perifocal position/velocity, then rotate into ECI.</div>
+        <div class="mini-card"><strong>B · Degrees vs radians</strong><br />Show how one unit mistake can create a new orbital plane and large state error.</div>
+        <div class="mini-card"><strong>C · Argument of perigee vs true anomaly</strong><br />Separate ellipse orientation from spacecraft position along the ellipse.</div>
+        <div class="mini-card"><strong>D · RAAN vs argument of perigee</strong><br />Distinguish rotating the orbital plane from rotating the ellipse inside the plane.</div>
+        <div class="mini-card"><strong>E · Circular orbit singularity</strong><br />When e ≈ 0, argument of perigee loses physical meaning.</div>
+        <div class="mini-card"><strong>F · Equatorial ambiguity</strong><br />When i ≈ 0, RAAN becomes undefined and can jump numerically.</div>
+      </div>
+    </section>
+
+    <section id="elements" class="content-card">
+      <span class="section-title">Orbital elements refresher</span>
+      <h3>Six numbers, but not six independent visual ideas</h3>
+      <div class="element-grid">
+        <div class="mini-card"><strong>a</strong><br />Semi-major axis: orbit size.</div>
+        <div class="mini-card"><strong>e</strong><br />Eccentricity: orbit shape.</div>
+        <div class="mini-card"><strong>i</strong><br />Inclination: tilt of orbital plane.</div>
+        <div class="mini-card"><strong>Ω</strong><br />RAAN: rotation of orbital plane around Earth.</div>
+        <div class="mini-card"><strong>ω</strong><br />Argument of perigee: ellipse orientation inside the plane.</div>
+        <div class="mini-card"><strong>ν</strong><br />True anomaly: spacecraft position measured from perigee.</div>
+      </div>
+      <div class="callout warn">
+        <strong>Important warning:</strong> Ω, ω, and ν are all angles, but they rotate different things. Mixing them changes the orbit geometry.
+      </div>
+    </section>
+
+    <section id="lab" class="interactive-card">
+      <span class="section-title">Interactive debugging lab</span>
+      <h3>Build the correct orbit, then introduce a controlled bug</h3>
+      <p>
+        Adjust the orbital elements and choose a bug mode. The plots compare the correct state against the bugged state.
+        The diagnostic cards estimate whether the issue is a plane error, position error, unit error, or singularity.
+      </p>
+
+      <div class="controls">
+        <div class="control-box"><label for="aInput">Semi-major axis a [km]</label><input id="aInput" type="number" value="7000" min="6600" max="45000" step="100" /></div>
+        <div class="control-box"><label for="eInput">Eccentricity e</label><input id="eInput" type="number" value="0.15" min="0" max="0.75" step="0.01" /></div>
+        <div class="control-box"><label for="iInput">Inclination i [deg]</label><input id="iInput" type="number" value="45" min="0" max="180" step="1" /></div>
+        <div class="control-box"><label for="raanInput">RAAN Ω [deg]</label><input id="raanInput" type="number" value="30" min="0" max="360" step="1" /></div>
+        <div class="control-box"><label for="argpInput">Argument of perigee ω [deg]</label><input id="argpInput" type="number" value="60" min="0" max="360" step="1" /></div>
+        <div class="control-box"><label for="nuInput">True anomaly ν [deg]</label><input id="nuInput" type="number" value="40" min="0" max="360" step="1" /></div>
+        <div class="control-box"><label for="bugMode">Debug mode</label>
+          <select id="bugMode">
+            <option value="correct">Correct conversion</option>
+            <option value="degRad">Degrees passed as radians</option>
+            <option value="swapRaanArgp">RAAN and argument of perigee swapped</option>
+            <option value="swapArgpNu">True anomaly mistaken for argument of perigee</option>
+            <option value="nuZero">True anomaly accidentally set to zero</option>
+            <option value="meanAsTrue">Mean anomaly used as true anomaly</option>
+            <option value="incSign">Inclination sign error</option>
+            <option value="circular">Circular orbit singularity</option>
+            <option value="equatorial">Near-equatorial ambiguity</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="button-row">
+        <button onclick="runDebugLab()">Run debugging lab</button>
+        <button class="ghost" onclick="setPreset('nominal')">Nominal case</button>
+        <button class="ghost" onclick="setPreset('circular')">Near circular</button>
+        <button class="ghost" onclick="setPreset('equatorial')">Near equatorial</button>
+        <button class="ghost" onclick="setPreset('highTilt')">High-inclination case</button>
+      </div>
+
+      <div id="orbit3dPlot" class="plot-box"></div>
+      <div id="pqwPlot" class="plot-box"></div>
+      <div id="diagnosticBarPlot" class="plot-box"></div>
+
+      <div class="metric-grid">
+        <div class="metric"><span>Position error</span><strong id="positionError">—</strong></div>
+        <div class="metric"><span>Velocity error</span><strong id="velocityError">—</strong></div>
+        <div class="metric"><span>Plane error</span><strong id="planeError">—</strong></div>
+        <div class="metric"><span>Likely bug</span><strong id="bugType">—</strong></div>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric"><span>Energy error</span><strong id="energyError">—</strong></div>
+        <div class="metric"><span>Angular momentum error</span><strong id="hError">—</strong></div>
+        <div class="metric"><span>Expected inclination</span><strong id="expectedInc">—</strong></div>
+        <div class="metric"><span>Recovered inclination</span><strong id="recoveredInc">—</strong></div>
+      </div>
+
+      <div id="labInterpretation" class="callout good">
+        <strong>Interpretation:</strong> Run the lab to classify the state representation error.
+      </div>
+    </section>
+
+    <section id="conversion" class="content-card">
+      <span class="section-title">Section A — Correct COE → State Vector Conversion</span>
+      <h3>The orbit begins in the perifocal plane</h3>
+      <p>
+        Classical orbital elements are first converted into position and velocity in the perifocal frame. The orbit is then rotated into the inertial frame using Ω, i, and ω.
+      </p>
+      <div class="math-light">\[p = a(1-e^2)\]</div>
+      <div class="math-light">\[\mathbf r_{pqw} = \left[\frac{p\cos\nu}{1+e\cos\nu},\frac{p\sin\nu}{1+e\cos\nu},0\right]\]</div>
+      <div class="math-light">\[\mathbf v_{pqw}=\sqrt{\frac{\mu}{p}}[-\sin\nu, e+\cos\nu,0]\]</div>
+      <div class="math-light">\[\mathbf r_{eci}=R_3(\Omega)R_1(i)R_3(\omega)\mathbf r_{pqw}\]</div>
+      <div class="callout good">
+        <strong>Debug idea:</strong> If the perifocal orbit looks correct but the 3D orbit is wrong, the bug is probably in Ω, i, ω, or the rotation sequence.
+      </div>
+    </section>
+
+    <section id="degrad" class="content-card">
+      <span class="section-title">Section B — Degrees vs Radians Bug</span>
+      <h3>A unit bug can create a different orbit</h3>
+      <p>
+        If code expects radians but receives degrees, an angle like 45° may be interpreted as 45 radians. This does not produce a small perturbation; it can rotate the orbital plane dramatically.
+      </p>
+      <div class="equation-box">
+        expected: i = 45°<br />
+        bugged: i = 45 rad
+      </div>
+      <div class="callout bad">
+        <strong>Key teaching line:</strong> A unit bug does not create a small error. For angles, it can create a new orbit.
+      </div>
+    </section>
+
+    <section id="omega-nu" class="content-card">
+      <span class="section-title">Section C — Argument of Perigee vs True Anomaly</span>
+      <h3>ω rotates the ellipse; ν moves the spacecraft</h3>
+      <div class="two-col">
+        <div class="mini-card"><strong>Argument of perigee ω</strong><br />Controls where perigee lies inside the orbital plane.</div>
+        <div class="mini-card"><strong>True anomaly ν</strong><br />Controls where the spacecraft is along the ellipse, measured from perigee.</div>
+      </div>
+      <div class="callout warn">
+        <strong>Diagnostic pattern:</strong> Small plane error + large position error + small energy error usually means the orbit geometry is similar, but the spacecraft is at the wrong point along the orbit.
+      </div>
+    </section>
+
+    <section id="raan-omega" class="content-card">
+      <span class="section-title">Section D — RAAN vs Argument of Perigee Swap</span>
+      <h3>Ω rotates the plane; ω rotates the ellipse inside the plane</h3>
+      <p>
+        Swapping RAAN and argument of perigee is a classic representation bug. The numbers may look reasonable, but the orbital plane, line of nodes, and perigee direction can all move.
+      </p>
+      <div class="equation-box">
+        Ω → orbital plane orientation<br />
+        ω → ellipse orientation within that plane
+      </div>
+      <div class="callout purple">
+        <strong>Visual clue:</strong> If the line of nodes and perigee marker move together in strange ways, check whether Ω and ω were swapped.
+      </div>
+    </section>
+
+    <section id="singularities" class="content-card">
+      <span class="section-title">Sections E/F — Circular and Equatorial Singularities</span>
+      <h3>Sometimes the element is not physically meaningful</h3>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>Circular orbit: e ≈ 0</strong><br />There is no unique perigee, so argument of perigee becomes undefined. Use argument of latitude: <br /><span class="status-pill">u = ω + ν</span></div>
+        <div class="mini-card"><strong>Equatorial orbit: i ≈ 0</strong><br />There is no clear line of nodes, so RAAN becomes undefined. Use longitude of perigee or true longitude.</div>
+        <div class="mini-card"><strong>Longitude of perigee</strong><br /><span class="status-pill">ϖ = Ω + ω</span></div>
+        <div class="mini-card"><strong>True longitude</strong><br /><span class="status-pill">l = Ω + ω + ν</span></div>
+      </div>
+      <div class="callout warn">
+        <strong>Debug warning:</strong> Near e = 0 or i = 0, recovered Ω or ω may jump even though the physical orbit is fine.
+      </div>
+    </section>
+
+    <section id="diagnostics" class="content-card">
+      <span class="section-title">Debugging logic</span>
+      <h3>Use error patterns to identify the bug</h3>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>Large position error + small energy error</strong><br />Likely angle interpretation problem.</div>
+        <div class="mini-card"><strong>Large plane error</strong><br />Likely RAAN or inclination issue.</div>
+        <div class="mini-card"><strong>Small plane error + large along-track error</strong><br />Likely true anomaly or epoch issue.</div>
+        <div class="mini-card"><strong>RAAN unstable near i = 0</strong><br />Equatorial singularity.</div>
+        <div class="mini-card"><strong>ω unstable near e = 0</strong><br />Circular orbit singularity.</div>
+        <div class="mini-card"><strong>Very large errors everywhere</strong><br />Likely degree/radian or unit bug.</div>
+      </div>
+    </section>
+
+    <section id="snippets" class="content-card">
+      <span class="section-title">Python / MATLAB snippets</span>
+      <h3>Code patterns for conversion and diagnostics</h3>
+      <p>
+        These snippets show the core operations used in the interactive page: perifocal conversion, rotation to ECI, and diagnostic checks.
+      </p>
+
+      <div class="code-tabs">
+        <button class="tab-btn active" onclick="showCodeTab('coeCode', this)">COE → PQW</button>
+        <button class="tab-btn" onclick="showCodeTab('rotCode', this)">Rotation to ECI</button>
+        <button class="tab-btn" onclick="showCodeTab('diagCode', this)">Diagnostics</button>
+      </div>
+
+      <div id="coeCode">
+<pre><code>% COE to perifocal position and velocity
+mu = 398600.4418;
+p = a*(1 - e^2);
+
+r_pqw = [p*cos(nu)/(1 + e*cos(nu));
+         p*sin(nu)/(1 + e*cos(nu));
+         0];
+
+v_pqw = sqrt(mu/p)*[-sin(nu);
+                    e + cos(nu);
+                    0];</code></pre>
+      </div>
+
+      <div id="rotCode" class="hidden">
+<pre><code>% Rotate from PQW to ECI
+R3_Omega = R3(Omega);
+R1_i     = R1(i);
+R3_omega = R3(omega);
+
+Q_pqw_to_eci = R3_Omega * R1_i * R3_omega;
+
+r_eci = Q_pqw_to_eci * r_pqw;
+v_eci = Q_pqw_to_eci * v_pqw;</code></pre>
+      </div>
+
+      <div id="diagCode" class="hidden">
+<pre><code>% Diagnostic checks
+energy = 0.5*dot(v,v) - mu/norm(r);
+h_vec  = cross(r,v);
+h_hat  = h_vec/norm(h_vec);
+
+plane_error = acosd(dot(h_hat_correct, h_hat_bugged));
+position_error = norm(r_correct - r_bugged);
+velocity_error = norm(v_correct - v_bugged);</code></pre>
+      </div>
+    </section>
+
+    <section id="takeaway" class="content-card">
+      <span class="section-title">Engineering takeaway</span>
+      <h3>Before trusting propagation or control, validate the state</h3>
+      <div class="roadmap-grid">
+        <div class="mini-card"><strong>1 · Check angle units</strong><br />Degrees and radians are one of the fastest ways to create a false orbit.</div>
+        <div class="mini-card"><strong>2 · Separate Ω, ω, and ν</strong><br />They rotate different geometry and should not be interchanged.</div>
+        <div class="mini-card"><strong>3 · Watch singular cases</strong><br />Circular and equatorial orbits make some classical elements undefined.</div>
+        <div class="mini-card"><strong>4 · Validate invariants</strong><br />Use energy, angular momentum, and plane-normal checks.</div>
+        <div class="mini-card"><strong>5 · Interpret error patterns</strong><br />Different bugs produce different diagnostic signatures.</div>
+        <div class="mini-card"><strong>6 · GNC link</strong><br />A controller can only act on the state representation it receives.</div>
+      </div>
+      <div class="callout good">
+        <strong>Final insight:</strong> An orbit is not defined only by equations. It is defined by equations, units, frames, time, and conventions. Before blaming the controller, solver, or propagator, debug the state.
+      </div>
+    </section>
+
+    <div class="back-link-row">
+      <a href="problems.html" class="back-link">← Back to Problem Bank</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      and guidance–navigation–control systems.
+    </p>
+  </footer>
+
+  <script>
+    const MU = 398600.4418;
+    const DEG = Math.PI/180;
+    const RAD = 180/Math.PI;
+
+    function fmt(x, d=3) { return Number.isFinite(x) ? Number(x).toFixed(d) : '—'; }
+    function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+    function dot(a,b){ return a.reduce((s,v,i)=>s+v*b[i],0); }
+    function cross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; }
+    function norm(a){ return Math.sqrt(dot(a,a)); }
+    function scale(a,s){ return a.map(v=>v*s); }
+    function sub(a,b){ return a.map((v,i)=>v-b[i]); }
+    function add(a,b){ return a.map((v,i)=>v+b[i]); }
+    function unit(a){ const n = norm(a); return n > 0 ? scale(a,1/n) : [0,0,0]; }
+    function angleBetween(a,b){ const c = clamp(dot(unit(a), unit(b)), -1, 1); return Math.acos(c)*RAD; }
+    function mod2pi(x){ return ((x%(2*Math.PI))+2*Math.PI)%(2*Math.PI); }
+
+    function R1(x){ const c=Math.cos(x), s=Math.sin(x); return [[1,0,0],[0,c,-s],[0,s,c]]; }
+    function R3(x){ const c=Math.cos(x), s=Math.sin(x); return [[c,-s,0],[s,c,0],[0,0,1]]; }
+    function matMul(A,B){ return A.map(row => B[0].map((_,j)=>row.reduce((sum,v,k)=>sum+v*B[k][j],0))); }
+    function matVec(A,x){ return A.map(row => row.reduce((sum,v,i)=>sum+v*x[i],0)); }
+
+    function coeToState(a,e,i,raan,argp,nu, rawAngles=false){
+      const p = a*(1-e*e);
+      const rmag = p/(1 + e*Math.cos(nu));
+      const rPQW = [rmag*Math.cos(nu), rmag*Math.sin(nu), 0];
+      const vPQW = scale([-Math.sin(nu), e + Math.cos(nu), 0], Math.sqrt(MU/p));
+      const Q = matMul(matMul(R3(raan), R1(i)), R3(argp));
+      return { r: matVec(Q, rPQW), v: matVec(Q, vPQW), rPQW, vPQW, Q, p };
+    }
+
+    function getInputs(){
+      return {
+        a: parseFloat(document.getElementById('aInput').value),
+        e: parseFloat(document.getElementById('eInput').value),
+        iDeg: parseFloat(document.getElementById('iInput').value),
+        raanDeg: parseFloat(document.getElementById('raanInput').value),
+        argpDeg: parseFloat(document.getElementById('argpInput').value),
+        nuDeg: parseFloat(document.getElementById('nuInput').value),
+        mode: document.getElementById('bugMode').value
+      };
+    }
+
+    function applyBug(inp){
+      let a=inp.a, e=inp.e, i=inp.iDeg*DEG, raan=inp.raanDeg*DEG, argp=inp.argpDeg*DEG, nu=inp.nuDeg*DEG;
+      let label = 'Correct conversion';
+
+      if (inp.mode === 'degRad') {
+        i = inp.iDeg; raan = inp.raanDeg; argp = inp.argpDeg; nu = inp.nuDeg;
+        label = 'Degrees passed as radians';
+      }
+      if (inp.mode === 'swapRaanArgp') {
+        [raan, argp] = [argp, raan];
+        label = 'RAAN and argument of perigee swapped';
+      }
+      if (inp.mode === 'swapArgpNu') {
+        [argp, nu] = [nu, argp];
+        label = 'Argument of perigee and true anomaly swapped';
+      }
+      if (inp.mode === 'nuZero') {
+        nu = 0;
+        label = 'True anomaly accidentally set to zero';
+      }
+      if (inp.mode === 'meanAsTrue') {
+        const E = 2*Math.atan(Math.sqrt((1-e)/(1+e))*Math.tan(nu/2));
+        const M = mod2pi(E - e*Math.sin(E));
+        nu = M;
+        label = 'Mean anomaly used as true anomaly';
+      }
+      if (inp.mode === 'incSign') {
+        i = -i;
+        label = 'Inclination sign error';
+      }
+      if (inp.mode === 'circular') {
+        e = 0.00001;
+        label = 'Circular orbit singularity: ω poorly defined';
+      }
+      if (inp.mode === 'equatorial') {
+        i = 0.00001*DEG;
+        label = 'Near-equatorial ambiguity: Ω poorly defined';
+      }
+      return {a,e,i,raan,argp,nu,label};
+    }
+
+    function stateEnergy(s){ return 0.5*Math.pow(norm(s.v),2) - MU/norm(s.r); }
+    function hVec(s){ return cross(s.r, s.v); }
+    function incFromState(s){ return Math.acos(clamp(hVec(s)[2]/norm(hVec(s)), -1, 1))*RAD; }
+
+    function orbitTrace(a,e,i,raan,argp,name,dash){
+      const xs=[], ys=[], zs=[];
+      for(let k=0;k<=240;k++){
+        const nu = 2*Math.PI*k/240;
+        const s = coeToState(a,e,i,raan,argp,nu);
+        xs.push(s.r[0]); ys.push(s.r[1]); zs.push(s.r[2]);
+      }
+      return {x:xs,y:ys,z:zs,mode:'lines',type:'scatter3d',name,line:{width:4,dash:dash||'solid'}};
+    }
+
+    function pqwTrace(a,e,nuGood,nuBug){
+      const p = a*(1-e*e);
+      const xs=[], ys=[];
+      for(let k=0;k<=240;k++){
+        const nu = 2*Math.PI*k/240;
+        const r = p/(1+e*Math.cos(nu));
+        xs.push(r*Math.cos(nu)); ys.push(r*Math.sin(nu));
+      }
+      const rGood = p/(1+e*Math.cos(nuGood));
+      const rBug = p/(1+e*Math.cos(nuBug));
+      return [
+        {x:xs,y:ys,mode:'lines',name:'Perifocal ellipse',line:{width:3}},
+        {x:[0],y:[0],mode:'markers',name:'Focus / Earth',marker:{size:10}},
+        {x:[rGood*Math.cos(nuGood)],y:[rGood*Math.sin(nuGood)],mode:'markers',name:'Correct spacecraft point',marker:{size:12}},
+        {x:[rBug*Math.cos(nuBug)],y:[rBug*Math.sin(nuBug)],mode:'markers',name:'Bugged spacecraft point',marker:{size:12,symbol:'diamond'}}
+      ];
+    }
+
+    function plotLayout(title,xTitle,yTitle){
+      return {
+        title:{text:title,font:{family:'Times New Roman, Georgia, serif',size:21}},
+        margin:{l:65,r:25,t:60,b:55},
+        xaxis:{title:xTitle,gridcolor:'#e5e7eb'},
+        yaxis:{title:yTitle,gridcolor:'#e5e7eb'},
+        paper_bgcolor:'#ffffff', plot_bgcolor:'#ffffff',
+        legend:{orientation:'h',y:-0.22}
+      };
+    }
+
+    function classify(posErr, velErr, planeErr, eErrPct, hErrPct, inp){
+      if (inp.mode === 'correct') return 'No bug';
+      if (inp.mode === 'degRad') return 'Deg/rad bug';
+      if (inp.mode === 'circular') return 'Circular singularity';
+      if (inp.mode === 'equatorial') return 'Equatorial singularity';
+      if (planeErr > 20) return 'Plane/rotation bug';
+      if (posErr > 100 && planeErr < 5) return 'Along-track angle bug';
+      if (Math.abs(eErrPct) < 0.1 && posErr > 50) return 'Angle interpretation bug';
+      return 'Check angle convention';
+    }
+
+    function runDebugLab(){
+      const inp = getInputs();
+      const good = {a:inp.a, e:inp.e, i:inp.iDeg*DEG, raan:inp.raanDeg*DEG, argp:inp.argpDeg*DEG, nu:inp.nuDeg*DEG};
+      const bug = applyBug(inp);
+      const sGood = coeToState(good.a, good.e, good.i, good.raan, good.argp, good.nu);
+      const sBug = coeToState(bug.a, bug.e, bug.i, bug.raan, bug.argp, bug.nu);
+
+      const posErr = norm(sub(sBug.r, sGood.r));
+      const velErr = norm(sub(sBug.v, sGood.v));
+      const planeErr = angleBetween(hVec(sGood), hVec(sBug));
+      const eErrPct = 100*(stateEnergy(sBug)-stateEnergy(sGood))/Math.abs(stateEnergy(sGood));
+      const hErrPct = 100*(norm(hVec(sBug))-norm(hVec(sGood)))/Math.abs(norm(hVec(sGood)));
+      const bugType = classify(posErr, velErr, planeErr, eErrPct, hErrPct, inp);
+
+      document.getElementById('positionError').textContent = fmt(posErr,2)+' km';
+      document.getElementById('velocityError').textContent = fmt(velErr,5)+' km/s';
+      document.getElementById('planeError').textContent = fmt(planeErr,3)+' deg';
+      document.getElementById('bugType').textContent = bugType;
+      document.getElementById('energyError').textContent = fmt(eErrPct,6)+' %';
+      document.getElementById('hError').textContent = fmt(hErrPct,6)+' %';
+      document.getElementById('expectedInc').textContent = fmt(inp.iDeg,3)+' deg';
+      document.getElementById('recoveredInc').textContent = fmt(incFromState(sBug),3)+' deg';
+
+      let interp = 'The error pattern suggests checking angle conventions and conversion assumptions.';
+      let cls = 'callout good';
+      if (inp.mode === 'degRad') { interp = 'Large state and plane errors appear because degree values were interpreted as radians.'; cls='callout bad'; }
+      else if (inp.mode === 'swapArgpNu' || inp.mode === 'nuZero' || inp.mode === 'meanAsTrue') { interp = 'The orbital plane may remain similar, but the spacecraft location shifts along the ellipse.'; cls='callout warn'; }
+      else if (inp.mode === 'swapRaanArgp' || inp.mode === 'incSign') { interp = 'The orbit plane or node direction changed. Check RAAN, inclination, and rotation order.'; cls='callout bad'; }
+      else if (inp.mode === 'circular') { interp = 'Near e = 0, argument of perigee is poorly defined. Use argument of latitude u = ω + ν.'; cls='callout warn'; }
+      else if (inp.mode === 'equatorial') { interp = 'Near i = 0, RAAN is poorly defined. Use longitude-based alternatives.'; cls='callout warn'; }
+      else if (inp.mode === 'correct') { interp = 'Correct conversion: differences should be near zero except numerical roundoff.'; cls='callout good'; }
+      const box = document.getElementById('labInterpretation');
+      box.className = cls;
+      box.innerHTML = '<strong>Interpretation:</strong> ' + interp;
+
+      const traces3d = [
+        orbitTrace(good.a, good.e, good.i, good.raan, good.argp, 'Correct orbit', 'solid'),
+        orbitTrace(bug.a, bug.e, bug.i, bug.raan, bug.argp, 'Bugged orbit', 'dash'),
+        {x:[sGood.r[0]],y:[sGood.r[1]],z:[sGood.r[2]],mode:'markers',type:'scatter3d',name:'Correct state',marker:{size:6}},
+        {x:[sBug.r[0]],y:[sBug.r[1]],z:[sBug.r[2]],mode:'markers',type:'scatter3d',name:'Bugged state',marker:{size:7,symbol:'diamond'}},
+        {x:[0],y:[0],z:[0],mode:'markers',type:'scatter3d',name:'Earth center',marker:{size:5}},
+        {x:[0,sGood.r[0]],y:[0,sGood.r[1]],z:[0,sGood.r[2]],mode:'lines',type:'scatter3d',name:'Correct radius vector',line:{width:3,dash:'dot'}},
+        {x:[0,sBug.r[0]],y:[0,sBug.r[1]],z:[0,sBug.r[2]],mode:'lines',type:'scatter3d',name:'Bugged radius vector',line:{width:3,dash:'dot'}}
+      ];
+      Plotly.newPlot('orbit3dPlot', traces3d, {
+        title:{text:'3D orbit comparison: correct vs bugged state',font:{family:'Times New Roman, Georgia, serif',size:21}},
+        margin:{l:0,r:0,t:60,b:0},
+        scene:{xaxis:{title:'x [km]'},yaxis:{title:'y [km]'},zaxis:{title:'z [km]'},aspectmode:'data'},
+        paper_bgcolor:'#ffffff', legend:{orientation:'h',y:-0.05}
+      }, {responsive:true,displaylogo:false});
+
+      Plotly.newPlot('pqwPlot', pqwTrace(good.a, good.e, good.nu, bug.nu), {
+        ...plotLayout('Perifocal-plane view: is the bug before or after rotation?', 'p-axis [km]', 'q-axis [km]'),
+        yaxis:{title:'q-axis [km]',scaleanchor:'x',scaleratio:1,gridcolor:'#e5e7eb'}
+      }, {responsive:true,displaylogo:false});
+
+      Plotly.newPlot('diagnosticBarPlot', [{
+        x:['Position error [km]','Velocity error [km/s]','Plane error [deg]','Energy error [%]','h error [%]'],
+        y:[posErr,velErr,planeErr,Math.abs(eErrPct),Math.abs(hErrPct)],
+        type:'bar', name:'Diagnostic magnitude'
+      }], plotLayout('Diagnostic error bars', 'Diagnostic', 'Magnitude'), {responsive:true,displaylogo:false});
+    }
+
+    function setPreset(type){
+      if(type==='nominal'){
+        document.getElementById('aInput').value=7000; document.getElementById('eInput').value=0.15; document.getElementById('iInput').value=45; document.getElementById('raanInput').value=30; document.getElementById('argpInput').value=60; document.getElementById('nuInput').value=40; document.getElementById('bugMode').value='swapArgpNu';
+      }
+      if(type==='circular'){
+        document.getElementById('aInput').value=7200; document.getElementById('eInput').value=0.001; document.getElementById('iInput').value=51.6; document.getElementById('raanInput').value=20; document.getElementById('argpInput').value=120; document.getElementById('nuInput').value=70; document.getElementById('bugMode').value='circular';
+      }
+      if(type==='equatorial'){
+        document.getElementById('aInput').value=42164; document.getElementById('eInput').value=0.01; document.getElementById('iInput').value=0.05; document.getElementById('raanInput').value=80; document.getElementById('argpInput').value=35; document.getElementById('nuInput').value=110; document.getElementById('bugMode').value='equatorial';
+      }
+      if(type==='highTilt'){
+        document.getElementById('aInput').value=10000; document.getElementById('eInput').value=0.25; document.getElementById('iInput').value=98; document.getElementById('raanInput').value=250; document.getElementById('argpInput').value=45; document.getElementById('nuInput').value=135; document.getElementById('bugMode').value='swapRaanArgp';
+      }
+      runDebugLab();
+    }
+
+    function showCodeTab(id, btn) {
+      ['coeCode','rotCode','diagCode'].forEach(x => document.getElementById(x).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    window.addEventListener('load', () => { runDebugLab(); });
+  </script>
+</body>
+</html>
