@@ -461,6 +461,7 @@
       <div id="orbit3dPlot" class="plot-box"></div>
       <div id="pqwPlot" class="plot-box"></div>
       <div id="diagnosticBarPlot" class="plot-box"></div>
+      <div id="planeOrientationPlot" class="plot-box"></div>
 
       <div class="metric-grid">
         <div class="metric"><span>Position error</span><strong id="positionError">—</strong></div>
@@ -1143,6 +1144,27 @@ velocity_error = norm(v_correct - v_bugged);</code></pre>
       plotLayout("Diagnostic error bars", "Diagnostic", "Magnitude"),
       { responsive: true, displaylogo: false }
     );
+    
+    Plotly.newPlot(
+  "planeOrientationPlot",
+  planeOrientationTraces(sGood, sBug, good, bug),
+  {
+    title: {
+      text: "Plane orientation diagnostic: normal vector, node line, and perigee direction",
+      font: { family: "Times New Roman, Georgia, serif", size: 21 }
+    },
+    margin: { l: 0, r: 0, t: 60, b: 0 },
+    scene: {
+      xaxis: { title: "x [km]" },
+      yaxis: { title: "y [km]" },
+      zaxis: { title: "z [km]" },
+      aspectmode: "data"
+    },
+    paper_bgcolor: "#ffffff",
+    legend: { orientation: "h", y: -0.05 }
+  },
+  { responsive: true, displaylogo: false }
+);
   }
 
   function setPreset(type) {
@@ -1185,7 +1207,50 @@ velocity_error = norm(v_correct - v_bugged);</code></pre>
       document.getElementById("nuInput").value = 135;
       document.getElementById("bugMode").value = "swapRaanArgp";
     }
+function vectorTrace(vec, name, scaleFactor, dash) {
+  return {
+    x: [0, vec[0] * scaleFactor],
+    y: [0, vec[1] * scaleFactor],
+    z: [0, vec[2] * scaleFactor],
+    mode: "lines+markers",
+    type: "scatter3d",
+    name,
+    line: { width: 5, dash: dash || "solid" },
+    marker: { size: 4 }
+  };
+}
 
+function planeOrientationTraces(sGood, sBug, good, bug) {
+  const hGood = unit(hVec(sGood));
+  const hBug = unit(hVec(sBug));
+
+  const kHat = [0, 0, 1];
+  const nodeGood = unit(cross(kHat, hGood));
+  const nodeBug = unit(cross(kHat, hBug));
+
+  const perigeeGood = unit(coeToState(good.a, good.e, good.i, good.raan, good.argp, 0).r);
+  const perigeeBug = unit(coeToState(bug.a, bug.e, bug.i, bug.raan, bug.argp, 0).r);
+
+  const scaleFactor = good.a * 0.45;
+
+  return [
+    vectorTrace(hGood, "Correct plane normal", scaleFactor, "solid"),
+    vectorTrace(hBug, "Bugged plane normal", scaleFactor, "dash"),
+    vectorTrace(nodeGood, "Correct node line", scaleFactor, "solid"),
+    vectorTrace(nodeBug, "Bugged node line", scaleFactor, "dash"),
+    vectorTrace(perigeeGood, "Correct perigee direction", scaleFactor, "solid"),
+    vectorTrace(perigeeBug, "Bugged perigee direction", scaleFactor, "dash"),
+    {
+      x: [0],
+      y: [0],
+      z: [0],
+      mode: "markers",
+      type: "scatter3d",
+      name: "Earth center",
+      marker: { size: 6 }
+    }
+  ];
+}
     runDebugLab();
   }
 
