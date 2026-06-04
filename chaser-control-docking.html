@@ -820,13 +820,34 @@ function plotStrategies(inputs) {
 }
 
 function classifyForMap(inputs, kp, kd) {
-  const temp = {...inputs, kp:kp, kd:kd, saturationEnabled:true};
-  const r = simulateDocking(temp, "satpd");
-  if (r.success) return 3;
-  if (r.oscillatory) return 2;
-  if (r.slow) return 1;
-  return 0;
+  const temp = {
+    ...inputs,
+    kp: kp,
+    kd: kd,
+    saturationEnabled: false,
+    timeMin: 120,
+    x0: 30,
+    y0: -800,
+    vx0: 0,
+    vy0: 0.05
+  };
+
+  const r = simulateDocking(temp, "pd");
+
+  const initialSep = Math.sqrt(temp.x0 * temp.x0 + temp.y0 * temp.y0);
+
+  if (r.finalSep < 20 && r.finalVel < 0.10)
+    return 3;   // Success
+
+  if (r.targetCrossings > 2)
+    return 2;   // Oscillatory
+
+  if (r.finalSep < initialSep)
+    return 1;   // Slow / improving
+
+  return 0;     // Fail
 }
+
 
 function runGainMap() {
   const inputs = getInputs();
