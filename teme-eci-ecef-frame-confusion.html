@@ -531,6 +531,33 @@
       font-weight: 850;
     }
 
+
+
+    .fidelity-note {
+      margin-top: 16px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: #fffaf0;
+      border: 1px solid #f1d79a;
+      color: #3f2b00;
+    }
+
+    .fidelity-note strong {
+      color: #9a6700;
+    }
+
+    .mini-note {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      line-height: 1.45;
+    }
+
+    .muted-control {
+      opacity: 0.65;
+    }
+
     @media (max-width: 920px) {
       .grid-2,
       .grid-3,
@@ -589,7 +616,9 @@
       <a href="#mismatch">MATLAB vs STK</a>
       <a href="#error-growth">Error Growth</a>
       <a href="#checklist">Checklist</a>
+      <a href="#symptoms">Symptoms</a>
       <a href="#code">Code</a>
+      <a href="#engineering">Engineering</a>
       <a href="#takeaway">Takeaway</a>
     </nav>
 
@@ -715,16 +744,20 @@
         <div class="problems-section-title">4 · Interactive Frame Selector</div>
         <h2>Frame Viewer: Inertial Orbit vs Rotating Earth</h2>
         <p>
-          Use the controls to see how an inertial-looking satellite position maps to an Earth-fixed ground track.
-          The simplified model is educational: it isolates the Earth-rotation effect instead of implementing a full TEME-to-ITRF pipeline.
+          Use the controls to see how a satellite position represented in an inertial frame maps to an Earth-fixed ground track as Earth rotates.
+          This viewer is an educational inertial-to-rotating-Earth demonstration. It isolates the dominant Earth-rotation effect so the frame error is easy to see.
         </p>
+        <div class="fidelity-note">
+          <strong>Model-fidelity note:</strong>
+          This is not a full TEME-to-ITRF/ECEF converter. The viewer applies a simple rotation about Earth’s spin axis only. It does not include GMST/ERA, precession, nutation, polar motion, Earth Orientation Parameters, or UT1–UTC corrections. Use it for frame intuition, not precision orbit validation.
+        </div>
 
         <div class="control-panel">
           <aside class="controls">
             <div class="control-group">
               <div class="control-title">State source</div>
               <div class="radio-row">
-                <label><input type="radio" name="stateSource" value="tle" checked> TLE-style LEO state</label>
+                <label><input type="radio" name="stateSource" value="tle" checked> ISS-like circular LEO example</label>
                 <label><input type="radio" name="stateSource" value="manual"> Manual circular orbit</label>
               </div>
             </div>
@@ -745,13 +778,13 @@
             </div>
 
             <div class="control-group">
-              <label for="viewerAltitude">Manual orbit altitude</label>
+              <label for="viewerAltitude">Manual orbit altitude <span class="mini-note">Used only when Manual Circular Orbit is selected.</span></label>
               <input id="viewerAltitude" type="range" min="300" max="1400" step="25" value="500" />
               <span class="range-readout" id="viewerAltitudeReadout">500 km</span>
             </div>
 
             <div class="control-group">
-              <label for="viewerInclination">Manual orbit inclination</label>
+              <label for="viewerInclination">Manual orbit inclination <span class="mini-note">Used only when Manual Circular Orbit is selected.</span></label>
               <input id="viewerInclination" type="range" min="0" max="98" step="1" value="51" />
               <span class="range-readout" id="viewerInclinationReadout">51°</span>
             </div>
@@ -776,7 +809,7 @@
             <span class="metric-value" id="rotationMetric">15.0°</span>
           </div>
           <div class="metric-card">
-            <span class="metric-label">Apparent longitude shift</span>
+            <span class="metric-label">Wrapped apparent longitude shift</span>
             <span class="metric-value" id="longitudeMetric">15.0°</span>
           </div>
           <div class="metric-card">
@@ -791,8 +824,12 @@
 
         <div class="callout success">
           <strong>Main lesson:</strong>
-          After only one hour, Earth rotates by about 15 degrees. If an inertial vector is plotted as if it were Earth-fixed,
-          the ground location will be wrong even when the orbit itself looks reasonable.
+          After only one hour, Earth rotates by about 15 degrees. If an inertial vector is plotted as if it were already Earth-fixed,
+          the satellite can appear over the wrong longitude even when altitude, period, and orbit shape look reasonable.
+        </div>
+        <div class="callout warning">
+          <strong>Plot interpretation:</strong>
+          The longitude-shift plot uses wrapped longitude difference in the ±180° range. It shows the apparent ground-track displacement, not the total accumulated Earth-rotation angle.
         </div>
       </section>
 
@@ -961,7 +998,8 @@
 lat, lon, alt = ecef_to_lla(r_teme)
 
 # Better idea:
-# Convert TEME -> inertial/reference frame -> ECEF/ITRF first
+# Correct idea:
+# Convert TEME -> ITRF/ECEF at the same epoch using Earth orientation data
 r_ecef = teme_to_ecef(r_teme, epoch, earth_orientation)
 lat, lon, alt = ecef_to_lla(r_ecef)</pre>
         </div>
@@ -1023,7 +1061,7 @@ lla = ecef2lla(r_teme');
 
     <footer class="footer">
       <a class="back-pill" href="problems.html">← Back to Problem Bank</a>
-      <p>Interactive GNC & Space Mechanics · Frame-aware orbit propagation problem</p>
+      <p>Interactive GNC & Space Mechanics · Frame-aware orbit propagation problem · Educational visualization</p>
     </footer>
   </main>
 
@@ -1036,6 +1074,24 @@ lla = ecef2lla(r_teme');
     function rad2deg(r) { return r * 180 / Math.PI; }
     function wrapLon(lon) {
       return ((lon + 180) % 360 + 360) % 360 - 180;
+    }
+
+    function wrappedAbsAngle(angleDeg) {
+      return Math.abs(wrapLon(angleDeg));
+    }
+
+    function breakGroundTrackAtDateline(lons, lats) {
+      const cleanLon = [];
+      const cleanLat = [];
+      for (let i = 0; i < lons.length; i++) {
+        if (i > 0 && Math.abs(lons[i] - lons[i - 1]) > 180) {
+          cleanLon.push(null);
+          cleanLat.push(null);
+        }
+        cleanLon.push(lons[i]);
+        cleanLat.push(lats[i]);
+      }
+      return { lon: cleanLon, lat: cleanLat };
     }
 
     function orbitPosition(tHours, altitudeKm, incDeg) {
@@ -1104,17 +1160,19 @@ lla = ecef2lla(r_teme');
     }
 
     function updateViewer() {
-      const { timeH, alt, inc, display, rotationOn } = getViewerInputs();
+      const { source, timeH, alt, inc, display, rotationOn } = getViewerInputs();
       document.getElementById('timeReadout').textContent = timeH.toFixed(2) + ' h';
-      document.getElementById('viewerAltitudeReadout').textContent = document.getElementById('viewerAltitude').value + ' km';
-      document.getElementById('viewerInclinationReadout').textContent = document.getElementById('viewerInclination').value + '°';
+      document.getElementById('viewerAltitudeReadout').textContent = source === 'tle' ? '420 km fixed' : alt + ' km';
+      document.getElementById('viewerInclinationReadout').textContent = source === 'tle' ? '51.6° fixed' : inc + '°';
+      document.getElementById('viewerAltitude').closest('.control-group').classList.toggle('muted-control', source === 'tle');
+      document.getElementById('viewerInclination').closest('.control-group').classList.toggle('muted-control', source === 'tle');
 
       const rotAngle = rotationOn ? earthRateDegPerHour * timeH : 0;
       const inertial = orbitPosition(timeH, alt, inc);
       const ecef = rotateZ(inertial, -rotAngle);
       const inertialLL = latLonFromVec(inertial);
       const ecefLL = latLonFromVec(ecef);
-      const shift = Math.abs(wrapLon(inertialLL.lon - ecefLL.lon));
+      const shift = wrappedAbsAngle(inertialLL.lon - ecefLL.lon);
 
       document.getElementById('rotationMetric').textContent = rotAngle.toFixed(1) + '°';
       document.getElementById('longitudeMetric').textContent = shift.toFixed(1) + '°';
@@ -1156,11 +1214,13 @@ lla = ecef2lla(r_teme');
         lonInertial.push(pll.lon);
         lonEcef.push(ell.lon);
         latVals.push(ell.lat);
-        shifts.push(Math.abs(wrapLon(pll.lon - ell.lon)));
+        shifts.push(wrappedAbsAngle(pll.lon - ell.lon));
       }
 
+      const brokenTrack = breakGroundTrackAtDateline(lonEcef, latVals);
+
       Plotly.react('groundTrackPlot', [
-        { type: 'scatter', mode: 'lines', x: lonEcef, y: latVals, name: 'ECEF ground track' },
+        { type: 'scatter', mode: 'lines', x: brokenTrack.lon, y: brokenTrack.lat, name: 'ECEF ground track' },
         { type: 'scatter', mode: 'markers', x: [ecefLL.lon], y: [ecefLL.lat], name: 'Current point' }
       ], {
         title: 'Ground Track Longitude / Latitude',
@@ -1172,10 +1232,10 @@ lla = ecef2lla(r_teme');
       Plotly.react('longitudePlot', [
         { type: 'scatter', mode: 'lines', x: times, y: shifts, name: 'Longitude shift' }
       ], {
-        title: 'Longitude Shift vs Time',
+        title: 'Wrapped Longitude Shift vs Time',
         margin: { l: 48, r: 20, t: 42, b: 42 },
         xaxis: { title: 'Time after epoch h' },
-        yaxis: { title: 'Shift deg' }
+        yaxis: { title: 'Wrapped shift deg' }
       }, { responsive: true, displayModeBar: false });
     }
 
@@ -1238,8 +1298,8 @@ lla = ecef2lla(r_teme');
       let cause = '';
 
       if (type === 'inertialAsEcef' || type === 'ecefAsInertial') {
-        shift = earthRateDegPerHour * t;
-        posErr = 2 * r * Math.sin(deg2rad(Math.min(180, shift)) / 2);
+        shift = wrappedAbsAngle(earthRateDegPerHour * t);
+        posErr = 2 * r * Math.sin(deg2rad(shift) / 2);
         track = 'Longitude shift';
         cause = 'Frame';
       } else if (type === 'epochOffset') {
@@ -1271,8 +1331,8 @@ lla = ecef2lla(r_teme');
       for (let i = 0; i <= 12; i += 0.25) {
         let y = 0;
         if (type === 'inertialAsEcef' || type === 'ecefAsInertial') {
-          const s = earthRateDegPerHour * i;
-          y = 2 * r * Math.sin(deg2rad(Math.min(180, s)) / 2);
+          const s = wrappedAbsAngle(earthRateDegPerHour * i);
+          y = 2 * r * Math.sin(deg2rad(s) / 2);
         } else if (type === 'epochOffset') {
           const velocity = Math.sqrt(mu / r);
           y = velocity * Math.min(600, 40 * i + 20);
