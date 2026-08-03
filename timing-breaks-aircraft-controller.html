@@ -272,6 +272,12 @@ th {
   color: #1d4ed8;
 }
 
+.table-scroll { width: 100%; overflow-x: auto; margin-top: 1rem; }
+.comparison-table td:not(:first-child),
+.comparison-table th:not(:first-child) { text-align: center; }
+.plot-guide { margin-top: 1.4rem; }
+.plot-guide ul, .engineering-observations ul { margin-bottom: 0; }
+
 .back-link-row {
   text-align: center;
   margin-top: 2.5rem;
@@ -511,9 +517,16 @@ th {
   <h2>Compare Continuous, Discrete, and Delayed Control</h2>
 
   <p>
-    Use the sliders to adjust controller gain, sample time, sensor delay, wind gust
-    strength, aircraft damping, and simulation time. The same aircraft and same
-    controller are used. Only the timing behaviour changes.
+    This interactive HAPS control laboratory compares continuous, fast-discrete,
+    slow-discrete, and delayed digital control. Use the sliders to adjust controller
+    gain, sample time, sensor delay, wind-gust strength, aircraft damping, and
+    simulation time.
+  </p>
+
+  <p>
+    The aircraft model and control law remain unchanged in all four cases. Only the
+    timing implementation changes, allowing the influence of sampling,
+    sample-and-hold behaviour, and sensor latency to be studied independently.
   </p>
 
   <div class="lab-control-box">
@@ -555,41 +568,41 @@ th {
     </div>
 
     <label>Controller gain:
-      <input type="range" id="gainSlider" min="0.005" max="0.12" step="0.005" value="0.060"
+      <input type="range" id="gainSlider" min="0.005" max="0.12" step="0.005" value="0.045"
       oninput="document.getElementById('gainVal').textContent=this.value">
-      <span id="gainVal">0.060</span>
+      <span id="gainVal">0.045</span>
     </label>
 
     <br><br>
 
     <label>Sample time:
-      <input type="range" id="sampleSlider" min="0.05" max="2.00" step="0.05" value="1.20"
+      <input type="range" id="sampleSlider" min="0.05" max="2.00" step="0.05" value="0.80"
       oninput="document.getElementById('sampleVal').textContent=this.value">
-      <span id="sampleVal">1.20</span> s
+      <span id="sampleVal">0.80</span> s
     </label>
 
     <br><br>
 
     <label>Sensor delay:
-      <input type="range" id="delaySlider" min="0" max="1.50" step="0.05" value="0.80"
+      <input type="range" id="delaySlider" min="0" max="1.50" step="0.05" value="0.60"
       oninput="document.getElementById('delayVal').textContent=this.value">
-      <span id="delayVal">0.80</span> s
+      <span id="delayVal">0.60</span> s
     </label>
 
     <br><br>
 
     <label>Wind gust strength:
-      <input type="range" id="windSlider" min="0" max="16" step="1" value="10"
+      <input type="range" id="windSlider" min="0" max="16" step="1" value="8"
       oninput="document.getElementById('windVal').textContent=this.value">
-      <span id="windVal">10</span> m/s equivalent
+      <span id="windVal">8</span> m/s equivalent
     </label>
 
     <br><br>
 
     <label>Aircraft damping:
-      <input type="range" id="dampSlider" min="0.05" max="0.80" step="0.05" value="0.10"
+      <input type="range" id="dampSlider" min="0.05" max="0.80" step="0.05" value="0.20"
       oninput="document.getElementById('dampVal').textContent=this.value">
-      <span id="dampVal">0.10</span>
+      <span id="dampVal">0.20</span>
     </label>
 
     <br><br>
@@ -605,7 +618,9 @@ th {
     <button class="lab-button" onclick="runTimingSimulation()">Run Simulation</button>
 
     <div id="feedback" class="feedback">
-      Select a timing mode and run the simulation to generate results.
+      Select a timing mode and run the simulation. In Compare-all mode, the metric
+      cards report the delayed case because it represents the most demanding timing
+      condition; the table below reports all four cases separately.
     </div>
   </div>
 
@@ -636,9 +651,37 @@ th {
     </div>
 
     <div class="result-card">
-      <strong>Maximum phase lag</strong>
+      <strong>Maximum measurement lag</strong>
       <p id="riskMetric">--</p>
     </div>
+  </div>
+
+  <div id="comparisonResults" class="problem-focus" style="display:none;">
+    <h3>Performance Comparison for the Current Inputs</h3>
+    <p>
+      These values are calculated from the present slider settings. They are not
+      fixed benchmark values; changing the gain, sampling period, delay, wind, or
+      damping will update the comparison.
+    </p>
+    <div class="table-scroll">
+      <table class="comparison-table">
+        <thead><tr><th>Timing Mode</th><th>RMS Error (m)</th><th>Overshoot (m)</th><th>Settling Time</th><th>Peak Command</th><th>Maximum Measurement Lag (m)</th></tr></thead>
+        <tbody id="comparisonTableBody"></tbody>
+      </table>
+    </div>
+    <p id="comparisonInterpretation"></p>
+  </div>
+
+  <div class="good-box plot-guide" id="plotGuide" style="display:none;">
+    <h3>How to Read the Plots</h3>
+    <ul>
+      <li><strong>Altitude response:</strong> compares tracking accuracy and overshoot.</li>
+      <li><strong>Pitch response:</strong> shows whether attitude motion remains damped.</li>
+      <li><strong>Control command:</strong> indicates the effort demanded from the actuator.</li>
+      <li><strong>Sample-and-hold response:</strong> shows commands being retained between updates.</li>
+      <li><strong>Sensor-delay response:</strong> compares the true state with the state available to the controller.</li>
+      <li><strong>Measurement-lag indicator:</strong> quantifies the instantaneous state-information mismatch.</li>
+    </ul>
   </div>
 
   <div id="altitudePlot" class="plot-box"></div>
@@ -647,6 +690,21 @@ th {
   <div id="sampleHoldPlot" class="plot-box"></div>
   <div id="delayPlot" class="plot-box"></div>
   <div id="phaseLagPlot" class="plot-box"></div>
+
+  <div class="warning-box engineering-observations" id="engineeringObservations" style="display:none;">
+    <h3>Engineering Observations</h3>
+    <ul>
+      <li>The continuous case is an ideal reference because the command is recomputed at every integration step.</li>
+      <li>Fast discrete control should remain close to the continuous solution when the sampling interval is short relative to the closed-loop response time.</li>
+      <li>Slow sampling introduces sample-and-hold behaviour and can increase oscillation, tracking error, and actuator demand.</li>
+      <li>Sampling combined with sensor delay is usually the most demanding case because the controller both updates less frequently and acts on older state information.</li>
+    </ul>
+    <p>
+      This simplified model is educational rather than a flight-qualified HAPS design model.
+      The exact numerical values depend on the selected parameters, but the timing mechanisms
+      demonstrated here are representative of real digital control implementation.
+    </p>
+  </div>
 
 </section>
 
@@ -755,8 +813,8 @@ th {
 
 dt = 0.01
 t_final = 120
-Ts = 1.2
-delay = 0.8
+Ts = 0.8
+delay = 0.6
 
 t = np.arange(0, t_final, dt)
 
@@ -770,9 +828,9 @@ V[0] = 25
 h[0] = 950
 theta[0] = 0
 
-K = 0.060
+K = 0.045
 K_theta = 0.8
-damping = 0.10
+damping = 0.20
 
 current_u = 0
 next_update = 0
@@ -789,7 +847,7 @@ for k in range(len(t)-1):
         current_u = K*(h_target - h_measured) - K_theta*theta_measured
         next_update += Ts
 
-    wind = 10*np.sin(2*np.pi*0.10*t[k])
+    wind = 8*np.sin(2*np.pi*0.10*t[k])
 
     V_dot = -0.015*(V[k] - 25) + 0.04*current_u + 0.03*wind
     h_dot = V[k]*np.sin(theta[k]) + 0.7*wind
@@ -988,6 +1046,22 @@ function computeSettlingTime(t, h, target, tolerance) {
   }
   return null;
 }
+function calculateMetrics(result, target) {
+  const errors = result.h.map(value => target - value);
+  return {
+    rmsError: computeRms(errors),
+    overshoot: Math.max(0, Math.max(...result.h) - target),
+    settlingTime: computeSettlingTime(result.t, result.h, target, 5.0),
+    peakControl: Math.max(...result.u.map(value => Math.abs(value))),
+    maximumMeasurementLag: Math.max(...result.phaseLag)
+  };
+}
+
+function metricRow(label, metrics) {
+  const settlingText = metrics.settlingTime === null ? "Not settled" : metrics.settlingTime.toFixed(1) + " s";
+  return `<tr><td><strong>${label}</strong></td><td>${metrics.rmsError.toFixed(1)}</td><td>${metrics.overshoot.toFixed(1)}</td><td>${settlingText}</td><td>${metrics.peakControl.toFixed(2)}</td><td>${metrics.maximumMeasurementLag.toFixed(1)}</td></tr>`;
+}
+
 function updateLineShapes(result, enabled) {
   if (!enabled) return [];
   const shapes = [];
@@ -1018,6 +1092,23 @@ function runTimingSimulation() {
   const slow = simulateTiming("slow", gain, sampleTime, sensorDelay, windStrength, damping, tFinal);
   const delayed = simulateTiming("delay", gain, sampleTime, sensorDelay, windStrength, damping, tFinal);
 
+  const continuousMetrics = calculateMetrics(continuous, hTarget);
+  const fastMetrics = calculateMetrics(fast, hTarget);
+  const slowMetrics = calculateMetrics(slow, hTarget);
+  const delayedMetrics = calculateMetrics(delayed, hTarget);
+
+  document.getElementById("comparisonTableBody").innerHTML =
+    metricRow("Continuous", continuousMetrics) +
+    metricRow("Discrete fast", fastMetrics) +
+    metricRow("Discrete slow", slowMetrics) +
+    metricRow("Discrete slow + sensor delay", delayedMetrics);
+
+  const delayedVsContinuous = delayedMetrics.rmsError - continuousMetrics.rmsError;
+  document.getElementById("comparisonInterpretation").innerHTML =
+    "<strong>Interpretation:</strong> For the current inputs, the delayed case has " +
+    Math.max(0, delayedVsContinuous).toFixed(1) +
+    " m more RMS tracking error than the continuous reference. Compare the rows to see how sampling and latency change performance while the aircraft model and controller gains remain unchanged.";
+
   let active = continuous;
 
   if (mode === "fast") active = fast;
@@ -1032,6 +1123,9 @@ function runTimingSimulation() {
   document.getElementById("delayPlot").style.display = "block";
   document.getElementById("phaseLagPlot").style.display = "block";
   document.getElementById("metricGrid").style.display = "grid";
+  document.getElementById("comparisonResults").style.display = "block";
+  document.getElementById("plotGuide").style.display = "block";
+  document.getElementById("engineeringObservations").style.display = "block";
 
   let altitudeTraces = [];
   let pitchTraces = [];
@@ -1074,9 +1168,9 @@ function runTimingSimulation() {
     ];
 
     phaseLagTraces = [
-      { x: fast.t, y: fast.phaseLag, mode: "lines", name: "Fast timing lag indicator" },
-      { x: slow.t, y: slow.phaseLag, mode: "lines", name: "Slow timing lag indicator" },
-      { x: delayed.t, y: delayed.phaseLag, mode: "lines", name: "Delayed timing lag indicator" }
+      { x: fast.t, y: fast.phaseLag, mode: "lines", name: "Fast measurement-lag indicator" },
+      { x: slow.t, y: slow.phaseLag, mode: "lines", name: "Slow measurement-lag indicator" },
+      { x: delayed.t, y: delayed.phaseLag, mode: "lines", name: "Delayed measurement-lag indicator" }
     ];
   }
 
@@ -1105,7 +1199,7 @@ function runTimingSimulation() {
     ];
 
     phaseLagTraces = [
-      { x: active.t, y: active.phaseLag, mode: "lines", name: "Timing error / phase lag indicator" }
+      { x: active.t, y: active.phaseLag, mode: "lines", name: "Timing error / measurement-lag indicator" }
     ];
   }
 
@@ -1147,20 +1241,18 @@ function runTimingSimulation() {
   }, { responsive: true });
 
   Plotly.newPlot("phaseLagPlot", phaseLagTraces, {
-    title: "Timing Error / Phase Lag Indicator",
+    title: "Timing Error / Measurement Lag Indicator",
     xaxis: { title: "Time (s)" },
     yaxis: { title: "|true altitude - measured altitude| (m)" },
     margin: { l: 70, r: 30, t: 60, b: 60 }
   }, { responsive: true });
 
-  const activeErrors = active.h.map(value => hTarget - value);
-  const rmsError = computeRms(activeErrors);
-  const maxAltitude = Math.max(...active.h);
-  const overshoot = Math.max(0, maxAltitude - hTarget);
-  const finalError = Math.abs(hTarget - active.h[active.h.length - 1]);
-  const maxLag = Math.max(...active.phaseLag);
-  const settlingTime = computeSettlingTime(active.t, active.h, hTarget, 5.0);
-  const peakControl = Math.max(...active.u.map(v => Math.abs(v)));
+  const activeMetrics = calculateMetrics(active, hTarget);
+  const rmsError = activeMetrics.rmsError;
+  const overshoot = activeMetrics.overshoot;
+  const maxLag = activeMetrics.maximumMeasurementLag;
+  const settlingTime = activeMetrics.settlingTime;
+  const peakControl = activeMetrics.peakControl;
   document.getElementById("altMetric").innerHTML = rmsError.toFixed(1) + " m";
   document.getElementById("overshootMetric").innerHTML = overshoot.toFixed(1) + " m";
   document.getElementById("sampleMetric").innerHTML = settlingTime === null ? "Not settled" : settlingTime.toFixed(1) + " s";
@@ -1215,7 +1307,7 @@ function runTimingSimulation() {
   if (mode === "compare") {
     feedback.className = "feedback warn";
     feedback.innerHTML =
-      "<strong>Compare-all mode:</strong> the controller gains and aircraft model are unchanged. The different responses come from controller timing, sample-and-hold behaviour, and delay.";
+      "<strong>Compare-all mode:</strong> all four cases use the same aircraft model and controller gains. The metric cards summarize the delayed case, while the comparison table reports every case. Differences in response arise only from update rate, sample-and-hold behaviour, and sensor latency.";
   }
 }
 window.addEventListener("DOMContentLoaded", () => runTimingSimulation());
