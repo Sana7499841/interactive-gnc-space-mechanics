@@ -472,7 +472,7 @@ th {
 </section>
 
 <section class="lab-card" id="cases">
-  <span class="section-pill">Three Timing Cases</span>
+  <span class="section-pill">Four Timing Cases</span>
 
   <h2>Same Controller, Different Timing</h2>
 
@@ -522,7 +522,7 @@ th {
 
     <div class="choice-row">
       <label>
-        <input type="radio" name="timingMode" value="continuous" checked>
+        <input type="radio" name="timingMode" value="continuous">
         Continuous
       </label>
 
@@ -542,7 +542,7 @@ th {
       </label>
 
       <label>
-        <input type="radio" name="timingMode" value="compare">
+        <input type="radio" name="timingMode" value="compare" checked>
         Compare all
       </label>
     </div>
@@ -555,49 +555,49 @@ th {
     </div>
 
     <label>Controller gain:
-      <input type="range" id="gainSlider" min="0.005" max="0.09" step="0.005" value="0.035"
+      <input type="range" id="gainSlider" min="0.005" max="0.12" step="0.005" value="0.060"
       oninput="document.getElementById('gainVal').textContent=this.value">
-      <span id="gainVal">0.035</span>
+      <span id="gainVal">0.060</span>
     </label>
 
     <br><br>
 
     <label>Sample time:
-      <input type="range" id="sampleSlider" min="0.05" max="1.20" step="0.05" value="0.50"
+      <input type="range" id="sampleSlider" min="0.05" max="2.00" step="0.05" value="1.20"
       oninput="document.getElementById('sampleVal').textContent=this.value">
-      <span id="sampleVal">0.50</span> s
+      <span id="sampleVal">1.20</span> s
     </label>
 
     <br><br>
 
     <label>Sensor delay:
-      <input type="range" id="delaySlider" min="0" max="1.20" step="0.05" value="0.30"
+      <input type="range" id="delaySlider" min="0" max="1.50" step="0.05" value="0.80"
       oninput="document.getElementById('delayVal').textContent=this.value">
-      <span id="delayVal">0.30</span> s
+      <span id="delayVal">0.80</span> s
     </label>
 
     <br><br>
 
     <label>Wind gust strength:
-      <input type="range" id="windSlider" min="0" max="14" step="1" value="6"
+      <input type="range" id="windSlider" min="0" max="16" step="1" value="10"
       oninput="document.getElementById('windVal').textContent=this.value">
-      <span id="windVal">6</span> m/s equivalent
+      <span id="windVal">10</span> m/s equivalent
     </label>
 
     <br><br>
 
     <label>Aircraft damping:
-      <input type="range" id="dampSlider" min="0.05" max="0.80" step="0.05" value="0.25"
+      <input type="range" id="dampSlider" min="0.05" max="0.80" step="0.05" value="0.10"
       oninput="document.getElementById('dampVal').textContent=this.value">
-      <span id="dampVal">0.25</span>
+      <span id="dampVal">0.10</span>
     </label>
 
     <br><br>
 
     <label>Simulation time:
-      <input type="range" id="timeSlider" min="40" max="200" step="20" value="100"
+      <input type="range" id="timeSlider" min="40" max="240" step="20" value="120"
       oninput="document.getElementById('timeVal').textContent=this.value">
-      <span id="timeVal">100</span> s
+      <span id="timeVal">120</span> s
     </label>
 
     <br>
@@ -611,7 +611,7 @@ th {
 
   <div class="result-grid" id="metricGrid" style="display:none;">
     <div class="result-card">
-      <strong>Maximum altitude error</strong>
+      <strong>RMS tracking error</strong>
       <p id="altMetric">--</p>
     </div>
 
@@ -621,12 +621,12 @@ th {
     </div>
 
     <div class="result-card">
-      <strong>Sample time</strong>
+      <strong>Settling time</strong>
       <p id="sampleMetric">--</p>
     </div>
 
     <div class="result-card">
-      <strong>Sensor delay</strong>
+      <strong>Peak control demand</strong>
       <p id="delayMetric">--</p>
     </div>
 
@@ -636,7 +636,7 @@ th {
     </div>
 
     <div class="result-card">
-      <strong>Timing risk level</strong>
+      <strong>Maximum phase lag</strong>
       <p id="riskMetric">--</p>
     </div>
   </div>
@@ -754,9 +754,9 @@ th {
 <pre><code>import numpy as np
 
 dt = 0.01
-t_final = 100
-Ts = 0.5
-delay = 0.3
+t_final = 120
+Ts = 1.2
+delay = 0.8
 
 t = np.arange(0, t_final, dt)
 
@@ -770,9 +770,9 @@ V[0] = 25
 h[0] = 950
 theta[0] = 0
 
-K = 0.035
+K = 0.060
 K_theta = 0.8
-damping = 0.25
+damping = 0.10
 
 current_u = 0
 next_update = 0
@@ -789,7 +789,7 @@ for k in range(len(t)-1):
         current_u = K*(h_target - h_measured) - K_theta*theta_measured
         next_update += Ts
 
-    wind = 6*np.sin(2*np.pi*0.10*t[k])
+    wind = 10*np.sin(2*np.pi*0.10*t[k])
 
     V_dot = -0.015*(V[k] - 25) + 0.04*current_u + 0.03*wind
     h_dot = V[k]*np.sin(theta[k]) + 0.7*wind
@@ -973,6 +973,32 @@ function simulateTiming(mode, gain, sampleTime, sensorDelay, windStrength, dampi
   };
 }
 
+
+function computeRms(values) {
+  if (!values.length) return 0;
+  return Math.sqrt(values.reduce((sum, v) => sum + v*v, 0) / values.length);
+}
+function computeSettlingTime(t, h, target, tolerance) {
+  for (let i = 0; i < h.length; i++) {
+    let settled = true;
+    for (let j = i; j < h.length; j++) {
+      if (Math.abs(h[j] - target) > tolerance) { settled = false; break; }
+    }
+    if (settled) return t[i];
+  }
+  return null;
+}
+function updateLineShapes(result, enabled) {
+  if (!enabled) return [];
+  const shapes = [];
+  for (let i = 0; i < result.t.length; i++) {
+    if (result.updateMarkers[i] === 1) {
+      shapes.push({type:'line',x0:result.t[i],x1:result.t[i],yref:'paper',y0:0,y1:1,line:{color:'rgba(100,116,139,0.30)',width:1,dash:'dot'}});
+    }
+  }
+  return shapes;
+}
+
 function runTimingSimulation() {
 
   const mode = document.querySelector('input[name="timingMode"]:checked').value;
@@ -997,6 +1023,7 @@ function runTimingSimulation() {
   if (mode === "fast") active = fast;
   if (mode === "slow") active = slow;
   if (mode === "delay") active = delayed;
+  if (mode === "compare") active = delayed;
 
   document.getElementById("altitudePlot").style.display = "block";
   document.getElementById("pitchPlot").style.display = "block";
@@ -1082,24 +1109,6 @@ function runTimingSimulation() {
     ];
   }
 
-  if (showMarkers && mode !== "continuous" && mode !== "compare") {
-    const markerTimes = [];
-    const markerValues = [];
-
-    for (let i = 0; i < active.t.length; i++) {
-      if (active.updateMarkers[i] === 1) {
-        markerTimes.push(active.t[i]);
-        markerValues.push(active.u[i]);
-      }
-    }
-
-    sampleHoldTraces.push({
-      x: markerTimes,
-      y: markerValues,
-      mode: "markers",
-      name: "Controller update moments"
-    });
-  }
 
   Plotly.newPlot("altitudePlot", altitudeTraces, {
     title: "Altitude Response",
@@ -1126,7 +1135,8 @@ function runTimingSimulation() {
     title: "Sample-and-Hold Command Behaviour",
     xaxis: { title: "Time (s)" },
     yaxis: { title: "Held command u" },
-    margin: { l: 70, r: 30, t: 60, b: 60 }
+    margin: { l: 70, r: 30, t: 60, b: 60 },
+    shapes: (mode === "compare" ? updateLineShapes(delayed, showMarkers) : updateLineShapes(active, showMarkers && mode !== "continuous"))
   }, { responsive: true });
 
   Plotly.newPlot("delayPlot", delayTraces, {
@@ -1143,19 +1153,18 @@ function runTimingSimulation() {
     margin: { l: 70, r: 30, t: 60, b: 60 }
   }, { responsive: true });
 
-  const activeAltErrors = active.h.map(value => Math.abs(hTarget - value));
-  const maxAltError = Math.max(...activeAltErrors);
-
+  const activeErrors = active.h.map(value => hTarget - value);
+  const rmsError = computeRms(activeErrors);
   const maxAltitude = Math.max(...active.h);
   const overshoot = Math.max(0, maxAltitude - hTarget);
-
   const finalError = Math.abs(hTarget - active.h[active.h.length - 1]);
   const maxLag = Math.max(...active.phaseLag);
-
-  document.getElementById("altMetric").innerHTML = maxAltError.toFixed(1) + " m";
+  const settlingTime = computeSettlingTime(active.t, active.h, hTarget, 5.0);
+  const peakControl = Math.max(...active.u.map(v => Math.abs(v)));
+  document.getElementById("altMetric").innerHTML = rmsError.toFixed(1) + " m";
   document.getElementById("overshootMetric").innerHTML = overshoot.toFixed(1) + " m";
-  document.getElementById("sampleMetric").innerHTML = active.effectiveSampleTime.toFixed(2) + " s";
-  document.getElementById("delayMetric").innerHTML = active.effectiveDelay.toFixed(2) + " s";
+  document.getElementById("sampleMetric").innerHTML = settlingTime === null ? "Not settled" : settlingTime.toFixed(1) + " s";
+  document.getElementById("delayMetric").innerHTML = peakControl.toFixed(2);
 
   const feedback = document.getElementById("feedback");
   const recoveryMetric = document.getElementById("recoveryMetric");
@@ -1173,7 +1182,7 @@ function runTimingSimulation() {
       "<strong>Continuous case:</strong> the controller updates at every integration step. This is the clean reference case, but it is idealized.";
 
     recoveryMetric.innerHTML = '<span class="status-pill">Ideal reference</span>';
-    riskMetric.innerHTML = '<span class="status-pill">Low timing risk</span>';
+    riskMetric.innerHTML = maxLag.toFixed(1) + " m";
   }
 
   else if (riskScore < 25) {
@@ -1182,7 +1191,7 @@ function runTimingSimulation() {
       "<strong>Low timing risk:</strong> the sample time and delay are small enough that behaviour remains close to the continuous case.";
 
     recoveryMetric.innerHTML = '<span class="status-pill">Good recovery</span>';
-    riskMetric.innerHTML = '<span class="status-pill">Low</span>';
+    riskMetric.innerHTML = maxLag.toFixed(1) + " m";
   }
 
   else if (riskScore < 55) {
@@ -1191,7 +1200,7 @@ function runTimingSimulation() {
       "<strong>Moderate timing risk:</strong> sample-and-hold behaviour and/or sensor delay are starting to change the aircraft response.";
 
     recoveryMetric.innerHTML = '<span class="status-pill">Degraded recovery</span>';
-    riskMetric.innerHTML = '<span class="status-pill">Moderate</span>';
+    riskMetric.innerHTML = maxLag.toFixed(1) + " m";
   }
 
   else {
@@ -1200,7 +1209,7 @@ function runTimingSimulation() {
       "<strong>High timing risk:</strong> the controller is reacting too slowly or using delayed information. Oscillation and poor recovery are likely.";
 
     recoveryMetric.innerHTML = '<span class="status-pill">Oscillation risk</span>';
-    riskMetric.innerHTML = '<span class="status-pill">High</span>';
+    riskMetric.innerHTML = maxLag.toFixed(1) + " m";
   }
 
   if (mode === "compare") {
@@ -1209,6 +1218,7 @@ function runTimingSimulation() {
       "<strong>Compare-all mode:</strong> the controller gains and aircraft model are unchanged. The different responses come from controller timing, sample-and-hold behaviour, and delay.";
   }
 }
+window.addEventListener("DOMContentLoaded", () => runTimingSimulation());
 </script>
 
 </body>
