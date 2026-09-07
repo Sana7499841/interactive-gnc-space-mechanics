@@ -1,0 +1,6234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.1.9 Measurement Models | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+</head>
+
+<body>
+
+<!-- ========================================================= -->
+<!-- HEADER -->
+<!-- ========================================================= -->
+
+<header class="notes-hero">
+
+  <h1>Measurement Models</h1>
+
+  <p class="notes-tagline">
+    Mathematical measurement equations for spacecraft sensors and navigation filters:
+    linear and nonlinear models, Jacobians, covariance, innovation, KF/EKF/MEKF/UKF
+    updates, gyroscope and accelerometer propagation, vector sensors, star trackers,
+    GNSS observables, camera/LiDAR RPO models, timing, gating, observability,
+    verification, and estimator implementation.
+  </p>
+
+  <nav class="pill-nav">
+    <a href="index.html" class="pill">Home</a>
+    <a href="tools.html" class="pill">Tools</a>
+    <a href="notes.html" class="pill active">Theory Notes</a>
+    <a href="references.html" class="pill">References</a>
+    <a href="problems.html" class="pill">Problem Bank</a>
+    <a href="about.html" class="pill">About</a>
+  </nav>
+
+</header>
+
+<main class="page-main">
+
+<!-- ========================================================= -->
+<!-- 4.1.9 MEASUREMENT MODELS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h2>4.1.9 Measurement Models</h2>
+
+
+  <p>
+    This page is the mathematical bridge between the physical sensor models and the
+    estimation algorithms that use them. Earlier sections describe what each sensor
+    measures and how its errors arise; here, those physical outputs are written as
+    estimator-compatible equations so that they can be used consistently inside a
+    Kalman filter, Extended Kalman Filter, Multiplicative EKF, Unscented Kalman Filter,
+    particle filter, or relative-navigation estimator.
+  </p>
+
+  <p>
+    A good measurement model must answer six questions for every sensor:
+    <strong>what quantity is measured, in which frame, at what time, with what uncertainty,
+    how that quantity depends on the estimator state, and how invalid or degraded
+    measurements are handled.</strong> The model is therefore more than a single equation;
+    it includes the predicted measurement, covariance, timing, frame definition,
+    validity logic, and—where required—the Jacobian or nonlinear transformation used by
+    the estimator.
+  </p>
+
+  <p>
+    The central estimator relationship is
+    \[
+      \boxed{\mathbf z_k = h(\mathbf x_k) + \mathbf v_k}
+    \]
+    but in real spacecraft software this expands into a complete chain involving
+    calibration, frame transformations, time alignment, measurement prediction,
+    innovation construction, covariance selection, gating, and state correction.
+  </p>
+
+  <p>
+    A <strong>measurement model</strong> mathematically relates the spacecraft state being estimated to the measurement produced by a sensor.
+  </p>
+
+  <p>
+    The fundamental estimator equation is
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = h(\mathbf x_k) + \mathbf v_k }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+\mathbf z_k
+  \]
+
+  <p>
+    is the measurement vector,
+  </p>
+
+  \[
+\mathbf x_k
+  \]
+
+  <p>
+    is the state vector,
+  </p>
+
+  \[
+h(\cdot)
+  \]
+
+  <p>
+    is the sensor measurement function, and
+  </p>
+
+  \[
+\mathbf v_k
+  \]
+
+  <p>
+    is measurement noise.
+  </p>
+
+  <p>
+    For linear measurements,
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = H_k\mathbf x_k + \mathbf v_k }
+  \]
+
+  <p>
+    where \(H_k\) is the measurement matrix.
+  </p>
+
+  <p>
+    For nonlinear spacecraft measurements such as magnetometer vectors, Sun vectors, ranges, bearings, pseudoranges, star-tracker attitude, or LiDAR measurements,
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = h(\mathbf x_k) + \mathbf v_k }
+  \]
+
+  <p>
+    must usually be linearized for an EKF:
+  </p>
+
+  \[
+\boxed{ H_k = \left. \frac{\partial h}{\partial\mathbf x} \right|_{\hat{\mathbf x}_k^-} }
+  \]
+
+  <p>
+    This chapter therefore connects
+  </p>
+
+  \[
+\boxed{ \text{Sensor Physics} \rightarrow \text{Measurement Equation} \rightarrow \text{Innovation} \rightarrow \text{Estimator Update} }
+  \]
+
+  <p>
+    and is the direct mathematical bridge from <strong>Sensor Models</strong> to <strong>Sensor Fusion and State Estimation</strong>.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.1 WHAT IS A MEASUREMENT MODEL? -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.1 What Is a Measurement Model?</h3>
+
+
+  <p>
+    A sensor does not usually measure every element of the spacecraft state directly.
+  </p>
+
+  <p>
+    Suppose
+  </p>
+
+  \[
+\mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \boldsymbol\omega\\ \mathbf b_g\\ \mathbf b_a \end{bmatrix}.
+  \]
+
+  <p>
+    A GNSS receiver may observe position and velocity.
+  </p>
+
+  <p>
+    A star tracker observes attitude.
+  </p>
+
+  <p>
+    A magnetometer observes a magnetic-field vector expressed in the body frame.
+  </p>
+
+  <p>
+    A Sun sensor observes the Sun direction.
+  </p>
+
+  <p>
+    A LiDAR may observe only range.
+  </p>
+
+  <p>
+    Therefore each sensor provides a different mapping
+  </p>
+
+  \[
+\boxed{ \mathbf z_i=h_i(\mathbf x)+\mathbf v_i. }
+  \]
+
+  <p>
+    Sensor fusion works because all those measurements constrain the <strong>same underlying state</strong>.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.2 TRUTH, ESTIMATED STATE AND MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.2 Truth, Estimated State and Measurement</h3>
+
+
+  <p>
+    Three quantities must always be distinguished.
+  </p>
+
+  <h4>True state</h4>
+
+  \[
+\boxed{ \mathbf x }
+  \]
+
+  <p>
+    represents the real spacecraft state.
+  </p>
+
+  <h4>Estimated state</h4>
+
+  \[
+\boxed{ \hat{\mathbf x} }
+  \]
+
+  <p>
+    is the navigation system's current estimate.
+  </p>
+
+  <h4>Sensor measurement</h4>
+
+  \[
+\boxed{ \mathbf z }
+  \]
+
+  <p>
+    is what the hardware reports.
+  </p>
+
+  <p>
+    The predicted measurement is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf z} = h(\hat{\mathbf x}^-). }
+  \]
+
+  <p>
+    The difference between actual and predicted measurement is the <strong>innovation</strong>
+  </p>
+
+  \[
+\boxed{ \mathbf y = \mathbf z-\hat{\mathbf z}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.3 MEASUREMENT RESIDUAL / INNOVATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.3 Measurement Residual / Innovation</h3>
+
+
+  <p>
+    The innovation is fundamental to Kalman filtering:
+  </p>
+
+  \[
+\boxed{ \mathbf y_k = \mathbf z_k - h(\hat{\mathbf x}_k^-). }
+  \]
+
+  <p>
+    It answers:
+  </p>
+
+  <blockquote>
+    How different is the sensor measurement from what the current spacecraft-state estimate predicts?
+  </blockquote>
+
+  <p>
+    If
+  </p>
+
+  \[
+\mathbf y_k\approx0,
+  \]
+
+  <p>
+    the measurement agrees with the prediction.
+  </p>
+
+  <p>
+    A large innovation may indicate:
+  </p>
+
+  <ul>
+
+    <li>genuine state-estimation error,</li>
+
+    <li>sensor noise,</li>
+
+    <li>underestimated covariance,</li>
+
+    <li>sensor bias,</li>
+
+    <li>incorrect dynamic model,</li>
+
+    <li>bad frame transformation,</li>
+
+    <li>timing error,</li>
+
+    <li>measurement fault.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.4 LINEAR MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.4 Linear Measurement Model</h3>
+
+
+  <p>
+    For a linear measurement,
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = H_k\mathbf x_k + \mathbf v_k. }
+  \]
+
+  <p>
+    Suppose
+  </p>
+
+  \[
+\mathbf x= \begin{bmatrix} x\\y\\z\\v_x\\v_y\\v_z \end{bmatrix}
+  \]
+
+  <p>
+    and GNSS measures position only.
+  </p>
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ \mathbf z= \begin{bmatrix} x\\y\\z \end{bmatrix} + \mathbf v }
+  \]
+
+  <p>
+    with
+  </p>
+
+  \[
+\boxed{ H= \begin{bmatrix} 1&0&0&0&0&0\\ 0&1&0&0&0&0\\ 0&0&1&0&0&0 \end{bmatrix}. }
+  \]
+
+  <p>
+    This matrix simply selects the states observed by the sensor.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.5 NONLINEAR MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.5 Nonlinear Measurement Model</h3>
+
+
+  <p>
+    Many spacecraft sensors have nonlinear relationships.
+  </p>
+
+  <p>
+    For example, a range sensor measuring distance to a target gives
+  </p>
+
+  \[
+\boxed{ \rho = \sqrt{ (x_C-x_T)^2+ (y_C-y_T)^2+ (z_C-z_T)^2 } + v_\rho. }
+  \]
+
+  <p>
+    This cannot be written exactly as
+  </p>
+
+  \[
+H\mathbf x.
+  \]
+
+  <p>
+    Instead,
+  </p>
+
+  \[
+\boxed{ z=h(\mathbf x)+v. }
+  \]
+
+  <p>
+    The EKF linearizes \(h\) about the current estimate.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.6 MEASUREMENT JACOBIAN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.6 Measurement Jacobian</h3>
+
+
+  <p>
+    For nonlinear measurement function
+  </p>
+
+  \[
+\mathbf z=h(\mathbf x),
+  \]
+
+  <p>
+    small perturbations satisfy
+  </p>
+
+  \[
+\boxed{ \delta\mathbf z \approx H\delta\mathbf x }
+  \]
+
+  <p>
+    with
+  </p>
+
+  \[
+\boxed{ H = \frac{\partial h}{\partial\mathbf x}. }
+  \]
+
+  <p>
+    For a scalar measurement,
+  </p>
+
+  \[
+H= \begin{bmatrix} \frac{\partial h}{\partial x_1} & \frac{\partial h}{\partial x_2} & \cdots & \frac{\partial h}{\partial x_n} \end{bmatrix}.
+  \]
+
+  <p>
+    The measurement Jacobian tells us how sensitive the sensor observation is to each estimated state.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.7 MEASUREMENT NOISE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.7 Measurement Noise</h3>
+
+
+  <p>
+    The classical model assumes
+  </p>
+
+  \[
+\boxed{ \mathbf v_k \sim \mathcal N(\mathbf0,R_k). }
+  \]
+
+  <p>
+    Here,
+  </p>
+
+  \[
+R_k = E[ \mathbf v_k\mathbf v_k^T ]
+  \]
+
+  <p>
+    is the measurement-noise covariance.
+  </p>
+
+  <p>
+    For independent sensor axes,
+  </p>
+
+  \[
+\boxed{ R = \operatorname{diag} ( \sigma_1^2, \sigma_2^2, \ldots ). }
+  \]
+
+  <p>
+    But this diagonal assumption is not always valid.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.8 MEASUREMENT COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.8 Measurement Covariance</h3>
+
+
+  <p>
+    For a three-axis sensor,
+  </p>
+
+  \[
+R= \begin{bmatrix} \sigma_x^2&R_{xy}&R_{xz}\\ R_{yx}&\sigma_y^2&R_{yz}\\ R_{zx}&R_{zy}&\sigma_z^2 \end{bmatrix}.
+  \]
+
+  <p>
+    Off-diagonal terms represent correlation.
+  </p>
+
+  <p>
+    A good estimator therefore needs both
+  </p>
+
+  \[
+\boxed{ \mathbf z }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ R. }
+  \]
+
+  <p>
+    A measurement without credible uncertainty information is much less useful for optimal fusion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.9 PREDICTED MEASUREMENT COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.9 Predicted Measurement Covariance</h3>
+
+
+  <p>
+    The uncertainty of the innovation is
+  </p>
+
+  \[
+\boxed{ S = HP^-H^T+R }
+  \]
+
+  <p>
+    for a linearized measurement.
+  </p>
+
+  <p>
+    Here,
+  </p>
+
+  <ul>
+
+    <li>\(P^-\) = predicted state covariance,</li>
+
+    <li>\(H\) = measurement Jacobian,</li>
+
+    <li>\(R\) = sensor covariance.</li>
+
+  </ul>
+
+  <p>
+    Thus measurement consistency depends on both navigation uncertainty and sensor uncertainty.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.10 KALMAN GAIN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.10 Kalman Gain</h3>
+
+
+  <p>
+    The Kalman gain is
+  </p>
+
+  \[
+\boxed{ K = P^-H^T S^{-1}. }
+  \]
+
+  <p>
+    Substituting
+  </p>
+
+  \[
+S=HP^-H^T+R,
+  \]
+
+  <p>
+    gives
+  </p>
+
+  \[
+\boxed{ K = P^-H^T (HP^-H^T+R)^{-1}. }
+  \]
+
+  <p>
+    This determines how strongly the measurement corrects the predicted state.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.11 MEANING OF MEASUREMENT COVARIANCE IN FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.11 Meaning of Measurement Covariance in Fusion</h3>
+
+
+  <p>
+    If
+  </p>
+
+  \[
+R\downarrow,
+  \]
+
+  <p>
+    the sensor is treated as more trustworthy.
+  </p>
+
+  <p>
+    Generally,
+  </p>
+
+  \[
+\boxed{ R\downarrow \Rightarrow K\uparrow }
+  \]
+
+  <p>
+    for the observed directions.
+  </p>
+
+  <p>
+    If
+  </p>
+
+  \[
+R\uparrow,
+  \]
+
+  <p>
+    the filter relies more on its propagated state.
+  </p>
+
+  <p>
+    Thus tuning \(R\) is not cosmetic—it changes navigation behaviour directly.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.12 MEASUREMENT UPDATE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.12 Measurement Update</h3>
+
+
+  <p>
+    The EKF update is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + K\mathbf y. }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+\mathbf y = \mathbf z-h(\hat{\mathbf x}^{-}).
+  \]
+
+  <p>
+    Covariance updates as
+  </p>
+
+  \[
+\boxed{ P^{+} = (I-KH)P^{-} }
+  \]
+
+  <p>
+    in the simplest form.
+  </p>
+
+  <p>
+    A numerically robust Joseph form is
+  </p>
+
+  \[
+\boxed{ P^+ = (I-KH)P^-(I-KH)^T + KRK^T. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.13 SENSOR BIAS IN A MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.13 Sensor Bias in a Measurement Model</h3>
+
+
+  <p>
+    Suppose a measurement contains bias:
+  </p>
+
+  \[
+\boxed{ z_m = h(\mathbf x) + b + v. }
+  \]
+
+  <p>
+    There are three main choices.
+  </p>
+
+  <h4>Calibrate it beforehand</h4>
+
+  \[
+z_{corr}=z_m-\hat b.
+  \]
+
+  <h4>Include it in the measurement covariance</h4>
+
+  <p>
+    Only appropriate when the residual bias behaves like an uncertain random error.
+  </p>
+
+  <h4>Estimate it as a state</h4>
+
+  <p>
+    For slowly varying biases,
+  </p>
+
+  \[
+\boxed{ \mathbf x = [ \mathbf x_{vehicle}, b ]^T. }
+  \]
+
+  <p>
+    This is common for gyro and accelerometer biases.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.14 MEASUREMENT FUNCTIONS AND SENSOR ERROR STATES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.14 Measurement Functions and Sensor Error States</h3>
+
+
+  <p>
+    Suppose
+  </p>
+
+  \[
+\mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \mathbf b_g\\ \mathbf b_a \end{bmatrix}.
+  \]
+
+  <p>
+    A measurement may depend directly on only some states.
+  </p>
+
+  <p>
+    For example, a magnetometer depends mainly on attitude:
+  </p>
+
+  \[
+\mathbf B_m^B = C_I^B(\mathbf q)\mathbf B^I + \mathbf v_B.
+  \]
+
+  <p>
+    But because attitude propagation depends on gyro bias, repeated magnetometer updates may indirectly help estimate
+  </p>
+
+  \[
+\mathbf b_g.
+  \]
+
+  <p>
+    This is an important distinction between <strong>direct measurement sensitivity</strong> and <strong>dynamic observability</strong>.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.15 DIRECT AND INDIRECT MEASUREMENTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.15 Direct and Indirect Measurements</h3>
+
+
+  <p>
+    A direct measurement can be represented approximately as
+  </p>
+
+  \[
+\boxed{ z=x_i+v. }
+  \]
+
+  <p>
+    Example:
+  </p>
+
+  \[
+\mathbf r_{GNSS} = \mathbf r+\mathbf v_r.
+  \]
+
+  <p>
+    An indirect measurement is
+  </p>
+
+  \[
+\boxed{ z=h(\mathbf x)+v. }
+  \]
+
+  <p>
+    Example:
+  </p>
+
+  \[
+\mathbf s^B = C_I^B(\mathbf q)\mathbf s^I+\mathbf v_s.
+  \]
+
+  <p>
+    The Sun sensor does not report a quaternion, yet it constrains attitude.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.16 GYROSCOPE MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.16 Gyroscope Measurement Model</h3>
+
+
+  <p>
+    A three-axis gyro model is
+  </p>
+
+  \[
+\boxed{ \boldsymbol\omega_m = (I+S_g+M_g) \boldsymbol\omega + \mathbf b_g + \mathbf n_g. }
+  \]
+
+  <p>
+    For estimator propagation, a simplified form is usually
+  </p>
+
+  \[
+\boxed{ \boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf n_g. }
+  \]
+
+  <p>
+    Thus corrected angular rate is
+  </p>
+
+  \[
+\boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m - \hat{\mathbf b}_g. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.17 GYROSCOPE AS PROCESS INPUT RATHER THAN MEASUREMENT UPDATE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.17 Gyroscope as Process Input Rather Than Measurement Update</h3>
+
+
+  <p>
+    A gyro is often not used as a conventional EKF measurement update.
+  </p>
+
+  <p>
+    Instead,
+  </p>
+
+  \[
+\boxed{ \boldsymbol\omega_m }
+  \]
+
+  <p>
+    drives attitude propagation.
+  </p>
+
+  <p>
+    Quaternion dynamics are
+  </p>
+
+  \[
+\boxed{ \dot q = \frac12 \Omega(\boldsymbol\omega) q. }
+  \]
+
+  <p>
+    Using the gyro,
+  </p>
+
+  \[
+\boxed{ \dot{\hat q} = \frac12 \Omega( \boldsymbol\omega_m-\hat{\mathbf b}_g ) \hat q. }
+  \]
+
+  <p>
+    This is why gyro noise often enters the <strong>process-noise model</strong> <strong>\(Q\)</strong> rather than only the measurement covariance \(R\).
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.18 GYRO BIAS-STATE MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.18 Gyro Bias-State Model</h3>
+
+
+  <p>
+    A common bias model is
+  </p>
+
+  \[
+\boxed{ \dot{\mathbf b}_g = \mathbf w_{bg} }
+  \]
+
+  <p>
+    or
+  </p>
+
+  \[
+\boxed{ \dot{\mathbf b}_g = -\frac1{\tau_g}\mathbf b_g + \mathbf w_{bg}. }
+  \]
+
+  <p>
+    The first is a random walk.
+  </p>
+
+  <p>
+    The second is first-order Gauss-Markov.
+  </p>
+
+  <p>
+    These dynamics belong in the filter state-transition model.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.19 ACCELEROMETER MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.19 Accelerometer Measurement Model</h3>
+
+
+  <p>
+    An accelerometer measures <strong>specific force</strong>, not total inertial acceleration.
+  </p>
+
+  <p>
+    The ideal relationship is
+  </p>
+
+  \[
+\boxed{ \mathbf f^B = C_I^B ( \mathbf a^I-\mathbf g^I ). }
+  \]
+
+  <p>
+    A practical measurement is
+  </p>
+
+  \[
+\boxed{ \mathbf f_m = (I+S_a+M_a)\mathbf f^B + \mathbf b_a + \mathbf n_a. }
+  \]
+
+  <p>
+    The simplified estimator model is
+  </p>
+
+  \[
+\boxed{ \mathbf f_m = \mathbf f^B + \mathbf b_a + \mathbf n_a. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.20 ACCELEROMETER IN NAVIGATION PROPAGATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.20 Accelerometer in Navigation Propagation</h3>
+
+
+  <p>
+    Corrected specific force is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf f}^B = \mathbf f_m-\hat{\mathbf b}_a. }
+  \]
+
+  <p>
+    Transform to inertial/navigation frame:
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf f}^I = C_B^I(\hat q) \hat{\mathbf f}^B. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ \dot{\hat{\mathbf v}} = \hat{\mathbf f}^I + \mathbf g^I + \mathbf a_{model}. }
+  \]
+
+  <p>
+    Position propagation follows:
+  </p>
+
+  \[
+\boxed{ \dot{\hat{\mathbf r}} = \hat{\mathbf v}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.21 ACCELEROMETER BIAS-STATE MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.21 Accelerometer Bias-State Model</h3>
+
+
+  <p>
+    The filter may estimate
+  </p>
+
+  \[
+\mathbf b_a.
+  \]
+
+  <p>
+    For random walk:
+  </p>
+
+  \[
+\boxed{ \dot{\mathbf b}_a = \mathbf w_{ba}. }
+  \]
+
+  <p>
+    For Gauss-Markov:
+  </p>
+
+  \[
+\boxed{ \dot{\mathbf b}_a = -\frac1{\tau_a}\mathbf b_a + \mathbf w_{ba}. }
+  \]
+
+  <p>
+    GNSS or other absolute navigation measurements can make accelerometer bias observable under suitable dynamics.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.22 MAGNETOMETER MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.22 Magnetometer Measurement Model</h3>
+
+
+  <p>
+    The inertial/reference magnetic field is
+  </p>
+
+  \[
+\mathbf B^I.
+  \]
+
+  <p>
+    Expected body-frame magnetic vector is
+  </p>
+
+  \[
+\boxed{ \mathbf B^B = C_I^B(\mathbf q) \mathbf B^I. }
+  \]
+
+  <p>
+    The ideal measurement function is therefore
+  </p>
+
+  \[
+\boxed{ h_B(\mathbf x) = C_I^B(\mathbf q) \mathbf B^I. }
+  \]
+
+  <p>
+    The measurement is
+  </p>
+
+  \[
+\boxed{ \mathbf z_B = \mathbf B_m^B = h_B(\mathbf x) + \mathbf v_B. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.23 FULL MAGNETOMETER MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.23 Full Magnetometer Measurement Model</h3>
+
+
+  <p>
+    Including calibration errors,
+  </p>
+
+  \[
+\boxed{ \mathbf B_m = A_B C_I^B(\mathbf q) \mathbf B^I + \mathbf b_B + \mathbf B_{sc} + \mathbf n_B. }
+  \]
+
+  <p>
+    where
+  </p>
+
+  <ul>
+
+    <li>\(A_B\) includes scale factor and soft-iron effects,</li>
+
+    <li>\(\mathbf b_B\) includes hard-iron offset,</li>
+
+    <li>\(\mathbf B_{sc}\) is spacecraft-generated magnetic field.</li>
+
+  </ul>
+
+  <p>
+    After calibration,
+  </p>
+
+  \[
+\boxed{ \mathbf z_B \approx C_I^B(\mathbf q)\mathbf B^I+\mathbf v_B. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.24 MAGNETOMETER INNOVATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.24 Magnetometer Innovation</h3>
+
+
+  <p>
+    Predicted magnetic measurement:
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf B}^B = C_I^B(\hat q^-)\mathbf B^I. }
+  \]
+
+  <p>
+    Innovation:
+  </p>
+
+  \[
+\boxed{ \mathbf y_B = \mathbf B_m^B - \hat{\mathbf B}^B. }
+  \]
+
+  <p>
+    This innovation carries attitude information.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.25 SMALL-ANGLE MAGNETOMETER JACOBIAN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.25 Small-Angle Magnetometer Jacobian</h3>
+
+
+  <p>
+    For small attitude error
+  </p>
+
+  \[
+\delta\boldsymbol\theta,
+  \]
+
+  <p>
+    approximately
+  </p>
+
+  \[
+\delta\mathbf B^B \approx -[\hat{\mathbf B}^B\times] \delta\boldsymbol\theta
+  \]
+
+  <p>
+    for one error convention.
+  </p>
+
+  <p>
+    Therefore the MEKF measurement matrix includes
+  </p>
+
+  \[
+\boxed{ H_B = \begin{bmatrix} -[\hat{\mathbf B}^B\times] & 0 & \cdots \end{bmatrix}. }
+  \]
+
+  <p>
+    Signs change with attitude-error definition, so convention consistency is essential.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.26 SUN-SENSOR MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.26 Sun-Sensor Measurement Model</h3>
+
+
+  <p>
+    The inertial Sun direction is
+  </p>
+
+  \[
+\mathbf s^I.
+  \]
+
+  <p>
+    Predicted body-frame Sun vector is
+  </p>
+
+  \[
+\boxed{ \mathbf s^B = C_I^B(\mathbf q) \mathbf s^I. }
+  \]
+
+  <p>
+    The sensor measurement is
+  </p>
+
+  \[
+\boxed{ \mathbf z_s = \mathbf s_m^B = C_I^B(\mathbf q)\mathbf s^I + \mathbf v_s. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.27 NORMALIZED SUN-VECTOR MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.27 Normalized Sun-Vector Measurement</h3>
+
+
+  <p>
+    Often only direction is important.
+  </p>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \bar{\mathbf s}_m = \frac{\mathbf s_m} {\|\mathbf s_m\|}. }
+  \]
+
+  <p>
+    The predicted vector is similarly normalized.
+  </p>
+
+  <p>
+    This removes dependence on optical intensity from the attitude measurement.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.28 SUN-SENSOR MEASUREMENT VALIDITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.28 Sun-Sensor Measurement Validity</h3>
+
+
+  <p>
+    The measurement model is conditional.
+  </p>
+
+  <p>
+    During eclipse,
+  </p>
+
+  \[
+\boxed{ valid_{Sun}=0. }
+  \]
+
+  <p>
+    Near sensor FOV limits,
+  </p>
+
+  \[
+R_{Sun}
+  \]
+
+  <p>
+    may increase.
+  </p>
+
+  <p>
+    Thus the practical model is
+  </p>
+
+  \[
+\boxed{ \mathbf z_s= \begin{cases} h_s(\mathbf x)+\mathbf v_s, &valid=1\\ \text{no update}, &valid=0. \end{cases} }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.29 SUN-SENSOR JACOBIAN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.29 Sun-Sensor Jacobian</h3>
+
+
+  <p>
+    For small attitude error,
+  </p>
+
+  \[
+\boxed{ \delta\mathbf s^B \approx -[\hat{\mathbf s}^B\times] \delta\boldsymbol\theta. }
+  \]
+
+  <p>
+    Therefore
+  </p>
+
+  \[
+\boxed{ H_s = \begin{bmatrix} -[\hat{\mathbf s}^B\times]&0&\cdots \end{bmatrix}. }
+  \]
+
+  <p>
+    This has the same mathematical structure as other known-reference vector measurements.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.30 GENERAL REFERENCE-VECTOR MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.30 General Reference-Vector Measurement Model</h3>
+
+
+  <p>
+    Magnetometers and Sun sensors can both be expressed as
+  </p>
+
+  \[
+\boxed{ \mathbf z_i^B = C_I^B(\mathbf q) \mathbf r_i^I + \mathbf v_i. }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+\mathbf r_i^I
+  \]
+
+  <p>
+    is a known inertial reference vector.
+  </p>
+
+  <p>
+    Examples:
+  </p>
+
+  \[
+\mathbf r_1^I=\mathbf B^I
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\mathbf r_2^I=\mathbf s^I.
+  \]
+
+  <p>
+    Thus a common vector-measurement update block can support multiple sensor types.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.31 CROSS-PRODUCT INNOVATION FOR UNIT VECTORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.31 Cross-Product Innovation for Unit Vectors</h3>
+
+
+  <p>
+    Rather than subtracting two normalized vectors directly, some attitude estimators use
+  </p>
+
+  \[
+\boxed{ \mathbf e_i = \mathbf z_i \times \hat{\mathbf z}_i. }
+  \]
+
+  <p>
+    For small angular errors,
+  </p>
+
+  \[
+\mathbf e_i
+  \]
+
+  <p>
+    is approximately proportional to attitude error perpendicular to the reference vector.
+  </p>
+
+  <p>
+    This is useful in compact attitude filters and nonlinear observers.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.32 STAR-TRACKER MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.32 Star-Tracker Measurement Model</h3>
+
+
+  <p>
+    A star tracker usually provides absolute attitude.
+  </p>
+
+  <p>
+    A high-level measurement model is
+  </p>
+
+  \[
+\boxed{ q_m = \delta q_v \otimes q. }
+  \]
+
+  <p>
+    Quaternion noise should not generally be treated as four independent additive Gaussian components because the quaternion must satisfy
+  </p>
+
+  \[
+\boxed{ \|q\|=1. }
+  \]
+
+  <p>
+    Instead attitude error is commonly represented by a three-component small-angle vector.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.33 STAR-TRACKER ERROR QUATERNION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.33 Star-Tracker Error Quaternion</h3>
+
+
+  <p>
+    Suppose
+  </p>
+
+  \[
+q_m
+  \]
+
+  <p>
+    is the measured quaternion and
+  </p>
+
+  \[
+\hat q^-
+  \]
+
+  <p>
+    is predicted attitude.
+  </p>
+
+  <p>
+    Define error quaternion as
+  </p>
+
+  \[
+\boxed{ \delta q_m = q_m \otimes (\hat q^-)^{-1} }
+  \]
+
+  <p>
+    for one convention.
+  </p>
+
+  <p>
+    For small error,
+  </p>
+
+  \[
+\boxed{ \delta q_m \approx \begin{bmatrix} 1\\ \frac12\delta\boldsymbol\theta \end{bmatrix}. }
+  \]
+
+  <p>
+    Then a three-component attitude residual can be extracted.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.34 STAR-TRACKER MEASUREMENT RESIDUAL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.34 Star-Tracker Measurement Residual</h3>
+
+
+  <p>
+    A common MEKF residual is
+  </p>
+
+  \[
+\boxed{ \mathbf y_{ST} \approx 2\, \operatorname{vec} ( q_m\otimes(\hat q^-)^{-1} ). }
+  \]
+
+  <p>
+    For small errors,
+  </p>
+
+  \[
+\boxed{ \mathbf y_{ST} \approx \delta\boldsymbol\theta+\mathbf v_{ST}. }
+  \]
+
+  <p>
+    Thus
+  </p>
+
+  \[
+\boxed{ H_{ST} = \begin{bmatrix} I_{3\times3}&0&\cdots \end{bmatrix} }
+  \]
+
+  <p>
+    for an attitude-error-state vector whose first three entries are \(\delta\boldsymbol\theta\).
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.35 QUATERNION SIGN AMBIGUITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.35 Quaternion Sign Ambiguity</h3>
+
+
+  <p>
+    Quaternions satisfy
+  </p>
+
+  \[
+\boxed{ q \equiv -q. }
+  \]
+
+  <p>
+    Therefore before forming the star-tracker residual, it is common to enforce
+  </p>
+
+  \[
+\boxed{ q_m^T\hat q>0. }
+  \]
+
+  <p>
+    If not,
+  </p>
+
+  \[
+q_m\leftarrow-q_m.
+  \]
+
+  <p>
+    Otherwise the filter may incorrectly interpret equivalent quaternions as a very large attitude error.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.36 STAR-TRACKER COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.36 Star-Tracker Covariance</h3>
+
+
+  <p>
+    Star-tracker accuracy may not be isotropic.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ R_{ST} = \operatorname{diag} ( \sigma_x^2, \sigma_y^2, \sigma_z^2 ). }
+  \]
+
+  <p>
+    Some trackers provide different accuracy about the boresight compared with transverse axes.
+  </p>
+
+  <p>
+    Therefore a scalar attitude-noise value is not always adequate.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.37 STAR-TRACKER VALIDITY MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.37 Star-Tracker Validity Model</h3>
+
+
+  <p>
+    Measurement availability can depend on:
+  </p>
+
+  <ul>
+
+    <li>Sun exclusion,</li>
+
+    <li>Earth/Moon exclusion,</li>
+
+    <li>star count,</li>
+
+    <li>image quality,</li>
+
+    <li>slew rate,</li>
+
+    <li>lost-in-space status.</li>
+
+  </ul>
+
+  <p>
+    Thus
+  </p>
+
+  \[
+\boxed{ valid_{ST} = f( \text{stars}, \text{blinding}, \text{tracking}, \omega, \text{quality} ). }
+  \]
+
+  <p>
+    A rejected star-tracker solution should normally produce <strong>no update</strong>, rather than simply a very large noise term.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.38 GNSS POSITION MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.38 GNSS Position Measurement Model</h3>
+
+
+  <p>
+    At solution level,
+  </p>
+
+  \[
+\boxed{ \mathbf r_m = \mathbf r + \mathbf b_r + \mathbf v_r. }
+  \]
+
+  <p>
+    After calibration/receiver processing,
+  </p>
+
+  \[
+\boxed{ \mathbf z_r = \mathbf r + \mathbf v_r. }
+  \]
+
+  <p>
+    If state is
+  </p>
+
+  \[
+\mathbf x = [ \mathbf r, \mathbf v, \ldots ]^T,
+  \]
+
+  <p>
+    then
+  </p>
+
+  \[
+\boxed{ H_r = \begin{bmatrix} I&0&\cdots \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.39 GNSS VELOCITY MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.39 GNSS Velocity Measurement Model</h3>
+
+
+  <p>
+    Similarly,
+  </p>
+
+  \[
+\boxed{ \mathbf v_m = \mathbf v + \mathbf b_v + \mathbf n_v. }
+  \]
+
+  <p>
+    Simplified:
+  </p>
+
+  \[
+\boxed{ \mathbf z_v = \mathbf v+\mathbf n_v. }
+  \]
+
+  <p>
+    Measurement matrix:
+  </p>
+
+  \[
+\boxed{ H_v = \begin{bmatrix} 0&I&\cdots \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.40 COMBINED GNSS PVT MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.40 Combined GNSS PVT Measurement</h3>
+
+
+  <p>
+    For position and velocity,
+  </p>
+
+  \[
+\boxed{ \mathbf z_{GNSS} = \begin{bmatrix} \mathbf r_m\\ \mathbf v_m \end{bmatrix}. }
+  \]
+
+  <p>
+    Predicted measurement:
+  </p>
+
+  \[
+\boxed{ h_{GNSS}(\mathbf x) = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}. }
+  \]
+
+  <p>
+    Therefore
+  </p>
+
+  \[
+\boxed{ H_{GNSS} = \begin{bmatrix} I&0&0&\cdots\\ 0&I&0&\cdots \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.41 GNSS MEASUREMENT COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.41 GNSS Measurement Covariance</h3>
+
+
+  <p>
+    A full covariance may be
+  </p>
+
+  \[
+\boxed{ R_{GNSS} = \begin{bmatrix} R_r&R_{rv}\\ R_{vr}&R_v \end{bmatrix}. }
+  \]
+
+  <p>
+    Position and velocity errors may be correlated because both are produced by the same internal receiver estimator.
+  </p>
+
+  <p>
+    A diagonal covariance is only an approximation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.42 RAW GNSS PSEUDORANGE MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.42 Raw GNSS Pseudorange Measurement Model</h3>
+
+
+  <p>
+    For satellite \(i\),
+  </p>
+
+  \[
+\boxed{ \rho_i = \| \mathbf r_i-\mathbf r \| + c(\delta t_r-\delta t_i) + I_i + T_i + b_i + n_i. }
+  \]
+
+  <p>
+    After known corrections,
+  </p>
+
+  \[
+\boxed{ \rho_i^{corr} = \| \mathbf r_i-\mathbf r \| + c\delta t_r + v_{\rho,i}. }
+  \]
+
+  <p>
+    This is nonlinear in receiver position.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.43 GNSS PSEUDORANGE JACOBIAN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.43 GNSS Pseudorange Jacobian</h3>
+
+
+  <p>
+    Define
+  </p>
+
+  \[
+\mathbf u_i = \frac{\mathbf r_i-\mathbf r} {\|\mathbf r_i-\mathbf r\|}.
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ \frac{\partial\rho_i} {\partial\mathbf r} = -\mathbf u_i^T. }
+  \]
+
+  <p>
+    If clock bias is expressed in metres,
+  </p>
+
+  \[
+b_c=c\delta t_r,
+  \]
+
+  <p>
+    the row becomes
+  </p>
+
+  \[
+\boxed{ H_{\rho,i} = \begin{bmatrix} -\mathbf u_i^T&0&1&\cdots \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.44 GNSS DOPPLER / RANGE-RATE MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.44 GNSS Doppler / Range-Rate Model</h3>
+
+
+  <p>
+    A simplified range-rate measurement is
+  </p>
+
+  \[
+\boxed{ \dot\rho_i = \mathbf u_i^T (\mathbf v_i-\mathbf v) + c(\dot{\delta t}_r-\dot{\delta t}_i) + n_{\dot\rho,i}. }
+  \]
+
+  <p>
+    After satellite-clock correction,
+  </p>
+
+  \[
+\boxed{ \dot\rho_i \approx \mathbf u_i^T (\mathbf v_i-\mathbf v) + d_c + n_{\dot\rho,i}. }
+  \]
+
+  <p>
+    This constrains spacecraft velocity and receiver clock drift.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.45 GNSS CARRIER-PHASE MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.45 GNSS Carrier-Phase Measurement</h3>
+
+
+  <p>
+    Carrier phase in metres can be represented as
+  </p>
+
+  \[
+\boxed{ L_i = R_i + c(\delta t_r-\delta t_i) - I_i + T_i + \lambda N_i + v_{\phi,i}. }
+  \]
+
+  <p>
+    The unknown integer ambiguity
+  </p>
+
+  \[
+\boxed{ N_i\in\mathbb Z }
+  \]
+
+  <p>
+    may become part of the estimator state in precision relative navigation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.46 GNSS CLOCK STATES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.46 GNSS Clock States</h3>
+
+
+  <p>
+    An integrated raw-GNSS filter may include
+  </p>
+
+  \[
+\boxed{ b_c=c\delta t_r }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ d_c=c\dot{\delta t}_r. }
+  \]
+
+  <p>
+    Clock dynamics can be modeled as
+  </p>
+
+  \[
+\boxed{ \dot b_c=d_c+w_b }
+  \]
+
+  \[
+\boxed{ \dot d_c=w_d. }
+  \]
+
+  <p>
+    These states appear directly in pseudorange and Doppler measurement models.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.47 RANGE MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.47 Range Measurement Model</h3>
+
+
+  <p>
+    For target-relative position
+  </p>
+
+  \[
+\delta\mathbf r = \mathbf r_C-\mathbf r_T,
+  \]
+
+  <p>
+    a range sensor measures
+  </p>
+
+  \[
+\boxed{ \rho = \|\delta\mathbf r\| + v_\rho. }
+  \]
+
+  <p>
+    This is a fundamental RPO measurement.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.48 RANGE JACOBIAN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.48 Range Jacobian</h3>
+
+
+  <p>
+    Let
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf u} = \frac{\delta\mathbf r} {\|\delta\mathbf r\|}. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ \frac{\partial\rho} {\partial\delta\mathbf r} = \hat{\mathbf u}^T. }
+  \]
+
+  <p>
+    For relative state
+  </p>
+
+  \[
+\mathbf x_{rel} = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v \end{bmatrix},
+  \]
+
+  \[
+\boxed{ H_\rho = \begin{bmatrix} \hat{\mathbf u}^T&0 \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.49 RANGE-RATE MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.49 Range-Rate Measurement</h3>
+
+
+  <p>
+    Range rate is
+  </p>
+
+  \[
+\boxed{ \dot\rho = \frac{ \delta\mathbf r^T\delta\mathbf v }{ \|\delta\mathbf r\| } + v_{\dot\rho}. }
+  \]
+
+  <p>
+    Equivalently,
+  </p>
+
+  \[
+\boxed{ \dot\rho = \hat{\mathbf u}^T \delta\mathbf v. }
+  \]
+
+  <p>
+    This is useful for radar, LiDAR, and RF relative-navigation systems.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.50 RANGE-RATE JACOBIAN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.50 Range-Rate Jacobian</h3>
+
+
+  <p>
+    For
+  </p>
+
+  \[
+\dot\rho = \hat{\mathbf u}^T \delta\mathbf v,
+  \]
+
+  <p>
+    the velocity derivative is
+  </p>
+
+  \[
+\boxed{ \frac{\partial\dot\rho} {\partial\delta\mathbf v} = \hat{\mathbf u}^T. }
+  \]
+
+  <p>
+    The position derivative is
+  </p>
+
+  \[
+\boxed{ \frac{\partial\dot\rho} {\partial\delta\mathbf r} = \frac{1}{\rho} \delta\mathbf v^T (I-\hat{\mathbf u}\hat{\mathbf u}^T). }
+  \]
+
+  <p>
+    Thus range-rate depends on both relative position and velocity.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.51 CAMERA BEARING MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.51 Camera Bearing Measurement</h3>
+
+
+  <p>
+    Suppose the target position in camera frame is
+  </p>
+
+  \[
+\mathbf r^C = \begin{bmatrix} x_C\\y_C\\z_C \end{bmatrix}.
+  \]
+
+  <p>
+    Azimuth and elevation may be
+  </p>
+
+  \[
+\boxed{ \alpha = \tan^{-1} \left( \frac{y_C}{x_C} \right) }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \beta = \tan^{-1} \left( \frac{z_C} {\sqrt{x_C^2+y_C^2}} \right). }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ \mathbf z_C = \begin{bmatrix} \alpha\\ \beta \end{bmatrix} + \mathbf v_C. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.52 CAMERA UNIT-LINE-OF-SIGHT MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.52 Camera Unit-Line-of-Sight Measurement</h3>
+
+
+  <p>
+    An alternative is to use a unit LOS vector:
+  </p>
+
+  \[
+\boxed{ \mathbf u_C = \frac{\mathbf r^C} {\|\mathbf r^C\|}. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ \mathbf z_C = \mathbf u_C+\mathbf v_C. }
+  \]
+
+  <p>
+    This avoids angle singularities in some implementations.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.53 PINHOLE CAMERA MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.53 Pinhole Camera Measurement Model</h3>
+
+
+  <p>
+    For camera-frame coordinates
+  </p>
+
+  \[
+(X,Y,Z),
+  \]
+
+  <p>
+    ideal image coordinates are
+  </p>
+
+  \[
+\boxed{ u = f_x\frac{X}{Z}+c_x }
+  \]
+
+  \[
+\boxed{ v = f_y\frac{Y}{Z}+c_y. }
+  \]
+
+  <p>
+    Thus
+  </p>
+
+  \[
+\boxed{ \mathbf z_{pixel} = \pi(\mathbf r^C) + \mathbf v_{pixel}. }
+  \]
+
+  <p>
+    A complete camera model may also include lens distortion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.54 CAMERA MEASUREMENT AND RELATIVE POSE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.54 Camera Measurement and Relative Pose</h3>
+
+
+  <p>
+    If a target feature has known target-frame location
+  </p>
+
+  \[
+\mathbf p_j^T,
+  \]
+
+  <p>
+    its camera-frame coordinate is
+  </p>
+
+  \[
+\boxed{ \mathbf p_j^C = C_T^C(\mathbf q_{rel}) \mathbf p_j^T + \mathbf r_{T/C}^C. }
+  \]
+
+  <p>
+    Projection gives image measurement
+  </p>
+
+  \[
+\boxed{ \mathbf z_j = \pi( \mathbf p_j^C ) + \mathbf v_j. }
+  \]
+
+  <p>
+    This is the basis of feature-based relative pose estimation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.55 LIDAR MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.55 LiDAR Measurement Model</h3>
+
+
+  <p>
+    At simple range level,
+  </p>
+
+  \[
+\boxed{ z_L = \|\delta\mathbf r\| + v_L. }
+  \]
+
+  <p>
+    A more advanced LiDAR can produce 3-D points.
+  </p>
+
+  <p>
+    For target point \(j\),
+  </p>
+
+  \[
+\boxed{ \mathbf p_{L,j} = C_T^L \mathbf p_{T,j} + \mathbf r_{T/L}^L + \mathbf v_j. }
+  \]
+
+  <p>
+    This can constrain relative position and attitude.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.56 RELATIVE POSITION MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.56 Relative Position Measurement</h3>
+
+
+  <p>
+    A cooperative relative-navigation sensor may directly provide
+  </p>
+
+  \[
+\boxed{ \mathbf z_r = \delta\mathbf r + \mathbf v_r. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ H_r = \begin{bmatrix} I&0&\cdots \end{bmatrix}. }
+  \]
+
+  <p>
+    This is one of the simplest RPO measurement models.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.57 RELATIVE VELOCITY MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.57 Relative Velocity Measurement</h3>
+
+
+  <p>
+    Similarly,
+  </p>
+
+  \[
+\boxed{ \mathbf z_v = \delta\mathbf v + \mathbf v_v. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ H_v = \begin{bmatrix} 0&I&\cdots \end{bmatrix}. }
+  \]
+
+  <p>
+    Relative velocity is particularly important for approach and capture safety.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.58 RELATIVE POSE MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.58 Relative Pose Measurement</h3>
+
+
+  <p>
+    For docking,
+  </p>
+
+  \[
+\boxed{ \mathbf z_{pose} = \begin{bmatrix} \delta\mathbf r_m\\ q_{rel,m} \end{bmatrix}. }
+  \]
+
+  <p>
+    Because the quaternion portion is nonlinear/manifold constrained, it is normally converted into a three-component attitude residual before fusion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.59 RELATIVE ANGULAR-RATE MEASUREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.59 Relative Angular-Rate Measurement</h3>
+
+
+  <p>
+    If available,
+  </p>
+
+  \[
+\boxed{ \boldsymbol\omega_{rel,m} = \boldsymbol\omega_{rel} + \mathbf n_\omega. }
+  \]
+
+  <p>
+    A relative docking state may then be
+  </p>
+
+  \[
+\boxed{ \mathbf x_{RPO} = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \delta\boldsymbol\theta\\ \boldsymbol\omega_{rel} \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.60 HILL / LVLH RELATIVE MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.60 Hill / LVLH Relative Measurement Model</h3>
+
+
+  <p>
+    Suppose relative measurements are expressed in Hill frame \(H\).
+  </p>
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ \delta\mathbf r^H = C_I^H ( \mathbf r_C^I-\mathbf r_T^I ). }
+  \]
+
+  <p>
+    A GNSS-derived relative position measurement becomes
+  </p>
+
+  \[
+\boxed{ \mathbf z_H = C_I^H ( \mathbf r_C-\mathbf r_T ) + \mathbf v_H. }
+  \]
+
+  <p>
+    This measurement function depends on both spacecraft states and the target orbital frame.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.61 RELATIVE VELOCITY IN ROTATING FRAME -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.61 Relative Velocity in Rotating Frame</h3>
+
+
+  <p>
+    Relative velocity transformation requires the rotating-frame correction:
+  </p>
+
+  \[
+\boxed{ \delta\mathbf v^H = C_I^H \delta\mathbf v^I - \boldsymbol\omega_{H/I}^{H} \times \delta\mathbf r^H. }
+  \]
+
+  <p>
+    Therefore a Hill-frame velocity measurement should not generally be obtained by simply rotating inertial relative velocity.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.62 MEASUREMENT MODELS FOR CW STATE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.62 Measurement Models for CW State</h3>
+
+
+  <p>
+    For
+  </p>
+
+  \[
+\mathbf x = \begin{bmatrix} x\\y\\z\\\dot x\\\dot y\\\dot z \end{bmatrix},
+  \]
+
+  <p>
+    a full relative-position measurement is
+  </p>
+
+  \[
+\boxed{ \mathbf z_r = \begin{bmatrix} x\\y\\z \end{bmatrix} +\mathbf v_r. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ H_r = \begin{bmatrix} I_3&0_3 \end{bmatrix}. }
+  \]
+
+  <p>
+    A full relative velocity measurement has
+  </p>
+
+  \[
+\boxed{ H_v = \begin{bmatrix} 0_3&I_3 \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.63 BEARING-ONLY RELATIVE NAVIGATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.63 Bearing-Only Relative Navigation</h3>
+
+
+  <p>
+    A camera may observe only LOS direction:
+  </p>
+
+  \[
+\boxed{ \mathbf z = \frac{\delta\mathbf r} {\|\delta\mathbf r\|} + \mathbf v. }
+  \]
+
+  <p>
+    This does not directly measure range.
+  </p>
+
+  <p>
+    Therefore range becomes observable only through:
+  </p>
+
+  <ul>
+
+    <li>spacecraft dynamics,</li>
+
+    <li>relative motion,</li>
+
+    <li>maneuvers,</li>
+
+    <li>additional sensors.</li>
+
+  </ul>
+
+  <p>
+    This is a classic example of <strong>measurement observability</strong>.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.64 RANGE-ONLY NAVIGATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.64 Range-Only Navigation</h3>
+
+
+  <p>
+    Conversely, a ranging sensor gives
+  </p>
+
+  \[
+\boxed{ \rho=\|\delta\mathbf r\|+v. }
+  \]
+
+  <p>
+    It does not independently provide LOS direction.
+  </p>
+
+  <p>
+    Multiple measurements over time or additional sensors are required to reconstruct the full relative state.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.65 MULTI-SENSOR RPO MEASUREMENT VECTOR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.65 Multi-Sensor RPO Measurement Vector</h3>
+
+
+  <p>
+    Suppose GNSS, camera, and LiDAR are simultaneously available.
+  </p>
+
+  <p>
+    A stacked measurement vector can be
+  </p>
+
+  \[
+\boxed{ \mathbf z = \begin{bmatrix} \delta\mathbf r_{GNSS}\\ \alpha_C\\ \beta_C\\ \rho_L \end{bmatrix}. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ h(\mathbf x) = \begin{bmatrix} h_{GNSS}(\mathbf x)\\ h_{camera}(\mathbf x)\\ h_{LiDAR}(\mathbf x) \end{bmatrix}. }
+  \]
+
+  <p>
+    The combined Jacobian is
+  </p>
+
+  \[
+\boxed{ H = \begin{bmatrix} H_{GNSS}\\ H_{camera}\\ H_{LiDAR} \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.66 SEQUENTIAL VS BATCH MEASUREMENT UPDATES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.66 Sequential vs Batch Measurement Updates</h3>
+
+
+  <p>
+    If multiple sensors arrive at the same epoch, they can be processed simultaneously:
+  </p>
+
+  \[
+\boxed{ \mathbf z = \begin{bmatrix} \mathbf z_1\\ \mathbf z_2 \end{bmatrix}. }
+  \]
+
+  <p>
+    Or sequentially:
+  </p>
+
+  \[
+\boxed{ \text{Update Sensor 1} \rightarrow \text{Update Sensor 2}. }
+  \]
+
+  <p>
+    For independent measurements and correct linearization, these can be equivalent in the linear case.
+  </p>
+
+  <p>
+    Sequential processing is often computationally convenient.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.67 BLOCK MEASUREMENT COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.67 Block Measurement Covariance</h3>
+
+
+  <p>
+    For stacked measurements,
+  </p>
+
+  \[
+\boxed{ R = \begin{bmatrix} R_1&R_{12}\\ R_{21}&R_2 \end{bmatrix}. }
+  \]
+
+  <p>
+    If sensors are independent,
+  </p>
+
+  \[
+R_{12}=0.
+  \]
+
+  <p>
+    If they share common error sources, the off-diagonal blocks should not automatically be ignored.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.68 MEASUREMENT CORRELATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.68 Measurement Correlation</h3>
+
+
+  <p>
+    Suppose two GNSS receivers share satellite-clock and orbit errors.
+  </p>
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ E[ \mathbf v_1 \mathbf v_2^T ] \neq0. }
+  \]
+
+  <p>
+    Similarly, two optical sensors mounted on one thermally deforming panel may share alignment errors.
+  </p>
+
+  <p>
+    Naively fusing correlated measurements as independent causes overconfidence.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.69 MEASUREMENT PREPROCESSING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.69 Measurement Preprocessing</h3>
+
+
+  <p>
+    The quantity entering the estimator may be different from raw sensor output.
+  </p>
+
+  <p>
+    Typical chain:
+  </p>
+
+  \[
+\boxed{ \text{Raw Sensor Data} \rightarrow \text{Calibration} \rightarrow \text{Frame Transformation} \rightarrow \text{Validity Check} \rightarrow \text{Measurement Model}. }
+  \]
+
+  <p>
+    For example:
+  </p>
+
+  \[
+\text{Raw magnetometer counts} \rightarrow \text{tesla/nT} \rightarrow \text{hard/soft-iron correction} \rightarrow \mathbf B^B.
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.70 CALIBRATION IN MEASUREMENT MODELS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.70 Calibration in Measurement Models</h3>
+
+
+  <p>
+    Suppose
+  </p>
+
+  \[
+\mathbf z_{raw} = A\mathbf z_{true} + \mathbf b + \mathbf n.
+  \]
+
+  <p>
+    Corrected measurement is
+  </p>
+
+  \[
+\boxed{ \mathbf z_{cal} = \hat A^{-1} ( \mathbf z_{raw}-\hat{\mathbf b} ). }
+  \]
+
+  <p>
+    Residual calibration uncertainty should remain represented in \(R\), or the calibration parameters may themselves be estimated.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.71 FRAME TRANSFORMATIONS BEFORE FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.71 Frame Transformations Before Fusion</h3>
+
+
+  <p>
+    Suppose sensor measurement is in sensor frame \(S\):
+  </p>
+
+  \[
+\mathbf z^S.
+  \]
+
+  <p>
+    To fuse it in body frame,
+  </p>
+
+  \[
+\boxed{ \mathbf z^B = C_S^B \mathbf z^S. }
+  \]
+
+  <p>
+    Its covariance transforms as
+  </p>
+
+  \[
+\boxed{ R^B = C_S^B R^S (C_S^B)^T. }
+  \]
+
+  <p>
+    Both measurement and covariance must be transformed consistently.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.72 MEASUREMENT TIMING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.72 Measurement Timing</h3>
+
+
+  <p>
+    The true measurement model is often
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = h( \mathbf x(t_k) ) + \mathbf v_k. }
+  \]
+
+  <p>
+    If the sensor has latency,
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = h( \mathbf x(t_k-\tau) ) + \mathbf v_k. }
+  \]
+
+  <p>
+    Using
+  </p>
+
+  \[
+h(\mathbf x(t_k))
+  \]
+
+  <p>
+    instead can create systematic innovation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.73 TIMESTAMP ERROR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.73 Timestamp Error</h3>
+
+
+  <p>
+    If measurement timestamp contains uncertainty
+  </p>
+
+  \[
+\delta t,
+  \]
+
+  <p>
+    then
+  </p>
+
+  \[
+\boxed{ \delta\mathbf z \approx \dot h(\mathbf x)\delta t. }
+  \]
+
+  <p>
+    For position,
+  </p>
+
+  \[
+\boxed{ \delta\mathbf r \approx \mathbf v\delta t. }
+  \]
+
+  <p>
+    For attitude,
+  </p>
+
+  \[
+\boxed{ \delta\boldsymbol\theta \approx \boldsymbol\omega\delta t. }
+  \]
+
+  <p>
+    Thus timing uncertainty can be represented as an additional effective measurement error.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.74 ASYNCHRONOUS MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.74 Asynchronous Measurement Model</h3>
+
+
+  <p>
+    Sensors arrive at different epochs:
+  </p>
+
+  \[
+t_{gyro}, \quad t_{ST}, \quad t_{GNSS}, \quad t_{LiDAR}.
+  \]
+
+  <p>
+    The filter should therefore follow:
+  </p>
+
+  \[
+\boxed{ \text{Propagate to Measurement Time} \rightarrow \text{Update} \rightarrow \text{Continue Propagation}. }
+  \]
+
+  <p>
+    Measurements should not be artificially forced into one common rate unless resampling is explicitly designed.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.75 OUT-OF-SEQUENCE MEASUREMENTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.75 Out-of-Sequence Measurements</h3>
+
+
+  <p>
+    Suppose
+  </p>
+
+  \[
+t_m<t_{current}.
+  \]
+
+  <p>
+    Possible solutions include:
+  </p>
+
+  <ul>
+
+    <li>discard the old measurement,</li>
+
+    <li>update a stored historical state,</li>
+
+    <li>repropagate after update,</li>
+
+    <li>use delayed-state filtering.</li>
+
+  </ul>
+
+  <p>
+    The correct approach depends on accuracy requirements and latency magnitude.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.76 MEASUREMENT VALIDITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.76 Measurement Validity</h3>
+
+
+  <p>
+    A complete measurement packet should include
+  </p>
+
+  \[
+\boxed{ \mathcal Z_i = \{ \mathbf z_i, t_i, R_i, valid_i, quality_i, status_i \}. }
+  \]
+
+  <p>
+    The estimator should update only if
+  </p>
+
+  \[
+\boxed{ valid_i=1. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.77 MEASUREMENT GATING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.77 Measurement Gating</h3>
+
+
+  <p>
+    Before fusion, compare innovation with expected uncertainty.
+  </p>
+
+  <p>
+    Compute
+  </p>
+
+  \[
+\boxed{ d^2 = \mathbf y^T S^{-1} \mathbf y. }
+  \]
+
+  <p>
+    If
+  </p>
+
+  \[
+\boxed{ d^2>\gamma, }
+  \]
+
+  <p>
+    the measurement may be rejected.
+  </p>
+
+  <p>
+    This is called Mahalanobis or innovation gating.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.78 CHI-SQUARE CONSISTENCY TEST -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.78 Chi-Square Consistency Test</h3>
+
+
+  <p>
+    If assumptions are approximately Gaussian and the innovation has \(m\) dimensions,
+  </p>
+
+  \[
+\boxed{ d^2 = \mathbf y^T S^{-1}\mathbf y }
+  \]
+
+  <p>
+    approximately follows a chi-square distribution with \(m\) degrees of freedom under nominal conditions.
+  </p>
+
+  <p>
+    Therefore \(\gamma\) can be selected from a desired confidence level.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.79 NORMALIZED INNOVATION SQUARED -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.79 Normalized Innovation Squared</h3>
+
+
+  <p>
+    The statistic
+  </p>
+
+  \[
+\boxed{ NIS = \mathbf y^T S^{-1} \mathbf y }
+  \]
+
+  <p>
+    is useful for:
+  </p>
+
+  <ul>
+
+    <li>measurement validation,</li>
+
+    <li>filter consistency,</li>
+
+    <li>covariance tuning,</li>
+
+    <li>Monte Carlo verification.</li>
+
+  </ul>
+
+  <p>
+    Persistent excessive NIS may indicate underestimated \(R\), incorrect \(Q\), model error, or sensor problems.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.80 INNOVATION WHITENESS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.80 Innovation Whiteness</h3>
+
+
+  <p>
+    In a consistent filter, innovations should approximately behave as zero-mean white sequences.
+  </p>
+
+  <p>
+    Ideally,
+  </p>
+
+  \[
+\boxed{ E[\mathbf y_k]\approx0 }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ E[ \mathbf y_k \mathbf y_{k-j}^T ] \approx0 \qquad j\neq0. }
+  \]
+
+  <p>
+    Strong temporal correlation indicates that the estimator or noise model may be missing important dynamics.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.81 ADAPTIVE MEASUREMENT COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.81 Adaptive Measurement Covariance</h3>
+
+
+  <p>
+    Instead of constant
+  </p>
+
+  \[
+R_i,
+  \]
+
+  <p>
+    use
+  </p>
+
+  \[
+\boxed{ R_i = R_i( \text{signal quality}, \text{geometry}, \text{environment}, \text{mode} ). }
+  \]
+
+  <p>
+    Examples:
+  </p>
+
+  \[
+R_{GNSS}=R(PDOP,C/N_0),
+  \]
+
+  \[
+R_{ST}=R(\omega,\text{star count}),
+  \]
+
+  \[
+R_{Sun}=R(\theta_{incidence}),
+  \]
+
+  \[
+R_{LiDAR}=R(\rho,\text{return quality}).
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.82 MISSING MEASUREMENTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.82 Missing Measurements</h3>
+
+
+  <p>
+    If a measurement is unavailable,
+  </p>
+
+  \[
+valid=0,
+  \]
+
+  <p>
+    the filter simply omits that update.
+  </p>
+
+  <p>
+    Propagation continues:
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf x}_{k+1}^- = f(\hat{\mathbf x}_k^+). }
+  \]
+
+  <p>
+    The covariance generally grows while absolute updates are unavailable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.83 MEASUREMENT DROPOUT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.83 Measurement Dropout</h3>
+
+
+  <p>
+    A dropout model can be written
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = \begin{cases} h(\mathbf x_k)+\mathbf v_k, &\delta_k=1\\ \emptyset, &\delta_k=0. \end{cases} }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+\delta_k\in\{0,1\}.
+  \]
+
+  <p>
+    Dropouts can be deterministic or probabilistic.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.84 MEASUREMENT SATURATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.84 Measurement Saturation</h3>
+
+
+  <p>
+    Suppose sensor output limits are
+  </p>
+
+  \[
+z_{min},z_{max}.
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ z_m = \operatorname{sat} ( h(\mathbf x)+v ). }
+  \]
+
+  <p>
+    A saturated measurement is not Gaussian around truth and should normally be flagged.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.85 MEASUREMENT QUANTISATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.85 Measurement Quantisation</h3>
+
+
+  <p>
+    A quantized measurement is
+  </p>
+
+  \[
+\boxed{ z_q = \Delta \operatorname{round} \left( \frac{z}{\Delta} \right). }
+  \]
+
+  <p>
+    For sufficiently fine quantization, the effect may be approximated as additional white noise with
+  </p>
+
+  \[
+\boxed{ \sigma_q^2 \approx \frac{\Delta^2}{12}. }
+  \]
+
+  <p>
+    For coarse quantization, an explicit quantizer is preferable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.86 OUTLIERS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.86 Outliers</h3>
+
+
+  <p>
+    A simple outlier model is
+  </p>
+
+  \[
+\boxed{ z_m = h(\mathbf x)+v+o }
+  \]
+
+  <p>
+    where \(o\) is a large occasional error.
+  </p>
+
+  <p>
+    Gaussian Kalman filters are not inherently robust to large outliers.
+  </p>
+
+  <p>
+    Therefore gating and FDIR are important.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.87 HEAVY-TAILED MEASUREMENT NOISE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.87 Heavy-Tailed Measurement Noise</h3>
+
+
+  <p>
+    Some sensor errors are better represented by heavy-tailed distributions than Gaussian noise.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>optical false detections,</li>
+
+    <li>multipath,</li>
+
+    <li>feature mismatches,</li>
+
+    <li>occasional GNSS faults.</li>
+
+  </ul>
+
+  <p>
+    A robust estimator may use:
+  </p>
+
+  <ul>
+
+    <li>Huber loss,</li>
+
+    <li>mixture models,</li>
+
+    <li>covariance inflation,</li>
+
+    <li>outlier rejection.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.88 MEASUREMENT BIAS ESTIMATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.88 Measurement Bias Estimation</h3>
+
+
+  <p>
+    If a sensor bias appears directly,
+  </p>
+
+  \[
+z = h(\mathbf x)+b+v,
+  \]
+
+  <p>
+    augment the state:
+  </p>
+
+  \[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ b \end{bmatrix}. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ H_a = \begin{bmatrix} \frac{\partial h}{\partial\mathbf x} & 1 \end{bmatrix}. }
+  \]
+
+  <p>
+    The bias can only be estimated if it is observable relative to other states and sensors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.89 SCALE-FACTOR ESTIMATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.89 Scale-Factor Estimation</h3>
+
+
+  <p>
+    Suppose
+  </p>
+
+  \[
+z = (1+s)h(\mathbf x)+v.
+  \]
+
+  <p>
+    If \(s\) is estimated,
+  </p>
+
+  \[
+\boxed{ \frac{\partial z}{\partial s} = h(\mathbf x). }
+  \]
+
+  <p>
+    Thus scale factor may be poorly observable when the physical input remains close to zero.
+  </p>
+
+  <p>
+    This illustrates why calibration maneuvers are useful.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.90 ALIGNMENT ERROR ESTIMATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.90 Alignment Error Estimation</h3>
+
+
+  <p>
+    If a sensor frame contains small misalignment
+  </p>
+
+  \[
+\delta\boldsymbol\alpha,
+  \]
+
+  <p>
+    then approximately
+  </p>
+
+  \[
+\boxed{ C_{S,true}^{B} \approx C_{S,nom}^{B} ( I-[\delta\boldsymbol\alpha\times] ). }
+  \]
+
+  <p>
+    The measurement Jacobian can then include derivatives with respect to alignment-error states.
+  </p>
+
+  <p>
+    This is useful in high-accuracy integrated navigation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.91 MEASUREMENT OBSERVABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.91 Measurement Observability</h3>
+
+
+  <p>
+    For linear systems, the observability matrix is
+  </p>
+
+  \[
+\boxed{ \mathcal O = \begin{bmatrix} H\\ HF\\ HF^2\\ \vdots \end{bmatrix}. }
+  \]
+
+  <p>
+    If
+  </p>
+
+  \[
+\operatorname{rank}(\mathcal O)=n,
+  \]
+
+  <p>
+    all \(n\) states are observable.
+  </p>
+
+  <p>
+    For nonlinear systems, local observability is more complicated, but the basic idea remains:
+  </p>
+
+  \[
+\boxed{ \text{A State Can Be Estimated Only If Measurements Contain Information About It}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.92 ONE VECTOR CANNOT DETERMINE FULL ATTITUDE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.92 One Vector Cannot Determine Full Attitude</h3>
+
+
+  <p>
+    A single known vector measurement satisfies
+  </p>
+
+  \[
+\mathbf z=C_I^B\mathbf r^I.
+  \]
+
+  <p>
+    Rotation around that vector leaves the measurement unchanged.
+  </p>
+
+  <p>
+    Therefore one vector provides only two independent attitude constraints.
+  </p>
+
+  <p>
+    Thus
+  </p>
+
+  \[
+\boxed{ \text{Sun Sensor Alone} \not\Rightarrow \text{Unique 3-Axis Attitude}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.93 TWO-VECTOR ATTITUDE OBSERVABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.93 Two-Vector Attitude Observability</h3>
+
+
+  <p>
+    With two non-collinear vectors
+  </p>
+
+  \[
+\mathbf r_1^I,\mathbf r_2^I,
+  \]
+
+  <p>
+    three-axis attitude can be determined.
+  </p>
+
+  <p>
+    But as
+  </p>
+
+  \[
+\boxed{ \|\mathbf r_1^I\times\mathbf r_2^I\| \rightarrow0, }
+  \]
+
+  <p>
+    the geometry becomes poorly conditioned.
+  </p>
+
+  <p>
+    Therefore measurement geometry directly influences observability and covariance.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.94 RANGE AND BEARING OBSERVABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.94 Range and Bearing Observability</h3>
+
+
+  <p>
+    Range-only measurement provides radial information.
+  </p>
+
+  <p>
+    Bearing-only provides angular information.
+  </p>
+
+  <p>
+    Combining them gives much stronger relative-position observability:
+  </p>
+
+  \[
+\boxed{ \text{Range} + \text{Bearing} \rightarrow \text{3-D Relative Geometry}. }
+  \]
+
+  <p>
+    This explains the strong complementarity of LiDAR and camera measurements.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.95 STATE-DEPENDENT MEASUREMENT SENSITIVITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.95 State-Dependent Measurement Sensitivity</h3>
+
+
+  <p>
+    Measurement quality can vary with state.
+  </p>
+
+  <p>
+    For example, camera bearing sensitivity depends on range.
+  </p>
+
+  <p>
+    A small transverse displacement at short range causes a larger angle change than the same displacement at long range.
+  </p>
+
+  <p>
+    Therefore
+  </p>
+
+  \[
+\boxed{ H=H(\mathbf x). }
+  \]
+
+  <p>
+    This is one reason nonlinear RPO filters have strongly geometry-dependent performance.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.96 MEASUREMENT SINGULARITIES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.96 Measurement Singularities</h3>
+
+
+  <p>
+    Some parameterizations contain singularities.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\alpha=\tan^{-1}(y/x)
+  \]
+
+  <p>
+    can become problematic near
+  </p>
+
+  \[
+x=0.
+  \]
+
+  <p>
+    Elevation equations may also become ill-conditioned near poles.
+  </p>
+
+  <p>
+    Unit-vector or Cartesian residual formulations can avoid some angle-coordinate singularities.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.97 NORMALIZATION-INDUCED CORRELATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.97 Normalization-Induced Correlation</h3>
+
+
+  <p>
+    If a measured vector is normalized,
+  </p>
+
+  \[
+\bar{\mathbf z} = \frac{\mathbf z}{\|\mathbf z\|},
+  \]
+
+  <p>
+    its three components are no longer independent because
+  </p>
+
+  \[
+\boxed{ \|\bar{\mathbf z}\|=1. }
+  \]
+
+  <p>
+    Therefore normalized-vector covariance lies primarily in the tangent plane perpendicular to the vector.
+  </p>
+
+  <p>
+    This matters in high-accuracy vector measurement modelling.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.98 QUATERNION MEASUREMENTS LIVE ON A MANIFOLD -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.98 Quaternion Measurements Live on a Manifold</h3>
+
+
+  <p>
+    Quaternions satisfy
+  </p>
+
+  \[
+\|q\|=1.
+  \]
+
+  <p>
+    Therefore treating quaternion error as
+  </p>
+
+  \[
+q_m-q
+  \]
+
+  <p>
+    in four-dimensional Euclidean space can be misleading.
+  </p>
+
+  <p>
+    Attitude residuals should generally be defined through group composition:
+  </p>
+
+  \[
+\boxed{ \delta q = q_m\otimes q^{-1}. }
+  \]
+
+  <p>
+    Then convert to a minimal three-component attitude error.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.99 MEASUREMENT MODELS IN MEKF -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.99 Measurement Models in MEKF</h3>
+
+
+  <p>
+    A typical MEKF error state is
+  </p>
+
+  \[
+\boxed{ \delta\mathbf x = \begin{bmatrix} \delta\boldsymbol\theta\\ \mathbf b_g \end{bmatrix}. }
+  \]
+
+  <p>
+    Vector sensor measurement:
+  </p>
+
+  \[
+\boxed{ \mathbf z_i = C_I^B(q)\mathbf r_i^I+\mathbf v_i. }
+  \]
+
+  <p>
+    Linearized residual:
+  </p>
+
+  \[
+\boxed{ \mathbf y_i \approx -[\hat{\mathbf z}_i\times] \delta\boldsymbol\theta + \mathbf v_i. }
+  \]
+
+  <p>
+    Thus
+  </p>
+
+  \[
+\boxed{ H_i = \begin{bmatrix} -[\hat{\mathbf z}_i\times]&0 \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.100 MEASUREMENT MODELS IN UKF -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.100 Measurement Models in UKF</h3>
+
+
+  <p>
+    The UKF does not require explicit Jacobians.
+  </p>
+
+  <p>
+    For sigma points
+  </p>
+
+  \[
+\chi_i,
+  \]
+
+  <p>
+    evaluate
+  </p>
+
+  \[
+\boxed{ \mathbf z_i = h(\chi_i). }
+  \]
+
+  <p>
+    The predicted measurement mean is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf z} = \sum_iW_i^{(m)}\mathbf z_i. }
+  \]
+
+  <p>
+    Measurement covariance is
+  </p>
+
+  \[
+\boxed{ P_{zz} = \sum_i W_i^{(c)} (\mathbf z_i-\hat{\mathbf z}) (\mathbf z_i-\hat{\mathbf z})^T + R. }
+  \]
+
+  <p>
+    Cross covariance is
+  </p>
+
+  \[
+\boxed{ P_{xz} = \sum_i W_i^{(c)} (\chi_i-\hat{\mathbf x}) (\mathbf z_i-\hat{\mathbf z})^T. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.101 UKF MEASUREMENT UPDATE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.101 UKF Measurement Update</h3>
+
+
+  <p>
+    The gain is
+  </p>
+
+  \[
+\boxed{ K = P_{xz}P_{zz}^{-1}. }
+  \]
+
+  <p>
+    Update:
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + K( \mathbf z-\hat{\mathbf z} ). }
+  \]
+
+  <p>
+    Covariance:
+  </p>
+
+  \[
+\boxed{ P^+ = P^- - KP_{zz}K^T. }
+  \]
+
+  <p>
+    For attitude, special care is still required because quaternions do not behave like unconstrained Euclidean states.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.102 MEASUREMENT MODELS IN PARTICLE FILTERS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.102 Measurement Models in Particle Filters</h3>
+
+
+  <p>
+    A particle filter represents state distribution using particles
+  </p>
+
+  \[
+\mathbf x^{(i)}.
+  \]
+
+  <p>
+    For each measurement,
+  </p>
+
+  \[
+\boxed{ w_i \propto p( \mathbf z \mid \mathbf x^{(i)} ). }
+  \]
+
+  <p>
+    For Gaussian measurement noise,
+  </p>
+
+  \[
+\boxed{ p(\mathbf z|\mathbf x) \propto \exp \left[ -\frac12 (\mathbf z-h(\mathbf x))^T R^{-1} (\mathbf z-h(\mathbf x)) \right]. }
+  \]
+
+  <p>
+    Thus the measurement model is still central even when no Jacobian is required.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.103 MEASUREMENT LIKELIHOOD -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.103 Measurement Likelihood</h3>
+
+
+  <p>
+    The probability of a measurement given state is
+  </p>
+
+  \[
+\boxed{ p(\mathbf z|\mathbf x). }
+  \]
+
+  <p>
+    For Gaussian noise,
+  </p>
+
+  \[
+\boxed{ p(\mathbf z|\mathbf x) = \frac{ \exp [ -\frac12\mathbf y^TR^{-1}\mathbf y ] }{ \sqrt{ (2\pi)^m|R| } }. }
+  \]
+
+  <p>
+    This connects Kalman filtering to the broader Bayesian estimation framework.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.104 MEASUREMENT INFORMATION MATRIX -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.104 Measurement Information Matrix</h3>
+
+
+  <p>
+    For linear Gaussian measurements,
+  </p>
+
+  \[
+\boxed{ \Lambda_z = H^TR^{-1}H. }
+  \]
+
+  <p>
+    This matrix quantifies measurement information about the state.
+  </p>
+
+  <p>
+    Sensors with good geometry and low uncertainty contribute more information.
+  </p>
+
+  <p>
+    This is useful for sensor selection and observability studies.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.105 FISHER INFORMATION PERSPECTIVE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.105 Fisher Information Perspective</h3>
+
+
+  <p>
+    Measurement quality can also be studied through Fisher information.
+  </p>
+
+  <p>
+    For Gaussian observations,
+  </p>
+
+  \[
+\boxed{ \mathcal I \approx H^TR^{-1}H. }
+  \]
+
+  <p>
+    This helps answer:
+  </p>
+
+  <blockquote>
+    Which sensor geometry or measurement schedule best constrains the states we care about?
+  </blockquote>
+
+  <p>
+    This is important in GNSS satellite geometry, optical navigation, and sensor placement.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.106 DYNAMIC MEASUREMENT COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.106 Dynamic Measurement Covariance</h3>
+
+
+  <p>
+    A practical filter may use
+  </p>
+
+  \[
+\boxed{ R_k = R( \text{sensor condition at }k ). }
+  \]
+
+  <p>
+    Examples:
+  </p>
+
+  <p>
+    GNSS:
+  </p>
+
+  \[
+\boxed{ R_{GNSS} = R(DOP,C/N_0,N_{sat}). }
+  \]
+
+  <p>
+    Star tracker:
+  </p>
+
+  \[
+\boxed{ R_{ST} = R(N_{stars},\omega,\text{blinding margin}). }
+  \]
+
+  <p>
+    LiDAR:
+  </p>
+
+  \[
+\boxed{ R_L = R(\rho,\text{return strength}). }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.107 COVARIANCE INFLATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.107 Covariance Inflation</h3>
+
+
+  <p>
+    If a sensor becomes degraded but remains usable,
+  </p>
+
+  \[
+\boxed{ R_{degraded} = \lambda R_{nominal}, \qquad \lambda>1. }
+  \]
+
+  <p>
+    This reduces its influence without discarding it entirely.
+  </p>
+
+  <p>
+    Covariance inflation is useful when quality indicators indicate degraded confidence.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.108 MEASUREMENT REJECTION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.108 Measurement Rejection</h3>
+
+
+  <p>
+    When a measurement is clearly invalid,
+  </p>
+
+  \[
+\boxed{ \text{Reject} \neq \text{Set Huge }R }
+  \]
+
+  <p>
+    conceptually.
+  </p>
+
+  <p>
+    A rejected measurement should normally generate no state update.
+  </p>
+
+  <p>
+    The distinction matters for software logic and fault reporting.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.109 MEASUREMENT AGE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.109 Measurement Age</h3>
+
+
+  <p>
+    Define
+  </p>
+
+  \[
+\boxed{ t_{age} = t_{current} - t_{measurement}. }
+  \]
+
+  <p>
+    A measurement may be rejected if
+  </p>
+
+  \[
+\boxed{ t_{age}>t_{max}. }
+  \]
+
+  <p>
+    This is particularly important for:
+  </p>
+
+  <ul>
+
+    <li>GNSS,</li>
+
+    <li>star trackers,</li>
+
+    <li>inter-spacecraft data,</li>
+
+    <li>vision processing.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.110 MEASUREMENT PACKET ARCHITECTURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.110 Measurement Packet Architecture</h3>
+
+
+  <p>
+    A robust software measurement packet might contain
+  </p>
+
+  \[
+\boxed{ \mathcal M_i = \{ type_i, \mathbf z_i, R_i, t_i, frame_i, valid_i, quality_i, status_i \}. }
+  \]
+
+  <p>
+    This prevents the estimator from assuming that every sensor has identical timing, frame, dimension, or covariance.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.111 FRAME METADATA -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.111 Frame Metadata</h3>
+
+
+  <p>
+    A measurement should identify its frame.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  \[
+\boxed{ BODY }
+  \]
+
+  \[
+\boxed{ ECI }
+  \]
+
+  \[
+\boxed{ ECEF }
+  \]
+
+  \[
+\boxed{ LVLH }
+  \]
+
+  \[
+\boxed{ CAMERA }
+  \]
+
+  \[
+\boxed{ SENSOR. }
+  \]
+
+  <p>
+    A measurement without known frame definition is not mathematically usable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.112 MEASUREMENT UNITS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.112 Measurement Units</h3>
+
+
+  <p>
+    Likewise, units must be explicit.
+  </p>
+
+  <p>
+    Examples:
+  </p>
+
+  \[
+rad/s
+  \]
+
+  \[
+m/s^2
+  \]
+
+  \[
+T
+  \]
+
+  \[
+m
+  \]
+
+  \[
+m/s
+  \]
+
+  \[
+rad.
+  \]
+
+  <p>
+    Measurement covariance must use the corresponding squared units.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+R_\theta
+  \]
+
+  <p>
+    has units
+  </p>
+
+  \[
+rad^2.
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.113 CONVERTING DATASHEET NOISE TO `R` -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.113 Converting Datasheet Noise to \(R\)</h3>
+
+
+  <p>
+    Suppose sensor noise density is
+  </p>
+
+  \[
+N_d.
+  \]
+
+  <p>
+    If effective bandwidth is \(B\),
+  </p>
+
+  \[
+\boxed{ \sigma \approx N_d\sqrt B }
+  \]
+
+  <p>
+    under appropriate PSD conventions.
+  </p>
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ R=\sigma^2. }
+  \]
+
+  <p>
+    But datasheet noise density, RMS noise, random walk, bias instability, and maximum accuracy are not interchangeable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.114 MEASUREMENT NOISE VS PROCESS NOISE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.114 Measurement Noise vs Process Noise</h3>
+
+
+  <p>
+    A critical distinction is:
+  </p>
+
+  \[
+\boxed{ R = \text{Measurement Uncertainty} }
+  \]
+
+  <p>
+    whereas
+  </p>
+
+  \[
+\boxed{ Q = \text{State-Propagation Uncertainty}. }
+  \]
+
+  <p>
+    For example, gyro white noise used to propagate attitude often contributes to \(Q\).
+  </p>
+
+  <p>
+    Star-tracker attitude noise belongs in \(R_{ST}\).
+  </p>
+
+  <p>
+    Do not insert all sensor specifications blindly into \(R\).
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.115 DISCRETE MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.115 Discrete Measurement Model</h3>
+
+
+  <p>
+    Measurements arrive at discrete epochs:
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = h_k(\mathbf x_k) + \mathbf v_k. }
+  \]
+
+  <p>
+    with
+  </p>
+
+  \[
+\boxed{ \mathbf v_k \sim \mathcal N(0,R_k). }
+  \]
+
+  <p>
+    This equation is separate from the state propagation
+  </p>
+
+  \[
+\boxed{ \mathbf x_{k+1} = f_k(\mathbf x_k) + \mathbf w_k. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.116 CONTINUOUS MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.116 Continuous Measurement Model</h3>
+
+
+  <p>
+    Some theoretical systems are described continuously:
+  </p>
+
+  \[
+\boxed{ \mathbf y(t) = h(\mathbf x(t)) + \mathbf v(t). }
+  \]
+
+  <p>
+    Most digital spacecraft estimators ultimately discretize those measurements.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.117 MULTI-RATE MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.117 Multi-Rate Measurement Model</h3>
+
+
+  <p>
+    Different sensors satisfy
+  </p>
+
+  \[
+\mathbf z_i(k_i) = h_i( \mathbf x(t_{i,k}) ) + \mathbf v_i.
+  \]
+
+  <p>
+    Therefore each sensor maintains its own time sequence:
+  </p>
+
+  \[
+\boxed{ \{t_{gyro,k}\}, \quad \{t_{GNSS,k}\}, \quad \{t_{ST,k}\}, \ldots }
+  \]
+
+  <p>
+    This is the mathematically correct view of asynchronous fusion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.118 SENSOR MEASUREMENT SIMULATOR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.118 Sensor Measurement Simulator</h3>
+
+
+  <p>
+    A generic simulator should follow:
+  </p>
+
+  <pre>
+Truth State x(t)
+      |
+      v
+Ideal Measurement h(x)
+      |
+      v
+Sensor Frame Transformation
+      |
+      v
+Calibration Errors
+      |
+      v
+Bias / Drift
+      |
+      v
+Random Noise
+      |
+      v
+Bandwidth / Dynamics
+      |
+      v
+Saturation
+      |
+      v
+Quantisation
+      |
+      v
+Sampling
+      |
+      v
+Latency
+      |
+      v
+Validity / Dropout
+      |
+      v
+z, R, timestamp, status
+  </pre>
+
+  <p>
+    The estimator should only see the measurement interface, not the truth signal.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.119 ESTIMATOR MEASUREMENT PROCESSING CHAIN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.119 Estimator Measurement Processing Chain</h3>
+
+
+  <p>
+    The estimator side should look like
+  </p>
+
+  <pre>
+Sensor Packet
+     |
+     v
+Check Validity
+     |
+     v
+Check Timestamp
+     |
+     v
+Convert Units
+     |
+     v
+Transform Frame
+     |
+     v
+Select / Compute R
+     |
+     v
+Predict Measurement h(x^-)
+     |
+     v
+Innovation y
+     |
+     v
+Compute H / Sigma Points
+     |
+     v
+Innovation Covariance S
+     |
+     v
+Gate Measurement
+     |
+     +---- Reject
+     |
+     v
+Kalman Update
+     |
+     v
+Updated State + Covariance
+  </pre>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.120 SIMULINK ARCHITECTURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.120 Simulink Architecture</h3>
+
+
+  <p>
+    A reusable Simulink implementation could use:
+  </p>
+
+  <pre>
+                         SPACECRAFT TRUTH
+                                |
+         +-----------+----------+----------+
+         |           |          |          |
+         v           v          v          v
+      IMU Model   GNSS Model  ST Model  Relative Sensors
+         |           |          |          |
+         +-----------+----------+----------+
+                                |
+                                v
+                       Sensor Measurement Bus
+                                |
+                                v
+                    Timestamp / Frame Handling
+                                |
+                                v
+                         Validity / FDIR
+                                |
+                                v
+                      Measurement Router
+                                |
+                                v
+                         EKF / MEKF / UKF
+                                |
+                                v
+                        State + Covariance
+  </pre>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.121 RECOMMENDED MEASUREMENT BUS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.121 Recommended Measurement Bus</h3>
+
+
+  <p>
+    Each sensor can use a bus containing
+  </p>
+
+  \[
+\boxed{ \{ ID,\, z,\, R,\, timestamp,\, frame,\, valid,\, quality,\, status \}. }
+  \]
+
+  <p>
+    This makes the estimator reusable across different sensor types.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.122 EXAMPLE: GYRO + STAR-TRACKER MEKF -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.122 Example: Gyro + Star-Tracker MEKF</h3>
+
+
+  <p>
+    State error:
+  </p>
+
+  \[
+\boxed{ \delta\mathbf x = \begin{bmatrix} \delta\boldsymbol\theta\\ \mathbf b_g \end{bmatrix}. }
+  \]
+
+  <p>
+    Gyro propagates quaternion:
+  </p>
+
+  \[
+\boxed{ \dot{\hat q} = \frac12 \Omega( \omega_m-\hat b_g ) \hat q. }
+  \]
+
+  <p>
+    Star tracker gives attitude residual:
+  </p>
+
+  \[
+\boxed{ \mathbf y_{ST} \approx \delta\boldsymbol\theta+\mathbf v_{ST}. }
+  \]
+
+  <p>
+    Then the MEKF updates both attitude error and gyro bias.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.123 EXAMPLE: IMU + GNSS EKF -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.123 Example: IMU + GNSS EKF</h3>
+
+
+  <p>
+    State:
+  </p>
+
+  \[
+\boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \delta\boldsymbol\theta\\ \mathbf b_a\\ \mathbf b_g \end{bmatrix}. }
+  \]
+
+  <p>
+    IMU propagates.
+  </p>
+
+  <p>
+    GNSS provides
+  </p>
+
+  \[
+\boxed{ \mathbf z = \begin{bmatrix} \mathbf r_{GNSS}\\ \mathbf v_{GNSS} \end{bmatrix}. }
+  \]
+
+  <p>
+    Measurement model:
+  </p>
+
+  \[
+\boxed{ h(\mathbf x) = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}. }
+  \]
+
+  <p>
+    Thus
+  </p>
+
+  \[
+\boxed{ H= \begin{bmatrix} I&0&0&0&0\\ 0&I&0&0&0 \end{bmatrix}. }
+  \]
+
+  <p>
+    Biases are corrected indirectly through state covariance coupling.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.124 EXAMPLE: SUN SENSOR + MAGNETOMETER MEKF -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.124 Example: Sun Sensor + Magnetometer MEKF</h3>
+
+
+  <p>
+    Predicted vectors:
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf s}^B = C_I^B(\hat q)\mathbf s^I }
+  \]
+
+  \[
+\boxed{ \hat{\mathbf B}^B = C_I^B(\hat q)\mathbf B^I. }
+  \]
+
+  <p>
+    Innovations:
+  </p>
+
+  \[
+\boxed{ \mathbf y_s = \mathbf s_m^B-\hat{\mathbf s}^B }
+  \]
+
+  \[
+\boxed{ \mathbf y_B = \mathbf B_m^B-\hat{\mathbf B}^B. }
+  \]
+
+  <p>
+    Stack them:
+  </p>
+
+  \[
+\boxed{ \mathbf y = \begin{bmatrix} \mathbf y_s\\ \mathbf y_B \end{bmatrix}. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ H= \begin{bmatrix} -[\hat{\mathbf s}^B\times]&0\\ -[\hat{\mathbf B}^B\times]&0 \end{bmatrix}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.125 EXAMPLE: GNSS + CAMERA + LIDAR RPO EKF -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.125 Example: GNSS + Camera + LiDAR RPO EKF</h3>
+
+
+  <p>
+    Relative state:
+  </p>
+
+  \[
+\boxed{ \mathbf x = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v \end{bmatrix}. }
+  \]
+
+  <p>
+    GNSS:
+  </p>
+
+  \[
+\boxed{ \mathbf z_G = \delta\mathbf r+\mathbf v_G. }
+  \]
+
+  <p>
+    Camera:
+  </p>
+
+  \[
+\boxed{ \mathbf z_C = \begin{bmatrix} \alpha\\ \beta \end{bmatrix} + \mathbf v_C. }
+  \]
+
+  <p>
+    LiDAR:
+  </p>
+
+  \[
+\boxed{ z_L = \|\delta\mathbf r\| + v_L. }
+  \]
+
+  <p>
+    The estimator combines Cartesian, angular, and scalar measurements of the same relative state.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.126 MEASUREMENT HANDOVER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.126 Measurement Handover</h3>
+
+
+  <p>
+    During RPO,
+  </p>
+
+  \[
+\boxed{ \text{GNSS} \rightarrow \text{GNSS + Camera} \rightarrow \text{Camera + LiDAR} }
+  \]
+
+  <p>
+    changes the active measurement vector with range.
+  </p>
+
+  <p>
+    The estimator should therefore support a variable measurement dimension.
+  </p>
+
+  <p>
+    At one epoch:
+  </p>
+
+  \[
+\mathbf z_k=\mathbf z_{GNSS}.
+  \]
+
+  <p>
+    Later:
+  </p>
+
+  \[
+\mathbf z_k= \begin{bmatrix} \mathbf z_C\\ z_L \end{bmatrix}.
+  \]
+
+  <p>
+    The state definition need not change simply because available sensors change.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.127 HANDOVER COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.127 Handover Covariance</h3>
+
+
+  <p>
+    During overlap, compare measurements using their uncertainties.
+  </p>
+
+  <p>
+    For two relative-position solutions,
+  </p>
+
+  \[
+\mathbf d = \hat{\mathbf r}_1 - \hat{\mathbf r}_2.
+  \]
+
+  <p>
+    Combined covariance:
+  </p>
+
+  \[
+\boxed{ P_d = P_1+P_2-P_{12}-P_{21}. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+\boxed{ d_M^2 = \mathbf d^T P_d^{-1} \mathbf d. }
+  \]
+
+  <p>
+    This gives a covariance-aware handover consistency test.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.128 CAPTURE-READINESS MEASUREMENT LOGIC -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.128 Capture-Readiness Measurement Logic</h3>
+
+
+  <p>
+    For RPO capture,
+  </p>
+
+  \[
+\|\delta\mathbf r\| \le r_{cap}
+  \]
+
+  \[
+\|\delta\mathbf v\| \le v_{cap}
+  \]
+
+  \[
+\theta_{rel} \le \theta_{cap}
+  \]
+
+  \[
+\|\boldsymbol\omega_{rel}\| \le \omega_{cap}.
+  \]
+
+  <p>
+    But navigation covariance should also satisfy requirements:
+  </p>
+
+  \[
+\boxed{ \sigma_r\le\sigma_{r,max} }
+  \]
+
+  \[
+\boxed{ \sigma_v\le\sigma_{v,max}. }
+  \]
+
+  <p>
+    Then a dwell timer can be applied.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.129 MEASUREMENT MODEL VERIFICATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.129 Measurement Model Verification</h3>
+
+
+  <p>
+    Each measurement model should be independently verified.
+  </p>
+
+  <p>
+    For truth state \(\mathbf x_{truth}\), calculate
+  </p>
+
+  \[
+\boxed{ \mathbf z_{expected} = h(\mathbf x_{truth}). }
+  \]
+
+  <p>
+    Compare against independently generated ideal measurement.
+  </p>
+
+  <p>
+    Tests should include:
+  </p>
+
+  <ul>
+
+    <li>zero-error conditions,</li>
+
+    <li>known rotations,</li>
+
+    <li>known translations,</li>
+
+    <li>axis-aligned geometries,</li>
+
+    <li>edge cases,</li>
+
+    <li>singular geometry,</li>
+
+    <li>invalid-sensor cases.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.130 JACOBIAN VERIFICATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.130 Jacobian Verification</h3>
+
+
+  <p>
+    Analytical Jacobians should be checked numerically.
+  </p>
+
+  <p>
+    For state component \(x_j\),
+  </p>
+
+  \[
+\boxed{ \frac{\partial h}{\partial x_j} \approx \frac{ h(\mathbf x+\epsilon\mathbf e_j) - h(\mathbf x-\epsilon\mathbf e_j) }{ 2\epsilon }. }
+  \]
+
+  <p>
+    Compare this finite-difference result to the analytical \(H\).
+  </p>
+
+  <p>
+    This is one of the most important EKF software-verification tests.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.131 INNOVATION MONTE CARLO VERIFICATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.131 Innovation Monte Carlo Verification</h3>
+
+
+  <p>
+    Under correct models,
+  </p>
+
+  \[
+\boxed{ \mathbf y_k = \mathbf z_k-h(\hat{\mathbf x}_k^-) }
+  \]
+
+  <p>
+    should statistically agree with
+  </p>
+
+  \[
+S_k.
+  \]
+
+  <p>
+    Across Monte Carlo runs, evaluate:
+  </p>
+
+  <ul>
+
+    <li>mean innovation,</li>
+
+    <li>covariance,</li>
+
+    <li>NIS,</li>
+
+    <li>whiteness,</li>
+
+    <li>rejected-measurement rate.</li>
+
+  </ul>
+
+  <p>
+    This helps detect incorrect \(H\), \(R\), timing, or frame conventions.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.132 COMMON MEASUREMENT-MODEL ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.132 Common Measurement-Model Errors</h3>
+
+
+  <p>
+    Frequent implementation mistakes include:
+  </p>
+
+  <ul>
+
+    <li>wrong coordinate frame,</li>
+
+    <li>reversed DCM direction,</li>
+
+    <li>quaternion convention mismatch,</li>
+
+    <li>incorrect quaternion multiplication order,</li>
+
+    <li>incorrect LOS sign,</li>
+
+    <li>ignoring rotating-frame velocity terms,</li>
+
+    <li>treating specific force as acceleration,</li>
+
+    <li>wrong measurement units,</li>
+
+    <li>wrong covariance units,</li>
+
+    <li>ignoring latency,</li>
+
+    <li>assuming all sensors are synchronous,</li>
+
+    <li>incorrect Jacobian signs,</li>
+
+    <li>forgetting covariance rotation,</li>
+
+    <li>using diagonal \(R\) despite strong correlation,</li>
+
+    <li>using sensor noise density directly as per-sample standard deviation,</li>
+
+    <li>not handling invalid measurements.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.133 MEASUREMENT MODEL VS SENSOR MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.133 Measurement Model vs Sensor Model</h3>
+
+
+  <p>
+    This distinction is important.
+  </p>
+
+  <p>
+    A <strong>sensor model</strong> answers:
+  </p>
+
+  \[
+\boxed{ \text{What does the physical sensor output?} }
+  \]
+
+  <p>
+    including bias, scale factor, sampling, saturation, etc.
+  </p>
+
+  <p>
+    A <strong>measurement model</strong> answers:
+  </p>
+
+  \[
+\boxed{ \text{Given estimator state }\mathbf x, \text{ what measurement should this sensor produce?} }
+  \]
+
+  <p>
+    Thus:
+  </p>
+
+  \[
+\boxed{ \text{Sensor Model} \rightarrow \text{Simulation} }
+  \]
+
+  <p>
+    while
+  </p>
+
+  \[
+\boxed{ \text{Measurement Model} \rightarrow \text{Estimator}. }
+  \]
+
+  <p>
+    They must be consistent but are not identical.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.134 TRUTH MODEL VS MEASUREMENT MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.134 Truth Model vs Measurement Model</h3>
+
+
+  <p>
+    In simulation:
+  </p>
+
+  \[
+\boxed{ \mathbf z_{sim} = h_{truth}(\mathbf x_{truth}) + \text{sensor errors}. }
+  \]
+
+  <p>
+    Inside estimator:
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf z} = h_{est}(\hat{\mathbf x}). }
+  \]
+
+  <p>
+    If
+  </p>
+
+  \[
+h_{truth}=h_{est}
+  \]
+
+  <p>
+    exactly, the simulation may be unrealistically optimistic.
+  </p>
+
+  <p>
+    Higher-fidelity validation can deliberately include modelling mismatch.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.135 MEASUREMENT MODEL FIDELITY LEVELS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.135 Measurement Model Fidelity Levels</h3>
+
+
+  <h4>Level 1 — Direct State Measurement</h4>
+
+  \[
+\boxed{ z=x+n. }
+  \]
+
+  <h4>Level 2 — Physical Geometry</h4>
+
+  \[
+\boxed{ z=h(x)+n. }
+  \]
+
+  <p>
+    Examples: vectors, range, bearing.
+  </p>
+
+  <h4>Level 3 — Sensor/System Effects</h4>
+
+  <p>
+    Include:
+  </p>
+
+  \[
+\boxed{ \text{bias} + \text{alignment} + \text{latency} + \text{validity} + \text{geometry}. }
+  \]
+
+  <h4>Level 4 — Raw Observable</h4>
+
+  <p>
+    Examples:
+  </p>
+
+  <ul>
+
+    <li>GNSS pseudorange,</li>
+
+    <li>image centroids,</li>
+
+    <li>star centroids,</li>
+
+    <li>LiDAR point clouds.</li>
+
+  </ul>
+
+  <p>
+    Higher fidelity allows deeper algorithm verification but increases complexity.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.136 RECOMMENDED STATE / MEASUREMENT SEPARATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.136 Recommended State / Measurement Separation</h3>
+
+
+  <p>
+    For a spacecraft estimator, maintain clearly:
+  </p>
+
+  <h4>State definition</h4>
+
+  \[
+\boxed{ \mathbf x }
+  \]
+
+  <h4>Propagation function</h4>
+
+  \[
+\boxed{ \mathbf x_{k+1} = f(\mathbf x_k,\mathbf u_k) }
+  \]
+
+  <h4>Individual sensor models</h4>
+
+  \[
+\boxed{ \mathbf z_i = h_i(\mathbf x)+\mathbf v_i }
+  \]
+
+  <h4>Measurement Jacobians</h4>
+
+  \[
+\boxed{ H_i = \frac{\partial h_i}{\partial\mathbf x}. }
+  \]
+
+  <p>
+    This modular architecture makes sensors easier to add or remove.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.137 RECOMMENDED SOFTWARE STRUCTURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.137 Recommended Software Structure</h3>
+
+
+  <p>
+    A practical navigation codebase can have modules such as:
+  </p>
+
+  <pre>
+propagate_state()
+propagate_covariance()
+
+predict_gyro_related_state()
+
+predict_magnetometer_measurement()
+predict_sun_measurement()
+predict_star_tracker_measurement()
+
+predict_gnss_position()
+predict_gnss_velocity()
+predict_gnss_pseudorange()
+
+predict_camera_measurement()
+predict_lidar_measurement()
+
+compute_innovation()
+compute_jacobian()
+validate_measurement()
+kalman_update()
+  </pre>
+
+  <p>
+    This avoids embedding sensor-specific mathematics directly inside one enormous estimator function.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.138 RECOMMENDED SIMULINK MEASUREMENT ARCHITECTURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.138 Recommended Simulink Measurement Architecture</h3>
+
+
+  <pre>
+                   ESTIMATED STATE x^-
+                           |
+        +------------------+------------------+
+        |                  |                  |
+        v                  v                  v
+ Magnetometer h_B(x)   GNSS h_G(x)     Camera/LiDAR h_R(x)
+        |                  |                  |
+        v                  v                  v
+ Predicted B          Predicted PVT      Predicted Relative
+        |                  |                  |
+        +---------+--------+------------------+
+                  |
+                  v
+             Measurement
+              Innovations
+                  |
+                  v
+              Jacobians
+                  |
+                  v
+           Covariance / Gating
+                  |
+                  v
+              EKF Update
+                  |
+                  v
+              State x^+
+  </pre>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.139 COMPLETE MEASUREMENT-MODEL TABLE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.139 Complete Measurement-Model Table</h3>
+
+
+  <div class="table-wrap">
+
+  <table>
+
+    <thead><tr>
+
+      <th>Sensor</th>
+
+      <th>Measurement</th>
+
+      <th>Typical \(h(\mathbf x)\)</th>
+
+      <th>Main States Observed</th>
+
+      <th></th>
+
+      <th></th>
+
+    </tr></thead>
+
+    <tbody>
+
+      <tr>
+
+        <td>Gyro</td>
+
+        <td>Angular rate</td>
+
+        <td>\(\omega+b_g\)</td>
+
+        <td>Angular rate / gyro bias</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>Accelerometer</td>
+
+        <td>Specific force</td>
+
+        <td>\(C_I^B(a-g)+b_a\)</td>
+
+        <td>Translation / attitude / accel bias</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>Magnetometer</td>
+
+        <td>Magnetic vector</td>
+
+        <td>\(C_I^B(q)B^I\)</td>
+
+        <td>Attitude</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>Sun Sensor</td>
+
+        <td>Sun vector</td>
+
+        <td>\(C_I^B(q)s^I\)</td>
+
+        <td>Attitude</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>Star Tracker</td>
+
+        <td>Quaternion / attitude</td>
+
+        <td>\(q\)</td>
+
+        <td>Attitude</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>GNSS Position</td>
+
+        <td>Position</td>
+
+        <td>\(r\)</td>
+
+        <td>Position</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>GNSS Velocity</td>
+
+        <td>Velocity</td>
+
+        <td>\(v\)</td>
+
+        <td>Velocity</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>GNSS Pseudorange</td>
+
+        <td>Range + clock</td>
+
+        <td>`\\</td>
+
+        <td>r_i-r\\</td>
+
+        <td>+b_c`</td>
+
+        <td>Position / clock</td>
+
+      </tr>
+
+      <tr>
+
+        <td>GNSS Doppler</td>
+
+        <td>Range rate + clock drift</td>
+
+        <td>LOS velocity</td>
+
+        <td>Velocity / clock drift</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>Camera</td>
+
+        <td>Bearing / pixels</td>
+
+        <td>Perspective projection</td>
+
+        <td>Relative position / pose</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>LiDAR</td>
+
+        <td>Range / 3-D points</td>
+
+        <td>Relative geometry</td>
+
+        <td>Relative position / pose</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+      <tr>
+
+        <td>Radar/RF</td>
+
+        <td>Range/range rate</td>
+
+        <td>Relative geometry</td>
+
+        <td>Relative position / velocity</td>
+
+        <td></td>
+
+        <td></td>
+
+      </tr>
+
+    </tbody>
+
+  </table>
+
+  </div>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.140 COMPLETE ESTIMATOR MEASUREMENT EQUATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.140 Complete Estimator Measurement Equation</h3>
+
+
+  <p>
+    A general spacecraft sensor measurement can be represented as
+  </p>
+
+  \[
+\boxed{ \mathbf z_{i,k} = h_i \left[ \mathbf x(t_{i,k}-\tau_i), \mathbf p_i \right] + \mathbf b_i + \mathbf v_{i,k} }
+  \]
+
+  <p>
+    subject to
+  </p>
+
+  \[
+\boxed{ valid_{i,k}=1. }
+  \]
+
+  <p>
+    Here,
+  </p>
+
+  <ul>
+
+    <li>\(\mathbf p_i\) contains calibration or geometric parameters,</li>
+
+    <li>\(\tau_i\) is sensor latency,</li>
+
+    <li>\(\mathbf b_i\) represents residual bias,</li>
+
+    <li>\(\mathbf v_i\) represents random uncertainty.</li>
+
+  </ul>
+
+  <p>
+    Predicted measurement is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf z}_{i,k} = h_i( \hat{\mathbf x}_k^-, \hat{\mathbf p}_i ). }
+  \]
+
+  <p>
+    Innovation is
+  </p>
+
+  \[
+\boxed{ \mathbf y_{i,k} = \mathbf z_{i,k} - \hat{\mathbf z}_{i,k}. }
+  \]
+
+  <p>
+    Jacobian is
+  </p>
+
+  \[
+\boxed{ H_{i,k} = \left. \frac{\partial h_i} {\partial\mathbf x} \right|_{\hat{\mathbf x}_k^-}. }
+  \]
+
+  <p>
+    Innovation covariance is
+  </p>
+
+  \[
+\boxed{ S_{i,k} = H_{i,k} P_k^- H_{i,k}^T + R_{i,k}. }
+  \]
+
+  <p>
+    Kalman gain is
+  </p>
+
+  \[
+\boxed{ K_{i,k} = P_k^-H_{i,k}^T S_{i,k}^{-1}. }
+  \]
+
+  <p>
+    State update is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf x}_k^+ = \hat{\mathbf x}_k^- + K_{i,k}\mathbf y_{i,k}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.141 COMPLETE MEASUREMENT-TO-ESTIMATOR CHAIN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.141 Complete Measurement-to-Estimator Chain</h3>
+
+
+  <pre>
+True Physical State
+        |
+        v
+Sensor Physics
+        |
+        v
+Raw Sensor Measurement
+        |
+        v
+Calibration
+        |
+        v
+Frame Transformation
+        |
+        v
+Timestamp / Latency Handling
+        |
+        v
+Validity + Quality
+        |
+        v
+Measurement z
+        |
+        +----------------------------+
+        |                            |
+        |                       Estimated State x^-
+        |                            |
+        |                            v
+        |                     Measurement Model h(x^-)
+        |                            |
+        |                            v
+        +--------------------&gt; Predicted Measurement
+                                     |
+                                     v
+                               Innovation y
+                                     |
+                                     v
+                                Jacobian H
+                                     |
+                                     v
+                       Innovation Covariance S
+                                     |
+                                     v
+                              Measurement Gate
+                                  /       \
+                               Reject     Accept
+                                           |
+                                           v
+                                      Kalman Gain
+                                           |
+                                           v
+                                      State Update
+                                           |
+                                           v
+                                 Updated State x^+
+                                           |
+                                           v
+                                 Updated Covariance P^+
+  </pre>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.142 MEASUREMENT MODEL DEVELOPMENT PROCEDURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.142 Measurement Model Development Procedure</h3>
+
+
+  <p>
+    For every new spacecraft sensor, use the same sequence:
+  </p>
+
+  <ol>
+
+    <li>Define exactly what the sensor physically measures.</li>
+
+    <li>Define the sensor output frame.</li>
+
+    <li>Define measurement units.</li>
+
+    <li>Define the estimator state.</li>
+
+    <li>Derive the ideal measurement function</li>
+
+  </ol>
+
+  \[
+h(\mathbf x).
+  \]
+
+  <ol>
+
+    <li>Add relevant calibration parameters.</li>
+
+    <li>Define measurement covariance</li>
+
+  </ol>
+
+  \[
+R.
+  \]
+
+  <ol>
+
+    <li>Derive the measurement Jacobian</li>
+
+  </ol>
+
+  \[
+H.
+  \]
+
+  <ol>
+
+    <li>Define timestamp and latency treatment.</li>
+
+    <li>Define validity conditions.</li>
+
+    <li>Define quality-dependent covariance.</li>
+
+    <li>Define innovation residual.</li>
+
+    <li>Define gating thresholds.</li>
+
+    <li>Verify the equation numerically.</li>
+
+    <li>Verify Jacobian by finite differences.</li>
+
+    <li>Run Monte Carlo consistency tests.</li>
+
+  </ol>
+
+  <p>
+    This procedure should be followed for every sensor added to the estimator.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.9.143 FINAL ENGINEERING PERSPECTIVE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.9.143 Final Engineering Perspective</h3>
+
+
+  <p>
+    The central idea of this chapter is
+  </p>
+
+  \[
+\boxed{ \text{A Sensor Measurement Becomes Useful to an Estimator Only After We Can Predict It From the State}. }
+  \]
+
+  <p>
+    That prediction is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf z} = h(\hat{\mathbf x}). }
+  \]
+
+  <p>
+    The difference between reality and prediction is
+  </p>
+
+  \[
+\boxed{ \mathbf y = \mathbf z-h(\hat{\mathbf x}). }
+  \]
+
+  <p>
+    And the estimator uses this innovation, together with the uncertainty
+  </p>
+
+  \[
+\boxed{ R }
+  \]
+
+  <p>
+    and the measurement sensitivity
+  </p>
+
+  \[
+\boxed{ H }
+  \]
+
+  <p>
+    to correct the spacecraft state.
+  </p>
+
+  <p>
+    Therefore the complete logic is
+  </p>
+
+  \[
+\boxed{ \text{Physical Sensor} \rightarrow \mathbf z }
+  \]
+
+  \[
+\boxed{ \text{Estimated State} \rightarrow h(\hat{\mathbf x}) }
+  \]
+
+  \[
+\boxed{ \mathbf z-h(\hat{\mathbf x}) \rightarrow \text{Innovation} }
+  \]
+
+  \[
+\boxed{ H+P+R \rightarrow K }
+  \]
+
+  \[
+\boxed{ K+\text{Innovation} \rightarrow \text{Updated Navigation State}. }
+  \]
+
+  <p>
+    For attitude sensors:
+  </p>
+
+  \[
+\boxed{ \text{Gyro} + \text{Sun/Magnetic/Star Measurements} \rightarrow \text{MEKF Attitude + Bias Estimation}. }
+  \]
+
+  <p>
+    For translational navigation:
+  </p>
+
+  \[
+\boxed{ \text{IMU} + \text{GNSS} \rightarrow \text{Position / Velocity / Bias Estimation}. }
+  \]
+
+  <p>
+    For RPO:
+  </p>
+
+  \[
+\boxed{ \text{GNSS / DGNSS} + \text{Camera} + \text{LiDAR} \rightarrow \text{Relative Position / Velocity / Pose Estimation}. }
+  \]
+
+  <p>
+    So <strong>4.1.9 Measurement Models</strong> should become the mathematical core of the entire Sensor Models chapter: <strong>4.1.1–4.1.6 explain what each sensor is and how it behaves; 4.1.7 explains the errors; 4.1.8 explains how sensors are combined; and 4.1.9 explains exactly how every one of those measurements enters KF/EKF/MEKF/UKF estimation.</strong>
+  </p>
+
+  <p>
+    For this level, <strong>no hardware manual is required</strong>. Manuals become important later when we populate actual numerical \(R\), bias, update rate, latency, output coordinate frame, packet format, validity/status flags, and sensor-specific interface details.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- PREVIOUS / NEXT -->
+<!-- ========================================================= -->
+
+<nav class="notes-prev-next">
+
+  <a href="combined-sensor-suites.html">
+    &larr; 4.1.8 Combined Sensor Suites
+  </a>
+
+  <a href="sensor-specifications.html">
+    4.1.10 Sensor Specifications &rarr;
+  </a>
+
+</nav>
+
+</main>
+
+<!-- ========================================================= -->
+<!-- FOOTER -->
+<!-- ========================================================= -->
+
+<footer class="site-footer">
+
+  <p>
+    © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+    Educational resource for spacecraft dynamics, orbital mechanics,
+    and guidance–navigation–control systems.
+  </p>
+
+</footer>
+
+</body>
+</html>

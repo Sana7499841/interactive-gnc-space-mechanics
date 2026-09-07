@@ -1,0 +1,2011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>4.1.10 Sensor Specifications | Interactive GNC &amp; Space Mechanics</title>
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" type="image/png" href="favicon1.png">
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+<header class="notes-hero">
+<h1>Sensor Specifications</h1>
+<p class="notes-tagline">How to read, normalize, compare, and convert spacecraft sensor datasheet specifications into GNC requirements, simulation parameters, covariance, Monte Carlo uncertainties, qualification evidence, and mission-ready sensor trades.</p>
+<nav class="pill-nav">
+<a href="index.html" class="pill">Home</a><a href="tools.html" class="pill">Tools</a><a href="notes.html" class="pill active">Theory Notes</a><a href="references.html" class="pill">References</a><a href="problems.html" class="pill">Problem Bank</a><a href="about.html" class="pill">About</a>
+</nav></header>
+<main class="page-main">
+<section class="notes-section-card">
+<h2>4.1.10 Sensor Specifications</h2>
+<p>Sensor specifications are the formal bridge between a component datasheet and spacecraft-level GNC performance. A datasheet value is meaningful only after its units, statistical definition, bandwidth, operating mode, environmental condition and confidence level are understood.</p>
+<p>This chapter treats a sensor as a complete engineering system: measurement quality, noise and stability, dynamic response, timing, geometry, electrical and mechanical integration, radiation and environmental tolerance, qualification, reliability, firmware behaviour, SWaP and procurement risk.</p>
+<p>The objective is to translate vendor information into quantities that GNC design can use directly: \(R\), \(Q\), \(P_0\), bias and scale-factor models, saturation limits, timing models, validity logic, Monte Carlo dispersions and requirement margins.</p>
+
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.1 Why Sensor Specifications Matter</h3>
+<p>In spacecraft GNC, a datasheet value becomes useful only when it is connected to a mission requirement. Gyro bias becomes attitude drift, update rate limits estimator bandwidth, field of view determines reference availability, and latency converts spacecraft motion into time-alignment error. The engineering chain is therefore <strong>specification → physical meaning → GNC consequence → requirement margin</strong>.</p>
+  <p>Sensor selection is not simply choosing the device with the lowest quoted “accuracy.”</p>
+  <p>A complete spacecraft sensor must satisfy requirements in:</p>
+  \[
+\boxed{ \text{Measurement Performance} + \text{Dynamic Performance} + \text{Timing} + \text{Environment} + \text{Interfaces} + \text{Mass / Power} + \text{Reliability} }
+  \]
+  <p>A sensor that is extremely accurate but too slow, too power-hungry, not radiation tolerant, or outside the required dynamic range may be unsuitable.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.2 Accuracy</h3>
+
+  <p>Accuracy describes closeness to truth.</p>
+  <p>For measurement</p>
+  \[
+z_m
+  \]
+  <p>and true value</p>
+  \[
+z_t,
+  \]
+  <p>the measurement error is</p>
+  \[
+\boxed{ e=z_m-z_t }
+  \]
+  <p>Accuracy may be specified as:</p>
+<ul><li>absolute error,</li><li>percentage of full scale,</li><li>percentage of reading,</li><li>RMS error,</li><li>\(1\sigma\),</li><li>\(3\sigma\),</li><li>worst case,</li><li>CEP,</li><li>RMS angular error,</li><li>radial error.</li></ul>
+  <p>These are <strong>not interchangeable</strong>.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.3 Precision</h3>
+
+  <p>Precision describes repeatability of measurements.</p>
+  <p>A sensor may have</p>
+  \[
+\boxed{ \text{High Precision} \quad\text{but}\quad \text{Low Accuracy} }
+  \]
+  <p>if repeated measurements cluster tightly around a biased value.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.4 Accuracy vs Precision</h3>
+
+  <p>Conceptually:</p>
+  \[
+\boxed{ \text{Accuracy} = \text{Closeness to Truth} }
+  \]
+  \[
+\boxed{ \text{Precision} = \text{Closeness Between Repeated Measurements} }
+  \]
+  <p>This distinction is fundamental when evaluating sensor performance.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.5 Resolution</h3>
+
+  <p>Resolution is the smallest input change that can be distinguished.</p>
+  <p>For an \(N\)-bit converter over full-scale range</p>
+  \[
+FSR,
+  \]
+  \[
+\boxed{ \Delta \approx \frac{FSR}{2^N} }
+  \]
+  <p>depending on encoding.</p>
+  <p>But digital bit depth does not guarantee true physical resolution because analog noise may dominate.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.6 Effective Resolution</h3>
+
+  <p>The effective resolution may be much worse than nominal ADC resolution.</p>
+  <p>If the LSB is smaller than sensor noise,</p>
+  \[
+\boxed{ \text{More Digital Bits} \not\Rightarrow \text{More Useful Information} }
+  \]
+  <p>This is particularly important for low-noise inertial and magnetic sensors.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.7 Sensitivity</h3>
+
+  <p>Sensitivity describes change in output per change in input:</p>
+  \[
+\boxed{ S = \frac{\Delta y}{\Delta x} }
+  \]
+  <p>For example:</p>
+<ul><li>V/\(g\),</li><li>counts/\(^{\circ}/s\),</li><li>V/T,</li><li>pixels/degree.</li></ul>
+  <p>Sensitivity is not the same as resolution or accuracy.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.8 Scale Factor</h3>
+
+  <p>For ideal sensor response,</p>
+  \[
+y=Kx.
+  \]
+  <p>The coefficient \(K\) is the scale factor.</p>
+  <p>A scale-factor error is often written as</p>
+  \[
+\boxed{ y=(1+s)x }
+  \]
+  <p>where \(s\) is the fractional scale-factor error.</p>
+  <p>It may be specified in:</p>
+<ul><li>%,</li><li>ppm,</li><li>ppm/\(^{\circ}C\),</li><li>ppm/year.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.9 Bias</h3>
+
+  <p>Bias is an additive offset:</p>
+  \[
+\boxed{ z_m=z_{true}+b }
+  \]
+  <p>Bias may be quoted as:</p>
+<ul><li>zero bias,</li><li>initial bias,</li><li>turn-on bias,</li><li>bias repeatability,</li><li>bias instability,</li><li>bias temperature coefficient.</li></ul>
+  <p>These terms refer to different behaviours and should not be treated as one specification.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.10 Bias Repeatability</h3>
+
+  <p>Bias repeatability describes how much initial bias changes between power cycles.</p>
+  <p>A typical model is</p>
+  \[
+\boxed{ b_0 \sim \mathcal N(\bar b,\sigma_b^2) }
+  \]
+  <p>This is often used as a <strong>run-to-run Monte Carlo uncertainty</strong>.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.11 Bias Stability</h3>
+
+  <p>Bias stability describes how the offset changes over time.</p>
+  <p>It can be given in units such as:</p>
+  \[
+^\circ/hr, \quad \mu g, \quad nT.
+  \]
+  <p>But the datasheet definition must be checked carefully because “bias stability” and “bias instability” are sometimes used differently by vendors.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.12 Bias Instability</h3>
+
+  <p>Bias instability is usually a stochastic low-frequency term, commonly derived from Allan deviation.</p>
+  <p>It should not automatically be interpreted as:</p>
+  \[
+\boxed{ \text{Constant Bias} }
+  \]
+  <p>or</p>
+  \[
+\boxed{ \text{Random Walk} }
+  \]
+  <p>without understanding the manufacturer's test method.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.13 Noise Density</h3>
+<p>Noise density is not a per-sample standard deviation by itself. The effective bandwidth and PSD convention determine the integrated RMS noise, so simulation and filter parameters must be derived from the configured sensor bandwidth rather than copied directly from a headline datasheet value.</p>
+  <p>Noise density is frequently specified as an amplitude spectral density:</p>
+  \[
+\boxed{ N_d }
+  \]
+  <p>with units such as</p>
+  \[
+\frac{^\circ/s}{\sqrt{\mathrm{Hz}}}, \quad \frac{m/s^2}{\sqrt{\mathrm{Hz}}}, \quad \frac{nT}{\sqrt{\mathrm{Hz}}}.
+  \]
+  <p>For approximately white noise over effective bandwidth \(B\),</p>
+  \[
+\boxed{ \sigma \approx N_d\sqrt{B} }
+  \]
+  <p>subject to PSD convention.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.14 RMS Noise</h3>
+
+  <p>RMS noise is already integrated over a particular bandwidth.</p>
+  <p>Therefore,</p>
+  \[
+\boxed{ \text{Noise Density} \neq \text{RMS Noise} }
+  \]
+  <p>unless the bandwidth is known.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.15 Random Walk Specifications</h3>
+
+  <p>Inertial sensors may specify:</p>
+<ul><li>Angle Random Walk,</li><li>Velocity Random Walk,</li><li>Rate Random Walk.</li></ul>
+  <p>These coefficients arise from different stochastic processes.</p>
+  <p>They should not be mixed directly with:</p>
+<ul><li>bias instability,</li><li>static RMS noise,</li><li>scale-factor error.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.16 Allan-Deviation Specifications</h3>
+
+  <p>A good inertial datasheet may include an Allan deviation curve.</p>
+  <p>This can reveal:</p>
+<ul><li>quantization noise,</li><li>white noise,</li><li>bias instability,</li><li>random walk,</li><li>rate ramp.</li></ul>
+  <p>The slope and coefficient interpretation must be consistent with units and Allan convention.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.17 Bandwidth</h3>
+<p>Bandwidth must be assessed against spacecraft dynamics and control-loop bandwidth. Too little bandwidth creates lag and missed dynamics; unnecessarily high bandwidth passes more vibration and electronic noise. It is therefore a dynamic-response versus noise trade.</p>
+  <p>Sensor bandwidth defines the frequency range over which the sensor can track input dynamics.</p>
+  <p>A simple first-order model is</p>
+  \[
+\boxed{ G(s)=\frac{1}{\tau s+1} }
+  \]
+  <p>with</p>
+  \[
+\boxed{ f_c = \frac{1}{2\pi\tau} }
+  \]
+  <p>Higher bandwidth permits faster response, but generally admits more high-frequency noise.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.18 Update Rate</h3>
+
+  <p>The output update rate is</p>
+  \[
+\boxed{ f_s=\frac{1}{T_s} }
+  \]
+  <p>This is not necessarily equal to sensor analog bandwidth.</p>
+  <p>A device may have high internal bandwidth but output data at a slower digital rate.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.19 Sampling Rate vs Output Rate</h3>
+
+  <p>Some sensors internally sample much faster than their reported output rate.</p>
+  <p>Therefore:</p>
+  \[
+\boxed{ \text{Internal Sampling Rate} \neq \text{Output Data Rate} }
+  \]
+  <p>This matters when interpreting anti-aliasing, digital filtering, and latency.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.20 Latency</h3>
+<p>Latency is a system-level GNC parameter because every measurement must be associated with the state that existed when it was physically taken. Deterministic delay can often be compensated; uncertain delay behaves as timing uncertainty and can create large innovations during fast motion.</p>
+  <p>Latency is the delay between the physical measurement epoch and when the value becomes available.</p>
+  \[
+\boxed{ \tau = t_{available}-t_{measurement} }
+  \]
+  <p>Latency matters strongly in fast spacecraft dynamics.</p>
+  <p>For attitude,</p>
+  \[
+\boxed{ \delta\theta \approx \omega\tau }
+  \]
+  <p>to first order.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.21 Timestamp Accuracy</h3>
+
+  <p>Timestamp error should be distinguished from latency.</p>
+  <p>Known delay may be corrected.</p>
+  <p>Unknown timestamp error produces a state mismatch:</p>
+  \[
+\boxed{ \delta r \approx v\,\delta t }
+  \]
+  \[
+\boxed{ \delta\theta \approx \omega\,\delta t }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.22 Jitter</h3>
+
+  <p>Timing jitter is variation in sample time:</p>
+  \[
+\boxed{ t_k=kT_s+\delta t_k }
+  \]
+  <p>For rapidly changing measurements,</p>
+  \[
+\boxed{ \delta z \approx \dot z\,\delta t }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.23 Dynamic Range</h3>
+
+  <p>Dynamic range describes the span of measurable input values.</p>
+  <p>For a gyro:</p>
+  \[
+\boxed{ -\omega_{max} \le \omega \le \omega_{max} }
+  \]
+  <p>For an accelerometer:</p>
+  \[
+\boxed{ -a_{max} \le a \le a_{max} }
+  \]
+  <p>The required range must include expected mission extremes, not merely nominal operating values.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.24 Full-Scale Range</h3>
+
+  <p>Full-scale range is often written as:</p>
+<ul><li>±250°/s,</li><li>±16 g,</li><li>±1000 µT.</li></ul>
+  <p>Selecting a larger full-scale range may reduce sensitivity or effective resolution.</p>
+  <p>Thus range and resolution involve a trade.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.25 Saturation</h3>
+
+  <p>A sensor saturates when input exceeds its measurable range.</p>
+  \[
+\boxed{ z_m = \operatorname{sat}(z,z_{min},z_{max}) }
+  \]
+  <p>Saturation is especially important during:</p>
+<ul><li>launch,</li><li>detumbling,</li><li>high-rate slews,</li><li>thruster firing,</li><li>close-range optical blinding.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.26 Nonlinearity</h3>
+
+  <p>Nonlinearity quantifies deviation from ideal proportional response.</p>
+  \[
+\boxed{ z_m = K_1z + K_2z^2 + K_3z^3+\cdots }
+  \]
+  <p>It may be specified as:</p>
+<ul><li>% of full scale,</li><li>ppm,</li><li>maximum deviation.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.27 Cross-Axis Sensitivity</h3>
+
+  <p>For vector sensors:</p>
+  \[
+\boxed{ z_{m,x} = z_x + c_{xy}z_y + c_{xz}z_z }
+  \]
+  <p>Cross-axis sensitivity may be specified as a percentage.</p>
+  <p>It is especially important in:</p>
+<ul><li>gyros,</li><li>accelerometers,</li><li>magnetometers.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.28 Axis Misalignment</h3>
+
+  <p>A sensor may specify orthogonality or alignment error in:</p>
+<ul><li>degrees,</li><li>arcminutes,</li><li>arcseconds,</li><li>milliradians.</li></ul>
+  <p>This must be distinguished from spacecraft-level installation misalignment.</p>
+  <p>The total alignment error may contain:</p>
+  \[
+\boxed{ \text{Internal Sensor Misalignment} + \text{Mounting Misalignment} + \text{Structural Deformation} }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.29 Temperature Range</h3>
+
+  <p>Sensors normally specify:</p>
+<ul><li>operating temperature,</li><li>storage temperature.</li></ul>
+  <p>These are not the same.</p>
+  <p>A device may survive a broad storage range but only meet accuracy specifications over a narrower operating range.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.30 Temperature Coefficients</h3>
+
+  <p>Important thermal specifications include:</p>
+  \[
+\boxed{ \frac{db}{dT} }
+  \]
+  <p>and</p>
+  \[
+\boxed{ \frac{ds}{dT} }
+  \]
+  <p>for bias and scale factor.</p>
+  <p>These may be quoted as:</p>
+<ul><li>°/s/°C,</li><li>µg/°C,</li><li>ppm/°C,</li><li>nT/°C.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.31 Thermal Stability</h3>
+
+  <p>It is useful to distinguish:</p>
+<ul><li>instantaneous temperature coefficient,</li><li>warm-up drift,</li><li>thermal cycling repeatability,</li><li>gradient sensitivity.</li></ul>
+  <p>High-accuracy sensors may require thermal control rather than only calibration.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.32 Warm-Up Time</h3>
+
+  <p>Some sensors require a stabilization period after power-on.</p>
+  \[
+\boxed{ t_{warmup} }
+  \]
+  <p>can influence mission readiness after reset or safe-mode recovery.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.33 Magnetic Sensitivity</h3>
+
+  <p>For sensors not intended to measure magnetic field, magnetic susceptibility may still matter.</p>
+  <p>For magnetometers, spacecraft-generated fields are often a dominant integration concern.</p>
+  <p>Relevant specifications can include:</p>
+<ul><li>sensitivity,</li><li>maximum field,</li><li>magnetic offset,</li><li>noise,</li><li>linearity.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.34 g-Sensitivity</h3>
+
+  <p>Gyroscope datasheets may specify sensitivity to linear acceleration.</p>
+  \[
+\boxed{ \omega_{error} = K_g a }
+  \]
+  <p>Units may be:</p>
+  \[
+\frac{^\circ/s}{g}
+  \]
+  <p>or equivalent.</p>
+  <p>This matters during launch and thruster firing.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.35 Vibration Sensitivity</h3>
+
+  <p>Performance under vibration may differ greatly from static laboratory performance.</p>
+  <p>Look for:</p>
+<ul><li>random vibration qualification,</li><li>sinusoidal vibration,</li><li>vibration rectification error,</li><li>microvibration sensitivity.</li></ul>
+  <p>This can matter for reaction-wheel spacecraft.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.36 Shock</h3>
+
+  <p>Launch and separation events can generate high mechanical shock.</p>
+  <p>Important specifications include:</p>
+<ul><li>survivable shock,</li><li>operational shock,</li><li>pyroshock qualification.</li></ul>
+  <p>Survival does not imply full measurement accuracy during shock.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.37 Radiation Tolerance</h3>
+<p>Radiation tolerance must be reviewed against orbit, mission duration, shielding, technology and fault-recovery strategy. A device can survive total dose yet still suffer single-event resets or latch-up, so cumulative degradation and transient-event susceptibility must both be considered.</p>
+  <p>Spacecraft sensors may need tolerance to:</p>
+  \[
+\boxed{ \text{TID} + \text{SEE} + \text{Displacement Damage} }
+  \]
+  <p>depending on technology.</p>
+  <p>Radiation specifications can include:</p>
+<ul><li>total ionizing dose,</li><li>SEL threshold,</li><li>SEU rate,</li><li>proton fluence.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.38 Total Ionizing Dose</h3>
+
+  <p>TID is accumulated radiation exposure.</p>
+  <p>It is typically specified in:</p>
+  \[
+\boxed{ krad(Si) }
+  \]
+  <p>or similar units.</p>
+  <p>Mission requirement depends on:</p>
+<ul><li>orbit,</li><li>duration,</li><li>shielding.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.39 Single-Event Effects</h3>
+
+  <p>SEE may include:</p>
+<ul><li>SEU,</li><li>SEL,</li><li>SEFI,</li><li>SET.</li></ul>
+  <p>Sensor selection should consider whether a transient upset merely corrupts one sample or can reset/damage the sensor.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.40 Space Qualification</h3>
+<p>Labels such as space-grade, space-qualified, radiation tolerant, radiation hardened and flight-proven are not equivalent. The meaningful evidence is the exact tested configuration, test standard, environmental level, margin and relevance to the intended mission.</p>
+  <p>Terms such as:</p>
+<ul><li>space-qualified,</li><li>space-grade,</li><li>radiation tolerant,</li><li>radiation hardened,</li><li>flight heritage</li></ul>
+  <p>are not equivalent.</p>
+  <p>The qualification standard and tested environment should be checked.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.41 Flight Heritage</h3>
+
+  <p>Flight heritage means previous use in space, but the value depends on:</p>
+<ul><li>orbit,</li><li>duration,</li><li>mission environment,</li><li>unit configuration,</li><li>qualification level.</li></ul>
+  <p>A device flown once in benign LEO does not automatically prove suitability for every mission.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.42 Reliability</h3>
+
+  <p>Reliability may be expressed through:</p>
+  \[
+\boxed{ MTBF }
+  \]
+  <p>or component failure rates.</p>
+  <p>For spacecraft, mission reliability also depends on:</p>
+<ul><li>redundancy,</li><li>derating,</li><li>radiation,</li><li>thermal cycling,</li><li>connector/interface reliability.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.43 Mass</h3>
+
+  <p>Sensor mass contributes directly to spacecraft mass budget:</p>
+  \[
+\boxed{ m_{sensor} }
+  \]
+  <p>but mounting brackets, harnesses, electronics, thermal hardware, and redundant units may add significant system mass.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.44 Power Consumption</h3>
+
+  <p>Power may have several operating states:</p>
+  \[
+\boxed{ P_{startup}, P_{acquisition}, P_{tracking}, P_{idle}, P_{peak}. }
+  \]
+  <p>Using only a single “typical power” value can underestimate spacecraft power requirements.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.45 Voltage and Current</h3>
+
+  <p>Important electrical specifications include:</p>
+<ul><li>supply voltage,</li><li>voltage tolerance,</li><li>startup current,</li><li>steady-state current,</li><li>inrush current.</li></ul>
+  <p>Inrush can be particularly important for small spacecraft power systems.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.46 Interface Type</h3>
+
+  <p>Possible interfaces include:</p>
+<ul><li>UART,</li><li>RS-422,</li><li>CAN,</li><li>SPI,</li><li>I²C,</li><li>Ethernet,</li><li>SpaceWire,</li><li>MIL-STD-1553,</li><li>custom LVDS.</li></ul>
+  <p>Interface choice affects:</p>
+<ul><li>bandwidth,</li><li>cabling,</li><li>timing,</li><li>flight-computer compatibility.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.47 Data Rate</h3>
+
+  <p>Sensor data rate is approximately</p>
+  \[
+\boxed{ R_d = N_{bytes} \times f_s }
+  \]
+  <p>plus protocol overhead.</p>
+  <p>High-rate cameras and LiDAR can dominate spacecraft data buses.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.48 Packet Structure</h3>
+
+  <p>A useful sensor packet may include:</p>
+  \[
+\boxed{ \{ measurement,\, timestamp,\, status,\, quality,\, temperature,\, checksum \} }
+  \]
+  <p>Availability of quality/status information can be as important as raw measurement accuracy.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.49 Time Synchronization Interfaces</h3>
+<p>High-quality multi-sensor fusion depends on a common time base. PPS, external triggers, hardware timestamps and synchronized clocks allow IMU, GNSS, star-tracker, camera and LiDAR measurements to be aligned at the estimator epoch instead of being fused with hidden bus or processing delays.</p>
+  <p>Important timing capabilities include:</p>
+<ul><li>PPS,</li><li>external trigger,</li><li>hardware timestamp,</li><li>clock input,</li><li>synchronization pulse.</li></ul>
+  <p>These are critical for high-accuracy multi-sensor fusion.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.50 Field of View</h3>
+
+  <p>Optical sensors have finite FOV.</p>
+  <p>For a star tracker or Sun sensor:</p>
+  \[
+\boxed{ \theta_{FOV} }
+  \]
+  <p>determines whether the reference can be observed.</p>
+  <p>Field of view affects:</p>
+<ul><li>acquisition,</li><li>availability,</li><li>sensor placement,</li><li>redundancy.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.51 Exclusion Angles</h3>
+
+  <p>Star trackers often specify exclusion angles relative to:</p>
+<ul><li>Sun,</li><li>Earth limb,</li><li>Moon.</li></ul>
+  <p>These are not the same as FOV.</p>
+  <p>An object can be outside the imaging FOV but still cause stray-light problems.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.52 Boresight Accuracy</h3>
+
+  <p>Optical sensors may specify boresight accuracy or knowledge error.</p>
+  <p>This must be distinguished from:</p>
+<ul><li>centroiding accuracy,</li><li>relative pointing accuracy,</li><li>absolute alignment to spacecraft body.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.53 Angular Resolution</h3>
+
+  <p>For optical sensors,</p>
+  \[
+\boxed{ \delta\theta }
+  \]
+  <p>may be reported in:</p>
+<ul><li>degrees,</li><li>arcminutes,</li><li>arcseconds,</li><li>microradians.</li></ul>
+  <p>Convert carefully.</p>
+  \[
+\boxed{ 1\ \text{arcsec} = 4.848\times10^{-6}\ \text{rad} }
+  \]
+  <p>approximately.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.54 Star-Tracker Accuracy</h3>
+<p>Star-tracker performance is often anisotropic: cross-boresight accuracy can differ markedly from around-boresight accuracy, while acquisition accuracy can differ from tracking accuracy. A single headline attitude number may therefore be insufficient for a realistic MEKF covariance.</p>
+  <p>Star trackers may specify:</p>
+<ul><li>cross-boresight accuracy,</li><li>around-boresight accuracy,</li><li>attitude knowledge,</li><li>acquisition accuracy,</li><li>tracking accuracy.</li></ul>
+  <p>These values should not be collapsed into one number.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.55 Star-Tracker Update Rate</h3>
+
+  <p>Tracking rate can influence attitude filter bandwidth.</p>
+  <p>Typical GNC logic may be:</p>
+  \[
+\boxed{ \text{Gyro High Rate} + \text{Star Tracker Lower Rate} }
+  \]
+  <p>Therefore star-tracker update rate must be adequate to bound gyro drift.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.56 Star-Tracker Slew-Rate Limit</h3>
+
+  <p>A star tracker may lose tracking above some angular rate:</p>
+  \[
+\boxed{ |\omega| > \omega_{track,max} }
+  \]
+  <p>The maximum acquisition rate and maximum tracking rate may be different.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.57 Lost-in-Space Acquisition Time</h3>
+
+  <p>A star tracker may specify:</p>
+  \[
+\boxed{ t_{LIS} }
+  \]
+  <p>for autonomous initial attitude acquisition.</p>
+  <p>This can affect recovery after spacecraft reset.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.58 Sun-Sensor Accuracy</h3>
+
+  <p>Sun-sensor accuracy may depend on:</p>
+<ul><li>incidence angle,</li><li>FOV position,</li><li>intensity,</li><li>temperature,</li><li>albedo.</li></ul>
+  <p>Therefore a single nominal angular accuracy may not describe full performance.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.59 Sun-Sensor FOV</h3>
+
+  <p>Coarse Sun sensors often provide broad coverage.</p>
+  <p>Fine Sun sensors may provide:</p>
+  \[
+\boxed{ \text{Higher Accuracy} \quad\text{but}\quad \text{Narrower FOV}. }
+  \]
+  <p>This creates an acquisition-versus-precision trade.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.60 Magnetometer Range</h3>
+
+  <p>The measurement range must accommodate both:</p>
+  \[
+\boxed{ \text{Environmental Magnetic Field} + \text{Spacecraft-Generated Field}. }
+  \]
+  <p>Insufficient range may cause saturation near magnetorquer operation or onboard magnetic sources.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.61 Magnetometer Noise</h3>
+
+  <p>Magnetometer noise density is often quoted in</p>
+  \[
+\boxed{ nT/\sqrt{Hz} }
+  \]
+  <p>or</p>
+  \[
+pT/\sqrt{Hz}.
+  \]
+  <p>But spacecraft magnetic contamination may dominate sensor intrinsic noise.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.62 Magnetometer Offset</h3>
+
+  <p>Offset may be specified in:</p>
+  \[
+\boxed{ nT }
+  \]
+  <p>or as % of full scale.</p>
+  <p>For spacecraft integration, hard-iron calibration and mounting location can be as important as factory offset.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.63 Gyroscope Range</h3>
+
+  <p>Gyro range must cover:</p>
+<ul><li>nominal pointing,</li><li>detumbling,</li><li>safe mode,</li><li>launch/separation transient,</li><li>commanded slew.</li></ul>
+  <p>A fine-pointing gyro with insufficient rate range may saturate during recovery.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.64 Gyroscope ARW</h3>
+
+  <p>Angle random walk is an important inertial specification.</p>
+  <p>Depending on units, it may be reported as</p>
+  \[
+^\circ/\sqrt{hr}
+  \]
+  <p>or equivalent.</p>
+  <p>It should be interpreted carefully before conversion into discrete process noise.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.65 Gyroscope Bias Instability</h3>
+
+  <p>Usually given in</p>
+  \[
+^\circ/hr.
+  \]
+  <p>This is often one of the headline numbers used to compare gyros.</p>
+  <p>But two sensors with identical bias-instability numbers can still have very different:</p>
+<ul><li>ARW,</li><li>range,</li><li>bandwidth,</li><li>temperature sensitivity,</li><li>radiation performance.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.66 Accelerometer Range</h3>
+
+  <p>Accelerometer range must consider:</p>
+<ul><li>launch acceleration,</li><li>thruster maneuvers,</li><li>vibration,</li><li>on-orbit low-acceleration navigation.</li></ul>
+  <p>A wide range may reduce low-level resolution.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.67 Accelerometer Noise Density</h3>
+
+  <p>May be specified as</p>
+  \[
+\boxed{ \mu g/\sqrt{Hz} }
+  \]
+  <p>or</p>
+  \[
+\boxed{ m/s^2/\sqrt{Hz}. }
+  \]
+  <p>The required noise level depends strongly on whether the accelerometer is used for:</p>
+<ul><li>coarse dynamics,</li><li>precise orbit determination,</li><li>drag-free control,</li><li>inertial navigation.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.68 Accelerometer Bias</h3>
+
+  <p>Bias directly affects integrated velocity and position.</p>
+  \[
+\boxed{ \delta v\approx b_a t }
+  \]
+  \[
+\boxed{ \delta r\approx\frac12b_a t^2 }
+  \]
+  <p>Thus accelerometer bias can be much more important than instantaneous noise in long-duration inertial navigation.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.69 GNSS Position Accuracy</h3>
+<p>GNSS position accuracy should be interpreted together with geometry, antenna performance, receiver mode and the statistical definition used. For RPO, raw observables, timing, common-satellite tracking and relative-solution covariance can be more important than standalone PVT accuracy.</p>
+  <p>GNSS may specify:</p>
+<ul><li>horizontal accuracy,</li><li>vertical accuracy,</li><li>3-D RMS,</li><li>CEP,</li><li>\(1\sigma\),</li><li>\(2\sigma\).</li></ul>
+  <p>These metrics must not be compared without conversion and definition.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.70 GNSS Velocity Accuracy</h3>
+
+  <p>Velocity accuracy may be derived from Doppler and can be much better than finite-differencing successive position solutions.</p>
+  <p>Check whether the quoted specification is:</p>
+<ul><li>per-axis,</li><li>horizontal,</li><li>3-D,</li><li>RMS.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.71 GNSS Timing Accuracy</h3>
+
+  <p>GNSS receivers may specify:</p>
+<ul><li>PPS accuracy,</li><li>timing RMS,</li><li>jitter,</li><li>absolute time error.</li></ul>
+  <p>This can be critical for sensor synchronization and formation flying.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.72 GNSS Update Rate</h3>
+
+  <p>GNSS PVT update rates may range widely.</p>
+  <p>The required rate depends on:</p>
+  \[
+\boxed{ \text{Spacecraft Dynamics} + \text{Navigation Filter} + \text{RPO Requirements} }
+  \]
+  <p>High update rate is particularly valuable for proximity operations.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.73 GNSS Time to First Fix</h3>
+
+  <p>Important quantities include:</p>
+<ul><li>cold start TTFF,</li><li>warm start TTFF,</li><li>hot start TTFF,</li><li>reacquisition time.</li></ul>
+  <p>These affect fault recovery.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.74 GNSS Tracking Sensitivity</h3>
+
+  <p>Signal sensitivity may be specified for:</p>
+<ul><li>acquisition,</li><li>tracking,</li><li>reacquisition.</li></ul>
+  <p>Tracking sensitivity is generally better than acquisition sensitivity.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.75 GNSS Raw Measurement Availability</h3>
+<p>Raw pseudorange, Doppler, carrier phase and signal-quality outputs enable tightly coupled GNSS/INS, differential processing, carrier-phase relative navigation and custom integrity monitoring. A receiver that outputs only PVT restricts the estimator architecture even if its standalone accuracy is good.</p>
+  <p>For advanced navigation, check whether receiver outputs:</p>
+  \[
+\boxed{ \rho,\quad \Phi,\quad D,\quad C/N_0 }
+  \]
+  <p>rather than only PVT.</p>
+  <p>This is crucial for:</p>
+<ul><li>tightly coupled GNSS/INS,</li><li>differential GNSS,</li><li>carrier-phase RPO.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.76 GNSS Dynamic Limits</h3>
+
+  <p>For space use, check:</p>
+<ul><li>maximum altitude,</li><li>maximum velocity,</li><li>acceleration,</li><li>jerk,</li><li>Doppler search range.</li></ul>
+  <p>A terrestrial receiver may be unsuitable despite excellent static accuracy.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.77 Antenna Specifications</h3>
+
+  <p>For GNSS, RF, and some other sensors, antenna performance is part of system performance.</p>
+  <p>Important parameters include:</p>
+<ul><li>gain,</li><li>radiation pattern,</li><li>polarization,</li><li>bandwidth,</li><li>axial ratio,</li><li>phase-centre variation,</li><li>noise figure for active antennas.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.78 LiDAR Range</h3>
+
+  <p>LiDAR datasheets may specify:</p>
+  \[
+\boxed{ \rho_{min}, \quad \rho_{max} }
+  \]
+  <p>but maximum range often depends on:</p>
+<ul><li>target reflectivity,</li><li>incidence angle,</li><li>aperture,</li><li>illumination,</li><li>atmospheric conditions for terrestrial systems.</li></ul>
+  <p>Spacecraft target surface properties therefore matter.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.79 LiDAR Range Accuracy</h3>
+
+  <p>Range accuracy may be written as</p>
+  \[
+\boxed{ \sigma_\rho }
+  \]
+  <p>or maximum error.</p>
+  <p>It can depend on:</p>
+<ul><li>range,</li><li>target reflectivity,</li><li>signal strength,</li><li>averaging.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.80 LiDAR Range Resolution</h3>
+
+  <p>Range resolution is not necessarily the same as range accuracy.</p>
+  <p>A device may report millimetre digital resolution while having centimetre absolute accuracy.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.81 LiDAR Angular Resolution</h3>
+
+  <p>Scanning LiDAR may specify angular step or beam divergence.</p>
+  <p>These influence:</p>
+<ul><li>point density,</li><li>target feature resolution,</li><li>relative pose observability.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.82 Camera Resolution</h3>
+
+  <p>Camera resolution in pixels alone does not define navigation accuracy.</p>
+  <p>Relative-navigation performance also depends on:</p>
+  \[
+\boxed{ \text{Focal Length} + \text{Pixel Pitch} + \text{Optics} + \text{Feature Algorithm} + \text{Range} }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.83 Instantaneous Field of View</h3>
+
+  <p>For a camera pixel,</p>
+  \[
+\boxed{ IFOV \approx \frac{p}{f} }
+  \]
+  <p>for small angles, where:</p>
+<ul><li>\(p\) = pixel pitch,</li><li>\(f\) = focal length.</li></ul>
+  <p>This connects detector geometry to angular resolution.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.84 Camera Frame Rate</h3>
+
+  <p>Frame rate determines temporal update rate:</p>
+  \[
+\boxed{ f_{camera}. }
+  \]
+  <p>A higher frame rate improves dynamic tracking but increases:</p>
+<ul><li>data rate,</li><li>processing load,</li><li>power.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.85 Camera Exposure Time</h3>
+
+  <p>Long exposure improves photon collection but increases motion blur.</p>
+  <p>Angular blur is approximately</p>
+  \[
+\boxed{ \delta\theta_{blur} \approx \omega t_{exp} }
+  \]
+  <p>during constant-rate motion.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.86 Signal-to-Noise Ratio</h3>
+
+  <p>SNR is commonly defined as</p>
+  \[
+\boxed{ SNR = \frac{P_{signal}}{P_{noise}} }
+  \]
+  <p>or in decibels,</p>
+  \[
+\boxed{ SNR_{dB} = 10\log_{10} \left( \frac{P_s}{P_n} \right). }
+  \]
+  <p>For amplitude quantities, the \(20\log_{10}\) form is used.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.87 Dynamic Accuracy</h3>
+<p>Bench accuracy can differ substantially from operational accuracy under slew, vibration, thermal transients, motion blur, RF dynamics or digital filtering. Qualification and GNC analysis should therefore include mission-representative dynamic conditions.</p>
+  <p>Static accuracy and dynamic accuracy can differ substantially.</p>
+  <p>For example, star-tracker accuracy during high slew may be worse than while stationary.</p>
+  <p>Thus:</p>
+  \[
+\boxed{ \text{Bench Accuracy} \neq \text{Operational Accuracy} }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.88 Absolute vs Relative Accuracy</h3>
+
+  <p>Absolute accuracy references an external truth.</p>
+  <p>Relative accuracy describes change or consistency over a shorter interval.</p>
+  <p>Examples include:</p>
+<ul><li>absolute attitude knowledge,</li><li>relative pointing error,</li><li>absolute position,</li><li>relative baseline accuracy.</li></ul>
+  <p>These specifications support different mission requirements.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.89 Short-Term vs Long-Term Stability</h3>
+
+  <p>Short-term sensor performance may be dominated by white noise.</p>
+  <p>Long-term performance may be dominated by:</p>
+<ul><li>bias drift,</li><li>thermal effects,</li><li>ageing,</li><li>radiation.</li></ul>
+  <p>Therefore qualification should consider the relevant mission time scale.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.90 Repeatability</h3>
+
+  <p>Repeatability can be specified across:</p>
+<ul><li>repeated measurements,</li><li>power cycles,</li><li>temperature cycles,</li><li>installation cycles.</li></ul>
+  <p>The exact test definition matters.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.91 Reproducibility</h3>
+
+  <p>Reproducibility concerns agreement under changed conditions such as:</p>
+<ul><li>different units,</li><li>different labs,</li><li>different operators,</li><li>different environments.</li></ul>
+  <p>It is broader than repeatability.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.92 Calibration Accuracy</h3>
+
+  <p>A manufacturer may provide factory calibration.</p>
+  <p>But residual calibration uncertainty should be distinguished from total operational accuracy.</p>
+  <p>Spacecraft integration may require additional:</p>
+<ul><li>alignment calibration,</li><li>thermal calibration,</li><li>magnetic calibration,</li><li>boresight calibration.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.93 Calibration Interval</h3>
+
+  <p>Some sensors require periodic recalibration.</p>
+  <p>For space missions, this may need to be achieved through:</p>
+<ul><li>onboard estimation,</li><li>celestial references,</li><li>ground processing,</li><li>calibration maneuvers.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.94 Stability Over Life</h3>
+
+  <p>Important long-term parameters include:</p>
+  \[
+\boxed{ \frac{db}{dt}, \quad \frac{ds}{dt}, \quad \frac{d\theta_{align}}{dt} }
+  \]
+  <p>where relevant.</p>
+  <p>These may be poorly characterized in short commercial datasheets.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.95 Availability</h3>
+<p>Availability is a mission-performance quantity, not a secondary statistic. A highly accurate sensor may still be unsuitable for a critical phase if eclipse, blinding, acquisition delay, geometry or thermal constraints make it unavailable too often.</p>
+  <p>Sensor availability is</p>
+  \[
+\boxed{ A = \frac{T_{valid}}{T_{mission}} }
+  \]
+  <p>approximately.</p>
+  <p>Availability is distinct from accuracy.</p>
+  <p>A very accurate sensor with frequent invalid periods may still require strong backup architecture.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.96 Continuity</h3>
+
+  <p>Continuity describes probability of maintaining valid service without unexpected interruption over a required interval.</p>
+  <p>This is particularly important during:</p>
+<ul><li>docking,</li><li>landing,</li><li>critical burns.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.97 Integrity</h3>
+
+  <p>Integrity concerns whether a sensor or navigation system can indicate when its output should not be trusted.</p>
+  <p>This may include:</p>
+<ul><li>status flags,</li><li>health indicators,</li><li>self-test,</li><li>residual monitoring.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.98 Built-In Test</h3>
+
+  <p>A sensor may support:</p>
+  \[
+\boxed{ BIT }
+  \]
+  <p>or</p>
+  \[
+\boxed{ BITE }
+  \]
+  <p>for built-in test equipment.</p>
+  <p>Check whether it detects:</p>
+<ul><li>hardware faults,</li><li>memory faults,</li><li>temperature issues,</li><li>optical obscuration,</li><li>calibration faults.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.99 Quality Flags</h3>
+
+  <p>Useful sensor outputs include:</p>
+<ul><li>validity,</li><li>confidence,</li><li>tracked stars,</li><li>satellites used,</li><li>SNR,</li><li>saturation,</li><li>temperature,</li><li>tracking mode.</li></ul>
+  <p>These can be directly used for adaptive covariance and FDIR.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.100 Startup Time</h3>
+
+  <p>Startup time may include:</p>
+  \[
+\boxed{ \text{Power-On} \rightarrow \text{Self-Test} \rightarrow \text{Warm-Up} \rightarrow \text{Acquisition} \rightarrow \text{Valid Data}. }
+  \]
+  <p>These are different stages.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.101 Recovery Time</h3>
+
+  <p>After reset, dropout, or blinding, how long until valid measurements return?</p>
+  <p>This can be more operationally important than initial startup time.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.102 Size and Envelope</h3>
+
+  <p>Physical dimensions affect:</p>
+<ul><li>spacecraft accommodation,</li><li>optical FOV,</li><li>thermal design,</li><li>harness routing,</li><li>placement relative to centre of mass.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.103 Mounting Requirements</h3>
+
+  <p>Important considerations include:</p>
+<ul><li>mounting flatness,</li><li>bolt pattern,</li><li>thermal interface,</li><li>vibration isolation,</li><li>alignment datum.</li></ul>
+  <p>Precision sensors may require strict mechanical tolerances.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.104 Sensor Reference Frame Definition</h3>
+
+  <p>The datasheet should define:</p>
+  \[
+\boxed{ S=\{x_s,y_s,z_s\} }
+  \]
+  <p>and sign conventions.</p>
+  <p>Without this, sensor-to-body transformation cannot be implemented correctly.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.105 Alignment Datum</h3>
+
+  <p>For high-accuracy systems, check whether alignment is referenced to:</p>
+<ul><li>mechanical housing,</li><li>optical boresight,</li><li>connector datum,</li><li>calibrated internal axes.</li></ul>
+  <p>The physical datum must be usable during spacecraft integration.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.106 Connector and Harness</h3>
+
+  <p>Practical specifications include:</p>
+<ul><li>connector type,</li><li>pin count,</li><li>shielding,</li><li>cable impedance,</li><li>maximum harness length.</li></ul>
+  <p>These can affect EMC and timing.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.107 EMC / EMI Compatibility</h3>
+
+  <p>Sensor qualification should include electromagnetic compatibility.</p>
+  <p>Check:</p>
+<ul><li>conducted emissions,</li><li>radiated emissions,</li><li>conducted susceptibility,</li><li>radiated susceptibility.</li></ul>
+  <p>Magnetometers require especially careful placement.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.108 Vacuum Compatibility</h3>
+
+  <p>For space hardware, materials should satisfy appropriate outgassing and vacuum compatibility requirements.</p>
+  <p>Optical sensors can be especially sensitive to contamination.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.109 Contamination Sensitivity</h3>
+
+  <p>Star trackers, cameras, and Sun sensors can degrade because of:</p>
+<ul><li>deposition,</li><li>molecular contamination,</li><li>particulate contamination.</li></ul>
+  <p>This may not appear prominently in a generic commercial datasheet.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.110 Thermal Interface</h3>
+
+  <p>A sensor may dissipate</p>
+  \[
+P_{sensor}
+  \]
+  <p>but allowable baseplate temperature and thermal resistance also matter.</p>
+  <p>Thermal design should consider both electrical power and heat rejection.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.111 Operational Life</h3>
+
+  <p>Check whether the sensor has limits on:</p>
+<ul><li>hours of operation,</li><li>detector life,</li><li>laser life,</li><li>mechanical scanner cycles,</li><li>power cycles.</li></ul>
+  <p>This is particularly relevant for active optical sensors and mechanisms.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.112 Redundancy Capability</h3>
+
+  <p>The sensor may support:</p>
+<ul><li>dual power inputs,</li><li>dual communication ports,</li><li>redundant heads,</li><li>cross-strapping.</li></ul>
+  <p>This can simplify spacecraft fault-tolerant architecture.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.113 Qualification Level</h3>
+
+  <p>Possible hardware categories include:</p>
+<ul><li>engineering model,</li><li>qualification model,</li><li>protoflight model,</li><li>flight model.</li></ul>
+  <p>Performance and documentation requirements differ.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.114 Qualification Testing</h3>
+
+  <p>Typical spacecraft sensor qualification may include:</p>
+<ul><li>vibration,</li><li>shock,</li><li>thermal vacuum,</li><li>thermal cycling,</li><li>EMC/EMI,</li><li>radiation,</li><li>life testing.</li></ul>
+  <p>The exact program depends on mission and standards.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.115 Acceptance Testing</h3>
+
+  <p>Qualification proves design margin.</p>
+  <p>Acceptance testing verifies each flight unit.</p>
+  <p>These are not the same.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.116 Heritage vs Qualification</h3>
+
+  <p>A sensor with heritage may still require additional qualification if:</p>
+<ul><li>mission environment differs,</li><li>packaging changed,</li><li>firmware changed,</li><li>radiation level differs,</li><li>mounting configuration differs.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.117 Software and Firmware</h3>
+
+  <p>For intelligent sensors, firmware is part of sensor performance.</p>
+  <p>Check:</p>
+<ul><li>version control,</li><li>update capability,</li><li>bootloader,</li><li>fault recovery,</li><li>deterministic timing.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.118 Output Determinism</h3>
+
+  <p>Some GNC systems require deterministic timing.</p>
+  <p>A sensor may report an average latency but exhibit variable processing delay.</p>
+  <p>Thus both</p>
+  \[
+\boxed{ \tau_{mean} }
+  \]
+  <p>and</p>
+  \[
+\boxed{ \sigma_\tau }
+  \]
+  <p>may matter.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.119 Fixed vs Configurable Parameters</h3>
+
+  <p>Sensors may allow configuration of:</p>
+<ul><li>range,</li><li>bandwidth,</li><li>output rate,</li><li>digital filtering,</li><li>integration time,</li><li>tracking mode.</li></ul>
+  <p>Performance specifications may depend on those settings.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.120 Configuration-Dependent Noise</h3>
+
+  <p>For example, increasing bandwidth can increase RMS noise:</p>
+  \[
+\boxed{ \sigma \propto \sqrt{B} }
+  \]
+  <p>Therefore datasheet noise values should be associated with the configuration in which they were measured.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.121 Configuration-Dependent Latency</h3>
+
+  <p>Digital filtering can reduce noise but increase group delay.</p>
+  <p>Thus:</p>
+  \[
+\boxed{ \text{More Filtering} \rightarrow \text{Less Noise} + \text{More Latency} }
+  \]
+  <p>This is a direct GNC trade.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.122 Noise-Bandwidth Trade</h3>
+
+  <p>A wider bandwidth:</p>
+  \[
+\boxed{ B\uparrow }
+  \]
+  <p>typically gives</p>
+  \[
+\boxed{ \text{Faster Response} }
+  \]
+  <p>but also</p>
+  \[
+\boxed{ \sigma_{noise}\uparrow. }
+  \]
+  <p>This is a fundamental sensor-control trade.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.123 Range-Resolution Trade</h3>
+
+  <p>For some sensing systems:</p>
+  \[
+\boxed{ \text{Larger Full Scale} \rightarrow \text{Worse Resolution} }
+  \]
+  <p>for fixed ADC bit depth.</p>
+  <p>The optimum range should therefore cover expected dynamics with reasonable margin.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.124 Accuracy-Power Trade</h3>
+
+  <p>Higher-performance sensors often consume more power.</p>
+  <p>For example:</p>
+  \[
+\boxed{ \text{MEMS IMU} \rightarrow \text{Low Power / Lower Precision} }
+  \]
+  <p>versus</p>
+  \[
+\boxed{ \text{FOG / RLG} \rightarrow \text{Higher Precision / Higher SWaP} }
+  \]
+  <p>in many implementations.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.125 Accuracy-Mass Trade</h3>
+
+  <p>High-precision optical or inertial sensors may require:</p>
+<ul><li>larger optics,</li><li>better thermal design,</li><li>mechanical isolation.</li></ul>
+  <p>Thus accuracy can increase system-level mass.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.126 Performance vs Cost</h3>
+
+  <p>Sensor trade studies should avoid assuming:</p>
+  \[
+\boxed{ \text{Highest Cost} = \text{Best Mission Choice}. }
+  \]
+  <p>The correct sensor is the one that satisfies mission requirements with acceptable margin and risk.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.127 SWaP</h3>
+
+  <p>A common comparison metric is</p>
+  \[
+\boxed{ SWaP = \text{Size} + \text{Weight} + \text{Power}. }
+  \]
+  <p>Sometimes cost is included as</p>
+  \[
+\boxed{ SWaP-C. }
+  \]
+  <p>This is particularly important for CubeSats.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.128 Datasheet Typical vs Maximum</h3>
+<p>Typical values are often representative, not guaranteed. Hard mission requirements should preferably be checked against guaranteed or qualified limits, with margin for temperature, ageing, radiation, alignment and modelling uncertainty.</p>
+  <p>Datasheets may quote:</p>
+<ul><li>typical,</li><li>nominal,</li><li>guaranteed,</li><li>maximum,</li><li>minimum.</li></ul>
+  <p>A “typical” value is not necessarily guaranteed.</p>
+  <p>For requirement verification, worst-case guaranteed values are often more appropriate.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.129 Typical vs \(1\sigma\)</h3>
+
+  <p>Typical does not automatically mean</p>
+  \[
+1\sigma.
+  \]
+  <p>Unless the manufacturer explicitly states a statistical confidence, no probability interpretation should be assumed.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.130 Maximum Error vs RMS Error</h3>
+
+  <p>A maximum error is a bound.</p>
+  <p>RMS is a statistical metric.</p>
+  <p>Thus:</p>
+  \[
+\boxed{ e_{max} \neq \sigma }
+  \]
+  <p>and should not be inserted directly into a Kalman-filter \(R\) matrix.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.131 Full Scale vs Reading Percentage</h3>
+
+  <p>These specifications behave differently.</p>
+  <p>For</p>
+  \[
+\pm100
+  \]
+  <p>full scale, \(1\%\) FS means a constant 1-unit error.</p>
+  <p>But \(1\%\) of reading means error scales with actual measurement.</p>
+  <p>This distinction matters at small signals.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.132 ppm</h3>
+
+  <p>Parts per million means</p>
+  \[
+\boxed{ 1\ ppm=10^{-6} }
+  \]
+  <p>Therefore:</p>
+  \[
+100\ ppm = 10^{-4} = 0.01\%.
+  \]
+  <p>This is frequently used for precision scale factors and oscillators.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.133 Temperature Coefficient in ppm/°C</h3>
+
+  <p>If scale factor has coefficient</p>
+  \[
+k_T
+  \]
+  <p>in ppm/°C,</p>
+  \[
+\boxed{ \frac{\Delta K}{K} = k_T\times10^{-6}\Delta T. }
+  \]
+  <p>This converts datasheet coefficients into simulation parameters.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.134 dB Specifications</h3>
+
+  <p>Some sensor/RF parameters are given in decibels.</p>
+  <p>For power ratio:</p>
+  \[
+\boxed{ G_{dB} = 10\log_{10} \left( \frac{P_2}{P_1} \right). }
+  \]
+  <p>For amplitude ratio under equal impedance:</p>
+  \[
+\boxed{ G_{dB} = 20\log_{10} \left( \frac{A_2}{A_1} \right). }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.135 Unit Conversion Discipline</h3>
+
+  <p>Before comparing sensors, normalize units.</p>
+  <p>Examples:</p>
+  \[
+^\circ/s \leftrightarrow rad/s
+  \]
+  \[
+^\circ/hr \leftrightarrow rad/s
+  \]
+  \[
+\mu g \leftrightarrow m/s^2
+  \]
+  \[
+nT \leftrightarrow T.
+  \]
+  <p>Unit errors can easily produce factors of thousands or millions.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.136 Angular Unit Conversion</h3>
+
+  \[
+\boxed{ 1^\circ = \frac{\pi}{180}\ rad }
+  \]
+  \[
+\boxed{ 1\ arcmin = \frac{\pi}{10800}\ rad }
+  \]
+  \[
+\boxed{ 1\ arcsec = \frac{\pi}{648000}\ rad. }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.137 Acceleration Unit Conversion</h3>
+
+  \[
+\boxed{ 1g \approx 9.80665\ m/s^2. }
+  \]
+  <p>Therefore,</p>
+  \[
+\boxed{ 1\ \mu g \approx 9.80665\times10^{-6}\ m/s^2. }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.138 Magnetic Unit Conversion</h3>
+
+  \[
+\boxed{ 1\ T = 10^6\ \mu T = 10^9\ nT. }
+  \]
+  <p>Spacecraft geomagnetic measurements are often expressed in nT or µT.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.139 Error Specification to Covariance</h3>
+<p>Only random measurement uncertainty at the update epoch belongs directly in \(R\). Bias, bias random walk, scale-factor uncertainty, alignment and latency may instead require calibration, state augmentation, process noise or a more complete timing/measurement model.</p>
+  <p>Suppose the manufacturer explicitly states a one-axis \(1\sigma\) accuracy:</p>
+  \[
+\sigma.
+  \]
+  <p>Then</p>
+  \[
+\boxed{ R=\sigma^2 }
+  \]
+  <p>for that scalar measurement.</p>
+  <p>For three independent axes:</p>
+  \[
+\boxed{ R= \operatorname{diag} ( \sigma_x^2, \sigma_y^2, \sigma_z^2 ). }
+  \]
+  <p>But only use this when the statistical interpretation is justified.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.140 \(3\sigma\) to \(1\sigma\)</h3>
+
+  <p>If a Gaussian specification explicitly states</p>
+  \[
+E_{3\sigma},
+  \]
+  <p>then</p>
+  \[
+\boxed{ \sigma = \frac{E_{3\sigma}}{3}. }
+  \]
+  <p>This conversion is invalid if the quoted “maximum” is not a Gaussian \(3\sigma\) quantity.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.141 RMS to Standard Deviation</h3>
+
+  <p>If error is zero mean,</p>
+  \[
+\boxed{ RMSE=\sigma. }
+  \]
+  <p>But if bias exists,</p>
+  \[
+\boxed{ RMSE^2 = b^2+\sigma^2. }
+  \]
+  <p>So RMS accuracy should not automatically be interpreted as zero-mean measurement noise.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.142 Datasheet Noise to Simulation</h3>
+<p>A robust conversion records the original vendor unit and test condition, normalizes the value, identifies whether it is density, RMS, a bound or a stability coefficient, and then maps it into the correct discrete-time model. This preserves traceability and avoids silent statistical errors.</p>
+  <p>A practical workflow is</p>
+  \[
+\boxed{ \text{Datasheet Noise Specification} \rightarrow \text{Interpret Units / Bandwidth} \rightarrow \text{Convert to Standard Deviation} \rightarrow \text{Discrete Noise Model} }
+  \]
+  <p>rather than copying the datasheet number directly into Simulink.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.143 Datasheet Bias to Monte Carlo</h3>
+
+  <p>A useful distinction is:</p>
+  <h4>Initial bias uncertainty</h4>
+  <p>Sample once:</p>
+  \[
+\boxed{ b_0^{(j)} \sim \mathcal D_b. }
+  \]
+  <h4>Time-varying bias</h4>
+  <p>Propagate:</p>
+  \[
+\boxed{ b_{k+1} = \phi b_k+w_k. }
+  \]
+  <p>These correspond to different datasheet parameters.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.144 Datasheet Latency to Model</h3>
+
+  <p>If latency is fixed:</p>
+  \[
+\boxed{ z(t) = h[x(t-\tau)]. }
+  \]
+  <p>If latency varies:</p>
+  \[
+\boxed{ \tau_k = \bar\tau+\delta\tau_k. }
+  \]
+  <p>This distinction matters in high-dynamic navigation.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.145 Sensor Specification Matrix</h3>
+<p>Keep both the vendor-original value and a normalized engineering value. All candidates should be compared using common units, confidence level, bandwidth, temperature, operating mode and qualification assumptions.</p>
+  <p>For every candidate sensor, I would create a common comparison sheet with fields like:</p>
+  <div class="table-wrap"><table><thead><tr>
+<th>Category</th>
+<th>Parameter</th>
+<th></th>
+</tr></thead><tbody>
+<tr><td>Measurement</td><td>Quantity measured</td><td></td></tr>
+<tr><td>Accuracy</td><td>\(1\sigma\), RMS, max</td><td></td></tr>
+<tr><td>Precision</td><td>Repeatability</td><td></td></tr>
+<tr><td>Resolution</td><td>Digital/effective</td><td></td></tr>
+<tr><td>Bias</td><td>Initial/turn-on</td><td></td></tr>
+<tr><td>Stability</td><td>Bias instability/drift</td><td></td></tr>
+<tr><td>Noise</td><td>Density/RMS</td><td></td></tr>
+<tr><td>Scale factor</td><td>Error/stability</td><td></td></tr>
+<tr><td>Alignment</td><td>Orthogonality/misalignment</td><td></td></tr>
+<tr><td>Range</td><td>Full scale</td><td></td></tr>
+<tr><td>Bandwidth</td><td>Hz</td><td></td></tr>
+<tr><td>Update rate</td><td>Hz</td><td></td></tr>
+<tr><td>Latency</td><td>ms</td><td></td></tr>
+<tr><td>Temperature</td><td>Operating/storage</td><td></td></tr>
+<tr><td>Radiation</td><td>TID/SEE</td><td></td></tr>
+<tr><td>Mechanical</td><td>Vibration/shock</td><td></td></tr>
+<tr><td>Interface</td><td>UART/SPI/CAN/etc.</td><td></td></tr>
+<tr><td>Timing</td><td>PPS/trigger/timestamp</td><td></td></tr>
+<tr><td>Mass</td><td>g/kg</td><td></td></tr>
+<tr><td>Power</td><td>W</td><td></td></tr>
+<tr><td>Dimensions</td><td>mm</td><td></td></tr>
+<tr><td>Qualification</td><td>TVAC/vibration/etc.</td><td></td></tr>
+<tr><td>Heritage</td><td>Missions/flights</td><td></td></tr>
+<tr><td>Availability</td><td>Lead time</td><td></td></tr>
+<tr><td>Cost</td><td>Unit price</td><td></td></tr>
+</tbody></table></div>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.146 Sensor-Specific Specification Matrix</h3>
+
+  <p>Then add type-specific fields.</p>
+  <h4>Gyro</h4>
+<ul><li>ARW,</li><li>bias instability,</li><li>rate random walk,</li><li>g-sensitivity.</li></ul>
+  <h4>Accelerometer</h4>
+<ul><li>VRW,</li><li>bias stability,</li><li>vibration rectification.</li></ul>
+  <h4>Magnetometer</h4>
+<ul><li>field range,</li><li>field noise,</li><li>hard/soft-iron sensitivity.</li></ul>
+  <h4>Star tracker</h4>
+<ul><li>cross-boresight accuracy,</li><li>roll accuracy,</li><li>FOV,</li><li>exclusion angles,</li><li>LIS time,</li><li>max slew.</li></ul>
+  <h4>Sun sensor</h4>
+<ul><li>angular accuracy,</li><li>FOV,</li><li>linearity,</li><li>albedo sensitivity.</li></ul>
+  <h4>GNSS</h4>
+<ul><li>PVT accuracy,</li><li>raw measurement output,</li><li>constellations,</li><li>frequencies,</li><li>altitude/dynamic capability,</li><li>TTFF.</li></ul>
+  <h4>Camera</h4>
+<ul><li>resolution,</li><li>FOV,</li><li>focal length,</li><li>frame rate,</li><li>exposure.</li></ul>
+  <h4>LiDAR</h4>
+<ul><li>min/max range,</li><li>range accuracy,</li><li>angular resolution,</li><li>point rate,</li><li>FOV.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.147 Specification Compliance</h3>
+
+  <p>For requirement</p>
+  \[
+p\le p_{req},
+  \]
+  <p>sensor compliance should include margin:</p>
+  \[
+\boxed{ M = p_{req}-p_{sensor} }
+  \]
+  <p>for an upper-limit parameter.</p>
+  <p>For minimum requirements such as update rate:</p>
+  \[
+\boxed{ M = p_{sensor}-p_{req}. }
+  \]
+  <p>Positive margin is preferable.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.148 Requirement Margin</h3>
+
+  <p>A sensor that barely meets nominal requirement may fail after:</p>
+<ul><li>temperature degradation,</li><li>radiation,</li><li>ageing,</li><li>mounting error.</li></ul>
+  <p>Therefore system margin must account for mission environment and uncertainty.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.149 Worst-Case Specification</h3>
+
+  <p>A robust comparison should consider:</p>
+  \[
+\boxed{ \text{Nominal} }
+  \]
+  \[
+\boxed{ \text{Typical} }
+  \]
+  \[
+\boxed{ \text{Worst Case} }
+  \]
+  <p>separately.</p>
+  <p>A sensor selected only from typical performance can create verification problems later.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.150 Beginning-of-Life vs End-of-Life</h3>
+
+  <p>Spacecraft sensor performance may change from BOL to EOL.</p>
+  <p>Thus:</p>
+  \[
+\boxed{ \text{Requirement Compliance at BOL} \not\Rightarrow \text{Requirement Compliance at EOL}. }
+  \]
+  <p>Consider:</p>
+<ul><li>radiation,</li><li>ageing,</li><li>thermal cycling,</li><li>calibration drift.</li></ul>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.151 Qualification Margin</h3>
+
+  <p>Environmental qualification normally includes margin over expected mission conditions.</p>
+  <p>For example:</p>
+  \[
+\boxed{ T_{qual} > T_{mission} }
+  \]
+  <p>or vibration levels above predicted flight loads.</p>
+  <p>The exact margin depends on the qualification standard.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.152 Sensor Procurement Specification</h3>
+<p>The procurement specification becomes the technical contract connecting the component to spacecraft verification. It should define performance, interfaces, environmental envelope, qualification evidence, calibration deliverables, software/firmware configuration, documentation and acceptance criteria.</p>
+  <p>A procurement specification should state required:</p>
+<ul><li>performance,</li><li>environment,</li><li>interfaces,</li><li>qualification,</li><li>documentation,</li><li>calibration,</li><li>delivery conditions.</li></ul>
+  <p>This reduces ambiguity with vendors.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.153 Questions to Ask a Sensor Vendor</h3>
+
+  <p>For spacecraft procurement, useful questions include:</p>
+<ol><li>Is the quoted accuracy typical, RMS, \(1\sigma\), \(3\sigma\), or maximum?</li><li>Under what temperature was it measured?</li><li>At what bandwidth and output rate?</li><li>What is the latency?</li><li>Is the latency deterministic?</li><li>What is the sensor-frame definition?</li><li>Are raw measurements available?</li><li>Is covariance or quality information provided?</li><li>What calibration is performed?</li><li>What is the post-calibration residual?</li><li>What environmental qualification has been completed?</li><li>What radiation testing exists?</li><li>What vibration/shock testing exists?</li><li>What flight heritage exists?</li><li>Are qualification reports available?</li><li>What firmware version was tested?</li><li>What is the lead time?</li><li>Are export restrictions applicable?</li><li>What is the expected lifetime?</li><li>What failure/status outputs are available?</li></ol>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.154 Sensor Specification to GNC Requirement</h3>
+<p>Every important datasheet parameter should trace to a GNC consequence in the error budget, estimator, controller, availability analysis or mission-mode logic. Prominent marketing parameters should not dominate the trade unless they matter to the mission.</p>
+  <p>Every datasheet parameter should be linked to a GNC consequence.</p>
+  <p>For example:</p>
+  \[
+\boxed{ \text{Gyro Bias} \rightarrow \text{Attitude Drift} }
+  \]
+  \[
+\boxed{ \text{Accelerometer Bias} \rightarrow \text{Velocity / Position Drift} }
+  \]
+  \[
+\boxed{ \text{Star Tracker Accuracy} \rightarrow \text{Attitude Knowledge Error} }
+  \]
+  \[
+\boxed{ \text{GNSS Accuracy} \rightarrow \text{Orbit / Relative Navigation Error} }
+  \]
+  \[
+\boxed{ \text{Latency} \rightarrow \text{Dynamic State Error} }
+  \]
+  \[
+\boxed{ \text{Update Rate} \rightarrow \text{Estimator Bandwidth} }
+  \]
+  \[
+\boxed{ \text{FOV} \rightarrow \text{Measurement Availability}. }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.155 Sensor Specification to Simulation Parameter</h3>
+
+  <p>The conversion chain should be</p>
+  \[
+\boxed{ \text{Datasheet} \rightarrow \text{Interpretation} \rightarrow \text{Engineering Parameter} \rightarrow \text{Simulation Model} }
+  \]
+  <p>Example:</p>
+  \[
+\boxed{ \text{Noise Density} \rightarrow \sigma \rightarrow R }
+  \]
+  \[
+\boxed{ \text{Bias Repeatability} \rightarrow b_0^{MC} }
+  \]
+  \[
+\boxed{ \text{Bias Instability} \rightarrow b(t) }
+  \]
+  \[
+\boxed{ \text{Bandwidth} \rightarrow G(s) }
+  \]
+  \[
+\boxed{ \text{Latency} \rightarrow \tau }
+  \]
+  \[
+\boxed{ \text{Range} \rightarrow \text{Saturation Limits}. }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.156 Sensor Specification to Kalman Filter</h3>
+<p>White output noise may define \(R\); bias-driving noise may define part of \(Q\); initial calibration uncertainty may define \(P_0\); alignment may belong in a calibration transform; and latency belongs in the timing model. Collapsing all specifications into one covariance term is physically inconsistent.</p>
+  <p>Not every datasheet number becomes \(R\).</p>
+  <p>Instead:</p>
+  \[
+\boxed{ \text{White Measurement Noise} \rightarrow R }
+  \]
+  \[
+\boxed{ \text{Bias Random Walk} \rightarrow Q }
+  \]
+  \[
+\boxed{ \text{Initial Bias Uncertainty} \rightarrow P_0 }
+  \]
+  \[
+\boxed{ \text{Scale Factor / Alignment} \rightarrow \text{Calibration or State Augmentation} }
+  \]
+  \[
+\boxed{ \text{Latency} \rightarrow \text{Timing Model} }
+  \]
+  <p>This distinction is extremely important.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.157 Sensor Specification to Monte Carlo</h3>
+
+  <p>A Monte Carlo campaign may classify specs as:</p>
+  <h4>Fixed</h4>
+  \[
+p=p_{nom}
+  \]
+  <h4>Run-to-run</h4>
+  \[
+p^{(j)} \sim \mathcal D
+  \]
+  <h4>Time-varying</h4>
+  \[
+p=p(t)
+  \]
+  <h4>Conditional</h4>
+  \[
+p=p(T,\omega,\rho,\ldots)
+  \]
+  <p>This produces realistic sensor uncertainty models.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.158 Comparing Two Sensors Correctly</h3>
+
+  <p>Two sensors should only be compared after normalizing:</p>
+<ul><li>units,</li><li>confidence level,</li><li>bandwidth,</li><li>output rate,</li><li>temperature,</li><li>dynamic range,</li><li>operating mode.</li></ul>
+  <p>For example:</p>
+  \[
+\boxed{ 5\ \mu g/\sqrt{Hz} }
+  \]
+  <p>cannot be directly compared with</p>
+  \[
+\boxed{ 20\ \mu g\ RMS }
+  \]
+  <p>without knowing bandwidth.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.159 Normalized Comparison</h3>
+
+  <p>A good sensor trade table should convert all candidates to common metrics such as:</p>
+  \[
+\boxed{ \sigma_{sample} }
+  \]
+  \[
+\boxed{ bias_{1\sigma} }
+  \]
+  \[
+\boxed{ range }
+  \]
+  \[
+\boxed{ latency }
+  \]
+  \[
+\boxed{ mass }
+  \]
+  \[
+\boxed{ power. }
+  \]
+  <p>This enables meaningful comparison.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.160 Weighted Trade Study</h3>
+<p>Weighted scoring should come only after mandatory constraints are applied. A sensor that is light, cheap and accurate must still be rejected if it fails a hard radiation, range, timing, interface or qualification requirement.</p>
+  <p>A trade score can be represented as</p>
+  \[
+\boxed{ J = \sum_i w_i s_i }
+  \]
+  <p>where:</p>
+<ul><li>\(w_i\) = importance weight,</li><li>\(s_i\) = normalized sensor score.</li></ul>
+  <p>But hard requirements should be treated as constraints, not merely weighted preferences.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.161 Hard Constraints vs Trade Criteria</h3>
+
+  <p>For example:</p>
+  <h4>Hard constraints</h4>
+  \[
+\boxed{ TID\ge TID_{req} }
+  \]
+  \[
+\boxed{ range\ge range_{req} }
+  \]
+  \[
+\boxed{ update\ rate\ge f_{req} }
+  \]
+  <h4>Trade criteria</h4>
+<ul><li>lower mass,</li><li>lower power,</li><li>lower cost,</li><li>better accuracy.</li></ul>
+  <p>A sensor that fails a hard constraint should normally be eliminated regardless of weighted score.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.162 Requirement Traceability</h3>
+
+  <p>Every selected specification should trace back to a system requirement.</p>
+  <p>Conceptually:</p>
+  \[
+\boxed{ \text{Mission Requirement} \rightarrow \text{GNC Requirement} \rightarrow \text{Sensor Requirement} \rightarrow \text{Datasheet Verification}. }
+  \]
+  <p>This prevents arbitrary sensor selection.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.163 Verification Method</h3>
+
+  <p>A sensor requirement should identify how it will be verified:</p>
+<ul><li>analysis,</li><li>test,</li><li>inspection,</li><li>demonstration.</li></ul>
+  <p>For example:</p>
+  \[
+\boxed{ \text{Mass} \rightarrow \text{Inspection} }
+  \]
+  \[
+\boxed{ \text{Noise} \rightarrow \text{Test} }
+  \]
+  \[
+\boxed{ \text{Navigation Impact} \rightarrow \text{Analysis / Monte Carlo}. }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.164 Example Generic Gyro Comparison</h3>
+
+  <p>Suppose two gyros have:</p>
+  <h4>Gyro A</h4>
+<ul><li>lower ARW,</li><li>better bias instability,</li><li>higher power,</li><li>larger mass.</li></ul>
+  <h4>Gyro B</h4>
+<ul><li>higher ARW,</li><li>lower power,</li><li>lower mass.</li></ul>
+  <p>The better choice depends on whether the mission is limited by:</p>
+  \[
+\boxed{ \text{Pointing Accuracy} }
+  \]
+  <p>or</p>
+  \[
+\boxed{ \text{SWaP}. }
+  \]
+  <p>There is no universally superior sensor.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.165 Example Star-Tracker Comparison</h3>
+
+  <p>A wide-FOV tracker may offer:</p>
+  \[
+\boxed{ \text{Higher Availability} }
+  \]
+  <p>while a narrower high-precision tracker may offer:</p>
+  \[
+\boxed{ \text{Better Accuracy}. }
+  \]
+  <p>Selection depends on mission attitude dynamics, exclusion geometry, redundancy, and pointing requirement.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.166 Example GNSS Comparison</h3>
+
+  <p>Receiver A may offer:</p>
+<ul><li>excellent PVT accuracy,</li><li>no carrier-phase raw output.</li></ul>
+  <p>Receiver B may offer:</p>
+<ul><li>similar PVT,</li><li>pseudorange,</li><li>Doppler,</li><li>carrier phase.</li></ul>
+  <p>For ordinary orbit determination, either may work.</p>
+  <p>For precision differential RPO:</p>
+  \[
+\boxed{ \text{Receiver B} }
+  \]
+  <p>may be far more valuable even if nominal standalone position accuracy is similar.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.167 Example RPO Sensor Comparison</h3>
+
+  <p>A camera may provide excellent bearing information but weak range observability.</p>
+  <p>A LiDAR may provide excellent range.</p>
+  <p>Thus:</p>
+  \[
+\boxed{ \text{Camera} + \text{LiDAR} }
+  \]
+  <p>can outperform either individually even when each has a worse headline accuracy in one dimension.</p>
+  <p>This shows why specification assessment must be system-level.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.168 Spacecraft Sensor Selection Worksheet</h3>
+
+  <p>For every candidate, record:</p>
+  \[
+\boxed{ \text{Performance} }
+  \]
+  \[
+\boxed{ \text{Environment} }
+  \]
+  \[
+\boxed{ \text{Electrical} }
+  \]
+  \[
+\boxed{ \text{Mechanical} }
+  \]
+  \[
+\boxed{ \text{Interface} }
+  \]
+  \[
+\boxed{ \text{Qualification} }
+  \]
+  \[
+\boxed{ \text{Heritage} }
+  \]
+  \[
+\boxed{ \text{Procurement Risk}. }
+  \]
+  <p>This becomes the basis for 4.1.11 Sensor Selection for Space Missions.</p>
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.169 Complete Datasheet Interpretation Flow</h3>
+<p>This should be treated as an iterative engineering loop. If Monte Carlo or hardware testing shows that navigation performance is not met, revisit the sensor requirement, candidate set, estimator assumptions or margins.</p>
+  <p>The complete workflow should be:</p>
+  \[
+\boxed{ \text{Mission Requirement} }
+  \]
+  \[
+\downarrow
+  \]
+  \[
+\boxed{ \text{Sensor Requirement} }
+  \]
+  \[
+\downarrow
+  \]
+  \[
+\boxed{ \text{Vendor Datasheet} }
+  \]
+  \[
+\downarrow
+  \]
+  \[
+\boxed{ \text{Interpret Units / Statistics / Test Conditions} }
+  \]
+  \[
+\downarrow
+  \]
+  \[
+\boxed{ \text{Normalize Candidate Sensors} }
+  \]
+  \[
+\downarrow
+  \]
+  \[
+\boxed{ \text{Convert to Simulation / Filter Parameters} }
+  \]
+  \[
+\downarrow
+  \]
+  \[
+\boxed{ \text{GNC Monte Carlo / Performance Analysis} }
+  \]
+  \[
+\downarrow
+  \]
+  \[
+\boxed{ \text{Select Sensor With Margin}. }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.170 Complete Sensor Specification Categories</h3>
+
+  <p>A complete spacecraft sensor specification should be reviewed under at least these categories:</p>
+  \[
+\boxed{ \text{Measurement Performance} }
+  \]
+  \[
+\boxed{ \text{Noise and Stability} }
+  \]
+  \[
+\boxed{ \text{Dynamics and Timing} }
+  \]
+  \[
+\boxed{ \text{Geometry / FOV} }
+  \]
+  \[
+\boxed{ \text{Environmental Compatibility} }
+  \]
+  \[
+\boxed{ \text{Electrical Interface} }
+  \]
+  \[
+\boxed{ \text{Mechanical Integration} }
+  \]
+  \[
+\boxed{ \text{Reliability / Qualification} }
+  \]
+  \[
+\boxed{ \text{SWaP} }
+  \]
+  \[
+\boxed{ \text{Procurement / Heritage}. }
+  \]
+</section>
+<section class="notes-section-card">
+<h3>4.1.10.171 Final Engineering Perspective</h3>
+
+  <p>The central lesson is:</p>
+  \[
+\boxed{ \text{Do Not Select a Sensor From One Headline Accuracy Number}. }
+  \]
+  <p>A sensor is a complete engineering system.</p>
+  <p>Its usefulness depends on:</p>
+  \[
+\boxed{ \text{Accuracy} + \text{Precision} + \text{Noise} + \text{Bias} + \text{Range} + \text{Bandwidth} + \text{Update Rate} + \text{Latency} }
+  \]
+  <p>together with</p>
+  \[
+\boxed{ \text{Temperature} + \text{Radiation} + \text{Vibration} + \text{Power} + \text{Mass} + \text{Interfaces} + \text{Qualification}. }
+  \]
+  <p>And for GNC specifically, the datasheet must ultimately be translated into:</p>
+  \[
+\boxed{ \text{Measurement Model} }
+  \]
+  \[
+\boxed{ R }
+  \]
+  \[
+\boxed{ Q }
+  \]
+  \[
+\boxed{ P_0 }
+  \]
+  \[
+\boxed{ \text{Saturation} }
+  \]
+  \[
+\boxed{ \text{Latency} }
+  \]
+  \[
+\boxed{ \text{Validity Logic} }
+  \]
+  \[
+\boxed{ \text{Monte Carlo Uncertainty}. }
+  \]
+  <p>So the correct engineering chain is</p>
+  \[
+\boxed{ \text{Datasheet Specification} \rightarrow \text{Physical Meaning} \rightarrow \text{GNC Impact} \rightarrow \text{Simulation Parameter} \rightarrow \text{Requirement Verification}. }
+  \]
+  <p>This makes <strong>4.1.10 Sensor Specifications</strong> the natural bridge between <strong>4.1.9 Measurement Models</strong> and <strong>4.1.11 Sensor Selection for Space Missions</strong>.</p>
+</section>
+<nav class="notes-prev-next">
+<a href="measurement-models.html">&larr; 4.1.9 Measurement Models</a>
+<a href="sensor-selection-space-missions.html">4.1.11 Sensor Selection for Space Missions &rarr;</a>
+</nav></main>
+<footer class="site-footer"><p>© 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics. Educational resource for spacecraft dynamics, orbital mechanics, and guidance–navigation–control systems.</p></footer>
+</body></html>
