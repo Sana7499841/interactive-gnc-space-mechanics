@@ -1,0 +1,5709 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.1.8 Combined Sensor Suites | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+</head>
+
+<body>
+
+<!-- ========================================================= -->
+<!-- HEADER -->
+<!-- ========================================================= -->
+
+<header class="notes-hero">
+
+  <h1>Combined Sensor Suites</h1>
+
+  <p class="notes-tagline">
+    Complementary spacecraft sensors, multi-rate fusion, IMU/GNSS integration,
+    gyro–star-tracker attitude estimation, Sun–magnetometer architectures,
+    RPO camera/LiDAR fusion, timing and frame alignment, observability,
+    redundancy, FDIR, sensor management, Monte Carlo verification, and
+    mission-level navigation architecture.
+  </p>
+
+  <nav class="pill-nav">
+    <a href="index.html" class="pill">Home</a>
+    <a href="tools.html" class="pill">Tools</a>
+    <a href="notes.html" class="pill active">Theory Notes</a>
+    <a href="references.html" class="pill">References</a>
+    <a href="problems.html" class="pill">Problem Bank</a>
+    <a href="about.html" class="pill">About</a>
+  </nav>
+
+</header>
+
+<main class="page-main">
+
+<!-- ========================================================= -->
+<!-- 4.1.8 COMBINED SENSOR SUITES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h2>4.1.8 Combined Sensor Suites</h2>
+
+
+  <p>
+    This chapter brings the individual sensor models together into one spacecraft-level
+    navigation architecture. The purpose is not merely to list compatible sensors, but to
+    explain how different sensing principles contribute complementary information to the
+    same estimated spacecraft state, how those measurements are aligned in time and frame,
+    how their uncertainty is represented, and how the suite continues operating when one
+    sensor becomes unavailable or unreliable.
+  </p>
+
+  <p>
+    In practice, a combined sensor suite is a complete system consisting of sensors,
+    calibration models, frame transformations, clocks and timestamps, data interfaces,
+    quality flags, health monitoring, navigation filters, sensor-selection logic, and
+    mission-mode management. The quality of the final navigation solution therefore depends
+    on the interaction of all these elements rather than on the advertised accuracy of any
+    single sensor.
+  </p>
+
+  <p>
+    A spacecraft rarely depends on a single sensor for complete navigation or attitude knowledge. Individual sensors measure different physical quantities, operate at different update rates, possess different error characteristics, and fail under different environmental or geometric conditions. A <strong>combined sensor suite</strong> deliberately brings several complementary sensors together so that the weaknesses of one sensor are compensated by the strengths of another.
+  </p>
+
+  <p>
+    The central idea is
+  </p>
+
+  \[
+\boxed{ \text{Multiple Complementary Sensors} \rightarrow \text{Time / Frame Alignment} \rightarrow \text{Measurement Validation} \rightarrow \text{Sensor Fusion} \rightarrow \text{Best Estimate of Spacecraft State} }
+  \]
+
+  <p>
+    A spacecraft navigation state may contain
+  </p>
+
+  \[
+\boxed{ \mathbf x= \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \boldsymbol\omega\\ \mathbf b_a\\ \mathbf b_g\\ b_c\\ \dot b_c\\ \cdots \end{bmatrix} }
+  \]
+
+  <p>
+    where the required states depend on the mission and estimator architecture.
+  </p>
+
+  <p>
+    Different sensors observe different portions of this state.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\text{Gyroscope}\rightarrow\boldsymbol\omega
+  \]
+
+  \[
+\text{Accelerometer}\rightarrow\mathbf f
+  \]
+
+  \[
+\text{Magnetometer}\rightarrow\mathbf B^B
+  \]
+
+  \[
+\text{Sun Sensor}\rightarrow\mathbf s^B
+  \]
+
+  \[
+\text{Star Tracker}\rightarrow\mathbf q
+  \]
+
+  \[
+\text{GNSS}\rightarrow\mathbf r,\mathbf v,t
+  \]
+
+  <p>
+    while RPO sensors may provide
+  </p>
+
+  \[
+\text{LiDAR}\rightarrow\rho,\dot\rho,\text{relative geometry}
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\text{Camera}\rightarrow\text{bearing / relative pose information}.
+  \]
+
+  <p>
+    The purpose of sensor fusion is therefore not simply to average several measurements. It is to exploit the <strong>different physical information, bandwidth, accuracy, observability, and failure modes</strong> of the available sensors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.1 WHY SPACECRAFT USE COMBINED SENSOR SUITES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.1 Why Spacecraft Use Combined Sensor Suites</h3>
+
+
+  <p>
+    No practical spacecraft sensor is ideal.
+  </p>
+
+  <p>
+    A gyroscope offers excellent high-rate rotational information but develops drift.
+  </p>
+
+  <p>
+    A star tracker provides highly accurate absolute attitude but operates at a lower update rate and may become unavailable because of blinding or high slew.
+  </p>
+
+  <p>
+    A magnetometer is simple and robust but is affected by spacecraft magnetic fields and provides only one reference vector.
+  </p>
+
+  <p>
+    A Sun sensor is excellent for acquisition and safe mode but is unavailable during eclipse.
+  </p>
+
+  <p>
+    GNSS provides absolute position, velocity, and timing but depends on satellite visibility and RF conditions.
+  </p>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \text{High Rate} + \text{Absolute Reference} + \text{Environmental Diversity} + \text{Redundancy} \rightarrow \text{Robust Navigation} }
+  \]
+
+  <p>
+    is one of the fundamental principles of spacecraft sensor-suite design.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.2 COMPLEMENTARY SENSOR CHARACTERISTICS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.2 Complementary Sensor Characteristics</h3>
+
+
+  <p>
+    The most useful sensor combinations usually contain sensors with complementary properties.
+  </p>
+
+  <p>
+    A common pattern is
+  </p>
+
+  \[
+\boxed{ \text{Fast Relative Sensor} + \text{Slower Absolute Sensor} }
+  \]
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ \text{Gyroscope} + \text{Star Tracker} }
+  \]
+
+  <p>
+    or
+  </p>
+
+  \[
+\boxed{ \text{IMU} + \text{GNSS}. }
+  \]
+
+  <p>
+    The high-rate sensor propagates the navigation state between absolute measurements, while the absolute sensor periodically corrects drift.
+  </p>
+
+  <p>
+    This gives the general architecture
+  </p>
+
+  \[
+\boxed{ \text{Propagation Sensor} \rightarrow \text{State Prediction} }
+  \]
+
+  <p>
+    combined with
+  </p>
+
+  \[
+\boxed{ \text{Absolute Sensor} \rightarrow \text{State Correction}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.3 SENSOR FUSION IS NOT SENSOR AVERAGING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.3 Sensor Fusion Is Not Sensor Averaging</h3>
+
+
+  <p>
+    Suppose two sensors measure different physical quantities:
+  </p>
+
+  \[
+\boldsymbol\omega_m
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\mathbf s_m.
+  \]
+
+  <p>
+    These cannot simply be averaged.
+  </p>
+
+  <p>
+    Instead, the spacecraft dynamics and measurement models connect them to a common state.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf n_g
+  \]
+
+  <p>
+    while
+  </p>
+
+  \[
+\mathbf s_m^B = C_I^B(\mathbf q)\mathbf s^I + \mathbf n_s.
+  \]
+
+  <p>
+    Both contain information about spacecraft attitude, but through fundamentally different measurement equations.
+  </p>
+
+  <p>
+    Thus sensor fusion uses
+  </p>
+
+  \[
+\boxed{ \mathbf x_{k+1}=f(\mathbf x_k,\mathbf u_k)+\mathbf w_k }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \mathbf z_k=h(\mathbf x_k)+\mathbf v_k }
+  \]
+
+  <p>
+    rather than simple arithmetic averaging.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.4 PROPAGATION SENSORS AND CORRECTION SENSORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.4 Propagation Sensors and Correction Sensors</h3>
+
+
+  <p>
+    A useful division is between <strong>propagation sensors</strong> and <strong>absolute-reference sensors</strong>.
+  </p>
+
+  <p>
+    Propagation sensors include:
+  </p>
+
+  \[
+\boxed{ \text{Gyroscope} }
+  \]
+
+  <p>
+    and, for translational navigation,
+  </p>
+
+  \[
+\boxed{ \text{Accelerometer}. }
+  \]
+
+  <p>
+    They provide high-rate measurements that support continuous state propagation.
+  </p>
+
+  <p>
+    Absolute-reference sensors include:
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker} }
+  \]
+
+  \[
+\boxed{ \text{Sun Sensor} }
+  \]
+
+  \[
+\boxed{ \text{Magnetometer} }
+  \]
+
+  \[
+\boxed{ \text{GNSS}. }
+  \]
+
+  <p>
+    These measurements prevent long-term divergence.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.5 TYPICAL SPACECRAFT SENSOR SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.5 Typical Spacecraft Sensor Suite</h3>
+
+
+  <p>
+    A representative spacecraft may carry
+  </p>
+
+  \[
+\boxed{ \text{Gyroscopes} + \text{Accelerometers} + \text{Magnetometers} + \text{Sun Sensors} + \text{Star Trackers} + \text{GNSS} }
+  \]
+
+  <p>
+    with mission-specific additions such as
+  </p>
+
+  \[
+\boxed{ \text{Camera} + \text{LiDAR} + \text{Laser Rangefinder} + \text{Radar} }
+  \]
+
+  <p>
+    for proximity operations.
+  </p>
+
+  <p>
+    The complete suite does not necessarily operate continuously. Different sensors may be activated depending on spacecraft mode.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.6 HIERARCHICAL SENSOR ARCHITECTURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.6 Hierarchical Sensor Architecture</h3>
+
+
+  <p>
+    A spacecraft often uses sensors in a hierarchy.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Survival Sensors} \rightarrow \text{Coarse Navigation Sensors} \rightarrow \text{Fine Navigation Sensors} \rightarrow \text{Mission-Specific Relative Sensors} }
+  \]
+
+  <p>
+    For attitude determination:
+  </p>
+
+  \[
+\boxed{ \text{Coarse Sun Sensor} \rightarrow \text{Sun + Magnetometer} \rightarrow \text{Gyro + Star Tracker} }
+  \]
+
+  <p>
+    For RPO:
+  </p>
+
+  \[
+\boxed{ \text{GNSS} \rightarrow \text{Differential GNSS} \rightarrow \text{Camera / LiDAR} \rightarrow \text{Precision Relative Pose Sensor} }
+  \]
+
+  <p>
+    This permits both robustness and high accuracy.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.7 IMU AS A COMBINED SENSOR SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.7 IMU as a Combined Sensor Suite</h3>
+
+
+  <p>
+    An <strong>Inertial Measurement Unit</strong> usually combines
+  </p>
+
+  \[
+\boxed{ 3\text{-axis Gyroscope} + 3\text{-axis Accelerometer}. }
+  \]
+
+  <p>
+    Its typical output is
+  </p>
+
+  \[
+\boxed{ \mathbf z_{IMU} = \begin{bmatrix} \boldsymbol\omega_m\\ \mathbf f_m \end{bmatrix}. }
+  \]
+
+  <p>
+    The gyro measures angular rate while the accelerometer measures specific force.
+  </p>
+
+  <p>
+    The IMU therefore supports propagation of both orientation and translational states.
+  </p>
+
+  <p>
+    However,
+  </p>
+
+  \[
+\boxed{ \text{IMU Alone} \rightarrow \text{Drifting Navigation Solution}. }
+  \]
+
+  <p>
+    It requires external aiding for long-term accuracy.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.8 IMU ERROR STATE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.8 IMU Error State</h3>
+
+
+  <p>
+    A typical INS error state is
+  </p>
+
+  \[
+\boxed{ \delta\mathbf x = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \delta\boldsymbol\theta\\ \mathbf b_a\\ \mathbf b_g \end{bmatrix}. }
+  \]
+
+  <p>
+    More elaborate models can include
+  </p>
+
+  \[
+\boxed{ \mathbf s_a,\; \mathbf s_g,\; \text{misalignment},\; \text{clock states}. }
+  \]
+
+  <p>
+    This is why combined sensor suites frequently estimate sensor errors as part of the navigation state.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.9 IMU + GNSS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.9 IMU + GNSS</h3>
+
+
+  <p>
+    One of the most important navigation architectures is
+  </p>
+
+  \[
+\boxed{ \text{IMU} + \text{GNSS}. }
+  \]
+
+  <p>
+    The IMU provides rapid propagation:
+  </p>
+
+  \[
+\boxed{ \mathbf x_{k+1}^{-} = f(\mathbf x_k^{+},\mathbf z_{IMU}). }
+  \]
+
+  <p>
+    GNSS provides absolute correction:
+  </p>
+
+  \[
+\boxed{ \mathbf z_{GNSS} = \begin{bmatrix} \mathbf r_m\\ \mathbf v_m \end{bmatrix}. }
+  \]
+
+  <p>
+    Thus
+  </p>
+
+  \[
+\boxed{ \text{IMU High-Rate Propagation} + \text{GNSS Absolute Updates} \rightarrow \text{Bounded Navigation Error}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.10 WHY IMU AND GNSS ARE COMPLEMENTARY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.10 Why IMU and GNSS Are Complementary</h3>
+
+
+  <p>
+    The IMU:
+  </p>
+
+  <ul>
+
+    <li>operates at high update rate,</li>
+
+    <li>provides continuous local measurements,</li>
+
+    <li>works without external radio signals,</li>
+
+    <li>has excellent short-term dynamics.</li>
+
+  </ul>
+
+  <p>
+    But IMU errors accumulate with integration.
+  </p>
+
+  <p>
+    GNSS:
+  </p>
+
+  <ul>
+
+    <li>provides absolute position,</li>
+
+    <li>provides absolute velocity,</li>
+
+    <li>provides precise time,</li>
+
+    <li>does not accumulate inertial drift.</li>
+
+  </ul>
+
+  <p>
+    But GNSS:
+  </p>
+
+  <ul>
+
+    <li>operates at lower rate,</li>
+
+    <li>may have latency,</li>
+
+    <li>may suffer outages,</li>
+
+    <li>depends on satellite geometry and RF visibility.</li>
+
+  </ul>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \text{IMU Strengths} \approx \text{GNSS Weaknesses} }
+  \]
+
+  <p>
+    and vice versa.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.11 LOOSELY COUPLED GNSS/INS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.11 Loosely Coupled GNSS/INS</h3>
+
+
+  <p>
+    In loosely coupled integration,
+  </p>
+
+  \[
+\boxed{ \text{GNSS Receiver} \rightarrow \mathbf r_{GNSS},\mathbf v_{GNSS} }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \text{IMU} \rightarrow \text{INS Propagation}. }
+  \]
+
+  <p>
+    The navigation filter compares them:
+  </p>
+
+  \[
+\boxed{ \mathbf y = \begin{bmatrix} \mathbf r_{GNSS}-\hat{\mathbf r}_{INS}\\ \mathbf v_{GNSS}-\hat{\mathbf v}_{INS} \end{bmatrix}. }
+  \]
+
+  <p>
+    Advantages include simplicity and clear hardware interfaces.
+  </p>
+
+  <p>
+    A limitation is that the GNSS receiver must first generate its own valid solution.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.12 TIGHTLY COUPLED GNSS/INS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.12 Tightly Coupled GNSS/INS</h3>
+
+
+  <p>
+    In tightly coupled integration, raw GNSS observables enter the integrated filter directly.
+  </p>
+
+  <p>
+    The filter may use
+  </p>
+
+  \[
+\boxed{ \rho_i,\quad \dot\rho_i }
+  \]
+
+  <p>
+    together with IMU measurements.
+  </p>
+
+  <p>
+    A possible state is
+  </p>
+
+  \[
+\boxed{ \mathbf x= [ \mathbf r, \mathbf v, \delta\boldsymbol\theta, \mathbf b_a, \mathbf b_g, b_c, d_c ]^T. }
+  \]
+
+  <p>
+    Benefits include:
+  </p>
+
+  <ul>
+
+    <li>use of individual satellites,</li>
+
+    <li>better degradation behaviour when fewer satellites are available,</li>
+
+    <li>direct estimation of clock states,</li>
+
+    <li>improved fault isolation.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.13 ULTRA-TIGHTLY COUPLED GNSS/INS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.13 Ultra-Tightly Coupled GNSS/INS</h3>
+
+
+  <p>
+    Ultra-tight integration goes deeper.
+  </p>
+
+  <p>
+    Rather than waiting for completed GNSS observables,
+  </p>
+
+  \[
+\boxed{ \text{INS Prediction} \rightarrow \text{GNSS Tracking-Loop Aid}. }
+  \]
+
+  <p>
+    The INS predicts expected code phase and Doppler, assisting receiver tracking loops.
+  </p>
+
+  <p>
+    This can improve operation during:
+  </p>
+
+  <ul>
+
+    <li>weak signals,</li>
+
+    <li>high dynamics,</li>
+
+    <li>short GNSS interruptions.</li>
+
+  </ul>
+
+  <p>
+    It is much more complex than ordinary spacecraft sensor fusion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.14 GYROSCOPE + MAGNETOMETER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.14 Gyroscope + Magnetometer</h3>
+
+
+  <p>
+    A gyro–magnetometer combination is a common low-cost attitude architecture.
+  </p>
+
+  <p>
+    The gyro provides:
+  </p>
+
+  \[
+\boldsymbol\omega_m
+  \]
+
+  <p>
+    for propagation.
+  </p>
+
+  <p>
+    The magnetometer provides:
+  </p>
+
+  \[
+\mathbf B_m^B
+  \]
+
+  <p>
+    as an absolute vector reference.
+  </p>
+
+  <p>
+    The expected magnetic-field direction is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf B}^B = C_I^B(\hat{\mathbf q}) \mathbf B^I. }
+  \]
+
+  <p>
+    The innovation can be
+  </p>
+
+  \[
+\boxed{ \mathbf y_B = \mathbf B_m^B-\hat{\mathbf B}^B. }
+  \]
+
+  <p>
+    The magnetometer therefore helps correct gyro drift.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.15 LIMITATION OF GYROSCOPE + MAGNETOMETER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.15 Limitation of Gyroscope + Magnetometer</h3>
+
+
+  <p>
+    A magnetometer provides only one reference vector.
+  </p>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \text{Magnetometer Alone} \neq \text{Complete Instantaneous Three-Axis Attitude}. }
+  \]
+
+  <p>
+    The gyro supplies dynamic continuity but does not independently remove every attitude ambiguity.
+  </p>
+
+  <p>
+    Performance also depends strongly on spacecraft magnetic cleanliness.
+  </p>
+
+  <p>
+    This architecture is therefore well suited to coarse attitude estimation but generally not high-precision pointing.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.16 GYROSCOPE + SUN SENSOR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.16 Gyroscope + Sun Sensor</h3>
+
+
+  <p>
+    Another complementary combination is
+  </p>
+
+  \[
+\boxed{ \text{Gyroscope} + \text{Sun Sensor}. }
+  \]
+
+  <p>
+    The gyro propagates attitude.
+  </p>
+
+  <p>
+    The Sun sensor measures
+  </p>
+
+  \[
+\mathbf s_m^B.
+  \]
+
+  <p>
+    The predicted vector is
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf s}^B = C_I^B(\hat{\mathbf q}) \mathbf s^I. }
+  \]
+
+  <p>
+    The difference constrains gyro drift.
+  </p>
+
+  <p>
+    But one Sun vector does not independently determine rotation around the Sun direction.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.17 GYROSCOPE + SUN SENSOR + MAGNETOMETER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.17 Gyroscope + Sun Sensor + Magnetometer</h3>
+
+
+  <p>
+    A highly useful coarse spacecraft architecture is
+  </p>
+
+  \[
+\boxed{ \text{Gyroscope} + \text{Sun Sensor} + \text{Magnetometer}. }
+  \]
+
+  <p>
+    Here:
+  </p>
+
+  \[
+\text{Gyro} \rightarrow \text{High-Rate Propagation}
+  \]
+
+  \[
+\text{Sun Sensor} \rightarrow \text{Celestial Reference}
+  \]
+
+  \[
+\text{Magnetometer} \rightarrow \text{Geomagnetic Reference}.
+  \]
+
+  <p>
+    The Sun and magnetic vectors provide two independent attitude references when they are sufficiently non-collinear.
+  </p>
+
+  <p>
+    Thus
+  </p>
+
+  \[
+\boxed{ \text{Two Absolute Vectors} + \text{Gyro Dynamics} \rightarrow \text{Three-Axis Attitude Estimate}. }
+  \]
+
+  <p>
+    This is particularly attractive for CubeSats and safe-mode architectures.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.18 SUN SENSOR + MAGNETOMETER WITHOUT GYRO -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.18 Sun Sensor + Magnetometer Without Gyro</h3>
+
+
+  <p>
+    If spacecraft dynamics are slow enough, attitude may be determined directly from two vector measurements:
+  </p>
+
+  \[
+\boxed{ \mathbf s^I,\mathbf B^I }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \mathbf s^B,\mathbf B^B. }
+  \]
+
+  <p>
+    TRIAD or Wahba-problem algorithms can estimate attitude.
+  </p>
+
+  <p>
+    However, without a gyro:
+  </p>
+
+  <ul>
+
+    <li>temporal propagation is weaker,</li>
+
+    <li>attitude estimates can become noisier,</li>
+
+    <li>high-rate control is more difficult.</li>
+
+  </ul>
+
+  <p>
+    Therefore a gyro remains highly beneficial.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.19 GYROSCOPE + STAR TRACKER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.19 Gyroscope + Star Tracker</h3>
+
+
+  <p>
+    For precision spacecraft attitude determination,
+  </p>
+
+  \[
+\boxed{ \text{Gyroscope} + \text{Star Tracker} }
+  \]
+
+  <p>
+    is one of the most important combinations.
+  </p>
+
+  <p>
+    The gyro provides high-rate attitude propagation.
+  </p>
+
+  <p>
+    The star tracker provides accurate absolute attitude.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Gyro} \rightarrow \hat q^{-} }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker} \rightarrow q_m \rightarrow \text{Correction}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.20 WHY GYRO + STAR TRACKER WORKS SO WELL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.20 Why Gyro + Star Tracker Works So Well</h3>
+
+
+  <p>
+    The gyro has high bandwidth but drift.
+  </p>
+
+  <p>
+    The star tracker has excellent absolute accuracy but lower bandwidth and potential availability constraints.
+  </p>
+
+  <p>
+    Together:
+  </p>
+
+  \[
+\boxed{ \text{High-Bandwidth Relative Information} + \text{Low-Drift Absolute Information} \rightarrow \text{High-Accuracy Attitude}. }
+  \]
+
+  <p>
+    This architecture is common in high-performance spacecraft.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.21 STAR-TRACKER UPDATE IN AN MEKF -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.21 Star-Tracker Update in an MEKF</h3>
+
+
+  <p>
+    Suppose the estimated quaternion is
+  </p>
+
+  \[
+\hat q.
+  \]
+
+  <p>
+    A star-tracker quaternion measurement is
+  </p>
+
+  \[
+q_m.
+  \]
+
+  <p>
+    The attitude error can be formed using an error quaternion:
+  </p>
+
+  \[
+\boxed{ \delta q = q_m\otimes\hat q^{-1} }
+  \]
+
+  <p>
+    for one convention.
+  </p>
+
+  <p>
+    For small errors,
+  </p>
+
+  \[
+\delta q \approx \begin{bmatrix} 1\\ \frac12\delta\boldsymbol\theta \end{bmatrix}
+  \]
+
+  <p>
+    depending on scalar-first/scalar-last convention.
+  </p>
+
+  <p>
+    The MEKF estimates
+  </p>
+
+  \[
+\delta\boldsymbol\theta
+  \]
+
+  <p>
+    rather than treating the quaternion as an unconstrained additive state.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.22 GYRO BIAS ESTIMATION USING STAR TRACKER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.22 Gyro Bias Estimation Using Star Tracker</h3>
+
+
+  <p>
+    A star tracker helps estimate gyro bias.
+  </p>
+
+  <p>
+    The gyro model is
+  </p>
+
+  \[
+\boxed{ \boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf n_g. }
+  \]
+
+  <p>
+    Without absolute references, \(\mathbf b_g\) produces increasing attitude error.
+  </p>
+
+  <p>
+    Repeated star-tracker updates expose the accumulating drift, allowing the filter to estimate
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf b}_g. }
+  \]
+
+  <p>
+    The corrected gyro rate becomes
+  </p>
+
+  \[
+\boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m-\hat{\mathbf b}_g. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.23 STAR TRACKER + GYRO + SUN SENSOR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.23 Star Tracker + Gyro + Sun Sensor</h3>
+
+
+  <p>
+    Some spacecraft retain a Sun sensor even when star trackers are available.
+  </p>
+
+  <p>
+    A useful hierarchy is
+  </p>
+
+  \[
+\boxed{ \text{Gyro + Star Tracker} }
+  \]
+
+  <p>
+    for nominal fine pointing, with
+  </p>
+
+  \[
+\boxed{ \text{Sun Sensor} }
+  \]
+
+  <p>
+    providing:
+  </p>
+
+  <ul>
+
+    <li>acquisition support,</li>
+
+    <li>safe mode,</li>
+
+    <li>independent cross-checking,</li>
+
+    <li>recovery if star tracker is unavailable.</li>
+
+  </ul>
+
+  <p>
+    This is an example of <strong>functional redundancy rather than identical redundancy</strong>.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.24 STAR TRACKER + GYRO + MAGNETOMETER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.24 Star Tracker + Gyro + Magnetometer</h3>
+
+
+  <p>
+    A magnetometer may also serve as an independent backup/reference.
+  </p>
+
+  <p>
+    During nominal operation,
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker + Gyro} }
+  \]
+
+  <p>
+    may dominate the attitude estimate.
+  </p>
+
+  <p>
+    During star-tracker loss,
+  </p>
+
+  \[
+\boxed{ \text{Gyro + Magnetometer} }
+  \]
+
+  <p>
+    can maintain a degraded but usable attitude solution.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.25 FULL ATTITUDE SENSOR SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.25 Full Attitude Sensor Suite</h3>
+
+
+  <p>
+    A robust spacecraft can therefore use
+  </p>
+
+  \[
+\boxed{ \text{Gyroscope} + \text{Star Tracker} + \text{Sun Sensor} + \text{Magnetometer}. }
+  \]
+
+  <p>
+    Their approximate roles are:
+  </p>
+
+  <div class="table-wrap">
+
+  <table>
+
+    <thead><tr>
+
+      <th>Sensor</th>
+
+      <th>Main Contribution</th>
+
+    </tr></thead>
+
+    <tbody>
+
+      <tr>
+
+        <td>Gyroscope</td>
+
+        <td>High-rate attitude propagation</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Star tracker</td>
+
+        <td>High-accuracy absolute attitude</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Sun sensor</td>
+
+        <td>Robust celestial reference and safe mode</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Magnetometer</td>
+
+        <td>Independent vector reference and magnetic-control support</td>
+
+      </tr>
+
+    </tbody>
+
+  </table>
+
+  </div>
+
+  <p>
+    This allows graceful degradation when one or more sensors become unavailable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.26 ACCELEROMETER + GYROSCOPE + GNSS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.26 Accelerometer + Gyroscope + GNSS</h3>
+
+
+  <p>
+    A complete inertial-navigation suite can combine
+  </p>
+
+  \[
+\boxed{ \text{Accelerometer} + \text{Gyroscope} + \text{GNSS}. }
+  \]
+
+  <p>
+    The accelerometer supports translational propagation.
+  </p>
+
+  <p>
+    The gyro supplies orientation needed to rotate measured specific force into the navigation frame.
+  </p>
+
+  <p>
+    GNSS corrects long-term position and velocity drift.
+  </p>
+
+  <p>
+    Thus attitude errors and translational errors become strongly coupled.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.27 ATTITUDE ERROR COUPLING IN GNSS/INS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.27 Attitude Error Coupling in GNSS/INS</h3>
+
+
+  <p>
+    The accelerometer measures specific force in its body/sensor frame.
+  </p>
+
+  <p>
+    It must be rotated into the navigation frame:
+  </p>
+
+  \[
+\boxed{ \mathbf f^I = C_B^I(\hat q) \mathbf f^B. }
+  \]
+
+  <p>
+    If attitude contains error
+  </p>
+
+  \[
+\delta\boldsymbol\theta,
+  \]
+
+  <p>
+    then acceleration contains error approximately
+  </p>
+
+  \[
+\boxed{ \delta\mathbf f^I \approx -[\mathbf f^I\times] \delta\boldsymbol\theta. }
+  \]
+
+  <p>
+    Therefore gyro errors indirectly create velocity and position errors.
+  </p>
+
+  <p>
+    GNSS position/velocity updates can consequently make gyro and accelerometer biases observable under suitable motion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.28 GNSS + STAR TRACKER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.28 GNSS + Star Tracker</h3>
+
+
+  <p>
+    GNSS and star trackers provide two different absolute measurements.
+  </p>
+
+  <p>
+    GNSS provides
+  </p>
+
+  \[
+\mathbf r,\mathbf v,t
+  \]
+
+  <p>
+    while the star tracker provides
+  </p>
+
+  \[
+q.
+  \]
+
+  <p>
+    Together they provide much of the spacecraft translational and rotational state.
+  </p>
+
+  <p>
+    However, high-rate dynamics still usually require gyro and possibly accelerometer propagation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.29 COMPLETE POSITION AND ATTITUDE NAVIGATION SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.29 Complete Position and Attitude Navigation Suite</h3>
+
+
+  <p>
+    A high-performance spacecraft navigation architecture can be
+  </p>
+
+  \[
+\boxed{ \text{IMU} + \text{GNSS} + \text{Star Tracker} }
+  \]
+
+  <p>
+    with optional
+  </p>
+
+  \[
+\boxed{ \text{Sun Sensor} + \text{Magnetometer}. }
+  \]
+
+  <p>
+    The estimator can simultaneously estimate:
+  </p>
+
+  \[
+\boxed{ \mathbf r,\; \mathbf v,\; \mathbf q,\; \mathbf b_a,\; \mathbf b_g,\; \text{clock states} }
+  \]
+
+  <p>
+    depending on architecture.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.30 CENTRALIZED SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.30 Centralized Sensor Fusion</h3>
+
+
+  <p>
+    In a centralized architecture, measurements from all sensors are processed in a single estimator.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  <pre>
+Gyro ----------+
+Accelerometer -+
+Magnetometer --+
+Sun Sensor ----+
+Star Tracker --+----&gt; Central EKF / UKF / MEKF ----&gt; State Estimate
+GNSS ----------+
+Camera --------+
+LiDAR ---------+
+  </pre>
+
+  <p>
+    Advantages include:
+  </p>
+
+  <ul>
+
+    <li>consistent covariance handling,</li>
+
+    <li>access to raw measurements,</li>
+
+    <li>strong cross-sensor coupling,</li>
+
+    <li>potentially optimal use of information.</li>
+
+  </ul>
+
+  <p>
+    Disadvantages include:
+  </p>
+
+  <ul>
+
+    <li>more complex estimator,</li>
+
+    <li>larger state dimension,</li>
+
+    <li>greater computational load,</li>
+
+    <li>increased software coupling.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.31 FEDERATED SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.31 Federated Sensor Fusion</h3>
+
+
+  <p>
+    In federated architectures, local filters first process individual sensor groups.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  <pre>
+GNSS + IMU --------&gt; Navigation Filter ----+
+                                            |
+Gyro + StarTracker -&gt; Attitude Filter -----+--&gt; Master Fusion
+                                            |
+Camera + LiDAR -----&gt; Relative Nav Filter -+
+  </pre>
+
+  <p>
+    Advantages can include:
+  </p>
+
+  <ul>
+
+    <li>modularity,</li>
+
+    <li>fault containment,</li>
+
+    <li>easier subsystem development,</li>
+
+    <li>graceful degradation.</li>
+
+  </ul>
+
+  <p>
+    But care must be taken with covariance and shared-information correlation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.32 HIERARCHICAL SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.32 Hierarchical Sensor Fusion</h3>
+
+
+  <p>
+    A hierarchical architecture may first produce subsystem-level states such as
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf q} }
+  \]
+
+  <p>
+    from an attitude estimator and
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf r},\hat{\mathbf v} }
+  \]
+
+  <p>
+    from a navigation estimator.
+  </p>
+
+  <p>
+    These states are then supplied to guidance.
+  </p>
+
+  <p>
+    This is common in practical spacecraft software because it separates:
+  </p>
+
+  <ul>
+
+    <li>attitude estimation,</li>
+
+    <li>translational navigation,</li>
+
+    <li>relative navigation.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.33 LOOSE VS TIGHT SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.33 Loose vs Tight Sensor Fusion</h3>
+
+
+  <p>
+    A general distinction exists beyond GNSS/INS.
+  </p>
+
+  <h4>Loose fusion</h4>
+
+  <p>
+    Fuse processed sensor outputs.
+  </p>
+
+  <p>
+    Example:
+  </p>
+
+  \[
+\boxed{ q_{startracker} + \boldsymbol\omega_{gyro} }
+  \]
+
+  <h4>Tight fusion</h4>
+
+  <p>
+    Fuse more fundamental measurements.
+  </p>
+
+  <p>
+    Example:
+  </p>
+
+  \[
+\boxed{ \text{Star centroids} + \text{gyro data} }
+  \]
+
+  <p>
+    or
+  </p>
+
+  \[
+\boxed{ \text{GNSS pseudoranges} + \text{IMU}. }
+  \]
+
+  <p>
+    Tighter integration can exploit more information but increases model complexity.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.34 KALMAN FILTER SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.34 Kalman Filter Sensor Fusion</h3>
+
+
+  <p>
+    For linear systems,
+  </p>
+
+  \[
+\boxed{ \mathbf x_{k+1} = F_k\mathbf x_k + G_k\mathbf w_k }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = H_k\mathbf x_k + \mathbf v_k. }
+  \]
+
+  <p>
+    The Kalman update is
+  </p>
+
+  \[
+\boxed{ K_k = P_k^-H_k^T (H_kP_k^-H_k^T+R_k)^{-1} }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf x}_k^+ = \hat{\mathbf x}_k^- + K_k (\mathbf z_k-H_k\hat{\mathbf x}_k^-). }
+  \]
+
+  <p>
+    Each sensor contributes through its own measurement equation and covariance.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.35 EKF SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.35 EKF Sensor Fusion</h3>
+
+
+  <p>
+    Most spacecraft measurement functions are nonlinear.
+  </p>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \mathbf z = h(\mathbf x)+\mathbf v. }
+  \]
+
+  <p>
+    The EKF linearizes:
+  </p>
+
+  \[
+\boxed{ H = \left. \frac{\partial h}{\partial\mathbf x} \right|_{\hat{\mathbf x}}. }
+  \]
+
+  <p>
+    Different sensors simply supply different \(h_i(\mathbf x)\) and \(R_i\).
+  </p>
+
+  <p>
+    This makes the EKF a natural framework for combined sensor suites.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.36 MEKF FOR ATTITUDE SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.36 MEKF for Attitude Sensor Fusion</h3>
+
+
+  <p>
+    For quaternion attitude estimation, the <strong>Multiplicative Extended Kalman Filter</strong> is widely used.
+  </p>
+
+  <p>
+    The nominal quaternion is maintained separately, while the filter estimates a small three-component attitude error:
+  </p>
+
+  \[
+\boxed{ \delta\boldsymbol\theta. }
+  \]
+
+  <p>
+    A representative state can be
+  </p>
+
+  \[
+\boxed{ \delta\mathbf x = \begin{bmatrix} \delta\boldsymbol\theta\\ \mathbf b_g \end{bmatrix}. }
+  \]
+
+  <p>
+    Measurements from star trackers, Sun sensors, and magnetometers can all update this state.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.37 UKF SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.37 UKF Sensor Fusion</h3>
+
+
+  <p>
+    The Unscented Kalman Filter avoids explicit first-order Jacobian linearization.
+  </p>
+
+  <p>
+    Sigma points are propagated through
+  </p>
+
+  \[
+f(\cdot)
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+h(\cdot).
+  \]
+
+  <p>
+    This can be useful for strongly nonlinear sensor models.
+  </p>
+
+  <p>
+    However:
+  </p>
+
+  \[
+\boxed{ \text{UKF} \not\Rightarrow \text{Automatically Better}. }
+  \]
+
+  <p>
+    Its suitability depends on state dimension, computational resources, model quality, and estimator design.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.38 COMPLEMENTARY FILTERS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.38 Complementary Filters</h3>
+
+
+  <p>
+    Not every spacecraft requires a full Kalman filter.
+  </p>
+
+  <p>
+    A complementary filter combines high-frequency information from one sensor with low-frequency absolute information from another.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ \text{Gyro High-Frequency Response} + \text{Sun/Magnetic Low-Frequency Reference}. }
+  \]
+
+  <p>
+    Complementary filters can be:
+  </p>
+
+  <ul>
+
+    <li>computationally inexpensive,</li>
+
+    <li>robust,</li>
+
+    <li>easy to tune.</li>
+
+  </ul>
+
+  <p>
+    They are useful for small spacecraft and safe-mode systems.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.39 SENSOR WEIGHTING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.39 Sensor Weighting</h3>
+
+
+  <p>
+    Sensor fusion depends on uncertainty.
+  </p>
+
+  <p>
+    For measurement covariance
+  </p>
+
+  \[
+R_i,
+  \]
+
+  <p>
+    a more accurate sensor generally receives more weight.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ R_i\downarrow \Rightarrow \text{Measurement Confidence}\uparrow. }
+  \]
+
+  <p>
+    However, covariance must reflect actual operating conditions.
+  </p>
+
+  <p>
+    A star tracker near blinding or a GNSS solution with poor geometry should not retain nominal high confidence.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.40 ADAPTIVE MEASUREMENT COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.40 Adaptive Measurement Covariance</h3>
+
+
+  <p>
+    Sensor covariance may vary:
+  </p>
+
+  \[
+\boxed{ R_i = R_i( \text{signal quality}, \text{geometry}, \text{temperature}, \text{dynamics}, \text{mode} ). }
+  \]
+
+  <p>
+    Examples include:
+  </p>
+
+  \[
+R_{GNSS}=R(DOP,C/N_0)
+  \]
+
+  \[
+R_{Sun}=R(\text{incidence angle})
+  \]
+
+  \[
+R_{ST}=R(\text{slew rate},\text{star count}).
+  \]
+
+  <p>
+    Adaptive weighting can substantially improve robustness.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.41 SENSOR AVAILABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.41 Sensor Availability</h3>
+
+
+  <p>
+    Combined suites must explicitly model sensor availability:
+  </p>
+
+  \[
+\boxed{ valid_i\in\{0,1\}. }
+  \]
+
+  <p>
+    Examples include:
+  </p>
+
+  \[
+valid_{Sun}=0
+  \]
+
+  <p>
+    during eclipse,
+  </p>
+
+  \[
+valid_{ST}=0
+  \]
+
+  <p>
+    during blinding or lost-in-space recovery,
+  </p>
+
+  <p>
+    and
+  </p>
+
+  \[
+valid_{GNSS}=0
+  \]
+
+  <p>
+    during insufficient satellite visibility.
+  </p>
+
+  <p>
+    Fusion software must operate correctly as the measurement set changes.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.42 ASYNCHRONOUS SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.42 Asynchronous Sensor Fusion</h3>
+
+
+  <p>
+    Sensors rarely operate at identical update rates.
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  \[
+f_{gyro}=100\text{ Hz}
+  \]
+
+  \[
+f_{star}=5\text{ Hz}
+  \]
+
+  \[
+f_{GNSS}=10\text{ Hz}
+  \]
+
+  \[
+f_{Sun}=1\text{ Hz}
+  \]
+
+  <p>
+    depending on hardware.
+  </p>
+
+  <p>
+    The estimator therefore runs asynchronously:
+  </p>
+
+  \[
+\boxed{ \text{Propagate at IMU/Gyro Rate} }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \text{Update Whenever a Valid Measurement Arrives}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.43 TIME SYNCHRONIZATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.43 Time Synchronization</h3>
+
+
+  <p>
+    Measurement fusion requires a consistent time base.
+  </p>
+
+  <p>
+    Each measurement should carry
+  </p>
+
+  \[
+\boxed{ t_m. }
+  \]
+
+  <p>
+    If sensors report data at different epochs, they must not simply be fused as simultaneous measurements.
+  </p>
+
+  <p>
+    A timing error
+  </p>
+
+  \[
+\Delta t
+  \]
+
+  <p>
+    can create
+  </p>
+
+  \[
+\boxed{ \delta\mathbf r \approx \mathbf v\Delta t }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \delta\boldsymbol\theta \approx \boldsymbol\omega\Delta t. }
+  \]
+
+  <p>
+    Time synchronization is therefore part of sensor fusion, not merely avionics housekeeping.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.44 LATENCY COMPENSATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.44 Latency Compensation</h3>
+
+
+  <p>
+    Suppose a star tracker measurement corresponds to
+  </p>
+
+  \[
+t_k
+  \]
+
+  <p>
+    but arrives at
+  </p>
+
+  \[
+t_k+\tau.
+  \]
+
+  <p>
+    The estimator can:
+  </p>
+
+  <ul>
+
+    <li>update a stored past state and repropagate,</li>
+
+    <li>propagate the measurement to the current time,</li>
+
+    <li>use an out-of-sequence measurement algorithm.</li>
+
+  </ul>
+
+  <p>
+    Ignoring latency can degrade accuracy substantially during fast maneuvers.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.45 FRAME ALIGNMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.45 Frame Alignment</h3>
+
+
+  <p>
+    Different sensors use different coordinate frames.
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  \[
+S_g
+  \]
+
+  <p>
+    for gyro,
+  </p>
+
+  \[
+S_m
+  \]
+
+  <p>
+    for magnetometer,
+  </p>
+
+  \[
+S_{ST}
+  \]
+
+  <p>
+    for star tracker,
+  </p>
+
+  \[
+A
+  \]
+
+  <p>
+    for GNSS antenna,
+  </p>
+
+  <p>
+    and
+  </p>
+
+  \[
+B
+  \]
+
+  <p>
+    for spacecraft body frame.
+  </p>
+
+  <p>
+    Measurements must therefore be transformed consistently.
+  </p>
+
+  <p>
+    For sensor \(i\),
+  </p>
+
+  \[
+\boxed{ \mathbf z^B = C_{S_i}^{B} \mathbf z^{S_i}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.46 SENSOR-TO-SENSOR ALIGNMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.46 Sensor-to-Sensor Alignment</h3>
+
+
+  <p>
+    Even when two sensors are mounted on the same spacecraft panel, their axes are not perfectly aligned.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ C_{gyro}^{ST} = C_B^{ST} C_{gyro}^{B}. }
+  \]
+
+  <p>
+    Alignment uncertainty can become one of the dominant errors when fusing a high-accuracy star tracker with a gyro.
+  </p>
+
+  <p>
+    Thus sensor-suite calibration includes not only each sensor individually, but also their relative geometry.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.47 LEVER ARMS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.47 Lever Arms</h3>
+
+
+  <p>
+    Different sensors may observe different physical points on the spacecraft.
+  </p>
+
+  <p>
+    An accelerometer offset from the centre of mass experiences
+  </p>
+
+  \[
+\mathbf a_s = \mathbf a_{CM} + \dot{\boldsymbol\omega}\times\mathbf r_s + \boldsymbol\omega\times (\boldsymbol\omega\times\mathbf r_s).
+  \]
+
+  <p>
+    Similarly, a GNSS antenna phase centre may be displaced from the spacecraft navigation reference point.
+  </p>
+
+  <p>
+    Lever-arm compensation is required in precision combined navigation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.48 COVARIANCE TRANSFORMATION BETWEEN FRAMES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.48 Covariance Transformation Between Frames</h3>
+
+
+  <p>
+    If a measurement covariance is defined in sensor frame \(S\),
+  </p>
+
+  \[
+R^S,
+  \]
+
+  <p>
+    and the measurement is rotated into body frame,
+  </p>
+
+  \[
+\mathbf z^B=C_S^B\mathbf z^S,
+  \]
+
+  <p>
+    then
+  </p>
+
+  \[
+\boxed{ R^B = C_S^B R^S (C_S^B)^T. }
+  \]
+
+  <p>
+    Fusion becomes inconsistent if the measurement is rotated but its covariance is not.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.49 CROSS-SENSOR CORRELATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.49 Cross-Sensor Correlation</h3>
+
+
+  <p>
+    Sensor errors are not always independent.
+  </p>
+
+  <p>
+    For two sensor errors,
+  </p>
+
+  \[
+\boxed{ E[ \mathbf e_1 \mathbf e_2^T ] = P_{12}. }
+  \]
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>shared temperature,</li>
+
+    <li>shared structural deformation,</li>
+
+    <li>common timing source,</li>
+
+    <li>common GNSS errors,</li>
+
+    <li>common processing.</li>
+
+  </ul>
+
+  <p>
+    Ignoring correlation can cause the estimator to become overconfident.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.50 COMMON-MODE ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.50 Common-Mode Errors</h3>
+
+
+  <p>
+    Redundant sensors may share a common error:
+  </p>
+
+  \[
+e_1=e_c+e_{1u}
+  \]
+
+  \[
+e_2=e_c+e_{2u}.
+  \]
+
+  <p>
+    Their difference is
+  </p>
+
+  \[
+e_1-e_2 = e_{1u}-e_{2u}.
+  \]
+
+  <p>
+    Thus the common error cancels in a comparison and may remain undetected.
+  </p>
+
+  <p>
+    This is why dissimilar redundancy can be valuable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.51 HOMOGENEOUS REDUNDANCY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.51 Homogeneous Redundancy</h3>
+
+
+  <p>
+    Homogeneous redundancy uses multiple similar sensors:
+  </p>
+
+  \[
+\boxed{ \text{Gyro A} + \text{Gyro B} + \text{Gyro C}. }
+  \]
+
+  <p>
+    Advantages include:
+  </p>
+
+  <ul>
+
+    <li>easy comparison,</li>
+
+    <li>hardware commonality,</li>
+
+    <li>voting.</li>
+
+  </ul>
+
+  <p>
+    Disadvantages include shared design weaknesses and common-mode errors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.52 DISSIMILAR REDUNDANCY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.52 Dissimilar Redundancy</h3>
+
+
+  <p>
+    Dissimilar redundancy uses sensors based on different physical principles.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker} + \text{Sun Sensor} + \text{Magnetometer}. }
+  \]
+
+  <p>
+    A common failure mechanism is less likely to affect all three identically.
+  </p>
+
+  <p>
+    This is particularly valuable for spacecraft fault tolerance.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.53 TRIPLE-MODULAR SENSOR VOTING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.53 Triple-Modular Sensor Voting</h3>
+
+
+  <p>
+    For three comparable measurements,
+  </p>
+
+  \[
+z_1,\quad z_2,\quad z_3,
+  \]
+
+  <p>
+    pairwise consistency can be checked.
+  </p>
+
+  <p>
+    If
+  </p>
+
+  \[
+|z_1-z_2|
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+|z_1-z_3|
+  \]
+
+  <p>
+    are large while
+  </p>
+
+  \[
+|z_2-z_3|
+  \]
+
+  <p>
+    is small, sensor 1 may be faulty.
+  </p>
+
+  <p>
+    Voting should consider measurement covariance rather than only raw differences.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.54 INNOVATION-BASED FDIR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.54 Innovation-Based FDIR</h3>
+
+
+  <p>
+    For sensor \(i\),
+  </p>
+
+  \[
+\boxed{ \mathbf y_i = \mathbf z_i - h_i(\hat{\mathbf x}^{-}). }
+  \]
+
+  <p>
+    Innovation covariance is
+  </p>
+
+  \[
+\boxed{ S_i = H_iP^-H_i^T+R_i. }
+  \]
+
+  <p>
+    The normalized residual is
+  </p>
+
+  \[
+\boxed{ d_i^2 = \mathbf y_i^T S_i^{-1} \mathbf y_i. }
+  \]
+
+  <p>
+    If
+  </p>
+
+  \[
+d_i^2>\gamma_i,
+  \]
+
+  <p>
+    the measurement can be rejected or marked degraded.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.55 CROSS-SENSOR CONSISTENCY MONITORING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.55 Cross-Sensor Consistency Monitoring</h3>
+
+
+  <p>
+    Different sensors can independently observe related quantities.
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker Attitude} \rightarrow \text{Predicted Sun Vector} }
+  \]
+
+  <p>
+    which can be compared with
+  </p>
+
+  \[
+\boxed{ \text{Sun-Sensor Measurement}. }
+  \]
+
+  <p>
+    Similarly,
+  </p>
+
+  \[
+\boxed{ \text{Gyro-Propagated Attitude} }
+  \]
+
+  <p>
+    can be compared with
+  </p>
+
+  \[
+\boxed{ \text{Star-Tracker Attitude}. }
+  \]
+
+  <p>
+    Cross-sensor consistency is a powerful fault-detection tool.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.56 GRACEFUL DEGRADATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.56 Graceful Degradation</h3>
+
+
+  <p>
+    A robust sensor suite should not jump directly from nominal operation to total loss of navigation.
+  </p>
+
+  <p>
+    Instead,
+  </p>
+
+  \[
+\boxed{ \text{Nominal} \rightarrow \text{Degraded} \rightarrow \text{Safe} }
+  \]
+
+  <p>
+    should be possible.
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  \[
+\boxed{ \text{Gyro + Star Tracker} }
+  \]
+
+  <p>
+    may degrade to
+  </p>
+
+  \[
+\boxed{ \text{Gyro + Sun Sensor + Magnetometer} }
+  \]
+
+  <p>
+    and finally to
+  </p>
+
+  \[
+\boxed{ \text{Coarse Sun Sensor + Magnetometer}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.57 MODE-DEPENDENT SENSOR SUITES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.57 Mode-Dependent Sensor Suites</h3>
+
+
+  <p>
+    Spacecraft sensors should be associated with operating modes.
+  </p>
+
+  <p>
+    A representative architecture is:
+  </p>
+
+  <div class="table-wrap">
+
+  <table>
+
+    <thead><tr>
+
+      <th>Spacecraft Mode</th>
+
+      <th>Typical Sensor Suite</th>
+
+    </tr></thead>
+
+    <tbody>
+
+      <tr>
+
+        <td>Detumble</td>
+
+        <td>Magnetometer + gyro</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Sun acquisition</td>
+
+        <td>Coarse Sun sensor + gyro + magnetometer</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Safe mode</td>
+
+        <td>Sun sensor + magnetometer + gyro</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Nominal attitude</td>
+
+        <td>Star tracker + gyro</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Orbit navigation</td>
+
+        <td>GNSS + IMU</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Far RPO</td>
+
+        <td>GNSS / differential GNSS</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Mid RPO</td>
+
+        <td>GNSS + camera / LiDAR</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Final approach</td>
+
+        <td>Camera + LiDAR + IMU</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Docking/capture</td>
+
+        <td>Precision relative pose sensors + IMU</td>
+
+      </tr>
+
+    </tbody>
+
+  </table>
+
+  </div>
+
+  <p>
+    This architecture is mission-dependent but illustrates how sensor suites evolve with mission phase.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.58 SAFE-MODE SENSOR SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.58 Safe-Mode Sensor Suite</h3>
+
+
+  <p>
+    Safe mode prioritizes survivability.
+  </p>
+
+  <p>
+    A typical suite may use
+  </p>
+
+  \[
+\boxed{ \text{Coarse Sun Sensors} + \text{Magnetometer} + \text{Gyroscope}. }
+  \]
+
+  <p>
+    Why?
+  </p>
+
+  <p>
+    Sun sensors provide a robust power-related reference.
+  </p>
+
+  <p>
+    Magnetometers remain available in eclipse.
+  </p>
+
+  <p>
+    Gyroscopes provide short-term rotational propagation.
+  </p>
+
+  <p>
+    The safe-mode controller therefore retains usable attitude knowledge even if fine sensors are unavailable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.59 NOMINAL FINE-POINTING SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.59 Nominal Fine-Pointing Suite</h3>
+
+
+  <p>
+    For fine pointing,
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker} + \text{Gyroscope} }
+  \]
+
+  <p>
+    may form the core architecture.
+  </p>
+
+  <p>
+    Optional aiding may include:
+  </p>
+
+  \[
+\boxed{ \text{GNSS} }
+  \]
+
+  <p>
+    for orbit knowledge and
+  </p>
+
+  \[
+\boxed{ \text{Sun Sensor / Magnetometer} }
+  \]
+
+  <p>
+    for redundancy and health monitoring.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.60 RPO SENSOR SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.60 RPO Sensor Suite</h3>
+
+
+  <p>
+    Rendezvous and proximity operations require a broader navigation architecture.
+  </p>
+
+  <p>
+    A representative chain is
+  </p>
+
+  \[
+\boxed{ \text{Absolute GNSS} \rightarrow \text{Differential GNSS} \rightarrow \text{Camera / LiDAR} \rightarrow \text{Precision Relative Pose} }
+  \]
+
+  <p>
+    with IMU aiding throughout.
+  </p>
+
+  <p>
+    The exact transition ranges depend on mission requirements and hardware capability.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.61 GNSS + CAMERA FOR RPO -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.61 GNSS + Camera for RPO</h3>
+
+
+  <p>
+    GNSS provides absolute or cooperative relative translation.
+  </p>
+
+  <p>
+    The camera provides direct target line-of-sight information.
+  </p>
+
+  <p>
+    For a camera,
+  </p>
+
+  \[
+\boxed{ \mathbf z_C = \begin{bmatrix} \alpha\\ \beta \end{bmatrix} }
+  \]
+
+  <p>
+    where \(\alpha,\beta\) are bearing angles.
+  </p>
+
+  <p>
+    A relative navigation filter can combine
+  </p>
+
+  \[
+\boxed{ \delta\mathbf r_{GNSS} }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \alpha,\beta. }
+  \]
+
+  <p>
+    This improves relative observability as the target becomes visually detectable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.62 GNSS + LIDAR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.62 GNSS + LiDAR</h3>
+
+
+  <p>
+    A LiDAR can directly provide target-relative range:
+  </p>
+
+  \[
+\boxed{ \rho_L = \|\delta\mathbf r\| + n_L. }
+  \]
+
+  <p>
+    Depending on design, it may also provide:
+  </p>
+
+  <ul>
+
+    <li>range rate,</li>
+
+    <li>bearing,</li>
+
+    <li>3-D point cloud,</li>
+
+    <li>relative pose.</li>
+
+  </ul>
+
+  <p>
+    GNSS provides broader-range orbital navigation, while LiDAR becomes increasingly useful at shorter ranges.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.63 CAMERA + LIDAR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.63 Camera + LiDAR</h3>
+
+
+  <p>
+    Camera and LiDAR are highly complementary.
+  </p>
+
+  <p>
+    Camera:
+  </p>
+
+  <ul>
+
+    <li>rich angular/feature information,</li>
+
+    <li>relatively high spatial resolution,</li>
+
+    <li>target identification capability.</li>
+
+  </ul>
+
+  <p>
+    LiDAR:
+  </p>
+
+  <ul>
+
+    <li>direct range,</li>
+
+    <li>active illumination,</li>
+
+    <li>3-D geometry.</li>
+
+  </ul>
+
+  <p>
+    Combined:
+  </p>
+
+  \[
+\boxed{ \text{Camera Bearing} + \text{LiDAR Range} \rightarrow \text{Improved Relative Position}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.64 CAMERA + LIDAR + IMU -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.64 Camera + LiDAR + IMU</h3>
+
+
+  <p>
+    A close-range RPO suite can use
+  </p>
+
+  \[
+\boxed{ \text{Camera} + \text{LiDAR} + \text{IMU}. }
+  \]
+
+  <p>
+    The IMU supplies high-rate propagation.
+  </p>
+
+  <p>
+    The camera supplies target direction and feature information.
+  </p>
+
+  <p>
+    The LiDAR supplies metric range and geometry.
+  </p>
+
+  <p>
+    This combination can support:
+  </p>
+
+  \[
+\boxed{ \text{Relative Position} + \text{Relative Velocity} + \text{Relative Attitude} }
+  \]
+
+  <p>
+    depending on sensor processing.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.65 RELATIVE POSE ESTIMATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.65 Relative Pose Estimation</h3>
+
+
+  <p>
+    Docking requires more than relative position.
+  </p>
+
+  <p>
+    The navigation state may include
+  </p>
+
+  \[
+\boxed{ \mathbf x_{rel} = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \mathbf q_{rel}\\ \boldsymbol\omega_{rel} \end{bmatrix}. }
+  \]
+
+  <p>
+    Camera and LiDAR data can therefore contribute to relative pose estimation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.66 SENSOR HANDOVER DURING RPO -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.66 Sensor Handover During RPO</h3>
+
+
+  <p>
+    Sensor handover should not simply switch one sensor off and another on at one exact range.
+  </p>
+
+  <p>
+    A safer strategy is
+  </p>
+
+  \[
+\boxed{ \text{Sensor A} \rightarrow \text{Overlap A+B} \rightarrow \text{Consistency Check} \rightarrow \text{Sensor B Dominant}. }
+  \]
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ \text{GNSS} \rightarrow \text{GNSS + Camera} \rightarrow \text{Camera + LiDAR}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.67 HANDOVER CONSISTENCY TEST -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.67 Handover Consistency Test</h3>
+
+
+  <p>
+    Before accepting the new sensor,
+  </p>
+
+  \[
+\boxed{ \|\hat{\mathbf r}_A-\hat{\mathbf r}_B\| < r_{threshold} }
+  \]
+
+  <p>
+    and possibly
+  </p>
+
+  \[
+\boxed{ \|\hat{\mathbf v}_A-\hat{\mathbf v}_B\| < v_{threshold}. }
+  \]
+
+  <p>
+    The threshold should account for both sensor covariances.
+  </p>
+
+  <p>
+    A covariance-normalized consistency check is generally more rigorous than a fixed raw difference.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.68 SENSOR SCHEDULING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.68 Sensor Scheduling</h3>
+
+
+  <p>
+    Sensors may be switched on only when needed.
+  </p>
+
+  <p>
+    Reasons include:
+  </p>
+
+  <ul>
+
+    <li>power reduction,</li>
+
+    <li>thermal control,</li>
+
+    <li>computational load,</li>
+
+    <li>instrument lifetime,</li>
+
+    <li>optical protection.</li>
+
+  </ul>
+
+  <p>
+    A sensor manager can therefore decide
+  </p>
+
+  \[
+\boxed{ \text{Which Sensors Should Be Active?} }
+  \]
+
+  <p>
+    based on spacecraft mode and navigation requirements.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.69 POWER-AWARE SENSOR MANAGEMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.69 Power-Aware Sensor Management</h3>
+
+
+  <p>
+    Suppose star trackers and LiDAR consume substantially more power than coarse sensors.
+  </p>
+
+  <p>
+    During safe mode, the spacecraft may use
+  </p>
+
+  \[
+\boxed{ \text{CSS + Magnetometer} }
+  \]
+
+  <p>
+    rather than high-power precision sensors.
+  </p>
+
+  <p>
+    During final RPO, the high-power relative sensors may be enabled.
+  </p>
+
+  <p>
+    Thus sensor-suite design is connected to the spacecraft power budget.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.70 COMPUTATIONAL LOAD -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.70 Computational Load</h3>
+
+
+  <p>
+    Each sensor adds processing requirements.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>star-pattern recognition,</li>
+
+    <li>GNSS signal processing,</li>
+
+    <li>image feature extraction,</li>
+
+    <li>LiDAR point-cloud processing,</li>
+
+    <li>EKF updates.</li>
+
+  </ul>
+
+  <p>
+    The navigation architecture therefore depends on available flight-computer resources.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.71 MEASUREMENT PREPROCESSING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.71 Measurement Preprocessing</h3>
+
+
+  <p>
+    Sensors often require preprocessing before fusion.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  \[
+\boxed{ \text{Raw IMU} \rightarrow \text{Calibration} \rightarrow \text{Bias Compensation} }
+  \]
+
+  \[
+\boxed{ \text{Raw Magnetometer} \rightarrow \text{Hard/Soft-Iron Calibration} }
+  \]
+
+  \[
+\boxed{ \text{Star Image} \rightarrow \text{Centroids} \rightarrow \text{Attitude} }
+  \]
+
+  \[
+\boxed{ \text{GNSS RF} \rightarrow \rho,\dot\rho,\Phi }
+  \]
+
+  \[
+\boxed{ \text{Camera Image} \rightarrow \text{Feature Measurements}. }
+  \]
+
+  <p>
+    The estimator should receive a well-defined measurement interface.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.72 COMMON MEASUREMENT PACKET -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.72 Common Measurement Packet</h3>
+
+
+  <p>
+    A useful software interface is
+  </p>
+
+  \[
+\boxed{ \mathcal Z_i = \{ \mathbf z_i, t_i, R_i, valid_i, quality_i, status_i \}. }
+  \]
+
+  <p>
+    This allows all sensors to follow a common estimator interface despite different physical measurements.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.73 MEASUREMENT QUEUE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.73 Measurement Queue</h3>
+
+
+  <p>
+    For asynchronous sensors, measurements can enter a time-ordered queue.
+  </p>
+
+  <pre>
+Gyro ----------\
+Accelerometer ---\
+Star Tracker -----\
+GNSS -------------+--&gt; Time-Ordered Measurement Queue
+Sun Sensor --------/
+Magnetometer -----/
+LiDAR -----------/
+Camera ----------/
+                         |
+                         v
+                    Navigation Filter
+  </pre>
+
+  <p>
+    This architecture simplifies multi-rate fusion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.74 OUT-OF-SEQUENCE MEASUREMENTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.74 Out-of-Sequence Measurements</h3>
+
+
+  <p>
+    Some measurements arrive late.
+  </p>
+
+  <p>
+    If
+  </p>
+
+  \[
+t_m<t_{current},
+  \]
+
+  <p>
+    the estimator faces an <strong>out-of-sequence measurement</strong>.
+  </p>
+
+  <p>
+    Possible strategies include:
+  </p>
+
+  <ul>
+
+    <li>discard it,</li>
+
+    <li>update a stored past state and repropagate,</li>
+
+    <li>approximate measurement propagation,</li>
+
+    <li>use a delayed-state estimator.</li>
+
+  </ul>
+
+  <p>
+    The correct choice depends on latency and mission accuracy.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.75 SENSOR INITIALIZATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.75 Sensor Initialization</h3>
+
+
+  <p>
+    Different sensors require different startup procedures.
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  \[
+\boxed{ \text{GNSS} \rightarrow \text{Acquire Satellites} \rightarrow \text{PVT Valid} }
+  \]
+
+  \[
+\boxed{ \text{Star Tracker} \rightarrow \text{Lost-in-Space Solution} \rightarrow \text{Tracking Mode} }
+  \]
+
+  \[
+\boxed{ \text{IMU} \rightarrow \text{Bias Initialization}. }
+  \]
+
+  <p>
+    Sensor-suite management must handle these transitions.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.76 INITIAL ATTITUDE ACQUISITION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.76 Initial Attitude Acquisition</h3>
+
+
+  <p>
+    A spacecraft may not initially know attitude accurately enough for a star tracker to enter tracking mode.
+  </p>
+
+  <p>
+    A possible acquisition sequence is
+  </p>
+
+  \[
+\boxed{ \text{Sun Sensor + Magnetometer} \rightarrow \text{Coarse Attitude} \rightarrow \text{Star Tracker Acquisition} \rightarrow \text{Fine Attitude}. }
+  \]
+
+  <p>
+    This illustrates how sensor suites can support one another operationally, not only mathematically.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.77 SENSOR OBSERVABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.77 Sensor Observability</h3>
+
+
+  <p>
+    Combining more sensors does not guarantee that all estimator states become observable.
+  </p>
+
+  <p>
+    Observability depends on:
+  </p>
+
+  <ul>
+
+    <li>measurement type,</li>
+
+    <li>spacecraft motion,</li>
+
+    <li>geometry,</li>
+
+    <li>sensor availability.</li>
+
+  </ul>
+
+  <p>
+    For example, one vector observation cannot determine rotation about that vector.
+  </p>
+
+  <p>
+    Two nearly parallel reference vectors also provide weak attitude observability.
+  </p>
+
+  <p>
+    Thus,
+  </p>
+
+  \[
+\boxed{ \text{More Sensors} \not\Rightarrow \text{Better Observability} }
+  \]
+
+  <p>
+    unless their information is sufficiently independent.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.78 GEOMETRY OF VECTOR SENSORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.78 Geometry of Vector Sensors</h3>
+
+
+  <p>
+    Suppose Sun and magnetic reference vectors satisfy
+  </p>
+
+  \[
+\mathbf s^I \parallel \mathbf B^I.
+  \]
+
+  <p>
+    Then their cross product approaches zero:
+  </p>
+
+  \[
+\boxed{ \|\mathbf s^I\times\mathbf B^I\| \rightarrow0. }
+  \]
+
+  <p>
+    TRIAD and related attitude solutions become poorly conditioned.
+  </p>
+
+  <p>
+    Thus vector geometry is a fundamental sensor-suite performance consideration.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.79 GNSS GEOMETRY IN A COMBINED SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.79 GNSS Geometry in a Combined Suite</h3>
+
+
+  <p>
+    GNSS accuracy also depends on satellite geometry.
+  </p>
+
+  <p>
+    Therefore even if GNSS remains technically valid,
+  </p>
+
+  \[
+PDOP\uparrow
+  \]
+
+  <p>
+    can imply
+  </p>
+
+  \[
+R_{GNSS}\uparrow.
+  \]
+
+  <p>
+    An integrated GNSS/INS filter can then rely more heavily on inertial propagation until geometry improves.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.80 DYNAMIC OBSERVABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.80 Dynamic Observability</h3>
+
+
+  <p>
+    Spacecraft maneuvers can improve observability.
+  </p>
+
+  <p>
+    For example, accelerometer bias and attitude error may be difficult to separate during certain static conditions.
+  </p>
+
+  <p>
+    Controlled motion can provide excitation that helps the estimator distinguish them.
+  </p>
+
+  <p>
+    Thus calibration maneuvers can be deliberately designed to improve sensor-suite observability.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.81 CALIBRATION OF A COMBINED SENSOR SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.81 Calibration of a Combined Sensor Suite</h3>
+
+
+  <p>
+    A complete suite requires both <strong>individual-sensor calibration</strong> and <strong>cross-sensor calibration</strong>.
+  </p>
+
+  <p>
+    The latter may estimate:
+  </p>
+
+  \[
+\boxed{ C_{gyro}^{ST} }
+  \]
+
+  \[
+\boxed{ C_{mag}^{B} }
+  \]
+
+  \[
+\boxed{ C_{Sun}^{B} }
+  \]
+
+  \[
+\boxed{ \mathbf l_{GNSS}^{B} }
+  \]
+
+  <p>
+    and timing offsets
+  </p>
+
+  \[
+\boxed{ \Delta t_{ij}. }
+  \]
+
+  <p>
+    Thus the calibration problem includes geometry and timing in addition to each sensor's intrinsic bias and scale factor.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.82 IN-ORBIT CROSS CALIBRATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.82 In-Orbit Cross Calibration</h3>
+
+
+  <p>
+    A high-accuracy sensor can calibrate a lower-accuracy sensor.
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker} + \text{Sun Ephemeris} \rightarrow \text{Predicted Sun Direction} }
+  \]
+
+  <p>
+    which can be compared with the Sun sensor.
+  </p>
+
+  <p>
+    Similarly, star-tracker attitude plus geomagnetic-field prediction can help evaluate magnetometer alignment.
+  </p>
+
+  <p>
+    GNSS can help estimate IMU biases through integrated navigation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.83 SENSOR FUSION AND CALIBRATION ARE COUPLED -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.83 Sensor Fusion and Calibration Are Coupled</h3>
+
+
+  <p>
+    In many spacecraft filters, calibration is performed continuously.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ \mathbf b_g }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \mathbf b_a }
+  \]
+
+  <p>
+    are estimated as navigation states.
+  </p>
+
+  <p>
+    Thus the filter performs both
+  </p>
+
+  \[
+\boxed{ \text{Navigation Estimation} + \text{Sensor Calibration}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.84 SENSOR FAILURE MODES IN A COMBINED SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.84 Sensor Failure Modes in a Combined Suite</h3>
+
+
+  <p>
+    Failures include:
+  </p>
+
+  <ul>
+
+    <li>complete loss of output,</li>
+
+    <li>excessive noise,</li>
+
+    <li>growing bias,</li>
+
+    <li>stuck output,</li>
+
+    <li>incorrect timestamp,</li>
+
+    <li>intermittent dropout,</li>
+
+    <li>corrupted data,</li>
+
+    <li>degraded calibration,</li>
+
+    <li>invalid quality flags.</li>
+
+  </ul>
+
+  <p>
+    The estimator should react differently to each type.
+  </p>
+
+  <p>
+    A sensor that reports no measurement is often easier to handle than one producing believable but incorrect data.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.85 FAULT ISOLATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.85 Fault Isolation</h3>
+
+
+  <p>
+    If the estimator detects inconsistency, the next question is:
+  </p>
+
+  \[
+\boxed{ \text{Which Sensor Is Faulty?} }
+  \]
+
+  <p>
+    This can be difficult when several sensors disagree.
+  </p>
+
+  <p>
+    Isolation can use:
+  </p>
+
+  <ul>
+
+    <li>pairwise residuals,</li>
+
+    <li>model-based predictions,</li>
+
+    <li>redundant sensing,</li>
+
+    <li>independent reference models,</li>
+
+    <li>consistency over time.</li>
+
+  </ul>
+
+  <p>
+    Dissimilar sensors can improve isolation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.86 SENSOR RECONFIGURATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.86 Sensor Reconfiguration</h3>
+
+
+  <p>
+    After fault isolation, the sensor manager may reconfigure the suite.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker Failed} }
+  \]
+
+  <p>
+    can trigger
+  </p>
+
+  \[
+\boxed{ \text{Gyro + Sun Sensor + Magnetometer Mode}. }
+  \]
+
+  <p>
+    Similarly,
+  </p>
+
+  \[
+\boxed{ \text{GNSS Lost} }
+  \]
+
+  <p>
+    can trigger
+  </p>
+
+  \[
+\boxed{ \text{INS Propagation + Alternative Relative Sensors}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.87 SENSOR REACQUISITION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.87 Sensor Reacquisition</h3>
+
+
+  <p>
+    A failed or unavailable sensor may later recover.
+  </p>
+
+  <p>
+    The system should not immediately trust it at full weight.
+  </p>
+
+  <p>
+    A safer sequence is
+  </p>
+
+  \[
+\boxed{ \text{Sensor Returns} \rightarrow \text{Acquisition} \rightarrow \text{Health Check} \rightarrow \text{Consistency Check} \rightarrow \text{Reintegration}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.88 DATA QUALITY FLAGS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.88 Data Quality Flags</h3>
+
+
+  <p>
+    Useful status information can include:
+  </p>
+
+  \[
+\boxed{ valid }
+  \]
+
+  \[
+\boxed{ degraded }
+  \]
+
+  \[
+\boxed{ saturated }
+  \]
+
+  \[
+\boxed{ outlier }
+  \]
+
+  \[
+\boxed{ tracking }
+  \]
+
+  \[
+\boxed{ acquiring }
+  \]
+
+  \[
+\boxed{ failed. }
+  \]
+
+  <p>
+    Sensor fusion should use these flags rather than assuming every packet is valid.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.89 SENSOR HEALTH MANAGER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.89 Sensor Health Manager</h3>
+
+
+  <p>
+    A spacecraft can maintain a centralized sensor health manager.
+  </p>
+
+  <pre>
+Sensors
+  |
+  v
+Measurement Validation
+  |
+  v
+Health / Quality Monitoring
+  |
+  +------ Good
+  |
+  +------ Degraded
+  |
+  +------ Failed
+  |
+  v
+Sensor Selection / Weighting
+  |
+  v
+Navigation Filter
+  </pre>
+
+  <p>
+    This separates sensor-health decisions from state-estimation mathematics.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.90 SENSOR SUITE MONTE CARLO ANALYSIS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.90 Sensor Suite Monte Carlo Analysis</h3>
+
+
+  <p>
+    Combined suites should be tested with simultaneous uncertainty in all relevant sensors.
+  </p>
+
+  <p>
+    For Monte Carlo run \(j\),
+  </p>
+
+  \[
+\boxed{ \mathcal P^{(j)} = \{ \mathbf b_g, \mathbf b_a, \delta C_{ST}, \delta C_{mag}, \sigma_{GNSS}, \tau_i, dropout_i,\ldots \}^{(j)}. }
+  \]
+
+  <p>
+    The complete simulation should include
+  </p>
+
+  \[
+\boxed{ \text{Truth} \rightarrow \text{Sensors} \rightarrow \text{Fusion} \rightarrow \text{Guidance} \rightarrow \text{Control} \rightarrow \text{Mission Outcome}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.91 CORRELATED MONTE CARLO ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.91 Correlated Monte Carlo Errors</h3>
+
+
+  <p>
+    Not every sensor uncertainty should be sampled independently.
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  <ul>
+
+    <li>two sensors on the same panel may share alignment deformation,</li>
+
+    <li>several GNSS measurements share clock errors,</li>
+
+    <li>temperature may affect multiple sensors simultaneously.</li>
+
+  </ul>
+
+  <p>
+    Thus correlated uncertainty may require
+  </p>
+
+  \[
+\boxed{ \mathbf e \sim \mathcal N(0,P) }
+  \]
+
+  <p>
+    with nonzero off-diagonal covariance.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.92 SENSOR AVAILABILITY MONTE CARLO -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.92 Sensor Availability Monte Carlo</h3>
+
+
+  <p>
+    Mission robustness also depends on availability.
+  </p>
+
+  <p>
+    Randomize or model:
+  </p>
+
+  \[
+\boxed{ \text{Star-Tracker Dropout} }
+  \]
+
+  \[
+\boxed{ \text{GNSS Outage} }
+  \]
+
+  \[
+\boxed{ \text{Sun-Sensor Eclipse} }
+  \]
+
+  \[
+\boxed{ \text{LiDAR Invalid Geometry}. }
+  \]
+
+  <p>
+    This is often more realistic than studying accuracy alone.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.93 FAULT INJECTION TESTING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.93 Fault Injection Testing</h3>
+
+
+  <p>
+    Combined sensor suites should be deliberately tested with faults such as:
+  </p>
+
+  \[
+\boxed{ b_g\rightarrow b_g+\Delta b }
+  \]
+
+  \[
+\boxed{ valid_{ST}\rightarrow0 }
+  \]
+
+  \[
+\boxed{ \mathbf r_{GNSS}\rightarrow \mathbf r_{GNSS}+\Delta\mathbf r_{fault} }
+  \]
+
+  \[
+\boxed{ z_{LiDAR}\rightarrow z_{stuck}. }
+  \]
+
+  <p>
+    The purpose is to verify:
+  </p>
+
+  <ul>
+
+    <li>detection,</li>
+
+    <li>isolation,</li>
+
+    <li>reconfiguration,</li>
+
+    <li>safe continuation.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.94 HARDWARE-IN-THE-LOOP TESTING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.94 Hardware-in-the-Loop Testing</h3>
+
+
+  <p>
+    Combined sensor suites should eventually be tested beyond pure software simulation.
+  </p>
+
+  <p>
+    A HIL setup may use:
+  </p>
+
+  <ul>
+
+    <li>real IMU,</li>
+
+    <li>GNSS RF simulator,</li>
+
+    <li>star-tracker simulator,</li>
+
+    <li>Sun-sensor light source,</li>
+
+    <li>camera scene generator,</li>
+
+    <li>LiDAR target emulator.</li>
+
+  </ul>
+
+  <p>
+    This validates:
+  </p>
+
+  \[
+\boxed{ \text{Timing} + \text{Interfaces} + \text{Real Sensor Dynamics} + \text{Navigation Software}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.95 SOFTWARE-IN-THE-LOOP ARCHITECTURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.95 Software-in-the-Loop Architecture</h3>
+
+
+  <p>
+    A SIL architecture may be
+  </p>
+
+  <pre>
+             SPACECRAFT TRUTH
+                    |
+     +--------------+---------------+
+     |              |               |
+     v              v               v
+   IMU Model    Attitude Sensors   GNSS Model
+     |              |               |
+     +--------------+---------------+
+                    |
+                    v
+              Sensor Bus
+                    |
+                    v
+           Validation / FDIR
+                    |
+                    v
+           Navigation Filter
+                    |
+                    v
+        Estimated Spacecraft State
+                    |
+                    v
+                Guidance
+                    |
+                    v
+                 Control
+  </pre>
+
+  <p>
+    RPO sensors can be added as another branch.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.96 SIMULINK COMBINED SENSOR SUITE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.96 Simulink Combined Sensor Suite</h3>
+
+
+  <p>
+    A reusable Simulink architecture can be
+  </p>
+
+  <pre>
+Spacecraft Truth
+      |
+      +---------------- Gyro Model
+      |
+      +---------------- Accelerometer Model
+      |
+      +---------------- Magnetometer Model
+      |
+      +---------------- Sun Sensor Model
+      |
+      +---------------- Star Tracker Model
+      |
+      +---------------- GNSS Model
+      |
+      +---------------- Camera / LiDAR Models
+      |
+      v
+Frame + Timestamp Normalisation
+      |
+      v
+Measurement Validity
+      |
+      v
+Sensor Health Manager
+      |
+      v
+Measurement Queue
+      |
+      v
+EKF / MEKF / UKF
+      |
+      v
+Estimated State + Covariance
+      |
+      v
+Guidance and Control
+  </pre>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.97 RECOMMENDED SIMULINK INTERFACES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.97 Recommended Simulink Interfaces</h3>
+
+
+  <p>
+    Each sensor subsystem should ideally output
+  </p>
+
+  \[
+\boxed{ \mathbf z_i }
+  \]
+
+  \[
+\boxed{ R_i }
+  \]
+
+  \[
+\boxed{ t_i }
+  \]
+
+  \[
+\boxed{ valid_i }
+  \]
+
+  \[
+\boxed{ status_i. }
+  \]
+
+  <p>
+    This makes the fusion architecture modular and easier to extend.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.98 SENSOR FUSION STATE VECTOR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.98 Sensor Fusion State Vector</h3>
+
+
+  <p>
+    A complete state vector might be
+  </p>
+
+  \[
+\boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \mathbf b_a\\ \mathbf b_g\\ b_c\\ d_c\\ \mathbf p_{cal}\\ \cdots \end{bmatrix}. }
+  \]
+
+  <p>
+    For RPO,
+  </p>
+
+  \[
+\boxed{ \mathbf x_{RPO} = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \mathbf q_{rel}\\ \boldsymbol\omega_{rel}\\ \mathbf b_{sensor} \end{bmatrix}. }
+  \]
+
+  <p>
+    Not every state should be included unless it is required and sufficiently observable.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.99 MEASUREMENT MODELS IN A COMBINED FILTER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.99 Measurement Models in a Combined Filter</h3>
+
+
+  <p>
+    A gyro may be used for propagation rather than direct update.
+  </p>
+
+  <p>
+    A magnetometer measurement is
+  </p>
+
+  \[
+\boxed{ \mathbf z_m = C_I^B(\mathbf q) \mathbf B^I + \mathbf v_m. }
+  \]
+
+  <p>
+    A Sun sensor is
+  </p>
+
+  \[
+\boxed{ \mathbf z_s = C_I^B(\mathbf q) \mathbf s^I + \mathbf v_s. }
+  \]
+
+  <p>
+    GNSS position is
+  </p>
+
+  \[
+\boxed{ \mathbf z_G = \mathbf r + \mathbf v_G. }
+  \]
+
+  <p>
+    A LiDAR range is
+  </p>
+
+  \[
+\boxed{ z_L = \|\delta\mathbf r\| + v_L. }
+  \]
+
+  <p>
+    A camera bearing is
+  </p>
+
+  \[
+\boxed{ \mathbf z_C = h_C(\delta\mathbf r,\mathbf q_{rel}) + \mathbf v_C. }
+  \]
+
+  <p>
+    All can coexist within one estimator.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.100 SENSOR SUITE SELECTION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.100 Sensor Suite Selection</h3>
+
+
+  <p>
+    Selecting a sensor suite requires consideration of more than individual sensor accuracy.
+  </p>
+
+  <p>
+    The key questions include mission state requirements, update rate, accuracy, observability, coverage, environmental availability, redundancy, power, mass, processing, thermal limits, radiation tolerance, interfaces, calibration burden, cross-sensor alignment, FDIR capability, and mission-phase transitions.
+  </p>
+
+  <p>
+    The design process should be
+  </p>
+
+  \[
+\boxed{ \text{Mission Objectives} \rightarrow \text{Required States} \rightarrow \text{Required Accuracy / Availability} \rightarrow \text{Sensor Observability} \rightarrow \text{Candidate Suite} \rightarrow \text{Fusion Design} \rightarrow \text{Monte Carlo / FDIR Verification}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.101 ACCURACY IS NOT THE ONLY REQUIREMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.101 Accuracy Is Not the Only Requirement</h3>
+
+
+  <p>
+    A spacecraft sensor suite should be evaluated using:
+  </p>
+
+  \[
+\boxed{ \text{Accuracy} }
+  \]
+
+  \[
+\boxed{ \text{Precision} }
+  \]
+
+  \[
+\boxed{ \text{Availability} }
+  \]
+
+  \[
+\boxed{ \text{Continuity} }
+  \]
+
+  \[
+\boxed{ \text{Integrity} }
+  \]
+
+  \[
+\boxed{ \text{Robustness} }
+  \]
+
+  \[
+\boxed{ \text{Recovery Capability}. }
+  \]
+
+  <p>
+    A very accurate sensor with poor availability may be unsuitable for a safety-critical mode.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.102 SENSOR DIVERSITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.102 Sensor Diversity</h3>
+
+
+  <p>
+    A well-designed suite may deliberately use different sensing physics.
+  </p>
+
+  <p>
+    For attitude:
+  </p>
+
+  \[
+\boxed{ \text{Inertial} + \text{Optical} + \text{Magnetic}. }
+  \]
+
+  <p>
+    For translational navigation:
+  </p>
+
+  \[
+\boxed{ \text{Inertial} + \text{RF Navigation} + \text{Optical / Active Ranging}. }
+  \]
+
+  <p>
+    Sensor diversity improves robustness to environmental and hardware-specific failures.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.103 SENSOR SUITE FOR CUBESAT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.103 Sensor Suite for CubeSat</h3>
+
+
+  <p>
+    A basic CubeSat attitude suite might use
+  </p>
+
+  \[
+\boxed{ \text{MEMS Gyro} + \text{Magnetometer} + \text{Coarse Sun Sensors}. }
+  \]
+
+  <p>
+    A more capable system might add
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker} }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \text{GNSS}. }
+  \]
+
+  <p>
+    The final architecture depends on mission pointing and navigation requirements.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.104 SENSOR SUITE FOR EARTH OBSERVATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.104 Sensor Suite for Earth Observation</h3>
+
+
+  <p>
+    An Earth-observation spacecraft may require precise attitude knowledge and geolocation.
+  </p>
+
+  <p>
+    A representative suite may be
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker} + \text{Precision Gyro} + \text{GNSS}. }
+  \]
+
+  <p>
+    Optional coarse sensors support safe mode.
+  </p>
+
+  <p>
+    The relationship between payload boresight and star-tracker frame can be one of the dominant geolocation-error contributors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.105 SENSOR SUITE FOR DEEP SPACE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.105 Sensor Suite for Deep Space</h3>
+
+
+  <p>
+    GNSS may be unavailable or limited in deep-space missions.
+  </p>
+
+  <p>
+    The navigation architecture may instead use
+  </p>
+
+  \[
+\boxed{ \text{Star Tracker} + \text{Gyroscope} + \text{Sun Sensor} }
+  \]
+
+  <p>
+    for attitude and external radiometric/optical navigation for translation.
+  </p>
+
+  <p>
+    Sensor-suite architecture must therefore be mission-environment specific.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.106 SENSOR SUITE FOR RPO AND DOCKING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.106 Sensor Suite for RPO and Docking</h3>
+
+
+  <p>
+    A sophisticated RPO spacecraft can use
+  </p>
+
+  \[
+\boxed{ \text{IMU} + \text{GNSS} + \text{Star Tracker} + \text{Camera} + \text{LiDAR} }
+  \]
+
+  <p>
+    with optional:
+  </p>
+
+  \[
+\boxed{ \text{Differential GNSS} }
+  \]
+
+  <p>
+    and additional docking sensors.
+  </p>
+
+  <p>
+    The important point is not that all sensors are used continuously, but that their operational envelopes overlap sufficiently to maintain navigation continuity.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.107 SENSOR SUITE FOR FORMATION FLYING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.107 Sensor Suite for Formation Flying</h3>
+
+
+  <p>
+    Formation flying can use
+  </p>
+
+  \[
+\boxed{ \text{GNSS / Carrier-Phase Differential GNSS} + \text{IMU} }
+  \]
+
+  <p>
+    for relative orbit determination.
+  </p>
+
+  <p>
+    Optical or RF inter-satellite measurements can add robustness and improve observability depending on formation geometry.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.108 SENSOR SUITE FOR SAFE AUTONOMOUS OPERATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.108 Sensor Suite for Safe Autonomous Operation</h3>
+
+
+  <p>
+    Autonomy requires not just multiple sensors, but a system capable of determining:
+  </p>
+
+  \[
+\boxed{ \text{What Sensors Are Available?} }
+  \]
+
+  \[
+\boxed{ \text{Which Are Trustworthy?} }
+  \]
+
+  \[
+\boxed{ \text{Which State Components Are Observable?} }
+  \]
+
+  \[
+\boxed{ \text{Which Mission Modes Are Safe?} }
+  \]
+
+  <p>
+    The sensor suite, estimator, FDIR, and mode manager must therefore be designed together.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.109 COMMON DESIGN MISTAKES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.109 Common Design Mistakes</h3>
+
+
+  <p>
+    Common mistakes include treating all measurements as synchronous, assuming constant covariance, ignoring sensor-to-body alignment, fusing duplicated information without accounting for correlation, trusting sensor validity flags blindly, assuming more sensors always improve observability, ignoring sensor handover transients, modelling only Gaussian noise, failing to model outages, and selecting sensors only from individual datasheet accuracy.
+  </p>
+
+  <p>
+    These mistakes can produce an apparently sophisticated fusion system that performs poorly in realistic mission conditions.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.110 RECOMMENDED COMBINED SENSOR-SUITE ARCHITECTURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.110 Recommended Combined Sensor-Suite Architecture</h3>
+
+
+  <p>
+    For a general spacecraft, a practical layered architecture is
+  </p>
+
+  <pre>
+                    SPACECRAFT TRUTH
+                           |
+        +------------------+------------------+
+        |                  |                  |
+        v                  v                  v
+   Inertial Sensors   Absolute Sensors   Relative Sensors
+   Gyro + Accel       ST / Sun / Mag     GNSS / Camera /
+                                          LiDAR
+        |                  |                  |
+        +------------------+------------------+
+                           |
+                           v
+              Calibration / Frame Mapping
+                           |
+                           v
+                  Time Synchronization
+                           |
+                           v
+               Validity + Quality Checks
+                           |
+                           v
+                    Sensor Manager
+                           |
+                           v
+              Measurement Queue / Router
+                           |
+                           v
+                 EKF / MEKF / UKF
+                           |
+                           v
+           State Estimate + Covariance
+                           |
+             +-------------+-------------+
+             |                           |
+             v                           v
+          Guidance                     FDIR
+             |                           |
+             v                           v
+          Control                 Mode Reconfiguration
+             |
+             v
+          Actuators
+  </pre>
+
+  <p>
+    This is a strong generic architecture because it separates sensing, normalization, health management, fusion, and mission control.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.111 COMPLETE ATTITUDE SENSOR FUSION CHAIN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.111 Complete Attitude Sensor Fusion Chain</h3>
+
+
+  <p>
+    For attitude determination:
+  </p>
+
+  <pre>
+Gyroscope
+   |
+   v
+High-Rate Quaternion Propagation
+   |
+   v
+Predicted Attitude
+   |
+   +--------------------+
+   |                    |
+   v                    v
+Star Tracker         Sun Sensor
+   |                    |
+   +---------+----------+
+             |
+             v
+        Magnetometer
+             |
+             v
+     Measurement Updates
+             |
+             v
+         MEKF / EKF
+             |
+             v
+      Attitude Estimate
+             |
+             v
+      Gyro Bias Estimate
+             |
+             v
+        Attitude Control
+  </pre>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.112 COMPLETE TRANSLATIONAL NAVIGATION CHAIN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.112 Complete Translational Navigation Chain</h3>
+
+
+  <p>
+    For spacecraft translation:
+  </p>
+
+  <pre>
+Accelerometer
+     |
+     v
+Specific Force
+     |
+     +------ Gyro Attitude
+     |
+     v
+Navigation-Frame Acceleration
+     |
+     v
+Velocity / Position Propagation
+     |
+     +----------------+
+     |                |
+     v                v
+   GNSS          Orbit Dynamics
+     |                |
+     +-------+--------+
+             |
+             v
+        Navigation EKF
+             |
+             v
+     Position + Velocity
+             |
+             v
+           Guidance
+  </pre>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.113 COMPLETE RPO SENSOR FUSION CHAIN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.113 Complete RPO Sensor Fusion Chain</h3>
+
+
+  <p>
+    For rendezvous and docking:
+  </p>
+
+  <pre>
+                       IMU
+                        |
+                        v
+                Relative-State Propagation
+                        |
+     +------------------+------------------+
+     |                  |                  |
+     v                  v                  v
+ GNSS / DGNSS         Camera             LiDAR
+     |                  |                  |
+     +------------------+------------------+
+                        |
+                        v
+               Time / Frame Alignment
+                        |
+                        v
+             Measurement Validation
+                        |
+                        v
+             Relative Navigation EKF
+                        |
+                        v
+        Relative Position / Velocity
+        Relative Attitude / Rate
+                        |
+                        v
+                 RPO Guidance
+                        |
+        +---------------+---------------+
+        |                               |
+        v                               v
+    Nominal Approach                 Abort Logic
+        |                               |
+        +---------------+---------------+
+                        |
+                        v
+                  Thruster Control
+  </pre>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.114 COMBINED SENSOR-SUITE ERROR BUDGET -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.114 Combined Sensor-Suite Error Budget</h3>
+
+
+  <p>
+    The total navigation error cannot be derived by looking at each sensor independently.
+  </p>
+
+  <p>
+    A conceptual combined error budget is
+  </p>
+
+  \[
+\boxed{ P_{nav} = f( P_{gyro}, P_{accel}, P_{ST}, P_{Sun}, P_{mag}, P_{GNSS}, P_{camera}, P_{LiDAR}, P_{timing}, P_{alignment}, P_{dynamics} ). }
+  \]
+
+  <p>
+    Because the estimator couples sensors through dynamics, the relationship is generally not simple addition.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.115 NAVIGATION COVARIANCE AS THE CENTRAL OUTPUT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.115 Navigation Covariance as the Central Output</h3>
+
+
+  <p>
+    A combined sensor suite should output not only the best estimate
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf x} }
+  \]
+
+  <p>
+    but also its uncertainty:
+  </p>
+
+  \[
+\boxed{ P = E[ (\mathbf x-\hat{\mathbf x}) (\mathbf x-\hat{\mathbf x})^T ]. }
+  \]
+
+  <p>
+    For autonomous guidance and safety systems,
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf x}+P }
+  \]
+
+  <p>
+    is far more informative than \(\hat{\mathbf x}\) alone.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.116 SENSOR SUITE AND MISSION SAFETY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.116 Sensor Suite and Mission Safety</h3>
+
+
+  <p>
+    For critical operations such as docking, a navigation solution may only be accepted when
+  </p>
+
+  \[
+\boxed{ valid_{nav}=1 }
+  \]
+
+  <p>
+    and covariance remains below required bounds.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ \sigma_{r,rel} < \sigma_{r,max} }
+  \]
+
+  \[
+\boxed{ \sigma_{v,rel} < \sigma_{v,max}. }
+  \]
+
+  <p>
+    Therefore spacecraft safety logic should use estimated uncertainty as well as estimated state.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.117 CAPTURE-READINESS SENSOR FUSION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.117 Capture-Readiness Sensor Fusion</h3>
+
+
+  <p>
+    For docking or robotic handover, the navigation system may evaluate
+  </p>
+
+  \[
+\boxed{ \|\mathbf r_{rel}\| \le r_{capture} }
+  \]
+
+  \[
+\boxed{ \|\mathbf v_{rel}\| \le v_{capture} }
+  \]
+
+  \[
+\boxed{ \theta_{rel} \le\theta_{capture} }
+  \]
+
+  \[
+\boxed{ \|\boldsymbol\omega_{rel}\| \le\omega_{capture}. }
+  \]
+
+  <p>
+    But these should ideally be checked using filtered states and sufficient confidence.
+  </p>
+
+  <p>
+    A stronger condition is
+  </p>
+
+  \[
+\boxed{ \text{State Limits} + \text{Covariance Limits} + \text{Dwell} \rightarrow \text{Capture Ready}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.118 SENSOR FUSION AND DWELL LOGIC -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.118 Sensor Fusion and Dwell Logic</h3>
+
+
+  <p>
+    Noisy sensors can repeatedly cross a threshold.
+  </p>
+
+  <p>
+    Therefore mode transitions may require
+  </p>
+
+  \[
+condition(t)=true
+  \]
+
+  <p>
+    for
+  </p>
+
+  \[
+\boxed{ t\ge T_{dwell}. }
+  \]
+
+  <p>
+    This reduces false transitions caused by measurement noise.
+  </p>
+
+  <p>
+    It is especially important for RPO hold points and capture readiness.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.119 HYSTERESIS IN SENSOR-MODE SWITCHING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.119 Hysteresis in Sensor-Mode Switching</h3>
+
+
+  <p>
+    Sensor switching thresholds can use hysteresis.
+  </p>
+
+  <p>
+    For example, activate a close-range sensor when
+  </p>
+
+  \[
+r<r_{in}
+  \]
+
+  <p>
+    but return to the far-range sensor only if
+  </p>
+
+  \[
+r>r_{out}
+  \]
+
+  <p>
+    with
+  </p>
+
+  \[
+\boxed{ r_{out}>r_{in}. }
+  \]
+
+  <p>
+    This prevents rapid switching near the transition boundary.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.120 CONFIDENCE-BASED SENSOR MANAGEMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.120 Confidence-Based Sensor Management</h3>
+
+
+  <p>
+    Sensor selection can depend on confidence instead of only range.
+  </p>
+
+  <p>
+    Define a quality metric
+  </p>
+
+  \[
+Q_i.
+  \]
+
+  <p>
+    Then the sensor manager can select or weight measurements based on
+  </p>
+
+  \[
+\boxed{ Q_i = f( R_i, valid_i, geometry_i, signal_i, health_i ). }
+  \]
+
+  <p>
+    This produces more intelligent mode transitions.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.121 COMBINED SUITE VERIFICATION METRICS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.121 Combined Suite Verification Metrics</h3>
+
+
+  <p>
+    Useful performance metrics include:
+  </p>
+
+  \[
+\boxed{ \text{State RMSE} }
+  \]
+
+  \[
+\boxed{ \text{3}\sigma\text{ Consistency} }
+  \]
+
+  \[
+\boxed{ \text{Availability} }
+  \]
+
+  \[
+\boxed{ \text{Sensor-Rejection Rate} }
+  \]
+
+  \[
+\boxed{ \text{Fault Detection Time} }
+  \]
+
+  \[
+\boxed{ \text{Recovery Time} }
+  \]
+
+  \[
+\boxed{ \text{Mission Success Rate}. }
+  \]
+
+  <p>
+    These are more meaningful than evaluating individual sensors independently.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.122 NEES AND NIS FOR FUSION VALIDATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.122 NEES and NIS for Fusion Validation</h3>
+
+
+  <p>
+    Estimator consistency can be evaluated using statistical measures.
+  </p>
+
+  <p>
+    The <strong>Normalized Estimation Error Squared</strong> is
+  </p>
+
+  \[
+\boxed{ NEES = (\mathbf x-\hat{\mathbf x})^T P^{-1} (\mathbf x-\hat{\mathbf x}). }
+  \]
+
+  <p>
+    The <strong>Normalized Innovation Squared</strong> is
+  </p>
+
+  \[
+\boxed{ NIS = \mathbf y^TS^{-1}\mathbf y. }
+  \]
+
+  <p>
+    These metrics help assess whether \(Q\) and \(R\) are consistent with actual navigation errors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.123 SENSOR SUITE TRADE STUDY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.123 Sensor Suite Trade Study</h3>
+
+
+  <p>
+    A sensor-suite trade study should compare complete architectures rather than individual sensors.
+  </p>
+
+  <p>
+    For example:
+  </p>
+
+  \[
+\boxed{ \text{Architecture A} = \text{Gyro + CSS + Magnetometer} }
+  \]
+
+  <p>
+    versus
+  </p>
+
+  \[
+\boxed{ \text{Architecture B} = \text{Gyro + Star Tracker + Magnetometer} }
+  \]
+
+  <p>
+    versus
+  </p>
+
+  \[
+\boxed{ \text{Architecture C} = \text{Dual Star Tracker + Gyro + CSS + Magnetometer}. }
+  \]
+
+  <p>
+    Trade criteria include accuracy, cost, mass, power, radiation tolerance, safe-mode capability, redundancy, FDIR and mission risk.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.124 SENSOR-SUITE DESIGN PHILOSOPHY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.124 Sensor-Suite Design Philosophy</h3>
+
+
+  <p>
+    The correct question is not
+  </p>
+
+  \[
+\boxed{ \text{Which sensor is the best?} }
+  \]
+
+  <p>
+    but
+  </p>
+
+  \[
+\boxed{ \text{Which combination of sensors provides the required state knowledge, availability, integrity, and fault tolerance for every mission phase?} }
+  \]
+
+  <p>
+    This is a system-level GNC question.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.125 KEY SENSOR COMBINATIONS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.125 Key Sensor Combinations</h3>
+
+
+  <p>
+    The most important architectures to remember are:
+  </p>
+
+  \[
+\boxed{ \text{Gyro + Star Tracker} \rightarrow \text{Precision Attitude} }
+  \]
+
+  \[
+\boxed{ \text{Gyro + Sun Sensor + Magnetometer} \rightarrow \text{Robust Coarse Attitude} }
+  \]
+
+  \[
+\boxed{ \text{IMU + GNSS} \rightarrow \text{Integrated Position / Velocity Navigation} }
+  \]
+
+  \[
+\boxed{ \text{Sun Sensor + Magnetometer} \rightarrow \text{Two-Vector Attitude Determination} }
+  \]
+
+  \[
+\boxed{ \text{GNSS + Camera + LiDAR + IMU} \rightarrow \text{RPO Relative Navigation} }
+  \]
+
+  \[
+\boxed{ \text{Star Tracker + Gyro + Sun Sensor + Magnetometer} \rightarrow \text{High-Accuracy + Safe-Mode Attitude Architecture}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.8.126 FINAL ENGINEERING PERSPECTIVE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.8.126 Final Engineering Perspective</h3>
+
+
+  <p>
+    The most important principle is
+  </p>
+
+  \[
+\boxed{ \text{No Single Sensor Provides Everything}. }
+  \]
+
+  <p>
+    A robust spacecraft navigation system deliberately combines sensors with different strengths:
+  </p>
+
+  \[
+\boxed{ \text{High Rate} + \text{Absolute Reference} + \text{Independent Physics} + \text{Redundancy} + \text{Availability} }
+  \]
+
+  <p>
+    to produce
+  </p>
+
+  \[
+\boxed{ \text{Accurate} + \text{Observable} + \text{Fault-Tolerant} + \text{Continuous Navigation}. }
+  \]
+
+  <p>
+    The complete architecture is therefore
+  </p>
+
+  \[
+\boxed{ \text{Sensors} \rightarrow \text{Calibration} \rightarrow \text{Frame Alignment} \rightarrow \text{Time Synchronization} \rightarrow \text{Validation} \rightarrow \text{Fusion} \rightarrow \text{State + Covariance} }
+  \]
+
+  <p>
+    followed by
+  </p>
+
+  \[
+\boxed{ \text{Navigation State} \rightarrow \text{Guidance} \rightarrow \text{Control} \rightarrow \text{Mission Execution}. }
+  \]
+
+  <p>
+    For spacecraft autonomy, this must be expanded further:
+  </p>
+
+  \[
+\boxed{ \text{Sensor Fusion} + \text{FDIR} + \text{Sensor Management} + \text{Mode Reconfiguration} \rightarrow \text{Robust Autonomous GNC}. }
+  \]
+
+  <p>
+    And for rendezvous and docking:
+  </p>
+
+  \[
+\boxed{ \text{GNSS / Differential GNSS} \rightarrow \text{Camera + LiDAR Overlap} \rightarrow \text{Precision Relative Navigation} \rightarrow \text{Capture / Docking}. }
+  \]
+
+  <p>
+    So <strong>4.1.8 Combined Sensor Suites</strong> becomes the bridge between the individual sensor models in <strong>4.1.1–4.1.6</strong>, the common sensor-error theory in <strong>4.1.7</strong>, and the formal filter measurement equations that will follow in <strong>4.1.9 Measurement Models</strong>.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- PREVIOUS / NEXT -->
+<!-- ========================================================= -->
+
+<nav class="notes-prev-next">
+
+  <a href="sensor-error-sources.html">
+    &larr; 4.1.7 Sensor Error Sources
+  </a>
+
+  <a href="measurement-models.html">
+    4.1.9 Measurement Models &rarr;
+  </a>
+
+</nav>
+
+</main>
+
+<!-- ========================================================= -->
+<!-- FOOTER -->
+<!-- ========================================================= -->
+
+<footer class="site-footer">
+
+  <p>
+    © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+    Educational resource for spacecraft dynamics, orbital mechanics,
+    and guidance–navigation–control systems.
+  </p>
+
+</footer>
+
+</body>
+</html>
