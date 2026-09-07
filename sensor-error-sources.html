@@ -1,0 +1,5742 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.1.7 Sensor Error Sources | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+</head>
+
+<body>
+
+<!-- ========================================================= -->
+<!-- HEADER -->
+<!-- ========================================================= -->
+
+<header class="notes-hero">
+
+  <h1>Sensor Error Sources</h1>
+
+  <p class="notes-tagline">
+    A complete spacecraft-GNC treatment of deterministic, stochastic, environmental,
+    dynamic, digital, installation, timing, calibration, covariance, Monte Carlo,
+    filtering, and fault-related sensor errors.
+  </p>
+
+  <nav class="pill-nav">
+    <a href="index.html" class="pill">Home</a>
+    <a href="tools.html" class="pill">Tools</a>
+    <a href="notes.html" class="pill active">Theory Notes</a>
+    <a href="references.html" class="pill">References</a>
+    <a href="problems.html" class="pill">Problem Bank</a>
+    <a href="about.html" class="pill">About</a>
+  </nav>
+
+</header>
+
+<main class="page-main">
+
+<!-- ========================================================= -->
+<!-- 4.1.7 SENSOR ERROR SOURCES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h2>4.1.7 Sensor Error Sources</h2>
+
+
+  <p>
+    This chapter is intentionally cross-cutting. The individual sensor pages explain
+    the physics and error mechanisms of gyroscopes, accelerometers, magnetometers,
+    star trackers, Sun sensors, and GNSS. Here, those effects are placed into one
+    common engineering framework so they can be used consistently in simulation,
+    calibration, covariance design, Kalman filtering, Monte Carlo analysis, FDIR,
+    and mission-level GNC verification.
+  </p>
+
+  <p>
+    The central engineering question is not simply, <em>“What is the sensor accuracy?”</em>
+    It is:
+    <strong>which errors are deterministic, which are stochastic, which vary with time
+    or environment, which can be calibrated, which must be estimated online, which
+    should appear in the process model, which should appear in the measurement
+    covariance, and which must instead be handled by validity or fault logic?</strong>
+  </p>
+
+  <p>
+    A spacecraft sensor never provides the exact physical quantity that exists in reality. Every measurement is affected by imperfections associated with the sensing element, electronics, calibration, installation, spacecraft environment, timing system, signal processing, and stochastic processes.
+  </p>
+
+  <p>
+    The general idea is
+  </p>
+
+  \[
+\boxed{ \text{True Physical Quantity} \rightarrow \text{Sensor Physics} \rightarrow \text{Deterministic Errors} \rightarrow \text{Stochastic Errors} \rightarrow \text{Sampling / Processing} \rightarrow \text{Measured Quantity} }
+  \]
+
+  <p>
+    A useful generic sensor model is
+  </p>
+
+  \[
+\boxed{ \mathbf z_m = h(\mathbf x) + \mathbf e_d + \mathbf e_s }
+  \]
+
+  <p>
+    where
+  </p>
+
+  <ul>
+
+    <li>\(\mathbf z_m\) = measured quantity,</li>
+
+    <li>\(h(\mathbf x)\) = ideal measurement predicted from the true state,</li>
+
+    <li>\(\mathbf e_d\) = deterministic or calibratable error,</li>
+
+    <li>\(\mathbf e_s\) = stochastic error.</li>
+
+  </ul>
+
+  <p>
+    For a three-axis vector sensor, a more detailed model is
+  </p>
+
+  \[
+\boxed{ \mathbf z_m = (\mathbf I+\mathbf S+\mathbf M) \mathbf z_{true} + \mathbf b + \mathbf n }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+\mathbf S= \begin{bmatrix} s_x&0&0\\ 0&s_y&0\\ 0&0&s_z \end{bmatrix}
+  \]
+
+  <p>
+    represents scale-factor errors,
+  </p>
+
+  \[
+\mathbf M
+  \]
+
+  <p>
+    represents misalignment, non-orthogonality and cross-axis coupling,
+  </p>
+
+  \[
+\mathbf b
+  \]
+
+  <p>
+    is sensor bias, and
+  </p>
+
+  \[
+\mathbf n
+  \]
+
+  <p>
+    represents stochastic measurement noise.
+  </p>
+
+  <p>
+    For real spacecraft sensors, this can be extended further:
+  </p>
+
+  \[
+\boxed{ \mathbf z_m(t_k) = \mathcal Q \left[ \mathcal S \left( h(\mathbf x(t_k-\tau)) + \mathbf e_{cal} + \mathbf e_{env} + \mathbf e_{dyn} + \mathbf n \right) \right] }
+  \]
+
+  <p>
+    where \(\mathcal S\) represents sampling, \(\mathcal Q\) quantisation, and \(\tau\) measurement latency.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.1 WHY SENSOR ERRORS MATTER IN GNC -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.1 Why Sensor Errors Matter in GNC</h3>
+
+
+  <p>
+    Sensor errors propagate directly into the quantities used by guidance, navigation and control.
+  </p>
+
+  <p>
+    The complete chain is
+  </p>
+
+  \[
+\boxed{ \text{Sensor Error} \rightarrow \text{Measurement Error} \rightarrow \text{State-Estimation Error} \rightarrow \text{Guidance Error} \rightarrow \text{Control Error} \rightarrow \text{Spacecraft Performance} }
+  \]
+
+  <p>
+    For example, a gyroscope bias produces attitude drift:
+  </p>
+
+  \[
+b_g \rightarrow \delta\omega \rightarrow \delta\theta.
+  \]
+
+  <p>
+    An accelerometer bias produces velocity and position drift:
+  </p>
+
+  \[
+b_a \rightarrow \delta v \rightarrow \delta r.
+  \]
+
+  <p>
+    A magnetometer bias distorts the measured geomagnetic vector and therefore affects attitude estimation and magnetic control.
+  </p>
+
+  <p>
+    Star-tracker centroiding, alignment or thermal errors directly influence spacecraft attitude knowledge.
+  </p>
+
+  <p>
+    GNSS range, clock, geometry and antenna errors propagate into position, velocity and timing estimates.
+  </p>
+
+  <p>
+    Consequently, sensor modelling is not merely an instrumentation problem. It is fundamental to the entire GNC error budget.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.2 SENSOR ERROR CLASSIFICATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.2 Sensor Error Classification</h3>
+
+
+  <p>
+    Sensor errors can be classified in several ways.
+  </p>
+
+  <p>
+    A useful top-level classification is
+  </p>
+
+  \[
+\boxed{ \text{Sensor Errors} = \text{Deterministic} + \text{Stochastic} + \text{Environmental} + \text{Dynamic} + \text{Digital} + \text{Installation} + \text{Operational} }
+  \]
+
+  <h4>Deterministic errors</h4>
+
+  <p>
+    These can often be characterized and calibrated:
+  </p>
+
+  <ul>
+
+    <li>constant bias,</li>
+
+    <li>scale-factor error,</li>
+
+    <li>axis misalignment,</li>
+
+    <li>non-orthogonality,</li>
+
+    <li>cross-axis sensitivity,</li>
+
+    <li>nonlinearity,</li>
+
+    <li>known temperature dependence,</li>
+
+    <li>mounting alignment error,</li>
+
+    <li>fixed latency.</li>
+
+  </ul>
+
+  <h4>Stochastic errors</h4>
+
+  <p>
+    These cannot be predicted exactly for an individual measurement:
+  </p>
+
+  <ul>
+
+    <li>white noise,</li>
+
+    <li>random walk,</li>
+
+    <li>bias instability,</li>
+
+    <li>correlated noise,</li>
+
+    <li>coloured noise,</li>
+
+    <li>flicker noise,</li>
+
+    <li>shot noise,</li>
+
+    <li>clock noise.</li>
+
+  </ul>
+
+  <h4>Environmental errors</h4>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>temperature,</li>
+
+    <li>radiation,</li>
+
+    <li>magnetic contamination,</li>
+
+    <li>vibration,</li>
+
+    <li>mechanical stress,</li>
+
+    <li>electromagnetic interference,</li>
+
+    <li>stray light,</li>
+
+    <li>Earth albedo,</li>
+
+    <li>thermal gradients.</li>
+
+  </ul>
+
+  <h4>Dynamic errors</h4>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>finite bandwidth,</li>
+
+    <li>response lag,</li>
+
+    <li>motion blur,</li>
+
+    <li>vibration sensitivity,</li>
+
+    <li>aliasing,</li>
+
+    <li>slew-rate limitations.</li>
+
+  </ul>
+
+  <h4>Digital errors</h4>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>quantisation,</li>
+
+    <li>finite numerical precision,</li>
+
+    <li>timestamp discretisation,</li>
+
+    <li>packet loss,</li>
+
+    <li>sample jitter.</li>
+
+  </ul>
+
+  <h4>Installation errors</h4>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>sensor-to-body misalignment,</li>
+
+    <li>lever-arm displacement,</li>
+
+    <li>antenna phase-centre offset,</li>
+
+    <li>structural deformation.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.3 ACCURACY, PRECISION, RESOLUTION AND REPEATABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.3 Accuracy, Precision, Resolution and Repeatability</h3>
+
+
+  <p>
+    These terms should not be used interchangeably.
+  </p>
+
+  <h4>Accuracy</h4>
+
+  <p>
+    Accuracy describes closeness to the true value.
+  </p>
+
+  \[
+\boxed{ e=z_m-z_{true} }
+  \]
+
+  <p>
+    Small measurement error generally corresponds to high accuracy.
+  </p>
+
+  <h4>Precision</h4>
+
+  <p>
+    Precision describes how tightly repeated measurements cluster.
+  </p>
+
+  <p>
+    A sensor may be highly precise but biased.
+  </p>
+
+  <h4>Resolution</h4>
+
+  <p>
+    Resolution is the smallest input change that can be represented or detected.
+  </p>
+
+  <p>
+    For an \(N\)-bit sensor over range
+  </p>
+
+  \[
+x_{min}\le x\le x_{max},
+  \]
+
+  <p>
+    an approximate digital resolution is
+  </p>
+
+  \[
+\boxed{ \Delta x = \frac{x_{max}-x_{min}}{2^N} }
+  \]
+
+  <p>
+    depending on encoding convention.
+  </p>
+
+  <h4>Repeatability</h4>
+
+  <p>
+    Repeatability describes the ability to reproduce measurements under nominally identical conditions.
+  </p>
+
+  <h4>Stability</h4>
+
+  <p>
+    Stability describes how sensor characteristics change with time.
+  </p>
+
+  <p>
+    These distinctions are essential when reading sensor datasheets.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.4 BIAS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.4 Bias</h3>
+
+
+  <p>
+    Bias is an additive offset between the sensor output and the ideal measurement.
+  </p>
+
+  \[
+\boxed{ z_m=z_{true}+b }
+  \]
+
+  <p>
+    For a vector sensor,
+  </p>
+
+  \[
+\boxed{ \mathbf z_m = \mathbf z_{true} + \mathbf b. }
+  \]
+
+  <p>
+    Bias may arise from:
+  </p>
+
+  <ul>
+
+    <li>electronics,</li>
+
+    <li>manufacturing tolerances,</li>
+
+    <li>mechanical stress,</li>
+
+    <li>calibration residuals,</li>
+
+    <li>temperature,</li>
+
+    <li>ageing,</li>
+
+    <li>radiation,</li>
+
+    <li>magnetic contamination.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.5 CONSTANT BIAS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.5 Constant Bias</h3>
+
+
+  <p>
+    The simplest model assumes
+  </p>
+
+  \[
+\boxed{ b(t)=b_0. }
+  \]
+
+  <p>
+    Thus
+  </p>
+
+  \[
+z_m=z_{true}+b_0+n.
+  \]
+
+  <p>
+    Constant bias can often be estimated during calibration.
+  </p>
+
+  <p>
+    However, even a small constant bias can become extremely important when the measurement is integrated.
+  </p>
+
+  <p>
+    For a gyro,
+  </p>
+
+  \[
+\delta\theta(t)\approx b_g t.
+  \]
+
+  <p>
+    For an accelerometer,
+  </p>
+
+  \[
+\delta v(t)\approx b_a t
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \delta r(t)\approx\frac12b_a t^2. }
+  \]
+
+  <p>
+    Therefore an apparently small inertial-sensor bias may produce large navigation errors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.6 BIAS REPEATABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.6 Bias Repeatability</h3>
+
+
+  <p>
+    A sensor may not return to exactly the same bias after:
+  </p>
+
+  <ul>
+
+    <li>power cycling,</li>
+
+    <li>thermal cycling,</li>
+
+    <li>launch,</li>
+
+    <li>mechanical shock,</li>
+
+    <li>long shutdown periods.</li>
+
+  </ul>
+
+  <p>
+    This is called bias repeatability or turn-on-to-turn-on bias variation.
+  </p>
+
+  <p>
+    A useful model is
+  </p>
+
+  \[
+\boxed{ b_0\sim\mathcal N(\bar b,\sigma_{b0}^2). }
+  \]
+
+  <p>
+    Each Monte Carlo realization can therefore begin with a different initial bias.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.7 BIAS DRIFT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.7 Bias Drift</h3>
+
+
+  <p>
+    Real bias usually changes slowly with time:
+  </p>
+
+  \[
+\boxed{ b=b(t). }
+  \]
+
+  <p>
+    The measurement becomes
+  </p>
+
+  \[
+z_m=z_{true}+b(t)+n(t).
+  \]
+
+  <p>
+    Bias drift may be caused by:
+  </p>
+
+  <ul>
+
+    <li>temperature,</li>
+
+    <li>electronics ageing,</li>
+
+    <li>mechanical relaxation,</li>
+
+    <li>radiation,</li>
+
+    <li>changing operating conditions.</li>
+
+  </ul>
+
+  <p>
+    Bias drift is especially important for inertial sensors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.8 BIAS RANDOM WALK -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.8 Bias Random Walk</h3>
+
+
+  <p>
+    A common stochastic model is
+  </p>
+
+  \[
+\boxed{ \dot b=w_b }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+w_b(t)\sim\mathcal N(0,q_b).
+  \]
+
+  <p>
+    In discrete time,
+  </p>
+
+  \[
+\boxed{ b_{k+1}=b_k+w_{b,k}. }
+  \]
+
+  <p>
+    More carefully, for a continuous white driving process with spectral density \(q_b\),
+  </p>
+
+  \[
+\boxed{ b_{k+1} = b_k+\sqrt{q_b\Delta t}\,\xi_k }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+\xi_k\sim\mathcal N(0,1).
+  \]
+
+  <p>
+    This model is widely used in Kalman filters.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.9 FIRST-ORDER GAUSS-MARKOV BIAS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.9 First-Order Gauss-Markov Bias</h3>
+
+
+  <p>
+    Not all bias processes should be represented as unbounded random walks.
+  </p>
+
+  <p>
+    A first-order Gauss-Markov model is
+  </p>
+
+  \[
+\boxed{ \dot b = -\frac{1}{\tau_b}b+w_b }
+  \]
+
+  <p>
+    where \(\tau_b\) is the correlation time.
+  </p>
+
+  <p>
+    Its discrete form is
+  </p>
+
+  \[
+\boxed{ b_{k+1} = e^{-\Delta t/\tau_b}b_k+w_k. }
+  \]
+
+  <p>
+    This gives a correlated but bounded stochastic process.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.10 BIAS INSTABILITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.10 Bias Instability</h3>
+
+
+  <p>
+    Bias instability describes slowly varying fluctuations that are not adequately represented by simple white noise.
+  </p>
+
+  <p>
+    It is commonly identified using Allan deviation.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Bias Instability} \rightarrow \text{Slowly Varying Measurement Offset}. }
+  \]
+
+  <p>
+    It is particularly important for gyroscopes and accelerometers.
+  </p>
+
+  <p>
+    Bias instability should not automatically be treated as identical to bias random walk. They represent different stochastic behaviours.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.11 SCALE-FACTOR ERROR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.11 Scale-Factor Error</h3>
+
+
+  <p>
+    Scale-factor error causes the sensor response to differ from the ideal proportionality.
+  </p>
+
+  <p>
+    For a scalar measurement,
+  </p>
+
+  \[
+\boxed{ z_m=(1+s)z_{true}. }
+  \]
+
+  <p>
+    If
+  </p>
+
+  \[
+s=0.01,
+  \]
+
+  <p>
+    the scale-factor error is approximately \(1\%\).
+  </p>
+
+  <p>
+    For a three-axis sensor,
+  </p>
+
+  \[
+\boxed{ \mathbf z_m = (\mathbf I+\mathbf S)\mathbf z_{true}. }
+  \]
+
+  <p>
+    Scale-factor error becomes particularly important when the measured quantity is large.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.12 SCALE-FACTOR ASYMMETRY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.12 Scale-Factor Asymmetry</h3>
+
+
+  <p>
+    Some sensors have different scale factors for positive and negative inputs:
+  </p>
+
+  \[
+s_+\neq s_-.
+  \]
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+z_m= \begin{cases} (1+s_+)z, & z\ge0\\ (1+s_-)z, & z<0. \end{cases}
+  \]
+
+  <p>
+    A single scale-factor coefficient may therefore be insufficient for high-fidelity modelling.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.13 SCALE-FACTOR TEMPERATURE DEPENDENCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.13 Scale-Factor Temperature Dependence</h3>
+
+
+  <p>
+    Scale factor can vary with temperature:
+  </p>
+
+  \[
+\boxed{ s(T) = s_0+k_{s1}(T-T_0)+k_{s2}(T-T_0)^2+\cdots }
+  \]
+
+  <p>
+    so that
+  </p>
+
+  \[
+z_m=[1+s(T)]z_{true}.
+  \]
+
+  <p>
+    This is one reason calibration tables are sometimes functions of temperature rather than fixed constants.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.14 AXIS MISALIGNMENT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.14 Axis Misalignment</h3>
+
+
+  <p>
+    A sensor's physical axes are not perfectly aligned with the assumed coordinate frame.
+  </p>
+
+  <p>
+    If
+  </p>
+
+  \[
+C_B^S
+  \]
+
+  <p>
+    maps a body-frame quantity into the sensor frame,
+  </p>
+
+  \[
+\boxed{ \mathbf z^S=C_B^S\mathbf z^B. }
+  \]
+
+  <p>
+    An error in \(C_B^S\) produces a mounting or alignment error.
+  </p>
+
+  <p>
+    For small angular misalignment,
+  </p>
+
+  \[
+C\approx I-[\delta\boldsymbol\theta\times]
+  \]
+
+  <p>
+    for one common convention.
+  </p>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \delta\mathbf z \approx -[\delta\boldsymbol\theta\times]\mathbf z. }
+  \]
+
+  <p>
+    The sign depends on the adopted frame/transformation convention.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.15 NON-ORTHOGONALITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.15 Non-Orthogonality</h3>
+
+
+  <p>
+    Ideally, the three sensor axes are mutually perpendicular:
+  </p>
+
+  \[
+\hat x\cdot\hat y = \hat y\cdot\hat z = \hat z\cdot\hat x = 0.
+  \]
+
+  <p>
+    Manufacturing imperfections can cause small deviations.
+  </p>
+
+  <p>
+    A non-orthogonality matrix can be represented as
+  </p>
+
+  \[
+\boxed{ M= \begin{bmatrix} 0&m_{xy}&m_{xz}\\ m_{yx}&0&m_{yz}\\ m_{zx}&m_{zy}&0 \end{bmatrix}. }
+  \]
+
+  <p>
+    The sensor model becomes
+  </p>
+
+  \[
+\mathbf z_m=(I+M)\mathbf z_{true}+\cdots.
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.16 CROSS-AXIS SENSITIVITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.16 Cross-Axis Sensitivity</h3>
+
+
+  <p>
+    An input along one physical axis may generate an output on another axis.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+z_{m,x} = z_x + c_{xy}z_y + c_{xz}z_z.
+  \]
+
+  <p>
+    The complete model is
+  </p>
+
+  \[
+\boxed{ \mathbf z_m=C_{cross}\mathbf z_{true}. }
+  \]
+
+  <p>
+    Cross-axis sensitivity can result from sensing-element construction, electronics, mounting, or imperfect calibration.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.17 COMBINED CALIBRATION MATRIX -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.17 Combined Calibration Matrix</h3>
+
+
+  <p>
+    Scale factor, misalignment and cross-axis effects can be grouped into one calibration matrix:
+  </p>
+
+  \[
+\boxed{ \mathbf z_m = A\mathbf z_{true} + \mathbf b + \mathbf n. }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+A = \begin{bmatrix} a_{11}&a_{12}&a_{13}\\ a_{21}&a_{22}&a_{23}\\ a_{31}&a_{32}&a_{33} \end{bmatrix}.
+  \]
+
+  <p>
+    Calibration seeks estimates
+  </p>
+
+  \[
+\hat A,\qquad\hat{\mathbf b}.
+  \]
+
+  <p>
+    The corrected measurement becomes
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf z}_{true} = \hat A^{-1} (\mathbf z_m-\hat{\mathbf b}). }
+  \]
+
+  <p>
+    This formulation is useful for accelerometers, gyroscopes and magnetometers.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.18 NONLINEARITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.18 Nonlinearity</h3>
+
+
+  <p>
+    A real sensor may not maintain a perfectly linear input-output relationship.
+  </p>
+
+  <p>
+    Instead of
+  </p>
+
+  \[
+z_m=Kz,
+  \]
+
+  <p>
+    the response may be
+  </p>
+
+  \[
+\boxed{ z_m = K_1z + K_2z^2 + K_3z^3 +\cdots. }
+  \]
+
+  <p>
+    Nonlinearity is often specified relative to full scale.
+  </p>
+
+  <p>
+    It becomes particularly important near the sensor's operating-range limits.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.19 HYSTERESIS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.19 Hysteresis</h3>
+
+
+  <p>
+    Hysteresis means the output depends not only on the current input but also on its previous history.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ z_m(t) = h[z(t),\text{history}]. }
+  \]
+
+  <p>
+    The output for increasing input may differ from the output for decreasing input.
+  </p>
+
+  <p>
+    Hysteresis may appear in:
+  </p>
+
+  <ul>
+
+    <li>magnetic sensors,</li>
+
+    <li>mechanical sensing elements,</li>
+
+    <li>thermal systems.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.20 DEAD ZONE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.20 Dead Zone</h3>
+
+
+  <p>
+    A sensor may have a region in which small input changes produce little or no observable output.
+  </p>
+
+  \[
+z_m= \begin{cases} 0,& |z|<z_d\\ f(z),&|z|\ge z_d. \end{cases}
+  \]
+
+  <p>
+    Dead-zone behaviour reduces sensitivity near zero.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.21 SATURATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.21 Saturation</h3>
+
+
+  <p>
+    Every physical sensor has a finite operating range.
+  </p>
+
+  <p>
+    If
+  </p>
+
+  \[
+z_{min}\le z\le z_{max},
+  \]
+
+  <p>
+    the measured value may be represented as
+  </p>
+
+  \[
+\boxed{ z_m = \operatorname{sat} (z,z_{min},z_{max}). }
+  \]
+
+  <p>
+    When the input exceeds the measurement range, information is lost.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>gyro rate exceeding full scale,</li>
+
+    <li>accelerometer acceleration exceeding range,</li>
+
+    <li>magnetometer saturation near strong magnetic fields,</li>
+
+    <li>photodetector saturation,</li>
+
+    <li>GNSS RF front-end overload.</li>
+
+  </ul>
+
+  <p>
+    A realistic simulation should generate a saturation flag when appropriate.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.22 QUANTISATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.22 Quantisation</h3>
+
+
+  <p>
+    Digital sensors represent continuous measurements using discrete levels.
+  </p>
+
+  <p>
+    For quantisation step
+  </p>
+
+  \[
+\Delta,
+  \]
+
+  \[
+\boxed{ z_q = \Delta \operatorname{round} \left( \frac{z}{\Delta} \right). }
+  \]
+
+  <p>
+    Quantisation error is
+  </p>
+
+  \[
+e_q=z_q-z.
+  \]
+
+  <p>
+    For an ideal uniform quantiser,
+  </p>
+
+  \[
+-\frac{\Delta}{2} \le e_q < \frac{\Delta}{2}.
+  \]
+
+  <p>
+    Under suitable assumptions,
+  </p>
+
+  \[
+\boxed{ \sigma_q^2\approx\frac{\Delta^2}{12}. }
+  \]
+
+  <p>
+    This approximation should not be blindly applied when the signal is highly correlated with the quantisation process.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.23 RESOLUTION VS QUANTISATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.23 Resolution vs Quantisation</h3>
+
+
+  <p>
+    Resolution and quantisation are related but conceptually different.
+  </p>
+
+  <p>
+    Resolution describes the smallest distinguishable input increment.
+  </p>
+
+  <p>
+    Quantisation describes the process of mapping a continuous value onto discrete output levels.
+  </p>
+
+  <p>
+    A sensor may also have effective resolution poorer than its digital bit depth because of analog noise.
+  </p>
+
+  <p>
+    Thus,
+  </p>
+
+  \[
+\boxed{ \text{Digital Bits} \neq \text{Effective Measurement Resolution}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.24 WHITE NOISE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.24 White Noise</h3>
+
+
+  <p>
+    A common sensor-noise model is zero-mean Gaussian white noise:
+  </p>
+
+  \[
+\boxed{ n(t)\sim\mathcal N(0,\sigma^2). }
+  \]
+
+  <p>
+    In discrete form,
+  </p>
+
+  \[
+z_k=z_{true,k}+n_k.
+  \]
+
+  <p>
+    with
+  </p>
+
+  \[
+n_k\sim\mathcal N(0,R).
+  \]
+
+  <p>
+    For vector measurements,
+  </p>
+
+  \[
+\boxed{ \mathbf n_k\sim\mathcal N(\mathbf0,R). }
+  \]
+
+  <p>
+    The covariance matrix need not be diagonal.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.25 MEASUREMENT NOISE COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.25 Measurement Noise Covariance</h3>
+
+
+  <p>
+    For a three-axis sensor,
+  </p>
+
+  \[
+R= \begin{bmatrix} \sigma_x^2&R_{xy}&R_{xz}\\ R_{yx}&\sigma_y^2&R_{yz}\\ R_{zx}&R_{zy}&\sigma_z^2 \end{bmatrix}.
+  \]
+
+  <p>
+    If axis errors are independent,
+  </p>
+
+  \[
+R= \operatorname{diag} (\sigma_x^2,\sigma_y^2,\sigma_z^2).
+  \]
+
+  <p>
+    Assuming diagonal covariance without justification can underestimate filter uncertainty when measurement errors are correlated.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.26 NOISE DENSITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.26 Noise Density</h3>
+
+
+  <p>
+    Sensor noise is often specified as an amplitude spectral density.
+  </p>
+
+  <p>
+    Typical units include
+  </p>
+
+  \[
+\frac{^\circ/s}{\sqrt{\mathrm{Hz}}}, \qquad \frac{m/s^2}{\sqrt{\mathrm{Hz}}}, \qquad \frac{nT}{\sqrt{\mathrm{Hz}}}.
+  \]
+
+  <p>
+    A generic relationship is
+  </p>
+
+  \[
+\boxed{ \sigma^2 = \int S_n(f)\,df. }
+  \]
+
+  <p>
+    For approximately white noise over effective bandwidth \(B\),
+  </p>
+
+  \[
+\boxed{ \sigma \propto N_d\sqrt{B}. }
+  \]
+
+  <p>
+    The exact numerical conversion depends on whether the specification uses one-sided or two-sided PSD conventions and on the actual filter bandwidth.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.27 POWER SPECTRAL DENSITY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.27 Power Spectral Density</h3>
+
+
+  <p>
+    The power spectral density describes how noise power is distributed with frequency.
+  </p>
+
+  \[
+\boxed{ S_x(f). }
+  \]
+
+  <p>
+    White noise approximately has
+  </p>
+
+  \[
+S_x(f)=\text{constant}.
+  \]
+
+  <p>
+    Coloured noise has frequency-dependent PSD.
+  </p>
+
+  <p>
+    PSD analysis helps distinguish different stochastic processes that cannot be understood from RMS noise alone.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.28 COLOURED NOISE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.28 Coloured Noise</h3>
+
+
+  <p>
+    Real sensor noise is frequently temporally correlated.
+  </p>
+
+  <p>
+    Unlike white noise,
+  </p>
+
+  \[
+E[n_k n_{k-j}] \neq0
+  \]
+
+  <p>
+    for some \(j\neq0\).
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>low-frequency drift,</li>
+
+    <li>\(1/f\) noise,</li>
+
+    <li>thermally correlated noise,</li>
+
+    <li>structural vibration,</li>
+
+    <li>electronics filtering.</li>
+
+  </ul>
+
+  <p>
+    A filter that assumes white measurement noise may become inconsistent if the real noise is strongly correlated.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.29 FLICKER NOISE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.29 Flicker Noise</h3>
+
+
+  <p>
+    Flicker noise is often associated with approximately
+  </p>
+
+  \[
+\boxed{ S(f)\propto\frac1f. }
+  \]
+
+  <p>
+    It dominates many sensors and electronic systems at low frequencies.
+  </p>
+
+  <p>
+    It is related conceptually to the slowly varying behaviour observed as bias instability.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.30 RANDOM WALK -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.30 Random Walk</h3>
+
+
+  <p>
+    Random walk arises when white noise is integrated.
+  </p>
+
+  \[
+\boxed{ x_{k+1}=x_k+w_k. }
+  \]
+
+  <p>
+    Its variance grows with time.
+  </p>
+
+  <p>
+    This behaviour is fundamental in inertial navigation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.31 ANGLE RANDOM WALK -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.31 Angle Random Walk</h3>
+
+
+  <p>
+    Gyroscope white rate noise integrates into attitude uncertainty.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Gyro White Noise} \xrightarrow{\int} \text{Angle Random Walk}. }
+  \]
+
+  <p>
+    Attitude uncertainty therefore increases with integration time.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.32 VELOCITY RANDOM WALK -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.32 Velocity Random Walk</h3>
+
+
+  <p>
+    Accelerometer white noise integrates into velocity uncertainty:
+  </p>
+
+  \[
+\boxed{ \text{Acceleration Noise} \xrightarrow{\int} \text{Velocity Random Walk}. }
+  \]
+
+  <p>
+    Further integration propagates the error into position.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.33 RATE RANDOM WALK -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.33 Rate Random Walk</h3>
+
+
+  <p>
+    Rate random walk describes a lower-frequency stochastic process in gyroscope output, distinct from ordinary white rate noise.
+  </p>
+
+  <p>
+    It is one of several noise mechanisms that can appear in Allan-deviation analysis.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.34 ALLAN VARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.34 Allan Variance</h3>
+
+
+  <p>
+    Allan variance is widely used to characterize inertial-sensor stochastic errors.
+  </p>
+
+  <p>
+    For averaging interval \(\tau\),
+  </p>
+
+  \[
+\boxed{ \sigma_A^2(\tau) = \frac12 E [ (\bar y_{k+1}-\bar y_k)^2 ]. }
+  \]
+
+  <p>
+    The Allan deviation is
+  </p>
+
+  \[
+\boxed{ \sigma_A(\tau) = \sqrt{\sigma_A^2(\tau)}. }
+  \]
+
+  <p>
+    Plotting
+  </p>
+
+  \[
+\log\sigma_A \quad\text{against}\quad \log\tau
+  \]
+
+  <p>
+    reveals different stochastic regimes.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.35 INTERPRETING AN ALLAN-DEVIATION PLOT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.35 Interpreting an Allan-Deviation Plot</h3>
+
+
+  <p>
+    Different slope regions may correspond to different processes such as:
+  </p>
+
+  <ul>
+
+    <li>quantisation noise,</li>
+
+    <li>white noise,</li>
+
+    <li>bias instability,</li>
+
+    <li>random walk,</li>
+
+    <li>rate ramp.</li>
+
+  </ul>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Time-Series Data} \rightarrow \text{Allan Deviation} \rightarrow \text{Noise Identification} \rightarrow \text{Stochastic Sensor Model}. }
+  \]
+
+  <p>
+    Coefficient extraction depends on the exact Allan-variance convention and units being used, so numerical conversion factors should be applied carefully.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.36 TEMPERATURE EFFECTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.36 Temperature Effects</h3>
+
+
+  <p>
+    Temperature affects nearly every spacecraft sensor.
+  </p>
+
+  <p>
+    A bias model can be written as
+  </p>
+
+  \[
+\boxed{ b(T) = b_0 + k_{b1}(T-T_0) + k_{b2}(T-T_0)^2 +\cdots. }
+  \]
+
+  <p>
+    Similarly,
+  </p>
+
+  \[
+s=s(T).
+  \]
+
+  <p>
+    A complete measurement may therefore be
+  </p>
+
+  \[
+\boxed{ z_m = [1+s(T)]z_{true} + b(T) + n. }
+  \]
+
+  <p>
+    Temperature effects may arise from:
+  </p>
+
+  <ul>
+
+    <li>electronics,</li>
+
+    <li>mechanical expansion,</li>
+
+    <li>refractive changes,</li>
+
+    <li>detector sensitivity,</li>
+
+    <li>oscillator drift,</li>
+
+    <li>structural alignment.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.37 THERMAL GRADIENT EFFECTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.37 Thermal Gradient Effects</h3>
+
+
+  <p>
+    Uniform temperature and thermal gradients are different problems.
+  </p>
+
+  <p>
+    A sensor may have acceptable bias stability at uniform temperature but experience alignment errors when different parts of the spacecraft structure are at different temperatures.
+  </p>
+
+  <p>
+    For precision attitude determination,
+  </p>
+
+  \[
+\boxed{ \text{Thermal Gradient} \rightarrow \text{Structural Deformation} \rightarrow \text{Sensor-to-Payload Misalignment}. }
+  \]
+
+  <p>
+    This is especially important for star trackers and precision payloads.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.38 AGEING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.38 Ageing</h3>
+
+
+  <p>
+    Sensor characteristics may change over mission life:
+  </p>
+
+  \[
+b=b(t_{life}), \qquad s=s(t_{life}).
+  \]
+
+  <p>
+    Ageing can affect:
+  </p>
+
+  <ul>
+
+    <li>electronics,</li>
+
+    <li>oscillators,</li>
+
+    <li>detector sensitivity,</li>
+
+    <li>magnetic materials,</li>
+
+    <li>optical components,</li>
+
+    <li>mechanical structures.</li>
+
+  </ul>
+
+  <p>
+    Long-duration missions may therefore require in-orbit recalibration.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.39 RADIATION EFFECTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.39 Radiation Effects</h3>
+
+
+  <p>
+    The space radiation environment can produce:
+  </p>
+
+  <ul>
+
+    <li>total ionizing dose effects,</li>
+
+    <li>displacement damage,</li>
+
+    <li>single-event effects,</li>
+
+    <li>detector hot pixels,</li>
+
+    <li>electronics drift,</li>
+
+    <li>memory corruption,</li>
+
+    <li>temporary sensor upset.</li>
+
+  </ul>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Radiation} \rightarrow \text{Sensor Parameter Drift / Transient Fault / Permanent Degradation}. }
+  \]
+
+  <p>
+    Radiation should therefore be considered both as an error source and as a reliability issue.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.40 VIBRATION AND MECHANICAL EFFECTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.40 Vibration and Mechanical Effects</h3>
+
+
+  <p>
+    Launch and on-orbit vibration can influence sensor measurements.
+  </p>
+
+  <p>
+    Sources include:
+  </p>
+
+  <ul>
+
+    <li>reaction wheels,</li>
+
+    <li>cryocoolers,</li>
+
+    <li>pumps,</li>
+
+    <li>mechanisms,</li>
+
+    <li>thruster firing,</li>
+
+    <li>structural modes.</li>
+
+  </ul>
+
+  <p>
+    A vibration signal may enter the sensor bandwidth and appear as real measurement content.
+  </p>
+
+  <p>
+    Thus,
+  </p>
+
+  \[
+\boxed{ \text{Mechanical Disturbance} \rightarrow \text{Sensor Motion} \rightarrow \text{Measured Disturbance}. }
+  \]
+
+  <p>
+    This is not always sensor noise—the sensor may be correctly measuring actual structural motion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.41 G-SENSITIVITY OF GYROSCOPES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.41 g-Sensitivity of Gyroscopes</h3>
+
+
+  <p>
+    Some gyroscopes exhibit sensitivity to linear acceleration:
+  </p>
+
+  \[
+\boxed{ \boldsymbol{\omega}_m = \boldsymbol{\omega} + K_g\mathbf a + \mathbf b_g + \mathbf n_g. }
+  \]
+
+  <p>
+    This may matter during:
+  </p>
+
+  <ul>
+
+    <li>launch,</li>
+
+    <li>thruster firing,</li>
+
+    <li>vibration,</li>
+
+    <li>high-acceleration maneuvers.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.42 LEVER-ARM EFFECTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.42 Lever-Arm Effects</h3>
+
+
+  <p>
+    A sensor mounted away from the spacecraft centre of mass experiences rotational acceleration.
+  </p>
+
+  <p>
+    For sensor offset \(\mathbf r\),
+  </p>
+
+  \[
+\boxed{ \mathbf a_s = \mathbf a_O + \dot{\boldsymbol\omega}\times\mathbf r + \boldsymbol\omega\times (\boldsymbol\omega\times\mathbf r) }
+  \]
+
+  <p>
+    for a rigid body-fixed sensor.
+  </p>
+
+  <p>
+    Therefore an accelerometer away from the reference point measures both translational and rotational effects.
+  </p>
+
+  <p>
+    GNSS antennas also require proper treatment of antenna location relative to the spacecraft reference point.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.43 ELECTROMAGNETIC INTERFERENCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.43 Electromagnetic Interference</h3>
+
+
+  <p>
+    Spacecraft electronics can interfere with sensors.
+  </p>
+
+  <p>
+    Potential sources include:
+  </p>
+
+  <ul>
+
+    <li>switching converters,</li>
+
+    <li>transmitters,</li>
+
+    <li>reaction-wheel electronics,</li>
+
+    <li>high-current cables,</li>
+
+    <li>magnetorquers,</li>
+
+    <li>digital buses.</li>
+
+  </ul>
+
+  <p>
+    Magnetometers are particularly sensitive.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \mathbf B_m = \mathbf B_{Earth} + \mathbf B_{spacecraft} + \mathbf n. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.44 OPTICAL CONTAMINATION AND STRAY LIGHT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.44 Optical Contamination and Stray Light</h3>
+
+
+  <p>
+    Optical sensors are affected by environmental optical errors.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>direct Sun,</li>
+
+    <li>Earth limb,</li>
+
+    <li>Moon,</li>
+
+    <li>Earth albedo,</li>
+
+    <li>spacecraft reflections,</li>
+
+    <li>contamination,</li>
+
+    <li>radiation-induced detector defects.</li>
+
+  </ul>
+
+  <p>
+    These effects apply particularly to:
+  </p>
+
+  <ul>
+
+    <li>star trackers,</li>
+
+    <li>Sun sensors,</li>
+
+    <li>cameras.</li>
+
+  </ul>
+
+  <p>
+    The measurement may become biased or completely invalid.
+  </p>
+
+  <p>
+    Therefore a realistic model requires a validity state, not merely increased Gaussian noise.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.45 GNSS-SPECIFIC ENVIRONMENTAL ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.45 GNSS-Specific Environmental Errors</h3>
+
+
+  <p>
+    GNSS contains several error sources that differ from conventional inertial sensors:
+  </p>
+
+  <ul>
+
+    <li>satellite orbit error,</li>
+
+    <li>satellite clock error,</li>
+
+    <li>receiver clock error,</li>
+
+    <li>propagation effects,</li>
+
+    <li>multipath,</li>
+
+    <li>antenna phase-centre variation,</li>
+
+    <li>RF interference,</li>
+
+    <li>geometry,</li>
+
+    <li>tracking error,</li>
+
+    <li>cycle slips.</li>
+
+  </ul>
+
+  <p>
+    Thus GNSS error cannot generally be represented only by
+  </p>
+
+  \[
+\mathbf r_m=\mathbf r+\mathbf n.
+  \]
+
+  <p>
+    That simple model is appropriate only at solution-level simulation fidelity.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.46 SAMPLING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.46 Sampling</h3>
+
+
+  <p>
+    Digital sensors provide measurements at discrete times:
+  </p>
+
+  \[
+\boxed{ t_k=kT_s. }
+  \]
+
+  <p>
+    The sampled measurement is
+  </p>
+
+  \[
+z[k]=z(t_k).
+  \]
+
+  <p>
+    Sampling introduces important GNC considerations:
+  </p>
+
+  <ul>
+
+    <li>update rate,</li>
+
+    <li>synchronization,</li>
+
+    <li>aliasing,</li>
+
+    <li>latency,</li>
+
+    <li>missed samples.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.47 ALIASING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.47 Aliasing</h3>
+
+
+  <p>
+    If the sampling frequency is insufficient, high-frequency signal content can appear as false lower-frequency content.
+  </p>
+
+  <p>
+    The Nyquist condition for a band-limited signal is
+  </p>
+
+  \[
+\boxed{ f_s>2f_{max}. }
+  \]
+
+  <p>
+    In practice, anti-aliasing filters are normally required before sampling.
+  </p>
+
+  <p>
+    Aliasing is especially important when spacecraft vibration frequencies overlap sensor bandwidth.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.48 SENSOR BANDWIDTH -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.48 Sensor Bandwidth</h3>
+
+
+  <p>
+    A real sensor cannot respond instantaneously.
+  </p>
+
+  <p>
+    A simple first-order model is
+  </p>
+
+  \[
+\boxed{ G(s)=\frac{1}{\tau s+1}. }
+  \]
+
+  <p>
+    The cutoff frequency is approximately
+  </p>
+
+  \[
+\boxed{ f_c=\frac{1}{2\pi\tau}. }
+  \]
+
+  <p>
+    Bandwidth affects:
+  </p>
+
+  <ul>
+
+    <li>dynamic tracking,</li>
+
+    <li>phase lag,</li>
+
+    <li>noise,</li>
+
+    <li>control-loop interaction.</li>
+
+  </ul>
+
+  <p>
+    A higher bandwidth is not automatically better because it can also admit more noise.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.49 LATENCY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.49 Latency</h3>
+
+
+  <p>
+    A sensor measurement may correspond to an earlier physical state.
+  </p>
+
+  \[
+\boxed{ z_m(t)=h[x(t-\tau)]+n(t). }
+  \]
+
+  <p>
+    For a rotating spacecraft, attitude error caused by timing error is approximately
+  </p>
+
+  \[
+\boxed{ \delta\boldsymbol\theta \approx \boldsymbol\omega\,\delta t. }
+  \]
+
+  <p>
+    Latency therefore becomes increasingly important during fast maneuvers.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.50 LATENCY VS TIMESTAMP ERROR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.50 Latency vs Timestamp Error</h3>
+
+
+  <p>
+    These should be distinguished.
+  </p>
+
+  <h4>Known latency</h4>
+
+  <p>
+    If
+  </p>
+
+  \[
+\tau
+  \]
+
+  <p>
+    is known accurately, the estimator can often compensate for it.
+  </p>
+
+  <h4>Timestamp error</h4>
+
+  <p>
+    If the measurement epoch itself is uncertain,
+  </p>
+
+  \[
+\delta t\neq0,
+  \]
+
+  <p>
+    the measurement is associated with the wrong spacecraft state.
+  </p>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \text{Known Latency} \neq \text{Timing Uncertainty}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.51 SAMPLING JITTER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.51 Sampling Jitter</h3>
+
+
+  <p>
+    The actual sample time may differ from its nominal value:
+  </p>
+
+  \[
+\boxed{ t_k=kT_s+\delta t_k. }
+  \]
+
+  <p>
+    For rapidly changing signals,
+  </p>
+
+  \[
+\delta z \approx \dot z\,\delta t.
+  \]
+
+  <p>
+    Sampling jitter can therefore become a measurable sensor error.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.52 SYNCHRONIZATION ERROR BETWEEN SENSORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.52 Synchronization Error Between Sensors</h3>
+
+
+  <p>
+    Sensor fusion assumes measurements are associated with consistent epochs.
+  </p>
+
+  <p>
+    Suppose
+  </p>
+
+  \[
+z_1=z_1(t)
+  \]
+
+  <p>
+    but
+  </p>
+
+  \[
+z_2=z_2(t-\Delta t).
+  \]
+
+  <p>
+    Directly combining them as simultaneous measurements introduces inconsistency.
+  </p>
+
+  <p>
+    This matters for:
+  </p>
+
+  <ul>
+
+    <li>GNSS + IMU,</li>
+
+    <li>gyro + star tracker,</li>
+
+    <li>camera + LiDAR,</li>
+
+    <li>differential GNSS between spacecraft.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.53 DROPOUT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.53 Dropout</h3>
+
+
+  <p>
+    Sensors do not always provide measurements.
+  </p>
+
+  <p>
+    Define
+  </p>
+
+  \[
+\boxed{ valid_k\in\{0,1\}. }
+  \]
+
+  <p>
+    Then
+  </p>
+
+  \[
+valid_k=0
+  \]
+
+  <p>
+    means the measurement should not be used.
+  </p>
+
+  <p>
+    Dropout can arise from:
+  </p>
+
+  <ul>
+
+    <li>star-tracker blinding,</li>
+
+    <li>Sun-sensor eclipse,</li>
+
+    <li>GNSS outage,</li>
+
+    <li>communication failure,</li>
+
+    <li>sensor reset,</li>
+
+    <li>invalid signal quality.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.54 OUTLIERS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.54 Outliers</h3>
+
+
+  <p>
+    Not every erroneous measurement follows a Gaussian distribution.
+  </p>
+
+  <p>
+    An outlier may be represented conceptually as
+  </p>
+
+  \[
+\boxed{ z_m=z_{true}+n+o }
+  \]
+
+  <p>
+    where \(o\) is a large occasional error.
+  </p>
+
+  <p>
+    Sources include:
+  </p>
+
+  <ul>
+
+    <li>false star identification,</li>
+
+    <li>GNSS multipath,</li>
+
+    <li>cycle slip,</li>
+
+    <li>detector artifact,</li>
+
+    <li>packet corruption.</li>
+
+  </ul>
+
+  <p>
+    Outliers require robust validation rather than merely increasing \(R\).
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.55 STUCK MEASUREMENTS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.55 Stuck Measurements</h3>
+
+
+  <p>
+    A sensor can fail while continuing to output a plausible-looking constant value:
+  </p>
+
+  \[
+\boxed{ z_k=z_{k-1}. }
+  \]
+
+  <p>
+    A simple range check may not detect such a fault.
+  </p>
+
+  <p>
+    Detection may require:
+  </p>
+
+  <ul>
+
+    <li>rate-of-change checks,</li>
+
+    <li>comparison with predicted dynamics,</li>
+
+    <li>redundant sensors,</li>
+
+    <li>innovation monitoring.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.56 SPIKE ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.56 Spike Errors</h3>
+
+
+  <p>
+    A transient sensor fault may produce
+  </p>
+
+  \[
+z_k=z_{true,k}+A_{spike}.
+  \]
+
+  <p>
+    Spike detection can use:
+  </p>
+
+  <ul>
+
+    <li>thresholding,</li>
+
+    <li>innovation gates,</li>
+
+    <li>temporal consistency,</li>
+
+    <li>median filtering where appropriate.</li>
+
+  </ul>
+
+  <p>
+    Care is needed not to reject genuine rapid spacecraft motion.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.57 NOISE VS FAULT -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.57 Noise vs Fault</h3>
+
+
+  <p>
+    A fundamental distinction is
+  </p>
+
+  \[
+\boxed{ \text{Expected Random Variation} \neq \text{Sensor Fault}. }
+  \]
+
+  <p>
+    Noise belongs within the expected statistical measurement model.
+  </p>
+
+  <p>
+    Faults correspond to abnormal behaviour outside the assumed model.
+  </p>
+
+  <p>
+    The GNC architecture should distinguish these cases because the response is different.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.58 MEASUREMENT VALIDITY LOGIC -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.58 Measurement Validity Logic</h3>
+
+
+  <p>
+    A realistic sensor output should include more than a numerical value.
+  </p>
+
+  <p>
+    A measurement packet can contain
+  </p>
+
+  \[
+\boxed{ \mathcal Z = \{ \mathbf z,\, t,\, R,\, valid,\, quality,\, status \}. }
+  \]
+
+  <p>
+    This allows the estimator to know:
+  </p>
+
+  <ul>
+
+    <li>what was measured,</li>
+
+    <li>when it was measured,</li>
+
+    <li>its uncertainty,</li>
+
+    <li>whether it should be trusted.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.59 INNOVATION MONITORING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.59 Innovation Monitoring</h3>
+
+
+  <p>
+    For an estimator,
+  </p>
+
+  \[
+\boxed{ \mathbf y_k = \mathbf z_k - h(\hat{\mathbf x}_k^-) }
+  \]
+
+  <p>
+    is the innovation.
+  </p>
+
+  <p>
+    Its covariance is
+  </p>
+
+  \[
+\boxed{ S_k = H_kP_k^-H_k^T+R_k. }
+  \]
+
+  <p>
+    Large innovations may indicate:
+  </p>
+
+  <ul>
+
+    <li>bad measurements,</li>
+
+    <li>incorrect sensor covariance,</li>
+
+    <li>model error,</li>
+
+    <li>maneuver not represented in dynamics,</li>
+
+    <li>sensor fault.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.60 MAHALANOBIS GATING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.60 Mahalanobis Gating</h3>
+
+
+  <p>
+    A normalized innovation statistic is
+  </p>
+
+  \[
+\boxed{ d^2 = \mathbf y^TS^{-1}\mathbf y. }
+  \]
+
+  <p>
+    A measurement can be rejected when
+  </p>
+
+  \[
+\boxed{ d^2>\gamma }
+  \]
+
+  <p>
+    where \(\gamma\) is selected from an appropriate statistical threshold.
+  </p>
+
+  <p>
+    This is preferable to applying the same raw-error threshold to measurements with different covariance.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.61 RESIDUAL MONITORING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.61 Residual Monitoring</h3>
+
+
+  <p>
+    With redundant measurements, residuals can be formed between sensors.
+  </p>
+
+  <p>
+    For two sensors measuring the same quantity,
+  </p>
+
+  \[
+\boxed{ r=z_1-z_2. }
+  \]
+
+  <p>
+    A growing residual may indicate sensor degradation.
+  </p>
+
+  <p>
+    However, the expected residual covariance must include uncertainty from both sensors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.62 REDUNDANCY -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.62 Redundancy</h3>
+
+
+  <p>
+    Spacecraft often carry redundant sensors.
+  </p>
+
+  <p>
+    Possible configurations include:
+  </p>
+
+  <ul>
+
+    <li>cold redundancy,</li>
+
+    <li>warm redundancy,</li>
+
+    <li>hot redundancy,</li>
+
+    <li>multiple sensing heads,</li>
+
+    <li>dissimilar sensor redundancy.</li>
+
+  </ul>
+
+  <p>
+    Redundancy provides:
+  </p>
+
+  \[
+\boxed{ \text{Fault Detection} + \text{Fault Isolation} + \text{Continued Operation}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.63 COMMON-MODE ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.63 Common-Mode Errors</h3>
+
+
+  <p>
+    Redundant sensors do not guarantee independent errors.
+  </p>
+
+  <p>
+    If both sensors experience the same disturbance,
+  </p>
+
+  \[
+e_1\approx e_2,
+  \]
+
+  <p>
+    comparison may not reveal the problem.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  <ul>
+
+    <li>common temperature environment,</li>
+
+    <li>common structural deformation,</li>
+
+    <li>shared clock error,</li>
+
+    <li>shared GNSS propagation errors,</li>
+
+    <li>spacecraft magnetic contamination.</li>
+
+  </ul>
+
+  <p>
+    This is a major consideration in redundancy architecture.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.64 CORRELATED SENSOR ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.64 Correlated Sensor Errors</h3>
+
+
+  <p>
+    For two measurements,
+  </p>
+
+  \[
+E[e_1e_2^T] = P_{12}.
+  \]
+
+  <p>
+    If
+  </p>
+
+  \[
+P_{12}\neq0,
+  \]
+
+  <p>
+    their errors are correlated.
+  </p>
+
+  <p>
+    The combined covariance is therefore not simply diagonal.
+  </p>
+
+  <p>
+    Ignoring correlation can cause an estimator to become overconfident.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.65 CALIBRATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.65 Calibration</h3>
+
+
+  <p>
+    Calibration estimates parameters relating sensor output to the physical truth.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Known Reference} + \text{Sensor Measurement} \rightarrow \text{Parameter Estimation} \rightarrow \text{Calibration Model}. }
+  \]
+
+  <p>
+    Typical calibration parameters include:
+  </p>
+
+  <ul>
+
+    <li>bias,</li>
+
+    <li>scale factor,</li>
+
+    <li>axis alignment,</li>
+
+    <li>non-orthogonality,</li>
+
+    <li>temperature coefficients,</li>
+
+    <li>optical distortion,</li>
+
+    <li>antenna offset.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.66 ONE-POINT CALIBRATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.66 One-Point Calibration</h3>
+
+
+  <p>
+    A one-point calibration can estimate an offset.
+  </p>
+
+  <p>
+    If the reference value is \(z_{ref}\),
+  </p>
+
+  \[
+\boxed{ \hat b=z_m-z_{ref}. }
+  \]
+
+  <p>
+    This does not independently determine scale factor.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.67 TWO-POINT CALIBRATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.67 Two-Point Calibration</h3>
+
+
+  <p>
+    With two known inputs,
+  </p>
+
+  \[
+z_{ref,1},\qquad z_{ref,2},
+  \]
+
+  <p>
+    and outputs
+  </p>
+
+  \[
+z_{m,1},\qquad z_{m,2},
+  \]
+
+  <p>
+    a linear model
+  </p>
+
+  \[
+z_m=az+b
+  \]
+
+  <p>
+    can estimate both scale factor and offset.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.68 MULTI-POSITION CALIBRATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.68 Multi-Position Calibration</h3>
+
+
+  <p>
+    Three-axis inertial and magnetic sensors frequently require measurements in many orientations.
+  </p>
+
+  <p>
+    The calibration problem becomes
+  </p>
+
+  \[
+\boxed{ \min_{A,b} \sum_k \| \mathbf z_{m,k} - A\mathbf z_{ref,k} - \mathbf b \|^2. }
+  \]
+
+  <p>
+    This can estimate:
+  </p>
+
+  <ul>
+
+    <li>scale factors,</li>
+
+    <li>cross-axis terms,</li>
+
+    <li>bias,</li>
+
+    <li>alignment parameters.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.69 TEMPERATURE CALIBRATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.69 Temperature Calibration</h3>
+
+
+  <p>
+    Sensor parameters can be measured over a thermal range:
+  </p>
+
+  \[
+\boxed{ \{T_i,b_i,s_i\} \rightarrow b(T),s(T). }
+  \]
+
+  <p>
+    The flight software can then apply temperature compensation.
+  </p>
+
+  <p>
+    This requires an accurate sensor temperature measurement and an appropriate calibration model.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.70 GROUND CALIBRATION VS IN-ORBIT CALIBRATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.70 Ground Calibration vs In-Orbit Calibration</h3>
+
+
+  <h4>Ground calibration</h4>
+
+  <p>
+    Allows controlled reference inputs and environmental testing.
+  </p>
+
+  <h4>In-orbit calibration</h4>
+
+  <p>
+    Can account for:
+  </p>
+
+  <ul>
+
+    <li>launch shifts,</li>
+
+    <li>zero-g environment,</li>
+
+    <li>thermal conditions,</li>
+
+    <li>ageing,</li>
+
+    <li>structural alignment changes.</li>
+
+  </ul>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \text{Ground Calibration} + \text{In-Orbit Estimation} }
+  \]
+
+  <p>
+    is often more powerful than either alone.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.71 CALIBRATION RESIDUAL ERROR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.71 Calibration Residual Error</h3>
+
+
+  <p>
+    Calibration does not eliminate uncertainty completely.
+  </p>
+
+  <p>
+    If
+  </p>
+
+  \[
+\hat b=b+\delta b,
+  \]
+
+  <p>
+    then after correction,
+  </p>
+
+  \[
+z_{corr}=z_m-\hat b
+  \]
+
+  <p>
+    contains
+  </p>
+
+  \[
+-\delta b.
+  \]
+
+  <p>
+    Therefore calibration parameters themselves require uncertainty models.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.72 SENSOR ERROR STATES IN A KALMAN FILTER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.72 Sensor Error States in a Kalman Filter</h3>
+
+
+  <p>
+    Slowly varying errors can be estimated as states.
+  </p>
+
+  <p>
+    For an INS,
+  </p>
+
+  \[
+\boxed{ \delta\mathbf x = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \delta\boldsymbol\theta\\ \mathbf b_a\\ \mathbf b_g \end{bmatrix}. }
+  \]
+
+  <p>
+    Additional states may include:
+  </p>
+
+  <ul>
+
+    <li>scale factors,</li>
+
+    <li>clock bias,</li>
+
+    <li>clock drift,</li>
+
+    <li>alignment errors.</li>
+
+  </ul>
+
+  <p>
+    The appropriate state vector depends on mission requirements and observability.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.73 PROCESS NOISE VS MEASUREMENT NOISE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.73 Process Noise vs Measurement Noise</h3>
+
+
+  <p>
+    These are fundamentally different.
+  </p>
+
+  <h4>Process noise</h4>
+
+  <p>
+    Represents uncertainty in state evolution:
+  </p>
+
+  \[
+\boxed{ \mathbf x_{k+1} = f(\mathbf x_k)+\mathbf w_k }
+  \]
+
+  <p>
+    with
+  </p>
+
+  \[
+\mathbf w_k\sim\mathcal N(0,Q).
+  \]
+
+  <h4>Measurement noise</h4>
+
+  <p>
+    Represents uncertainty in sensor observations:
+  </p>
+
+  \[
+\boxed{ \mathbf z_k = h(\mathbf x_k)+\mathbf v_k }
+  \]
+
+  <p>
+    with
+  </p>
+
+  \[
+\mathbf v_k\sim\mathcal N(0,R).
+  \]
+
+  <p>
+    Thus,
+  </p>
+
+  \[
+\boxed{ Q\neq R. }
+  \]
+
+  <p>
+    Confusing the two produces incorrect filter tuning.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.74 OBSERVABILITY OF SENSOR ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.74 Observability of Sensor Errors</h3>
+
+
+  <p>
+    Including a bias state in an EKF does not guarantee that the filter can estimate it.
+  </p>
+
+  <p>
+    A parameter must influence measurements in a distinguishable way.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{State Included in Filter} \not\Rightarrow \text{State Observable}. }
+  \]
+
+  <p>
+    Observability depends on:
+  </p>
+
+  <ul>
+
+    <li>sensor combination,</li>
+
+    <li>spacecraft motion,</li>
+
+    <li>reference geometry,</li>
+
+    <li>measurement availability.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.75 ERROR PROPAGATION THROUGH INTEGRATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.75 Error Propagation Through Integration</h3>
+
+
+  <p>
+    Some sensor errors become increasingly severe because GNC algorithms integrate their measurements.
+  </p>
+
+  <p>
+    Gyro:
+  </p>
+
+  \[
+\boxed{ \delta\theta = \int\delta\omega\,dt. }
+  \]
+
+  <p>
+    Accelerometer:
+  </p>
+
+  \[
+\boxed{ \delta v = \int\delta a\,dt }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \delta r = \int\delta v\,dt. }
+  \]
+
+  <p>
+    This explains why inertial navigation requires external aiding.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.76 ATTITUDE ERROR COUPLING INTO ACCELERATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.76 Attitude Error Coupling into Acceleration</h3>
+
+
+  <p>
+    Accelerometer measurements must be transformed using the estimated attitude.
+  </p>
+
+  <p>
+    If the attitude estimate contains
+  </p>
+
+  \[
+\delta\boldsymbol\theta,
+  \]
+
+  <p>
+    then the transformed acceleration also contains error.
+  </p>
+
+  <p>
+    For a small attitude error,
+  </p>
+
+  \[
+\boxed{ \delta\mathbf a \approx -[\mathbf f\times] \delta\boldsymbol\theta }
+  \]
+
+  <p>
+    up to the adopted frame/error convention.
+  </p>
+
+  <p>
+    Thus gyro errors can indirectly produce position errors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.77 FRAME-TRANSFORMATION ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.77 Frame-Transformation Errors</h3>
+
+
+  <p>
+    Sensor measurements often require transformations:
+  </p>
+
+  \[
+\boxed{ \mathbf z^B = C_S^B\mathbf z^S. }
+  \]
+
+  <p>
+    If
+  </p>
+
+  \[
+C_S^B
+  \]
+
+  <p>
+    is uncertain, the transformed measurement contains additional error.
+  </p>
+
+  <p>
+    This applies to:
+  </p>
+
+  <ul>
+
+    <li>IMUs,</li>
+
+    <li>magnetometers,</li>
+
+    <li>Sun sensors,</li>
+
+    <li>star trackers,</li>
+
+    <li>GNSS antenna reference points.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.78 ERROR COVARIANCE TRANSFORMATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.78 Error Covariance Transformation</h3>
+
+
+  <p>
+    Suppose measurement covariance is known in frame \(A\):
+  </p>
+
+  \[
+P^A.
+  \]
+
+  <p>
+    After rotation into frame \(B\),
+  </p>
+
+  \[
+\boxed{ P^B = C_A^B P^A (C_A^B)^T. }
+  \]
+
+  <p>
+    Covariance must be transformed with the measurement.
+  </p>
+
+  <p>
+    Rotating the vector but leaving its covariance in the original frame is inconsistent.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.79 LINEAR ERROR PROPAGATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.79 Linear Error Propagation</h3>
+
+
+  <p>
+    For
+  </p>
+
+  \[
+\mathbf y=f(\mathbf x),
+  \]
+
+  <p>
+    small perturbations satisfy
+  </p>
+
+  \[
+\boxed{ \delta\mathbf y \approx J\delta\mathbf x }
+  \]
+
+  <p>
+    where
+  </p>
+
+  \[
+J=\frac{\partial f}{\partial\mathbf x}.
+  \]
+
+  <p>
+    Therefore covariance propagates as
+  </p>
+
+  \[
+\boxed{ P_y \approx JP_xJ^T. }
+  \]
+
+  <p>
+    This is one of the fundamental tools of GNC uncertainty analysis.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.80 ROOT-SUM-SQUARE ERROR BUDGET -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.80 Root-Sum-Square Error Budget</h3>
+
+
+  <p>
+    If scalar error contributors are independent,
+  </p>
+
+  \[
+\boxed{ \sigma_{total} = \sqrt{ \sigma_1^2+ \sigma_2^2+ \cdots+ \sigma_n^2 }. }
+  \]
+
+  <p>
+    This is commonly used in engineering error budgets.
+  </p>
+
+  <p>
+    However, RSS is not valid without modification when errors are correlated.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.81 COVARIANCE-BASED ERROR BUDGET -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.81 Covariance-Based Error Budget</h3>
+
+
+  <p>
+    For correlated vector errors,
+  </p>
+
+  \[
+\boxed{ P_{total} = \sum_iP_i + \sum_{i\neq j}P_{ij}. }
+  \]
+
+  <p>
+    This is more general than simply adding independent \(1\sigma\) values by RSS.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.82 1Σ, 2Σ AND 3Σ -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.82 1σ, 2σ and 3σ</h3>
+
+
+  <p>
+    For a one-dimensional Gaussian distribution,
+  </p>
+
+  \[
+x\sim\mathcal N(\mu,\sigma^2),
+  \]
+
+  <p>
+    the intervals
+  </p>
+
+  \[
+\mu\pm\sigma, \qquad \mu\pm2\sigma, \qquad \mu\pm3\sigma
+  \]
+
+  <p>
+    represent progressively larger probability regions.
+  </p>
+
+  <p>
+    However, the corresponding probabilities for multidimensional error ellipsoids are not identical to the one-dimensional interpretation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.83 RMS ERROR -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.83 RMS Error</h3>
+
+
+  <p>
+    Root-mean-square error is
+  </p>
+
+  \[
+\boxed{ RMSE = \sqrt{ \frac1N \sum_{k=1}^{N} (z_k-z_{true,k})^2 }. }
+  \]
+
+  <p>
+    RMSE combines bias and random variation.
+  </p>
+
+  <p>
+    For a scalar error with mean bias \(b\) and variance \(\sigma^2\),
+  </p>
+
+  \[
+\boxed{ RMSE^2=b^2+\sigma^2. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.84 MONTE CARLO SENSOR ERROR MODELLING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.84 Monte Carlo Sensor Error Modelling</h3>
+
+
+  <p>
+    Monte Carlo simulation is essential for evaluating combined sensor uncertainties.
+  </p>
+
+  <p>
+    For run \(j\), sample uncertain parameters such as
+  </p>
+
+  \[
+\boxed{ b^{(j)},\; s^{(j)},\; \delta\theta^{(j)},\; \sigma^{(j)},\; \tau^{(j)}. }
+  \]
+
+  <p>
+    Then simulate
+  </p>
+
+  \[
+\boxed{ \text{Truth} \rightarrow \text{Sensor Errors} \rightarrow \text{Estimator} \rightarrow \text{Guidance} \rightarrow \text{Controller} \rightarrow \text{Mission Outcome}. }
+  \]
+
+  <p>
+    This captures nonlinear interaction between errors that cannot always be understood from an analytical RSS budget.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.85 FIXED VS RUN-TO-RUN VS TIME-VARYING ERRORS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.85 Fixed vs Run-to-Run vs Time-Varying Errors</h3>
+
+
+  <p>
+    This distinction is critical in Monte Carlo simulation.
+  </p>
+
+  <h4>Fixed parameter</h4>
+
+  <p>
+    Constant for every simulation:
+  </p>
+
+  \[
+p=p_0.
+  \]
+
+  <h4>Run-to-run uncertainty</h4>
+
+  <p>
+    Randomly sampled once per Monte Carlo run:
+  </p>
+
+  \[
+p^{(j)}\sim\mathcal D_p.
+  \]
+
+  <p>
+    Examples:
+  </p>
+
+  <ul>
+
+    <li>mounting error,</li>
+
+    <li>initial bias,</li>
+
+    <li>calibration residual.</li>
+
+  </ul>
+
+  <h4>Time-varying uncertainty</h4>
+
+  <p>
+    Changes throughout a simulation:
+  </p>
+
+  \[
+p=p(t).
+  \]
+
+  <p>
+    Examples:
+  </p>
+
+  <ul>
+
+    <li>white noise,</li>
+
+    <li>bias drift,</li>
+
+    <li>dropout,</li>
+
+    <li>temperature.</li>
+
+  </ul>
+
+  <p>
+    These should not be modelled identically.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.86 WORST-CASE ANALYSIS VS MONTE CARLO -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.86 Worst-Case Analysis vs Monte Carlo</h3>
+
+
+  <p>
+    Worst-case analysis asks whether requirements remain satisfied under extreme parameter combinations.
+  </p>
+
+  <p>
+    Monte Carlo estimates statistical performance.
+  </p>
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\boxed{ \text{Worst Case} \neq \text{Monte Carlo}. }
+  \]
+
+  <p>
+    Both may be required for safety-critical spacecraft functions.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.87 SENSOR ERROR BUDGET -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.87 Sensor Error Budget</h3>
+
+
+  <p>
+    A complete sensor error budget can contain:
+  </p>
+
+  <div class="table-wrap">
+
+  <table>
+
+    <thead><tr>
+
+      <th>Error Source</th>
+
+      <th>Type</th>
+
+      <th>Typical Model</th>
+
+      <th>Calibration Possible?</th>
+
+      <th>Time Dependence</th>
+
+    </tr></thead>
+
+    <tbody>
+
+      <tr>
+
+        <td>Bias</td>
+
+        <td>Additive</td>
+
+        <td>\(b\)</td>
+
+        <td>Yes</td>
+
+        <td>Constant / varying</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Scale factor</td>
+
+        <td>Multiplicative</td>
+
+        <td>\(1+s\)</td>
+
+        <td>Yes</td>
+
+        <td>Slow</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Misalignment</td>
+
+        <td>Geometric</td>
+
+        <td>\(C\)</td>
+
+        <td>Yes</td>
+
+        <td>Slow</td>
+
+      </tr>
+
+      <tr>
+
+        <td>White noise</td>
+
+        <td>Stochastic</td>
+
+        <td>\(n\)</td>
+
+        <td>No</td>
+
+        <td>Fast</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Bias drift</td>
+
+        <td>Stochastic</td>
+
+        <td>\(b(t)\)</td>
+
+        <td>Partly</td>
+
+        <td>Slow</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Quantisation</td>
+
+        <td>Digital</td>
+
+        <td>\(Q(z)\)</td>
+
+        <td>No</td>
+
+        <td>Sample dependent</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Saturation</td>
+
+        <td>Nonlinear</td>
+
+        <td>\(\operatorname{sat}(z)\)</td>
+
+        <td>No</td>
+
+        <td>Input dependent</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Temperature</td>
+
+        <td>Environmental</td>
+
+        <td>\(b(T),s(T)\)</td>
+
+        <td>Often</td>
+
+        <td>Slow</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Latency</td>
+
+        <td>Timing</td>
+
+        <td>\(z(t-\tau)\)</td>
+
+        <td>Often</td>
+
+        <td>Fixed / varying</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Dropout</td>
+
+        <td>Availability</td>
+
+        <td>\(valid=0\)</td>
+
+        <td>No</td>
+
+        <td>Event dependent</td>
+
+      </tr>
+
+    </tbody>
+
+  </table>
+
+  </div>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.88 ERROR SOURCES BY SENSOR TYPE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.88 Error Sources by Sensor Type</h3>
+
+
+  <div class="table-wrap">
+
+  <table>
+
+    <thead><tr>
+
+      <th>Error Source</th>
+
+      <th>Gyro</th>
+
+      <th>Accelerometer</th>
+
+      <th>Magnetometer</th>
+
+      <th>Star Tracker</th>
+
+      <th>Sun Sensor</th>
+
+      <th>GNSS</th>
+
+    </tr></thead>
+
+    <tbody>
+
+      <tr>
+
+        <td>Bias</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Scale factor</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>—/limited</td>
+
+        <td>✓</td>
+
+        <td>—</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Misalignment</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+      </tr>
+
+      <tr>
+
+        <td>White noise</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Random walk</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>possible</td>
+
+        <td>—</td>
+
+        <td>—</td>
+
+        <td>clock/process dependent</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Temperature</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Quantisation</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Saturation</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>detector</td>
+
+        <td>detector</td>
+
+        <td>RF/tracking</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Environmental interference</td>
+
+        <td>vibration</td>
+
+        <td>vibration</td>
+
+        <td>magnetic</td>
+
+        <td>stray light</td>
+
+        <td>albedo/light</td>
+
+        <td>RF/multipath</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Dropout</td>
+
+        <td>possible</td>
+
+        <td>possible</td>
+
+        <td>possible</td>
+
+        <td>common</td>
+
+        <td>eclipse</td>
+
+        <td>visibility</td>
+
+      </tr>
+
+      <tr>
+
+        <td>Timing error</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>✓</td>
+
+        <td>critical</td>
+
+        <td>relevant</td>
+
+        <td>critical</td>
+
+      </tr>
+
+    </tbody>
+
+  </table>
+
+  </div>
+
+  <p>
+    The exact relevance and magnitude are sensor- and implementation-dependent.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.89 GYROSCOPE ERROR MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.89 Gyroscope Error Model</h3>
+
+
+  <p>
+    A useful complete model is
+  </p>
+
+  \[
+\boxed{ \boldsymbol\omega_m = (I+S_g+M_g)\boldsymbol\omega + \mathbf b_g + K_{ga}\mathbf a + \mathbf n_g. }
+  \]
+
+  <p>
+    with
+  </p>
+
+  \[
+\dot{\mathbf b}_g = -\frac1{\tau_g}\mathbf b_g + \mathbf w_{bg}
+  \]
+
+  <p>
+    or a random-walk model where appropriate.
+  </p>
+
+  <p>
+    Important gyro errors include:
+  </p>
+
+  <ul>
+
+    <li>bias,</li>
+
+    <li>angle random walk,</li>
+
+    <li>bias instability,</li>
+
+    <li>rate random walk,</li>
+
+    <li>scale factor,</li>
+
+    <li>non-orthogonality,</li>
+
+    <li>g-sensitivity,</li>
+
+    <li>temperature,</li>
+
+    <li>saturation.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.90 ACCELEROMETER ERROR MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.90 Accelerometer Error Model</h3>
+
+
+  <p>
+    A representative model is
+  </p>
+
+  \[
+\boxed{ \mathbf f_m = (I+S_a+M_a)\mathbf f + \mathbf b_a + \mathbf n_a. }
+  \]
+
+  <p>
+    Additional effects may include:
+  </p>
+
+  <ul>
+
+    <li>bias drift,</li>
+
+    <li>vibration,</li>
+
+    <li>temperature,</li>
+
+    <li>nonlinearity,</li>
+
+    <li>cross-axis sensitivity,</li>
+
+    <li>saturation,</li>
+
+    <li>lever arm.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.91 MAGNETOMETER ERROR MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.91 Magnetometer Error Model</h3>
+
+
+  <p>
+    A representative model is
+  </p>
+
+  \[
+\boxed{ \mathbf B_m = A_m\mathbf B_{true} + \mathbf b_h + \mathbf B_{spacecraft} + \mathbf n_m. }
+  \]
+
+  <p>
+    where \(A_m\) can represent soft-iron, scale-factor and alignment effects, while \(\mathbf b_h\) represents hard-iron offset.
+  </p>
+
+  <p>
+    Magnetic contamination is often as important as the intrinsic sensor error.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.92 STAR-TRACKER ERROR MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.92 Star-Tracker Error Model</h3>
+
+
+  <p>
+    A high-level model is
+  </p>
+
+  \[
+\boxed{ q_m = \delta q_{err} \otimes q_{true}(t-\tau). }
+  \]
+
+  <p>
+    The error quaternion can contain contributions from:
+  </p>
+
+  <ul>
+
+    <li>centroiding,</li>
+
+    <li>catalogue uncertainty,</li>
+
+    <li>optics,</li>
+
+    <li>alignment,</li>
+
+    <li>thermal deformation,</li>
+
+    <li>timing,</li>
+
+    <li>motion blur,</li>
+
+    <li>processing.</li>
+
+  </ul>
+
+  <p>
+    A validity flag should represent blinding and loss of tracking.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.93 SUN-SENSOR ERROR MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.93 Sun-Sensor Error Model</h3>
+
+
+  <p>
+    For a vector-level Sun sensor,
+  </p>
+
+  \[
+\boxed{ \mathbf s_m = C_{err}\mathbf s_{true} + \mathbf b_s + \mathbf n_s. }
+  \]
+
+  <p>
+    For photodiode-based coarse Sun sensors, errors can additionally arise from:
+  </p>
+
+  <ul>
+
+    <li>cosine-response deviation,</li>
+
+    <li>scale-factor mismatch,</li>
+
+    <li>albedo,</li>
+
+    <li>shadowing,</li>
+
+    <li>saturation,</li>
+
+    <li>temperature,</li>
+
+    <li>dark current.</li>
+
+  </ul>
+
+  <p>
+    During eclipse,
+  </p>
+
+  \[
+\boxed{ valid_{Sun}=0. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.94 GNSS ERROR MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.94 GNSS Error Model</h3>
+
+
+  <p>
+    At solution level,
+  </p>
+
+  \[
+\boxed{ \mathbf r_m = \mathbf r + \mathbf b_r + \mathbf n_r }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \mathbf v_m = \mathbf v + \mathbf b_v + \mathbf n_v. }
+  \]
+
+  <p>
+    At raw-observable level,
+  </p>
+
+  \[
+\boxed{ \rho_i = R_i + c(\delta t_r-\delta t_i) + I_i+T_i + \Delta\rho_{orbit} + \Delta\rho_{mp} + b_i + n_i. }
+  \]
+
+  <p>
+    For spacecraft applications, geometry, antenna orientation, timing and signal availability are essential components of the error model.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.95 SENSOR ERROR AND CONTROL-SYSTEM PERFORMANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.95 Sensor Error and Control-System Performance</h3>
+
+
+  <p>
+    Measurement noise enters the feedback loop.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Sensor Noise} \rightarrow \text{Estimated State Noise} \rightarrow \text{Control Command Variation} \rightarrow \text{Actuator Activity}. }
+  \]
+
+  <p>
+    Excessive sensor noise may therefore increase:
+  </p>
+
+  <ul>
+
+    <li>reaction-wheel activity,</li>
+
+    <li>thruster firing,</li>
+
+    <li>propellant consumption,</li>
+
+    <li>jitter.</li>
+
+  </ul>
+
+  <p>
+    Filtering must balance noise rejection against latency and dynamic response.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.96 SENSOR ERROR AND GUIDANCE PERFORMANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.96 Sensor Error and Guidance Performance</h3>
+
+
+  <p>
+    Guidance operates on estimated states rather than truth.
+  </p>
+
+  \[
+\boxed{ \hat{\mathbf x} = \mathbf x + \delta\mathbf x. }
+  \]
+
+  <p>
+    Therefore,
+  </p>
+
+  \[
+\mathbf u_G = G(\hat{\mathbf x})
+  \]
+
+  <p>
+    differs from the ideal guidance command.
+  </p>
+
+  <p>
+    For RPO, relative-navigation uncertainty affects:
+  </p>
+
+  <ul>
+
+    <li>approach corridor,</li>
+
+    <li>braking,</li>
+
+    <li>hold-point detection,</li>
+
+    <li>collision avoidance,</li>
+
+    <li>capture readiness.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.97 SENSOR ERROR AND AUTONOMOUS MODE LOGIC -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.97 Sensor Error and Autonomous Mode Logic</h3>
+
+
+  <p>
+    Sensor errors also influence discrete spacecraft decisions.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  \[
+\boxed{ \text{Sun Detected?} }
+  \]
+
+  \[
+\boxed{ \text{Star Tracker Valid?} }
+  \]
+
+  \[
+\boxed{ \text{GNSS Fix Valid?} }
+  \]
+
+  \[
+\boxed{ \text{Capture Conditions Satisfied?} }
+  \]
+
+  <p>
+    Thus sensor uncertainty affects not only continuous estimation but also spacecraft state-machine transitions.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.98 REQUIREMENT ALLOCATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.98 Requirement Allocation</h3>
+
+
+  <p>
+    Mission-level performance requirements should be flowed down to sensor requirements.
+  </p>
+
+  <p>
+    Conceptually,
+  </p>
+
+  \[
+\boxed{ \text{Mission Requirement} \rightarrow \text{GNC Requirement} \rightarrow \text{Navigation Error Budget} \rightarrow \text{Sensor Requirement}. }
+  \]
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\sigma_{position,mission}
+  \]
+
+  <p>
+    may be allocated among:
+  </p>
+
+  <ul>
+
+    <li>GNSS,</li>
+
+    <li>IMU,</li>
+
+    <li>timing,</li>
+
+    <li>alignment,</li>
+
+    <li>estimator,</li>
+
+    <li>modelling errors.</li>
+
+  </ul>
+
+  <p>
+    Sensor selection should therefore begin from system requirements rather than datasheet comparison alone.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.99 CALIBRATION VS ESTIMATION VS FILTERING -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.99 Calibration vs Estimation vs Filtering</h3>
+
+
+  <p>
+    These terms solve different problems.
+  </p>
+
+  <h4>Calibration</h4>
+
+  <p>
+    Determines systematic sensor parameters.
+  </p>
+
+  \[
+\boxed{ \text{Calibration} \rightarrow b,S,M,\ldots }
+  \]
+
+  <h4>Estimation</h4>
+
+  <p>
+    Determines unknown spacecraft states and sometimes sensor errors.
+  </p>
+
+  \[
+\boxed{ \text{Estimator} \rightarrow \hat x,\hat b,\ldots }
+  \]
+
+  <h4>Filtering</h4>
+
+  <p>
+    Reduces unwanted measurement variation and estimates state using models and measurements.
+  </p>
+
+  <p>
+    They complement one another.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.100 ERROR MITIGATION STRATEGIES -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.100 Error Mitigation Strategies</h3>
+
+
+  <p>
+    Sensor errors can be addressed using several mechanisms:
+  </p>
+
+  <ol>
+
+    <li>better sensor hardware,</li>
+
+    <li>mechanical/thermal design,</li>
+
+    <li>careful placement,</li>
+
+    <li>electromagnetic cleanliness,</li>
+
+    <li>preflight calibration,</li>
+
+    <li>temperature compensation,</li>
+
+    <li>in-orbit calibration,</li>
+
+    <li>filtering,</li>
+
+    <li>sensor fusion,</li>
+
+    <li>bias estimation,</li>
+
+    <li>redundancy,</li>
+
+    <li>FDIR,</li>
+
+    <li>measurement gating,</li>
+
+    <li>adaptive covariance,</li>
+
+    <li>operational constraints.</li>
+
+  </ol>
+
+  <p>
+    No single technique removes all sensor errors.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.101 SENSOR ERROR SIMULATION ARCHITECTURE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.101 Sensor Error Simulation Architecture</h3>
+
+
+  <p>
+    A useful generic simulation chain is
+  </p>
+
+  <pre>
+Truth State
+    |
+    v
+Ideal Measurement h(x)
+    |
+    v
+Frame Transformation
+    |
+    v
+Scale Factor
+    |
+    v
+Misalignment / Cross-Axis Error
+    |
+    v
+Nonlinearity
+    |
+    v
+Bias
+    |
+    v
+Bias Drift
+    |
+    v
+Environmental Effects
+    |
+    v
+White / Coloured Noise
+    |
+    v
+Bandwidth / Sensor Dynamics
+    |
+    v
+Saturation
+    |
+    v
+Quantisation
+    |
+    v
+Sampling
+    |
+    v
+Latency / Timestamp
+    |
+    v
+Dropout / Fault Logic
+    |
+    v
+Measurement + Covariance + Validity
+    |
+    v
+Navigation Filter
+  </pre>
+
+  <p>
+    The exact ordering should reflect the physics of the particular sensor; this chain is a modelling framework rather than a universal physical sequence.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.102 SIMULINK IMPLEMENTATION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.102 Simulink Implementation</h3>
+
+
+  <p>
+    A reusable Simulink sensor-error subsystem can contain:
+  </p>
+
+  <pre>
+Truth Signal
+     |
+     v
+Coordinate Transform
+     |
+     v
+Calibration Matrix
+     |
+     +------ Bias
+     |
+     +------ Bias Drift
+     |
+     +------ Temperature Model
+     |
+     +------ Noise
+     |
+     v
+Sensor Dynamics
+     |
+     v
+Saturation
+     |
+     v
+Quantizer
+     |
+     v
+Zero-Order Hold
+     |
+     v
+Transport Delay
+     |
+     v
+Validity / Fault Logic
+     |
+     v
+Sensor Output
+  </pre>
+
+  <p>
+    Outputs should ideally include
+  </p>
+
+  \[
+\boxed{ \mathbf z_m,\quad R,\quad t_m,\quad valid,\quad status. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.103 LOW-, MEDIUM- AND HIGH-FIDELITY MODELS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.103 Low-, Medium- and High-Fidelity Models</h3>
+
+
+  <h4>Level 1 — Simple Measurement Model</h4>
+
+  \[
+\boxed{ z_m=z_{true}+b+n. }
+  \]
+
+  <p>
+    Suitable for early controller development.
+  </p>
+
+  <h4>Level 2 — Engineering Sensor Model</h4>
+
+  \[
+\boxed{ \mathbf z_m = (I+S+M)\mathbf z_{true} + \mathbf b(t,T) + \mathbf n. }
+  \]
+
+  <p>
+    Add:
+  </p>
+
+  <ul>
+
+    <li>saturation,</li>
+
+    <li>quantisation,</li>
+
+    <li>sampling,</li>
+
+    <li>latency,</li>
+
+    <li>dropout.</li>
+
+  </ul>
+
+  <p>
+    Suitable for GNC design and Monte Carlo analysis.
+  </p>
+
+  <h4>Level 3 — Physics-Based Sensor Model</h4>
+
+  <p>
+    Model:
+  </p>
+
+  <ul>
+
+    <li>sensing physics,</li>
+
+    <li>environment,</li>
+
+    <li>spacecraft geometry,</li>
+
+    <li>electronics,</li>
+
+    <li>signal processing,</li>
+
+    <li>acquisition/tracking,</li>
+
+    <li>detailed failure mechanisms.</li>
+
+  </ul>
+
+  <p>
+    Suitable for high-fidelity SIL/HIL and verification.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.104 SENSOR DATASHEET PARAMETERS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.104 Sensor Datasheet Parameters</h3>
+
+
+  <p>
+    When reading a datasheet, do not look only at “accuracy.”
+  </p>
+
+  <p>
+    Important parameters include:
+  </p>
+
+  <ul>
+
+    <li>measurement range,</li>
+
+    <li>resolution,</li>
+
+    <li>bias,</li>
+
+    <li>bias repeatability,</li>
+
+    <li>bias stability,</li>
+
+    <li>noise density,</li>
+
+    <li>random walk,</li>
+
+    <li>scale-factor error,</li>
+
+    <li>scale-factor stability,</li>
+
+    <li>nonlinearity,</li>
+
+    <li>cross-axis sensitivity,</li>
+
+    <li>alignment accuracy,</li>
+
+    <li>bandwidth,</li>
+
+    <li>update rate,</li>
+
+    <li>latency,</li>
+
+    <li>temperature range,</li>
+
+    <li>thermal coefficients,</li>
+
+    <li>radiation tolerance,</li>
+
+    <li>vibration/shock qualification,</li>
+
+    <li>power,</li>
+
+    <li>mass,</li>
+
+    <li>interface,</li>
+
+    <li>calibration information.</li>
+
+  </ul>
+
+  <p>
+    Sensor-specific pages then add parameters such as star-tracker exclusion angles or GNSS signal/tracking capabilities.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.105 DATASHEET VALUE VS SIMULATION PARAMETER -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.105 Datasheet Value vs Simulation Parameter</h3>
+
+
+  <p>
+    A datasheet specification is not always directly usable as a simulation standard deviation.
+  </p>
+
+  <p>
+    For example,
+  </p>
+
+  \[
+\boxed{ \text{Noise Density} \neq \text{Per-Sample }\sigma }
+  \]
+
+  <p>
+    without knowing bandwidth and convention.
+  </p>
+
+  <p>
+    Similarly,
+  </p>
+
+  \[
+\boxed{ \text{Maximum Error} \neq 1\sigma. }
+  \]
+
+  <p>
+    And
+  </p>
+
+  \[
+\boxed{ \text{Bias Stability} \neq \text{Constant Bias}. }
+  \]
+
+  <p>
+    The statistical meaning of each specification must be understood before using it in Monte Carlo simulation.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.106 UNITS AND CONVERSIONS -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.106 Units and Conversions</h3>
+
+
+  <p>
+    Sensor error modelling is especially vulnerable to unit mistakes.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  \[
+^\circ/s \leftrightarrow rad/s
+  \]
+
+  \[
+\mu g \leftrightarrow m/s^2
+  \]
+
+  \[
+nT \leftrightarrow T
+  \]
+
+  \[
+arcsec \leftrightarrow rad.
+  \]
+
+  <p>
+    For angular conversion,
+  </p>
+
+  \[
+\boxed{ 1^\circ=\frac{\pi}{180}\;rad }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ 1\;arcsec = \frac{\pi}{180\times3600}\;rad. }
+  \]
+
+  <p>
+    Every simulation parameter should therefore carry an explicit unit.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.107 ERROR CORRELATION TIME -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.107 Error Correlation Time</h3>
+
+
+  <p>
+    The magnitude of an error is not enough to characterize it.
+  </p>
+
+  <p>
+    Two noise processes may have the same RMS but very different time behaviour.
+  </p>
+
+  <p>
+    Thus a stochastic model may require both
+  </p>
+
+  \[
+\boxed{ \sigma }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ \tau_c }
+  \]
+
+  <p>
+    where \(\tau_c\) is correlation time.
+  </p>
+
+  <p>
+    This strongly affects estimator performance.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.108 SENSOR ERROR STATE MACHINE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.108 Sensor Error State Machine</h3>
+
+
+  <p>
+    Some sensor errors are mode-dependent.
+  </p>
+
+  <p>
+    A sensor can transition through
+  </p>
+
+  \[
+\boxed{ \text{OFF} \rightarrow \text{INITIALIZING} \rightarrow \text{ACQUIRING} \rightarrow \text{VALID} \rightarrow \text{DEGRADED} \rightarrow \text{FAILED}. }
+  \]
+
+  <p>
+    Examples:
+  </p>
+
+  <ul>
+
+    <li>star tracker acquiring stars,</li>
+
+    <li>GNSS waiting for fix,</li>
+
+    <li>Sun sensor entering eclipse,</li>
+
+    <li>sensor recovering after reset.</li>
+
+  </ul>
+
+  <p>
+    This is often more realistic than assuming continuous availability.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.109 ADAPTIVE MEASUREMENT COVARIANCE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.109 Adaptive Measurement Covariance</h3>
+
+
+  <p>
+    Sensor quality can change with operating conditions.
+  </p>
+
+  <p>
+    Instead of constant
+  </p>
+
+  \[
+R=R_0,
+  \]
+
+  <p>
+    use
+  </p>
+
+  \[
+\boxed{ R=R(\text{quality},\text{geometry},\text{environment}). }
+  \]
+
+  <p>
+    Examples:
+  </p>
+
+  <ul>
+
+    <li>GNSS covariance increases with poor geometry,</li>
+
+    <li>star-tracker covariance may increase during high slew,</li>
+
+    <li>Sun-sensor accuracy may degrade near FOV limits.</li>
+
+  </ul>
+
+  <p>
+    This allows the estimator to weight measurements according to their actual quality.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.110 SENSOR FAULT INJECTION -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.110 Sensor Fault Injection</h3>
+
+
+  <p>
+    Verification should deliberately inject faults.
+  </p>
+
+  <p>
+    Examples include:
+  </p>
+
+  \[
+b\rightarrow b+\Delta b
+  \]
+
+  \[
+s\rightarrow s+\Delta s
+  \]
+
+  \[
+valid\rightarrow0
+  \]
+
+  \[
+z\rightarrow z_{stuck}
+  \]
+
+  \[
+z\rightarrow z+A_{spike}
+  \]
+
+  \[
+\tau\rightarrow\tau+\Delta\tau.
+  \]
+
+  <p>
+    This allows verification of:
+  </p>
+
+  <ul>
+
+    <li>estimator robustness,</li>
+
+    <li>FDIR,</li>
+
+    <li>safe mode,</li>
+
+    <li>abort logic,</li>
+
+    <li>redundancy switching.</li>
+
+  </ul>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.111 VERIFICATION AGAINST TRUTH -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.111 Verification Against Truth</h3>
+
+
+  <p>
+    Simulation provides access to truth.
+  </p>
+
+  <p>
+    Therefore measurement error can be calculated as
+  </p>
+
+  \[
+\boxed{ \mathbf e_k = \mathbf z_{m,k} - \mathbf z_{true,k}. }
+  \]
+
+  <p>
+    Useful statistics include:
+  </p>
+
+  \[
+\bar{\mathbf e},
+  \]
+
+  \[
+\sigma_e,
+  \]
+
+  \[
+RMSE,
+  \]
+
+  \[
+e_{max},
+  \]
+
+  <p>
+    and error PSD/Allan deviation where appropriate.
+  </p>
+
+  <p>
+    Estimator consistency can additionally be evaluated using covariance-normalized metrics.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.112 SENSOR ERROR BUDGET TO NAVIGATION ERROR BUDGET -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.112 Sensor Error Budget to Navigation Error Budget</h3>
+
+
+  <p>
+    Individual sensor specifications are not the final engineering objective.
+  </p>
+
+  <p>
+    The important chain is
+  </p>
+
+  \[
+\boxed{ \text{Sensor Errors} }
+  \]
+
+  \[
+\downarrow
+  \]
+
+  \[
+\boxed{ \text{Measurement Covariance} }
+  \]
+
+  \[
+\downarrow
+  \]
+
+  \[
+\boxed{ \text{Navigation State Covariance} }
+  \]
+
+  \[
+\downarrow
+  \]
+
+  \[
+\boxed{ \text{Guidance / Control Uncertainty} }
+  \]
+
+  \[
+\downarrow
+  \]
+
+  \[
+\boxed{ \text{Mission Performance}. }
+  \]
+
+  <p>
+    This is the connection between sensor engineering and spacecraft GNC.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.113 COMPLETE GENERALIZED SENSOR MODEL -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.113 Complete Generalized Sensor Model</h3>
+
+
+  <p>
+    A useful high-level model combining the major error classes is
+  </p>
+
+  \[
+\boxed{ \begin{aligned} \mathbf z_m(t_k) ={}& \mathcal Q \Big[ \mathcal D \big( A(T,t)\, C_{B}^{S}(t)\, h[\mathbf x(t_k-\tau)] \\ &+ \mathbf b(T,t) + \mathbf e_{env}(t) + \mathbf e_{dyn}(t) + \mathbf n(t) \big) \Big] \end{aligned} }
+  \]
+
+  <p>
+    subject to
+  </p>
+
+  \[
+\boxed{ z_{min}\le z_m\le z_{max} }
+  \]
+
+  <p>
+    and
+  </p>
+
+  \[
+\boxed{ valid_k\in\{0,1\}. }
+  \]
+
+  <p>
+    Here:
+  </p>
+
+  <ul>
+
+    <li>\(h(\mathbf x)\) generates the ideal physical measurement,</li>
+
+    <li>\(C_B^S\) represents sensor installation/frame transformation,</li>
+
+    <li>\(A\) represents scale factor, non-orthogonality and cross-axis effects,</li>
+
+    <li>\(\mathbf b\) represents bias,</li>
+
+    <li>\(\mathbf e_{env}\) represents environmental errors,</li>
+
+    <li>\(\mathbf e_{dyn}\) represents dynamic response effects,</li>
+
+    <li>\(\mathbf n\) represents stochastic noise,</li>
+
+    <li>\(\mathcal D\) represents sensor dynamics/sampling,</li>
+
+    <li>\(\mathcal Q\) represents quantisation.</li>
+
+  </ul>
+
+  <p>
+    Not every sensor requires every term.
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.114 COMPLETE ERROR-MANAGEMENT CHAIN -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.114 Complete Error-Management Chain</h3>
+
+
+  <p>
+    At spacecraft-system level:
+  </p>
+
+  \[
+\boxed{ \text{Sensor Physics} \rightarrow \text{Error Characterization} \rightarrow \text{Calibration} \rightarrow \text{Measurement Model} }
+  \]
+
+  \[
+\downarrow
+  \]
+
+  \[
+\boxed{ \text{Covariance Modelling} \rightarrow \text{Sensor Fusion} \rightarrow \text{Innovation Monitoring} }
+  \]
+
+  \[
+\downarrow
+  \]
+
+  \[
+\boxed{ \text{FDIR} \rightarrow \text{Navigation Estimate} \rightarrow \text{Guidance} \rightarrow \text{Control}. }
+  \]
+
+</section>
+
+<!-- ========================================================= -->
+<!-- 4.1.7.115 FINAL ENGINEERING PERSPECTIVE -->
+<!-- ========================================================= -->
+
+<section class="notes-section-card">
+
+  <h3>4.1.7.115 Final Engineering Perspective</h3>
+
+
+  <p>
+    The most important point of this chapter is:
+  </p>
+
+  \[
+\boxed{ \text{Sensor Error} \neq \text{White Noise Only}. }
+  \]
+
+  <p>
+    A realistic spacecraft sensor can contain
+  </p>
+
+  \[
+\boxed{ \text{Bias} + \text{Drift} + \text{Scale Factor} + \text{Misalignment} + \text{Nonlinearity} + \text{Noise} + \text{Environment} + \text{Timing} + \text{Digital Effects} + \text{Availability}. }
+  \]
+
+  <p>
+    These errors also behave differently:
+  </p>
+
+  \[
+\boxed{ \text{Constant} \neq \text{Run-to-Run} \neq \text{Time-Varying} \neq \text{Fault}. }
+  \]
+
+  <p>
+    The complete spacecraft engineering philosophy should therefore be
+  </p>
+
+  \[
+\boxed{ \text{Characterize} \rightarrow \text{Calibrate} \rightarrow \text{Model} \rightarrow \text{Estimate} \rightarrow \text{Monitor} \rightarrow \text{Mitigate}. }
+  \]
+
+  <p>
+    And ultimately,
+  </p>
+
+  \[
+\boxed{ \text{Sensor Error Model} \rightarrow \text{Navigation Uncertainty} \rightarrow \text{GNC Performance} \rightarrow \text{Mission Safety and Success}. }
+  \]
+
+  <p>
+    This gives <strong>4.1.7</strong> a different and important role from the individual sensor pages: the gyro, accelerometer, magnetometer, star-tracker, Sun-sensor, and GNSS pages explain the errors of each instrument, while <strong>Sensor Error Sources explains the common mathematical and engineering framework connecting all of those errors to calibration, stochastic modelling, Kalman filtering, Monte Carlo analysis, FDIR, and spacecraft-level GNC performance.</strong>
+  </p>
+
+</section>
+
+<!-- ========================================================= -->
+<!-- PREVIOUS / NEXT -->
+<!-- ========================================================= -->
+
+<nav class="notes-prev-next">
+
+  <a href="gnss.html">
+    &larr; 4.1.6 GPS / GNSS
+  </a>
+
+  <a href="combined-sensor-suites.html">
+    4.1.8 Combined Sensor Suites &rarr;
+  </a>
+
+</nav>
+
+</main>
+
+<footer class="site-footer">
+  <p>
+    © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+    Educational resource for spacecraft dynamics, orbital mechanics,
+    and guidance–navigation–control systems.
+  </p>
+</footer>
+
+</body>
+</html>
