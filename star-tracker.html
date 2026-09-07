@@ -1,0 +1,6399 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>4.1.4 Star Trackers | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+</head>
+
+
+<body>
+
+<!-- ========================================================= -->
+<!-- HEADER -->
+<!-- ========================================================= -->
+
+<header class="notes-hero">
+
+  <h1>Star Trackers</h1>
+
+  <p class="notes-tagline">
+    Celestial attitude determination, star-image processing,
+    measurement modelling, error sources, spacecraft integration,
+    and sensor fusion for precision GNC.
+  </p>
+
+  <nav class="pill-nav">
+    <a href="index.html" class="pill">Home</a>
+    <a href="tools.html" class="pill">Tools</a>
+    <a href="notes.html" class="pill active">Theory Notes</a>
+    <a href="references.html" class="pill">References</a>
+    <a href="problems.html" class="pill">Problem Bank</a>
+    <a href="about.html" class="pill">About</a>
+  </nav>
+
+</header>
+
+
+<!-- ========================================================= -->
+<!-- MAIN CONTENT -->
+<!-- ========================================================= -->
+
+<main class="page-main">
+
+<section class="notes-section-card">
+
+<h2>4.1.4 Star Trackers</h2>
+
+<p>
+A <strong>star tracker</strong> is a precision optical attitude sensor used
+to determine the orientation of a spacecraft relative to an inertial
+celestial reference frame. It observes stars within its field of view,
+determines their directions from the focal-plane image, identifies the
+observed stars using an onboard star catalogue, and solves for the
+orientation of the star-tracker frame relative to the inertial frame.
+</p>
+
+<p>
+Star trackers are among the most accurate absolute attitude sensors used
+on spacecraft. They are therefore particularly important for missions
+requiring precise attitude knowledge, such as Earth observation,
+astronomy, formation flying, rendezvous and docking, laser communication,
+precision payload pointing, and deep-space navigation.
+</p>
+
+<p>
+The basic star-tracker processing chain can be represented as
+</p>
+
+<p>
+\[
+\boxed{\text{Celestial Star Field}}
+\rightarrow
+\boxed{\text{Optical System}}
+\rightarrow
+\boxed{\text{Detector}}
+\rightarrow
+\boxed{\text{Star Detection}}
+\rightarrow
+\boxed{\text{Centroiding}}
+\rightarrow
+\boxed{\text{Star Identification}}
+\rightarrow
+\boxed{\text{Attitude Determination}}
+\rightarrow
+\boxed{\mathbf q_{ST}}
+\]
+</p>
+
+<p>
+Unlike a gyroscope, the star tracker does not primarily measure angular
+velocity. It provides an <strong>absolute celestial attitude reference</strong>.
+This makes star trackers and gyroscopes highly complementary sensors.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.1 Role of Star Trackers in GNC</h3>
+<!-- ========================================================= -->
+
+<p>
+The attitude of a spacecraft describes the orientation of the spacecraft
+body frame relative to a chosen reference frame. For many missions this
+reference is an inertial frame.
+</p>
+
+<p>
+Suppose the inertial direction of a catalogue star is
+</p>
+
+<p>
+\[
+\mathbf s_i^I.
+\]
+</p>
+
+<p>
+The same star is observed by the star tracker as a direction
+</p>
+
+<p>
+\[
+\mathbf s_i^S
+\]
+</p>
+
+<p>
+expressed in the star-tracker sensor frame \(S\).
+</p>
+
+<p>
+Ideally,
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s_i^S
+=
+C_I^S
+\mathbf s_i^I
+}
+\]
+</p>
+
+<p>
+where \(C_I^S\) transforms vectors from the inertial frame into the
+star-tracker frame.
+</p>
+
+<p>
+If the mounting transformation between the star-tracker frame and the
+spacecraft body frame is known,
+</p>
+
+<p>
+\[
+C_S^B,
+\]
+</p>
+
+<p>
+then the spacecraft attitude can be obtained from
+</p>
+
+<p>
+\[
+\boxed{
+C_I^B
+=
+C_S^B C_I^S
+}
+\]
+</p>
+
+<p>
+for this particular DCM convention.
+</p>
+
+<p>
+Therefore, the fundamental star-tracker problem is
+</p>
+
+<p>
+\[
+\boxed{
+\{\mathbf s_i^I\}
++
+\{\mathbf s_i^S\}
+\rightarrow
+C_I^S
+\rightarrow
+C_I^B
+}
+\]
+</p>
+
+<p>
+or equivalently,
+</p>
+
+<p>
+\[
+\boxed{
+\text{Known Celestial Directions}
++
+\text{Measured Star Directions}
+\rightarrow
+\text{Spacecraft Attitude}.
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.2 Why Stars Are Useful Attitude References</h3>
+<!-- ========================================================= -->
+
+<p>
+Stars provide excellent attitude references because they are extremely
+distant. Their directions therefore behave approximately as fixed
+directions in an inertial celestial reference frame over the short time
+scales relevant to spacecraft attitude determination.
+</p>
+
+<p>
+For a catalogue star,
+</p>
+
+<p>
+\[
+\mathbf s_i^I
+=
+\begin{bmatrix}
+s_{ix}\\
+s_{iy}\\
+s_{iz}
+\end{bmatrix}
+\]
+</p>
+
+<p>
+is known from astronomical catalogue data.
+</p>
+
+<p>
+The spacecraft rotates this inertial direction into the sensor frame:
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s_i^S
+=
+C_I^S(\mathbf q)\mathbf s_i^I.
+}
+\]
+</p>
+
+<p>
+The star tracker observes several such directions and solves the inverse
+problem:
+</p>
+
+<p>
+\[
+\boxed{
+\{\mathbf s_i^I,\mathbf s_i^S\}
+\rightarrow
+\hat{\mathbf q}.
+}
+\]
+</p>
+
+<p>
+This provides an absolute attitude reference and prevents the
+unbounded long-term drift associated with integrating gyroscope
+measurements alone.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.3 Star Tracker vs Gyroscope</h3>
+<!-- ========================================================= -->
+
+<p>
+A gyroscope measures angular velocity:
+</p>
+
+<p>
+\[
+\boxed{
+\boldsymbol{\omega}_m
+=
+\boldsymbol{\omega}_{true}
++
+\mathbf b_g
++
+\mathbf n_g.
+}
+\]
+</p>
+
+<p>
+The spacecraft attitude must then be propagated using the measured
+angular velocity. Because gyro bias is integrated with time, attitude
+errors accumulate.
+</p>
+
+<p>
+A star tracker instead provides an absolute attitude measurement.
+A simplified quaternion measurement model is
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_{ST}
+=
+\delta\mathbf q_{ST}
+\otimes
+\mathbf q_{true}
+}
+\]
+</p>
+
+<p>
+where \(\delta\mathbf q_{ST}\) represents the star-tracker attitude
+measurement error under a specified quaternion convention.
+</p>
+
+<p>
+Consequently,
+</p>
+
+<p>
+\[
+\boxed{\text{Gyroscope}}
+\rightarrow
+\boxed{\text{High-Rate Relative Attitude Propagation}}
+\]
+</p>
+
+<p>
+while
+</p>
+
+<p>
+\[
+\boxed{\text{Star Tracker}}
+\rightarrow
+\boxed{\text{Accurate Absolute Attitude Correction}}.
+\]
+</p>
+
+<p>
+A spacecraft attitude estimator therefore commonly combines both:
+</p>
+
+<p>
+\[
+\boxed{\text{Gyroscope + Star Tracker}}
+\rightarrow
+\boxed{\text{EKF / MEKF}}
+\rightarrow
+\boxed{\text{Attitude + Gyro Bias Estimate}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.4 Main Components of a Star Tracker</h3>
+<!-- ========================================================= -->
+
+<p>
+A modern autonomous star tracker combines optical, electronic, and
+software subsystems.
+</p>
+
+<p>
+The principal components are
+</p>
+
+<p>
+\[
+\boxed{\text{Baffle}}
+\rightarrow
+\boxed{\text{Optics}}
+\rightarrow
+\boxed{\text{Image Detector}}
+\rightarrow
+\boxed{\text{Processing Electronics}}
+\rightarrow
+\boxed{\text{Star Catalogue}}
+\rightarrow
+\boxed{\text{Attitude Algorithm}}.
+\]
+</p>
+
+<h4>Optical System</h4>
+
+<p>
+The optical system focuses light from stars onto the detector.
+Important optical parameters include:
+</p>
+
+<ul>
+  <li>focal length,</li>
+  <li>aperture,</li>
+  <li>focal ratio,</li>
+  <li>field of view,</li>
+  <li>optical transmission,</li>
+  <li>spectral response,</li>
+  <li>point-spread function,</li>
+  <li>lens distortion.</li>
+</ul>
+
+<h4>Detector</h4>
+
+<p>
+The detector converts incident photons into electrical and eventually
+digital signals. CMOS and CCD detector technologies are commonly
+associated with star-sensing systems.
+</p>
+
+<h4>Baffle</h4>
+
+<p>
+The baffle suppresses off-axis illumination from bright objects such as
+the Sun, Earth, and Moon and reduces stray light reaching the detector.
+</p>
+
+<h4>Processing Electronics</h4>
+
+<p>
+The processing electronics may perform image acquisition, thresholding,
+star detection, centroiding, catalogue matching, attitude determination,
+quality assessment, and communication with the spacecraft computer.
+</p>
+
+<h4>Star Catalogue</h4>
+
+<p>
+The onboard star catalogue provides the celestial reference directions
+needed to identify the stars observed in the image.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.5 Field of View</h3>
+<!-- ========================================================= -->
+
+<p>
+A star tracker observes only a limited region of the celestial sphere at
+any instant. This region is described by the instrument
+<strong>field of view</strong>.
+</p>
+
+<p>
+For a detector dimension \(D\) and focal length \(f\), an approximate
+one-dimensional field of view is
+</p>
+
+<p>
+\[
+\boxed{
+\mathrm{FOV}
+=
+2\tan^{-1}
+\left(
+\frac{D}{2f}
+\right).
+}
+\]
+</p>
+
+<p>
+For a rectangular detector,
+</p>
+
+<p>
+\[
+\boxed{
+\mathrm{FOV}_x
+=
+2\tan^{-1}
+\left(
+\frac{D_x}{2f}
+\right)
+}
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\boxed{
+\mathrm{FOV}_y
+=
+2\tan^{-1}
+\left(
+\frac{D_y}{2f}
+\right).
+}
+\]
+</p>
+
+<p>
+A wide field of view generally increases the number of stars available
+for identification and can improve lost-in-space acquisition
+robustness.
+</p>
+
+<p>
+However, for a fixed detector, increasing the field of view generally
+reduces the angular scale represented by each pixel.
+</p>
+
+<p>
+Thus an important optical trade-off is
+</p>
+
+<p>
+\[
+\boxed{
+\text{Wide FOV}
+\leftrightarrow
+\text{Fine Angular Resolution}.
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.6 Star Magnitude and Limiting Magnitude</h3>
+<!-- ========================================================= -->
+
+<p>
+Stars have very different apparent brightnesses. Apparent magnitude is a
+logarithmic measure of brightness.
+</p>
+
+<p>
+For two stars,
+</p>
+
+<p>
+\[
+\boxed{
+m_1-m_2
+=
+-2.5
+\log_{10}
+\left(
+\frac{F_1}{F_2}
+\right)
+}
+\]
+</p>
+
+<p>
+where \(F_1\) and \(F_2\) are their observed fluxes.
+</p>
+
+<p>
+A star tracker has a limiting magnitude \(m_{\mathrm{lim}}\), which
+describes approximately the faintest stars that can be reliably detected
+under specified operating conditions.
+</p>
+
+<p>
+The limiting magnitude depends on
+</p>
+
+<ul>
+  <li>optical aperture,</li>
+  <li>optical transmission,</li>
+  <li>detector sensitivity,</li>
+  <li>quantum efficiency,</li>
+  <li>exposure time,</li>
+  <li>detector noise,</li>
+  <li>background illumination,</li>
+  <li>spacecraft angular rate,</li>
+  <li>detection thresholds.</li>
+</ul>
+
+<p>
+A tracker capable of detecting fainter stars generally has a larger
+candidate star population available inside a given field of view.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.7 From Starlight to a Detector Image</h3>
+<!-- ========================================================= -->
+
+<p>
+Because stars are extremely distant, the light arriving from an
+individual star can be approximated as a bundle of parallel rays.
+</p>
+
+<p>
+The optical system focuses those rays onto the focal plane.
+</p>
+
+<p>
+An ideal point source would produce an infinitesimally small point.
+Real optical systems instead produce a finite intensity distribution
+known as the <strong>point-spread function</strong>:
+</p>
+
+<p>
+\[
+\boxed{
+PSF(x,y).
+}
+\]
+</p>
+
+<p>
+Consequently, a star normally illuminates multiple pixels rather than a
+single detector element.
+</p>
+
+<p>
+The image-formation chain is therefore
+</p>
+
+<p>
+\[
+\boxed{\text{Star Direction}}
+\rightarrow
+\boxed{\text{Optical Projection}}
+\rightarrow
+\boxed{\text{PSF}}
+\rightarrow
+\boxed{\text{Detector Pixels}}.
+\]
+</p>
+
+<p>
+The spread across several pixels enables sub-pixel centroid estimation,
+which is one reason star trackers can achieve angular measurement
+precision much finer than the angular width of a single pixel.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.8 Pinhole Camera Model</h3>
+<!-- ========================================================= -->
+
+<p>
+A useful first-order model of the star-tracker optics is the pinhole
+camera model.
+</p>
+
+<p>
+Consider a star direction expressed in the star-tracker frame:
+</p>
+
+<p>
+\[
+\mathbf s^S
+=
+\begin{bmatrix}
+s_x\\
+s_y\\
+s_z
+\end{bmatrix}.
+\]
+</p>
+
+<p>
+Assuming the optical axis is the \(+z\) direction, the ideal focal-plane
+coordinates are
+</p>
+
+<p>
+\[
+\boxed{
+x_f
+=
+f\frac{s_x}{s_z}
+}
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\boxed{
+y_f
+=
+f\frac{s_y}{s_z}.
+}
+\]
+</p>
+
+<p>
+If the detector pixel pitches are \(p_x\) and \(p_y\), then the
+corresponding pixel coordinates may be written as
+</p>
+
+<p>
+\[
+\boxed{
+u
+=
+u_0+\frac{x_f}{p_x}
+}
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\boxed{
+v
+=
+v_0+\frac{y_f}{p_y}
+}
+\]
+</p>
+
+<p>
+where \((u_0,v_0)\) represents the principal point.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.9 Pixel Position to Star Line of Sight</h3>
+<!-- ========================================================= -->
+
+<p>
+After a star image has been detected and its centroid measured at
+\((u,v)\), the processing algorithm converts the centroid back into a
+line-of-sight direction.
+</p>
+
+<p>
+The focal-plane coordinates are
+</p>
+
+<p>
+\[
+x=(u-u_0)p_x
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+y=(v-v_0)p_y.
+\]
+</p>
+
+<p>
+An unnormalised direction is
+</p>
+
+<p>
+\[
+\tilde{\mathbf s}^{S}
+=
+\begin{bmatrix}
+x\\
+y\\
+f
+\end{bmatrix}.
+\]
+</p>
+
+<p>
+The corresponding unit vector is
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s^{S}
+=
+\frac{
+\tilde{\mathbf s}^{S}
+}{
+\|\tilde{\mathbf s}^{S}\|
+}.
+}
+\]
+</p>
+
+<p>
+Thus,
+</p>
+
+<p>
+\[
+\boxed{
+\text{Centroid}
+\rightarrow
+\text{Calibrated Pixel Coordinate}
+\rightarrow
+\text{Star LOS Vector}.
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.10 Camera Intrinsic Matrix</h3>
+<!-- ========================================================= -->
+
+<p>
+The projection can be expressed more compactly using the camera
+intrinsic matrix
+</p>
+
+<p>
+\[
+K
+=
+\begin{bmatrix}
+f_x & \gamma & c_x\\
+0 & f_y & c_y\\
+0 & 0 & 1
+\end{bmatrix}.
+\]
+</p>
+
+<p>
+For an image point represented in homogeneous coordinates,
+</p>
+
+<p>
+\[
+\tilde{\mathbf p}
+=
+\begin{bmatrix}
+u\\
+v\\
+1
+\end{bmatrix},
+\]
+</p>
+
+<p>
+the ideal projection satisfies
+</p>
+
+<p>
+\[
+\tilde{\mathbf p}
+\propto
+K\mathbf s^S.
+\]
+</p>
+
+<p>
+Conversely,
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s^S
+=
+\frac{
+K^{-1}\tilde{\mathbf p}
+}{
+\|K^{-1}\tilde{\mathbf p}\|
+}.
+}
+\]
+</p>
+
+<p>
+Errors in the calibrated values of \(f_x,f_y,c_x,c_y\), detector
+orientation, or pixel geometry therefore translate into star-vector
+errors and ultimately into attitude errors.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.11 Optical Distortion</h3>
+<!-- ========================================================= -->
+
+<p>
+Real optical systems do not follow the ideal pinhole model exactly.
+One important source of systematic error is lens distortion.
+</p>
+
+<p>
+For radial distortion, define
+</p>
+
+<p>
+\[
+r^2=x^2+y^2.
+\]
+</p>
+
+<p>
+A commonly used polynomial model is
+</p>
+
+<p>
+\[
+\boxed{
+x_d
+=
+x
+\left(
+1+k_1r^2+k_2r^4+k_3r^6+\cdots
+\right)
+}
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\boxed{
+y_d
+=
+y
+\left(
+1+k_1r^2+k_2r^4+k_3r^6+\cdots
+\right).
+}
+\]
+</p>
+
+<p>
+Tangential distortion and other optical imperfections may also be
+included.
+</p>
+
+<p>
+A realistic processing chain therefore contains
+</p>
+
+<p>
+\[
+\boxed{\text{Raw Centroid}}
+\rightarrow
+\boxed{\text{Distortion Correction}}
+\rightarrow
+\boxed{\text{Calibrated Star Vector}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.12 Star Detection</h3>
+<!-- ========================================================= -->
+
+<p>
+The digital detector image contains stars, background illumination,
+detector noise, hot pixels, radiation events, and possibly stray-light
+features.
+</p>
+
+<p>
+The processing software must first identify candidate star regions.
+A simple detection condition is
+</p>
+
+<p>
+\[
+I(u,v)>I_{\mathrm{threshold}}.
+\]
+</p>
+
+<p>
+An adaptive threshold may be based on the estimated background:
+</p>
+
+<p>
+\[
+\boxed{
+I_{\mathrm{threshold}}
+=
+\mu_{bg}
++
+k\sigma_{bg}
+}
+\]
+</p>
+
+<p>
+where
+</p>
+
+<ul>
+  <li>\(\mu_{bg}\) is the estimated background intensity,</li>
+  <li>\(\sigma_{bg}\) is the background standard deviation,</li>
+  <li>\(k\) controls the detection threshold.</li>
+</ul>
+
+<p>
+Connected pixels exceeding the threshold can then be grouped into
+candidate objects.
+</p>
+
+<p>
+Further checks may reject
+</p>
+
+<ul>
+  <li>isolated hot pixels,</li>
+  <li>cosmic-ray events,</li>
+  <li>extended objects,</li>
+  <li>large stray-light structures,</li>
+  <li>objects inconsistent with the expected star PSF.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.13 Centroiding</h3>
+<!-- ========================================================= -->
+
+<p>
+Once a candidate star has been detected, its location must be estimated
+more accurately than the raw pixel coordinates.
+</p>
+
+<p>
+A common intensity-weighted centroid is
+</p>
+
+<p>
+\[
+\boxed{
+u_c
+=
+\frac{
+\sum_i I_i u_i
+}{
+\sum_i I_i
+}
+}
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\boxed{
+v_c
+=
+\frac{
+\sum_i I_i v_i
+}{
+\sum_i I_i
+}.
+}
+\]
+</p>
+
+<p>
+The summation is performed over the pixels associated with the detected
+star image.
+</p>
+
+<p>
+Because the PSF spreads the star signal across multiple pixels,
+centroiding can estimate the star location to a fraction of a pixel.
+</p>
+
+<p>
+More advanced methods may include
+</p>
+
+<ul>
+  <li>Gaussian fitting,</li>
+  <li>PSF fitting,</li>
+  <li>maximum-likelihood estimation,</li>
+  <li>adaptive centroid windows,</li>
+  <li>background-compensated centroiding.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.14 Centroid Error and Angular Error</h3>
+<!-- ========================================================= -->
+
+<p>
+Suppose the centroid uncertainty is \(\sigma_c\) pixels and the detector
+pixel pitch is \(p\).
+</p>
+
+<p>
+The approximate focal-plane position uncertainty is
+</p>
+
+<p>
+\[
+\sigma_x
+\approx
+p\sigma_c.
+\]
+</p>
+
+<p>
+For small angles, the corresponding angular uncertainty is approximately
+</p>
+
+<p>
+\[
+\boxed{
+\sigma_\theta
+\approx
+\frac{p}{f}\sigma_c.
+}
+\]
+</p>
+
+<p>
+This relationship demonstrates several important design effects:
+</p>
+
+<ul>
+  <li>smaller pixels can improve angular sampling,</li>
+  <li>longer focal length improves angular resolution,</li>
+  <li>better centroid algorithms improve angular accuracy.</li>
+</ul>
+
+<p>
+However, a longer focal length for a fixed detector also reduces the
+field of view.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.15 Signal-to-Noise Ratio</h3>
+<!-- ========================================================= -->
+
+<p>
+The quality of star detection and centroiding depends strongly on the
+signal-to-noise ratio.
+</p>
+
+<p>
+A representative detector-level expression is
+</p>
+
+<p>
+\[
+\boxed{
+SNR
+=
+\frac{N_s}
+{
+\sqrt{
+N_s+
+N_b+
+N_d+
+N_r^2
+}
+}
+}
+\]
+</p>
+
+<p>
+where, depending on the detector model,
+</p>
+
+<ul>
+  <li>\(N_s\) represents the star-generated signal,</li>
+  <li>\(N_b\) represents background contribution,</li>
+  <li>\(N_d\) represents dark-current contribution,</li>
+  <li>\(N_r\) represents read-noise contribution.</li>
+</ul>
+
+<p>
+Higher SNR generally improves both star-detection probability and
+centroid precision.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.16 Detector Noise Sources</h3>
+<!-- ========================================================= -->
+
+<h4>Photon Shot Noise</h4>
+
+<p>
+Photon arrival is a statistical process. For \(N\) detected photons,
+the standard deviation associated with ideal Poisson shot noise scales
+approximately as
+</p>
+
+<p>
+\[
+\boxed{
+\sigma_{shot}\approx\sqrt{N}.
+}
+\]
+</p>
+
+<h4>Read Noise</h4>
+
+<p>
+Electronic circuitry introduces noise while reading detector pixels.
+This becomes particularly important for weak star signals.
+</p>
+
+<h4>Dark Current</h4>
+
+<p>
+Thermally generated charge accumulates even without incident starlight.
+Dark current generally increases with detector temperature.
+</p>
+
+<h4>Fixed-Pattern Noise</h4>
+
+<p>
+Different pixels may have slightly different gain and offset
+characteristics.
+</p>
+
+<h4>Quantisation Noise</h4>
+
+<p>
+The analogue signal is converted into finite digital levels by an
+analogue-to-digital converter.
+</p>
+
+<h4>Hot and Dead Pixels</h4>
+
+<p>
+Some pixels may produce unusually high output or fail to respond
+normally.
+</p>
+
+<h4>Radiation Events</h4>
+
+<p>
+Energetic particles can produce transient bright features that may
+initially resemble stars.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.17 Exposure Time</h3>
+<!-- ========================================================= -->
+
+<p>
+The exposure time \(T_e\) determines how long the detector integrates
+incoming light.
+</p>
+
+<p>
+A longer exposure generally collects more photons and can improve the
+detection of faint stars.
+</p>
+
+<p>
+However, if the spacecraft rotates during the exposure, the star image
+moves across the detector.
+</p>
+
+<p>
+Therefore,
+</p>
+
+<p>
+\[
+\boxed{
+\text{Longer Exposure}
+\rightarrow
+\text{Higher Sensitivity}
+}
+\]
+</p>
+
+<p>
+but also
+</p>
+
+<p>
+\[
+\boxed{
+\text{Longer Exposure}
+\rightarrow
+\text{Greater Motion Blur}.
+}
+\]
+</p>
+
+<p>
+Exposure time is therefore one of the principal star-tracker design and
+operational trade-offs.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.18 Motion Blur</h3>
+<!-- ========================================================= -->
+
+<p>
+If the spacecraft angular rate during an exposure is approximately
+\(\omega\), then the first-order angular displacement during the
+exposure is
+</p>
+
+<p>
+\[
+\boxed{
+\Delta\theta_{blur}
+\approx
+\omega T_e.
+}
+\]
+</p>
+
+<p>
+For small angles, the corresponding focal-plane displacement is
+approximately
+</p>
+
+<p>
+\[
+\boxed{
+\Delta x
+\approx
+f\omega T_e.
+}
+\]
+</p>
+
+<p>
+In detector pixels,
+</p>
+
+<p>
+\[
+\boxed{
+N_{blur}
+\approx
+\frac{f\omega T_e}{p}.
+}
+\]
+</p>
+
+<p>
+Excessive blur can cause
+</p>
+
+<ul>
+  <li>reduced centroid accuracy,</li>
+  <li>lower detection probability,</li>
+  <li>star streaks rather than compact spots,</li>
+  <li>pattern-recognition failure,</li>
+  <li>loss of attitude solution.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.19 Maximum Tracking and Acquisition Rate</h3>
+<!-- ========================================================= -->
+
+<p>
+Star trackers usually specify angular-rate limits.
+</p>
+
+<p>
+A simplified relation is
+</p>
+
+<p>
+\[
+\omega_{\max}T_e
+<
+\theta_{\mathrm{allowable\ smear}}.
+\]
+</p>
+
+<p>
+Thus,
+</p>
+
+<p>
+\[
+\boxed{
+\omega_{\max}
+\approx
+\frac{
+\theta_{\mathrm{allowable\ smear}}
+}{
+T_e
+}.
+}
+\]
+</p>
+
+<p>
+Actual limits depend on detector sensitivity, exposure-control
+algorithms, image processing, star brightness, and field of view.
+</p>
+
+<p>
+It is important to distinguish between
+<strong>maximum acquisition rate</strong> and
+<strong>maximum tracking rate</strong>.
+A tracker that already knows approximately where the stars should be may
+continue tracking under conditions where a complete lost-in-space
+solution would be difficult.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.20 Star Catalogue</h3>
+<!-- ========================================================= -->
+
+<p>
+The onboard star catalogue contains the reference information needed to
+identify observed stars.
+</p>
+
+<p>
+A catalogue entry may contain
+</p>
+
+<p>
+\[
+\{
+ID_i,\alpha_i,\delta_i,m_i,\ldots
+\}
+\]
+</p>
+
+<p>
+where
+</p>
+
+<ul>
+  <li>\(ID_i\) is the star identifier,</li>
+  <li>\(\alpha_i\) is right ascension,</li>
+  <li>\(\delta_i\) is declination,</li>
+  <li>\(m_i\) is apparent magnitude.</li>
+</ul>
+
+<p>
+The corresponding inertial unit vector can be formed as
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s_i^I
+=
+\begin{bmatrix}
+\cos\delta_i\cos\alpha_i\\
+\cos\delta_i\sin\alpha_i\\
+\sin\delta_i
+\end{bmatrix}.
+}
+\]
+</p>
+
+<p>
+The onboard catalogue is normally optimized for attitude determination
+rather than simply containing every known astronomical object.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.21 Catalogue Epoch and Apparent Star Direction</h3>
+<!-- ========================================================= -->
+
+<p>
+For very accurate attitude determination, catalogue vectors cannot
+always be treated as mathematically immutable.
+</p>
+
+<p>
+Depending on the required accuracy, corrections may be considered for
+</p>
+
+<ul>
+  <li>proper motion,</li>
+  <li>catalogue epoch,</li>
+  <li>precession,</li>
+  <li>nutation depending on reference convention,</li>
+  <li>stellar aberration,</li>
+  <li>spacecraft velocity,</li>
+  <li>parallax in very high-accuracy applications.</li>
+</ul>
+
+<p>
+A higher-fidelity reference-generation chain is therefore
+</p>
+
+<p>
+\[
+\boxed{\text{Catalogue}}
+\rightarrow
+\boxed{\text{Epoch / Apparent-Position Corrections}}
+\rightarrow
+\boxed{\mathbf s_i^I(t)}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.22 Star Identification</h3>
+<!-- ========================================================= -->
+
+<p>
+After stars have been detected and converted into measured directions,
+the tracker must determine which catalogue stars produced those
+observations.
+</p>
+
+<p>
+This is the <strong>star-identification problem</strong>.
+</p>
+
+<p>
+The central problem is
+</p>
+
+<p>
+\[
+\boxed{
+\text{Observed Star Pattern}
+\leftrightarrow
+\text{Catalogue Star Pattern}.
+}
+\]
+</p>
+
+<p>
+Useful geometric quantities include
+</p>
+
+<ul>
+  <li>inter-star angles,</li>
+  <li>triangle geometry,</li>
+  <li>polygon geometry,</li>
+  <li>local neighbourhoods,</li>
+  <li>relative angular distances.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.23 Inter-Star Angle</h3>
+<!-- ========================================================= -->
+
+<p>
+For two measured star directions
+</p>
+
+<p>
+\[
+\mathbf s_1,\qquad\mathbf s_2,
+\]
+</p>
+
+<p>
+their angular separation is
+</p>
+
+<p>
+\[
+\boxed{
+\theta_{12}
+=
+\cos^{-1}
+\left(
+\mathbf s_1^T\mathbf s_2
+\right).
+}
+\]
+</p>
+
+<p>
+A rigid spacecraft rotation changes the coordinates of both vectors but
+does not change the angle between them.
+</p>
+
+<p>
+Therefore, inter-star angular separation provides an attitude-independent
+geometric quantity that can be compared directly with catalogue data.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.24 Pattern-Matching Algorithms</h3>
+<!-- ========================================================= -->
+
+<p>
+A variety of methods can be used for autonomous star identification.
+Examples include
+</p>
+
+<ul>
+  <li>pair-angle methods,</li>
+  <li>triangle methods,</li>
+  <li>polygon methods,</li>
+  <li>grid methods,</li>
+  <li>geometric hashing,</li>
+  <li>pyramid algorithms,</li>
+  <li>voting algorithms,</li>
+  <li>database lookup techniques.</li>
+</ul>
+
+<p>
+Although the computational details differ, the objective remains
+</p>
+
+<p>
+\[
+\boxed{
+\{\text{Measured Geometric Features}\}
+\rightarrow
+\{\text{Catalogue Correspondences}\}.
+}
+\]
+</p>
+
+<p>
+Once sufficiently reliable correspondences have been established,
+the tracker can solve for attitude.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.25 Lost-in-Space Mode</h3>
+<!-- ========================================================= -->
+
+<p>
+When the tracker has no useful prior knowledge of spacecraft attitude,
+it must determine attitude directly from the current star image.
+</p>
+
+<p>
+This operating condition is commonly called
+<strong>lost-in-space</strong>.
+</p>
+
+<p>
+The processing sequence is
+</p>
+
+<p>
+\[
+\boxed{\text{Acquire Image}}
+\rightarrow
+\boxed{\text{Detect Stars}}
+\rightarrow
+\boxed{\text{Calculate Star Pattern}}
+\rightarrow
+\boxed{\text{Search Catalogue}}
+\rightarrow
+\boxed{\text{Identify Stars}}
+\rightarrow
+\boxed{\text{Solve Attitude}}.
+\]
+</p>
+
+<p>
+Lost-in-space processing generally requires more computation than
+tracking because the catalogue search cannot rely strongly on a prior
+attitude estimate.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.26 Tracking Mode</h3>
+<!-- ========================================================= -->
+
+<p>
+Once attitude is known, the previous attitude solution can be used to
+predict which catalogue stars should appear in the next image.
+</p>
+
+<p>
+Conceptually,
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_{k-1}
+\rightarrow
+\text{Predicted Star Locations}
+\rightarrow
+\text{Local Image Search}
+\rightarrow
+\mathbf q_k.
+}
+\]
+</p>
+
+<p>
+Tracking mode can therefore be computationally faster and more robust
+than repeating a complete lost-in-space solution every frame.
+</p>
+
+<p>
+A typical operational sequence is
+</p>
+
+<p>
+\[
+\boxed{\text{Lost-in-Space Acquisition}}
+\rightarrow
+\boxed{\text{Initial Attitude}}
+\rightarrow
+\boxed{\text{Tracking Mode}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.27 Wahba's Problem</h3>
+<!-- ========================================================= -->
+
+<p>
+Once observed stars have been associated with catalogue stars, the
+attitude can be found by solving a vector-observation attitude
+determination problem.
+</p>
+
+<p>
+The classical formulation is <strong>Wahba's problem</strong>.
+</p>
+
+<p>
+Suppose
+</p>
+
+<p>
+\[
+\mathbf r_i
+\]
+</p>
+
+<p>
+is the known inertial reference vector and
+</p>
+
+<p>
+\[
+\mathbf b_i
+\]
+</p>
+
+<p>
+is the corresponding measured sensor/body-frame vector.
+</p>
+
+<p>
+The attitude matrix \(C\) is selected to minimize
+</p>
+
+<p>
+\[
+\boxed{
+J(C)
+=
+\frac{1}{2}
+\sum_{i=1}^{N}
+a_i
+\left\|
+\mathbf b_i-C\mathbf r_i
+\right\|^2
+}
+\]
+</p>
+
+<p>
+where \(a_i\) represents the weighting assigned to observation \(i\).
+</p>
+
+<p>
+The weights may reflect the relative quality or covariance of different
+star measurements.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.28 Attitude Determination Algorithms</h3>
+<!-- ========================================================= -->
+
+<p>
+Several algorithms can solve the attitude-determination problem.
+Important examples include
+</p>
+
+<ul>
+  <li>TRIAD,</li>
+  <li>Davenport's q-method,</li>
+  <li>QUEST,</li>
+  <li>singular-value-decomposition methods,</li>
+  <li>other optimal quaternion estimators.</li>
+</ul>
+
+<p>
+The output is normally represented as
+</p>
+
+<p>
+\[
+\boxed{
+\hat C_I^S
+}
+\]
+</p>
+
+<p>
+or
+</p>
+
+<p>
+\[
+\boxed{
+\hat{\mathbf q}_{SI}.
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.29 Davenport's q-Method</h3>
+<!-- ========================================================= -->
+
+<p>
+Define the attitude profile matrix
+</p>
+
+<p>
+\[
+\boxed{
+B
+=
+\sum_i
+a_i
+\mathbf b_i
+\mathbf r_i^T.
+}
+\]
+</p>
+
+<p>
+Then define
+</p>
+
+<p>
+\[
+S=B+B^T,
+\]
+</p>
+
+<p>
+\[
+\sigma=\operatorname{tr}(B),
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\mathbf z
+=
+\begin{bmatrix}
+B_{23}-B_{32}\\
+B_{31}-B_{13}\\
+B_{12}-B_{21}
+\end{bmatrix}.
+\]
+</p>
+
+<p>
+The Davenport matrix is
+</p>
+
+<p>
+\[
+\boxed{
+K
+=
+\begin{bmatrix}
+S-\sigma I & \mathbf z\\
+\mathbf z^T & \sigma
+\end{bmatrix}.
+}
+\]
+</p>
+
+<p>
+The quaternion corresponding to the optimal attitude is obtained from
+the eigenvector associated with the maximum eigenvalue of \(K\),
+subject to the quaternion ordering and attitude convention used in the
+implementation.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.30 QUEST</h3>
+<!-- ========================================================= -->
+
+<p>
+QUEST stands for <strong>Quaternion ESTimator</strong>.
+It is an efficient method for solving Wahba's problem and is strongly
+associated with spacecraft attitude determination.
+</p>
+
+<p>
+Conceptually,
+</p>
+
+<p>
+\[
+\boxed{
+\{
+\mathbf b_i,
+\mathbf r_i,
+a_i
+\}
+\rightarrow
+\text{QUEST}
+\rightarrow
+\hat{\mathbf q}.
+}
+\]
+</p>
+
+<p>
+QUEST combines several noisy vector observations to obtain an attitude
+quaternion consistent with the weighted vector measurements.
+</p>
+
+<p>
+The star-tracker processing chain therefore becomes
+</p>
+
+<p>
+\[
+\boxed{\text{Centroids}}
+\rightarrow
+\boxed{\text{Star LOS Vectors}}
+\rightarrow
+\boxed{\text{Catalogue Matching}}
+\rightarrow
+\boxed{\text{QUEST}}
+\rightarrow
+\boxed{\mathbf q_{ST}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.31 Number of Stars Required</h3>
+<!-- ========================================================= -->
+
+<p>
+A single measured star vector does not uniquely determine complete
+three-axis attitude because rotation about that vector remains
+unobservable.
+</p>
+
+<p>
+Two non-collinear vector observations can theoretically determine full
+attitude.
+</p>
+
+<p>
+Therefore, under ideal geometry,
+</p>
+
+<p>
+\[
+\boxed{
+N_{\mathrm{stars}}\geq2
+}
+\]
+</p>
+
+<p>
+can provide a complete attitude solution.
+</p>
+
+<p>
+Practical star trackers normally use more than two stars because
+additional observations improve
+</p>
+
+<ul>
+  <li>noise averaging,</li>
+  <li>robustness,</li>
+  <li>star-identification confidence,</li>
+  <li>outlier detection,</li>
+  <li>attitude accuracy.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.32 Importance of Star Geometry</h3>
+<!-- ========================================================= -->
+
+<p>
+The number of observed stars alone does not completely determine
+attitude accuracy. Their geometric distribution is also important.
+</p>
+
+<p>
+Stars spread over the field of view generally provide stronger attitude
+information than stars concentrated in a small region.
+</p>
+
+<p>
+The attitude covariance therefore depends on
+</p>
+
+<ul>
+  <li>number of observed stars,</li>
+  <li>angular distribution of the stars,</li>
+  <li>individual centroid uncertainty,</li>
+  <li>measurement weights,</li>
+  <li>optical calibration,</li>
+  <li>catalogue uncertainty.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.33 Star Tracker Outputs</h3>
+<!-- ========================================================= -->
+
+<p>
+A star tracker can provide more than a quaternion.
+Depending on the hardware, outputs may include
+</p>
+
+<ul>
+  <li>attitude quaternion,</li>
+  <li>direction cosine matrix,</li>
+  <li>Euler angles,</li>
+  <li>identified star vectors,</li>
+  <li>number of tracked stars,</li>
+  <li>measurement timestamp,</li>
+  <li>attitude covariance or accuracy estimate,</li>
+  <li>solution-quality indicator,</li>
+  <li>acquisition/tracking status,</li>
+  <li>validity flag,</li>
+  <li>fault or warning flags,</li>
+  <li>instrument temperature and housekeeping information.</li>
+</ul>
+
+<p>
+For a GNC estimator, a useful abstract output interface is
+</p>
+
+<p>
+\[
+\boxed{
+\{
+\mathbf q_{ST},
+R_{ST},
+t_{ST},
+valid_{ST}
+\}.
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.34 Ideal Star Tracker Model</h3>
+<!-- ========================================================= -->
+
+<p>
+At the simplest GNC modelling level, an ideal star tracker produces
+exactly the true spacecraft attitude:
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_{ST}
+=
+\mathbf q_{true}.
+}
+\]
+</p>
+
+<p>
+At vector level,
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s_{m,i}^S
+=
+C_I^S
+\mathbf s_i^I.
+}
+\]
+</p>
+
+<p>
+This ideal model assumes
+</p>
+
+<ul>
+  <li>perfect optics,</li>
+  <li>perfect centroiding,</li>
+  <li>perfect catalogue data,</li>
+  <li>zero alignment error,</li>
+  <li>zero measurement noise,</li>
+  <li>zero latency,</li>
+  <li>perfect timing,</li>
+  <li>no motion blur,</li>
+  <li>no stray light,</li>
+  <li>perfect star identification.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.35 Small-Angle Attitude Error Model</h3>
+<!-- ========================================================= -->
+
+<p>
+For GNC simulation and estimation, star-tracker error is often
+represented as a small three-axis rotation:
+</p>
+
+<p>
+\[
+\delta\boldsymbol{\theta}
+=
+\begin{bmatrix}
+\delta\theta_x\\
+\delta\theta_y\\
+\delta\theta_z
+\end{bmatrix}.
+\]
+</p>
+
+<p>
+For a scalar-first quaternion and sufficiently small error,
+</p>
+
+<p>
+\[
+\boxed{
+\delta\mathbf q
+\approx
+\begin{bmatrix}
+1\\
+\frac{1}{2}\delta\boldsymbol{\theta}
+\end{bmatrix}.
+}
+\]
+</p>
+
+<p>
+A measured quaternion can then be modelled as
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_m
+=
+\delta\mathbf q
+\otimes
+\mathbf q_{true}.
+}
+\]
+</p>
+
+<p>
+The multiplication order depends on whether the error is defined in the
+left- or right-multiplicative sense and on the adopted frame convention.
+The convention must therefore be defined explicitly in both simulation
+and flight software.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.36 Measurement Covariance</h3>
+<!-- ========================================================= -->
+
+<p>
+The small attitude error can be modelled as a random vector:
+</p>
+
+<p>
+\[
+\boxed{
+\delta\boldsymbol{\theta}_{ST}
+\sim
+\mathcal N
+(
+\mathbf 0,
+R_{ST}
+).
+}
+\]
+</p>
+
+<p>
+A simplified diagonal covariance is
+</p>
+
+<p>
+\[
+\boxed{
+R_{ST}
+=
+\begin{bmatrix}
+\sigma_x^2&0&0\\
+0&\sigma_y^2&0\\
+0&0&\sigma_z^2
+\end{bmatrix}.
+}
+\]
+</p>
+
+<p>
+A more complete model may contain non-zero cross-correlation terms.
+</p>
+
+<p>
+The covariance is particularly important when the measurement is fused
+inside an EKF or MEKF because it determines how strongly the estimator
+should trust the star tracker relative to its propagated attitude.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.37 Cross-Boresight and Roll Accuracy</h3>
+<!-- ========================================================= -->
+
+<p>
+Star-tracker attitude accuracy is often not identical about all three
+axes.
+</p>
+
+<p>
+The optical axis is called the <strong>boresight</strong>.
+Errors perpendicular to the optical axis are commonly described as
+cross-boresight errors.
+</p>
+
+<p>
+Rotation about the optical axis is commonly referred to as roll or twist
+about the boresight.
+</p>
+
+<p>
+A simplified covariance may therefore have the form
+</p>
+
+<p>
+\[
+R_{ST}
+=
+\begin{bmatrix}
+\sigma_{CB1}^2&0&0\\
+0&\sigma_{CB2}^2&0\\
+0&0&\sigma_{roll}^2
+\end{bmatrix}.
+\]
+</p>
+
+<p>
+The roll accuracy may differ from cross-boresight accuracy because roll
+information depends strongly on the relative geometry of multiple stars
+across the focal plane.
+</p>
+
+<p>
+For precision simulations, using one scalar accuracy value for all three
+axes can therefore be insufficient.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.38 Accuracy, Precision and Attitude Knowledge</h3>
+<!-- ========================================================= -->
+
+<h4>Precision</h4>
+
+<p>
+Precision describes the repeatability of measurements.
+</p>
+
+<h4>Accuracy</h4>
+
+<p>
+Accuracy describes closeness to the true attitude.
+</p>
+
+<h4>Attitude Knowledge</h4>
+
+<p>
+Attitude knowledge describes how accurately the complete spacecraft
+navigation system knows the spacecraft orientation.
+</p>
+
+<p>
+Therefore,
+</p>
+
+<p>
+\[
+\boxed{
+\text{Star Tracker Accuracy}
+\neq
+\text{Spacecraft Attitude Knowledge}.
+}
+\]
+</p>
+
+<p>
+Final attitude knowledge can also be affected by
+</p>
+
+<ul>
+  <li>sensor mounting error,</li>
+  <li>thermal distortion,</li>
+  <li>gyro bias,</li>
+  <li>timestamp error,</li>
+  <li>filter tuning,</li>
+  <li>structural deformation,</li>
+  <li>reference-frame transformations.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.39 Star Tracker Bias</h3>
+<!-- ========================================================= -->
+
+<p>
+A simplified attitude-error model can be written as
+</p>
+
+<p>
+\[
+\boxed{
+\delta\boldsymbol{\theta}_m
+=
+\mathbf b_{ST}
++
+\mathbf n_{ST}
+}
+\]
+</p>
+
+<p>
+where
+</p>
+
+<ul>
+  <li>\(\mathbf b_{ST}\) represents systematic attitude error,</li>
+  <li>\(\mathbf n_{ST}\) represents random measurement error.</li>
+</ul>
+
+<p>
+Systematic error may arise from
+</p>
+
+<ul>
+  <li>boresight calibration,</li>
+  <li>optical distortion,</li>
+  <li>focal-length calibration,</li>
+  <li>detector geometry,</li>
+  <li>thermal deformation,</li>
+  <li>spacecraft mounting,</li>
+  <li>catalogue or processing errors.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.40 Mounting Alignment</h3>
+<!-- ========================================================= -->
+
+<p>
+The star tracker measures attitude in its own sensor frame \(S\), while
+the GNC system normally requires attitude in the spacecraft body frame
+\(B\).
+</p>
+
+<p>
+The calibrated sensor-to-body transformation is
+</p>
+
+<p>
+\[
+C_S^B.
+\]
+</p>
+
+<p>
+Thus,
+</p>
+
+<p>
+\[
+\boxed{
+C_I^B
+=
+C_S^B C_I^S.
+}
+\]
+</p>
+
+<p>
+If the actual mounting transformation differs from the calibrated
+transformation, a systematic spacecraft attitude error results.
+</p>
+
+<p>
+For a small alignment error, a first-order representation is
+</p>
+
+<p>
+\[
+\boxed{
+C_{S,true}^{B}
+\approx
+\left(
+I-
+[
+\delta\boldsymbol{\theta}_{align}\times
+]
+\right)
+C_{S,cal}^{B}
+}
+\]
+</p>
+
+<p>
+subject to the selected perturbation convention.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.41 Thermoelastic Alignment Error</h3>
+<!-- ========================================================= -->
+
+<p>
+The mechanical relationship between the star tracker and spacecraft
+body can change as temperatures vary.
+</p>
+
+<p>
+Possible causes include
+</p>
+
+<ul>
+  <li>optical-bench expansion,</li>
+  <li>panel deformation,</li>
+  <li>mounting-bracket deformation,</li>
+  <li>temperature gradients,</li>
+  <li>internal instrument deformation.</li>
+</ul>
+
+<p>
+A simple first-order model is
+</p>
+
+<p>
+\[
+\boxed{
+\delta\boldsymbol{\theta}_{align}(T)
+=
+\delta\boldsymbol{\theta}_0
++
+K_T(T-T_0).
+}
+\]
+</p>
+
+<p>
+For high-accuracy spacecraft, thermoelastic alignment errors can become
+comparable to or larger than the intrinsic random measurement noise of
+the tracker.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.42 Timing Error</h3>
+<!-- ========================================================= -->
+
+<p>
+A star-tracker attitude solution corresponds to the time at which the
+image was observed. If the measurement is associated with the wrong
+time, the spacecraft may have rotated between the true observation time
+and the assumed measurement time.
+</p>
+
+<p>
+If the timestamp error is \(\delta t\), then for small rotations
+</p>
+
+<p>
+\[
+\boxed{
+\delta\boldsymbol{\theta}_{time}
+\approx
+\boldsymbol{\omega}\delta t.
+}
+\]
+</p>
+
+<p>
+Therefore, timing accuracy becomes increasingly important as spacecraft
+angular rate increases.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.43 Latency</h3>
+<!-- ========================================================= -->
+
+<p>
+Latency is the time between image acquisition and availability of the
+processed attitude solution.
+</p>
+
+<p>
+The chain is approximately
+</p>
+
+<p>
+\[
+\boxed{\text{Exposure}}
+\rightarrow
+\boxed{\text{Readout}}
+\rightarrow
+\boxed{\text{Image Processing}}
+\rightarrow
+\boxed{\text{Star Identification}}
+\rightarrow
+\boxed{\text{Attitude Solution}}
+\rightarrow
+\boxed{\text{Communication}}.
+\]
+</p>
+
+<p>
+If an image corresponds to time \(t_k\) but is delivered at
+</p>
+
+<p>
+\[
+t_k+\tau,
+\]
+</p>
+
+<p>
+then \(\tau\) is the measurement latency.
+</p>
+
+<p>
+A known latency can often be handled by the navigation architecture,
+provided the measurement is correctly time tagged.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.44 Update Rate</h3>
+<!-- ========================================================= -->
+
+<p>
+Star trackers normally provide measurements at a finite update rate.
+If the update period is \(T_{ST}\),
+</p>
+
+<p>
+\[
+\boxed{
+f_{ST}
+=
+\frac{1}{T_{ST}}.
+}
+\]
+</p>
+
+<p>
+Gyroscopes generally provide measurements much more frequently.
+Therefore, the estimator commonly uses
+</p>
+
+<p>
+\[
+\boxed{\text{Gyroscope}}
+\rightarrow
+\boxed{\text{High-Rate Propagation}}
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\boxed{\text{Star Tracker}}
+\rightarrow
+\boxed{\text{Periodic Absolute Correction}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.45 Sun Exclusion Angle</h3>
+<!-- ========================================================= -->
+
+<p>
+The Sun is enormously brighter than the stars observed by a star
+tracker. Direct sunlight or strong near-axis sunlight can therefore
+saturate the detector or generate severe stray light.
+</p>
+
+<p>
+The tracker typically requires
+</p>
+
+<p>
+\[
+\boxed{
+\theta_{Sun}
+>
+\theta_{Sun,exclusion}.
+}
+\]
+</p>
+
+<p>
+If the Sun approaches the exclusion region, possible effects include
+</p>
+
+<ul>
+  <li>detector saturation,</li>
+  <li>high background illumination,</li>
+  <li>ghost images,</li>
+  <li>internal reflections,</li>
+  <li>loss of detectable stars,</li>
+  <li>invalid attitude solution.</li>
+</ul>
+
+<p>
+Sun exclusion is therefore both a sensor specification and a spacecraft
+attitude-planning constraint.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.46 Earth Exclusion Angle</h3>
+<!-- ========================================================= -->
+
+<p>
+The bright Earth can also produce significant background and stray
+light, particularly for spacecraft in low Earth orbit.
+</p>
+
+<p>
+A tracker may specify a minimum separation from the bright Earth limb:
+</p>
+
+<p>
+\[
+\boxed{
+\theta_{Earth\,limb}
+>
+\theta_{Earth,exclusion}.
+}
+\]
+</p>
+
+<p>
+Earth exclusion geometry should therefore be included when analysing
+star-tracker availability over an orbit.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.47 Moon Exclusion Angle</h3>
+<!-- ========================================================= -->
+
+<p>
+The Moon is another bright object that can interfere with star
+detection.
+</p>
+
+<p>
+A corresponding constraint may be
+</p>
+
+<p>
+\[
+\boxed{
+\theta_{Moon}
+>
+\theta_{Moon,exclusion}.
+}
+\]
+</p>
+
+<p>
+The required angle depends on the tracker optics, baffle, detector, and
+image-processing architecture.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.48 Stray Light</h3>
+<!-- ========================================================= -->
+
+<p>
+A useful focal-plane intensity model is
+</p>
+
+<p>
+\[
+\boxed{
+I_{measured}
+=
+I_{stars}
++
+I_{background}
++
+I_{stray}
++
+n_{detector}.
+}
+\]
+</p>
+
+<p>
+Stray-light sources can include
+</p>
+
+<ul>
+  <li>the Sun,</li>
+  <li>Earth,</li>
+  <li>Moon,</li>
+  <li>illuminated spacecraft structures,</li>
+  <li>solar arrays,</li>
+  <li>antennas,</li>
+  <li>internal optical reflections.</li>
+</ul>
+
+<p>
+Stray light raises the image background and reduces the contrast between
+stars and the detector background.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.49 Baffle Design</h3>
+<!-- ========================================================= -->
+
+<p>
+The baffle prevents or attenuates unwanted off-axis light before it
+reaches the optical system.
+</p>
+
+<p>
+Important baffle characteristics include
+</p>
+
+<ul>
+  <li>Sun rejection angle,</li>
+  <li>Earth rejection geometry,</li>
+  <li>internal vanes,</li>
+  <li>surface absorptivity,</li>
+  <li>scattering properties,</li>
+  <li>entrance aperture geometry,</li>
+  <li>optical cleanliness.</li>
+</ul>
+
+<p>
+The conceptual process is
+</p>
+
+<p>
+\[
+\boxed{\text{Bright Off-Axis Source}}
+\rightarrow
+\boxed{\text{Baffle Rejection}}
+\rightarrow
+\boxed{\text{Reduced Stray Light}}
+\rightarrow
+\boxed{\text{Improved Star Detection}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.50 Earth Albedo and Spacecraft Reflections</h3>
+<!-- ========================================================= -->
+
+<p>
+Even if the Sun itself is outside the exclusion angle, sunlight reflected
+from Earth or spacecraft surfaces may enter the star-tracker optics.
+</p>
+
+<p>
+Potential reflecting structures include
+</p>
+
+<ul>
+  <li>solar arrays,</li>
+  <li>antennas,</li>
+  <li>radiators,</li>
+  <li>multilayer insulation,</li>
+  <li>payload structures,</li>
+  <li>other bright spacecraft surfaces.</li>
+</ul>
+
+<p>
+Consequently, star-tracker accommodation should consider the complete
+spacecraft optical environment rather than only direct celestial
+sources.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.51 Radiation Effects</h3>
+<!-- ========================================================= -->
+
+<p>
+The detector and electronics operate in the space-radiation
+environment.
+</p>
+
+<p>
+Possible effects include
+</p>
+
+<ul>
+  <li>transient bright pixels,</li>
+  <li>hot-pixel growth,</li>
+  <li>dead pixels,</li>
+  <li>total-ionising-dose degradation,</li>
+  <li>displacement damage,</li>
+  <li>single-event effects,</li>
+  <li>processor upsets.</li>
+</ul>
+
+<p>
+Radiation-induced detector events can be rejected using spatial shape,
+temporal persistence, predicted star position, or catalogue-pattern
+consistency.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.52 False Stars and Non-Stellar Objects</h3>
+<!-- ========================================================= -->
+
+<p>
+Not every bright object detected in the focal plane is necessarily a
+catalogue star.
+</p>
+
+<p>
+False candidates can include
+</p>
+
+<ul>
+  <li>hot pixels,</li>
+  <li>cosmic-ray events,</li>
+  <li>planets,</li>
+  <li>other spacecraft,</li>
+  <li>debris,</li>
+  <li>reflections,</li>
+  <li>optical artifacts.</li>
+</ul>
+
+<p>
+Reliable attitude determination therefore depends on geometric
+consistency between multiple detected objects and the catalogue.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.53 Blinding and Loss of Tracking</h3>
+<!-- ========================================================= -->
+
+<p>
+A star tracker may temporarily fail to provide a valid attitude
+solution.
+</p>
+
+<p>
+Possible causes include
+</p>
+
+<ul>
+  <li>Sun intrusion,</li>
+  <li>Earth intrusion,</li>
+  <li>Moon intrusion,</li>
+  <li>excessive angular rate,</li>
+  <li>insufficient visible stars,</li>
+  <li>high background illumination,</li>
+  <li>detector saturation,</li>
+  <li>radiation events,</li>
+  <li>optical contamination,</li>
+  <li>pattern-identification failure,</li>
+  <li>hardware faults.</li>
+</ul>
+
+<p>
+A realistic sensor interface therefore requires a validity flag:
+</p>
+
+<p>
+\[
+\boxed{
+valid_{ST}
+=
+\begin{cases}
+1,&\text{valid attitude solution}\\
+0,&\text{invalid attitude solution}.
+\end{cases}
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.54 Acquisition and Reacquisition Time</h3>
+<!-- ========================================================= -->
+
+<p>
+After power-up or loss of tracking, the tracker may require finite time
+before a valid attitude solution becomes available.
+</p>
+
+<p>
+Relevant specifications can include
+</p>
+
+<ul>
+  <li>time to first attitude solution,</li>
+  <li>lost-in-space acquisition time,</li>
+  <li>reacquisition time,</li>
+  <li>tracking recovery time.</li>
+</ul>
+
+<p>
+These parameters are important for safe-mode and manoeuvre recovery
+analysis.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.55 Quaternion Sign Ambiguity</h3>
+<!-- ========================================================= -->
+
+<p>
+The two quaternions
+</p>
+
+<p>
+\[
+\mathbf q
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+-\mathbf q
+\]
+</p>
+
+<p>
+represent exactly the same physical orientation.
+</p>
+
+<p>
+Therefore,
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q\equiv-\mathbf q.
+}
+\]
+</p>
+
+<p>
+A tracker may consequently output an attitude quaternion with the
+opposite sign from the previous sample even though the physical attitude
+has changed only slightly.
+</p>
+
+<p>
+A common continuity test is
+</p>
+
+<p>
+\[
+\mathbf q_k^T\mathbf q_{k-1}<0.
+\]
+</p>
+
+<p>
+If this condition occurs, the sign can be changed:
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_k
+\leftarrow
+-\mathbf q_k.
+}
+\]
+</p>
+
+<p>
+This prevents artificial sign discontinuities in interpolation,
+plotting, and some estimator interfaces.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.56 Quaternion Measurement Residual</h3>
+<!-- ========================================================= -->
+
+<p>
+Quaternion components should generally not be treated as four
+independent Euclidean attitude errors.
+</p>
+
+<p>
+Suppose the predicted attitude is
+</p>
+
+<p>
+\[
+\hat{\mathbf q}
+\]
+</p>
+
+<p>
+and the star-tracker attitude is
+</p>
+
+<p>
+\[
+\mathbf q_{ST}.
+\]
+</p>
+
+<p>
+An error quaternion can be formed as
+</p>
+
+<p>
+\[
+\boxed{
+\delta\mathbf q
+=
+\mathbf q_{ST}
+\otimes
+\hat{\mathbf q}^{-1}
+}
+\]
+</p>
+
+<p>
+for one common error convention.
+</p>
+
+<p>
+For a small attitude error,
+</p>
+
+<p>
+\[
+\delta\mathbf q
+\approx
+\begin{bmatrix}
+1\\
+\frac12\delta\boldsymbol{\theta}
+\end{bmatrix}.
+\]
+</p>
+
+<p>
+Hence,
+</p>
+
+<p>
+\[
+\boxed{
+\delta\boldsymbol{\theta}
+\approx
+2\delta\mathbf q_v
+}
+\]
+</p>
+
+<p>
+where \(\delta\mathbf q_v\) is the vector part of the error quaternion.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.57 Star Tracker in a Multiplicative EKF</h3>
+<!-- ========================================================= -->
+
+<p>
+A common spacecraft attitude-estimation architecture uses a nominal
+quaternion together with a small attitude-error state.
+</p>
+
+<p>
+A representative error state is
+</p>
+
+<p>
+\[
+\boxed{
+\delta\mathbf x
+=
+\begin{bmatrix}
+\delta\boldsymbol{\theta}\\
+\delta\mathbf b_g
+\end{bmatrix}
+}
+\]
+</p>
+
+<p>
+where
+</p>
+
+<ul>
+  <li>\(\delta\boldsymbol{\theta}\) is the small attitude error,</li>
+  <li>\(\delta\mathbf b_g\) is the gyro-bias error.</li>
+</ul>
+
+<p>
+The gyro propagates the nominal attitude:
+</p>
+
+<p>
+\[
+\boxed{
+\dot{\hat{\mathbf q}}
+=
+\frac12
+\Omega
+\left(
+\boldsymbol{\omega}_m-\hat{\mathbf b}_g
+\right)
+\hat{\mathbf q}.
+}
+\]
+</p>
+
+<p>
+When a star-tracker measurement arrives, an attitude-error quaternion is
+formed between the measured and predicted attitudes.
+</p>
+
+<p>
+The small-angle residual is then used in the Kalman measurement update.
+The filter can correct both attitude error and gyro-bias error.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.58 Gyroscope + Star Tracker Sensor Fusion</h3>
+<!-- ========================================================= -->
+
+<pre>
+                 Gyroscope
+                     |
+                     v
+              Angular Rate
+                     |
+                     v
+            Bias Compensation
+                     |
+                     v
+          Quaternion Propagation
+                     |
+                     v
+             Predicted Attitude
+                     |
+                     +----------------------+
+                                            |
+                                            v
+Star Tracker --------------------------> MEKF / EKF
+Absolute Attitude                          |
+                                            v
+                                  Attitude Innovation
+                                            |
+                             +--------------+--------------+
+                             |                             |
+                             v                             v
+                     Attitude Correction            Gyro Bias Estimate
+                             |                             |
+                             +--------------+--------------+
+                                            |
+                                            v
+                                  Estimated Attitude
+                                            |
+                                            v
+                                    GNC Controller
+</pre>
+
+<p>
+The gyroscope provides high-rate rotational information, while the star
+tracker periodically anchors the estimate to an absolute celestial
+reference.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.59 Measurement Gating</h3>
+<!-- ========================================================= -->
+
+<p>
+A spacecraft estimator should not automatically accept every star-tracker
+measurement.
+</p>
+
+<p>
+Suppose the attitude innovation is represented by
+</p>
+
+<p>
+\[
+\mathbf y.
+\]
+</p>
+
+<p>
+If its innovation covariance is
+</p>
+
+<p>
+\[
+S,
+\]
+</p>
+
+<p>
+then a normalized innovation statistic can be formed:
+</p>
+
+<p>
+\[
+\boxed{
+d^2
+=
+\mathbf y^T
+S^{-1}
+\mathbf y.
+}
+\]
+</p>
+
+<p>
+If \(d^2\) exceeds a selected statistical threshold, the measurement may
+be rejected or flagged.
+</p>
+
+<p>
+A large innovation can indicate
+</p>
+
+<ul>
+  <li>incorrect star identification,</li>
+  <li>bad timestamp,</li>
+  <li>stale data,</li>
+  <li>tracker reset,</li>
+  <li>blinding,</li>
+  <li>sensor fault,</li>
+  <li>estimator divergence.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.60 Measurement Validity Logic</h3>
+<!-- ========================================================= -->
+
+<p>
+A more complete validity function can be represented as
+</p>
+
+<p>
+\[
+\boxed{
+valid_{ST}
+=
+f(
+status,
+N_{stars},
+quality,
+timestamp,
+R_{ST},
+innovation,
+geometry
+).
+}
+\]
+</p>
+
+<p>
+A star-tracker measurement may be accepted only if
+</p>
+
+<ul>
+  <li>the tracker reports a valid solution,</li>
+  <li>the number of identified stars is sufficient,</li>
+  <li>the quality metric is acceptable,</li>
+  <li>the timestamp is valid,</li>
+  <li>the measurement is not stale,</li>
+  <li>the covariance is acceptable,</li>
+  <li>the innovation passes gating,</li>
+  <li>no severe exclusion condition is present.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.61 Star Tracker Dropout</h3>
+<!-- ========================================================= -->
+
+<p>
+During a star-tracker outage,
+</p>
+
+<p>
+\[
+valid_{ST}=0.
+\]
+</p>
+
+<p>
+The attitude estimator can continue using gyroscope propagation:
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_k
+\leftarrow
+\text{Gyro Propagation}.
+}
+\]
+</p>
+
+<p>
+However, the uncertainty grows because gyro bias and noise are no longer
+periodically corrected by an absolute attitude sensor.
+</p>
+
+<p>
+Therefore,
+</p>
+
+<p>
+\[
+\boxed{
+\text{Longer Star-Tracker Outage}
+\rightarrow
+\text{Larger Attitude Uncertainty}.
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.62 Multiple Star Trackers</h3>
+<!-- ========================================================= -->
+
+<p>
+Spacecraft requiring high availability or fault tolerance may carry more
+than one star tracker.
+</p>
+
+<p>
+Advantages include
+</p>
+
+<ul>
+  <li>redundancy,</li>
+  <li>improved sky coverage,</li>
+  <li>reduced probability of simultaneous blinding,</li>
+  <li>cross-checking between sensors,</li>
+  <li>fault detection and isolation.</li>
+</ul>
+
+<p>
+The architecture becomes
+</p>
+
+<p>
+\[
+\boxed{\text{ST-1}}
++
+\boxed{\text{ST-2}}
++
+\boxed{\text{Gyroscope}}
+\rightarrow
+\boxed{\text{Attitude Estimator}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.63 Multiple Optical Heads</h3>
+<!-- ========================================================= -->
+
+<p>
+Some star-tracker architectures use multiple optical heads connected to
+common processing electronics.
+</p>
+
+<p>
+Each head has a different mounting transformation:
+</p>
+
+<p>
+\[
+C_{S_1}^{B},
+\qquad
+C_{S_2}^{B},
+\qquad
+C_{S_3}^{B}.
+\]
+</p>
+
+<p>
+This can improve total sky availability because a bright object that
+affects one optical head may not affect another.
+</p>
+
+<p>
+However, a shared processor or power interface can introduce common-mode
+failure mechanisms, so multiple heads do not necessarily provide the
+same redundancy as completely independent tracker units.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.64 Relative Alignment Monitoring</h3>
+<!-- ========================================================= -->
+
+<p>
+If two trackers provide simultaneous attitude solutions, their relative
+solutions can be compared.
+</p>
+
+<p>
+The nominal relative orientation between two sensor frames is
+</p>
+
+<p>
+\[
+\boxed{
+C_{S_1}^{S_2}
+=
+C_B^{S_2}C_{S_1}^{B}.
+}
+\]
+</p>
+
+<p>
+A systematic change in the measured relative orientation may indicate
+</p>
+
+<ul>
+  <li>thermal deformation,</li>
+  <li>mounting drift,</li>
+  <li>calibration error,</li>
+  <li>sensor degradation,</li>
+  <li>structural change.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.65 Star Tracker with Sun Sensors</h3>
+<!-- ========================================================= -->
+
+<p>
+A Sun sensor provides a direction to the Sun, whereas a star tracker can
+provide complete three-axis celestial attitude.
+</p>
+
+<p>
+Sun sensors are nevertheless valuable for
+</p>
+
+<ul>
+  <li>safe mode,</li>
+  <li>initial acquisition,</li>
+  <li>coarse attitude determination,</li>
+  <li>independent consistency checks,</li>
+  <li>operation during star-tracker outages.</li>
+</ul>
+
+<p>
+A layered attitude-sensing architecture may therefore use
+</p>
+
+<p>
+\[
+\boxed{
+\text{Gyroscope}
++
+\text{Sun Sensor}
++
+\text{Star Tracker}.
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.66 Star Tracker with Magnetometers</h3>
+<!-- ========================================================= -->
+
+<p>
+A magnetometer provides the local geomagnetic-field direction in the
+spacecraft body frame.
+</p>
+
+<p>
+A Sun sensor and magnetometer can provide coarse attitude information
+during early spacecraft operations.
+</p>
+
+<p>
+A representative mode transition is
+</p>
+
+<p>
+\[
+\boxed{\text{Magnetometer + Sun Sensor}}
+\rightarrow
+\boxed{\text{Coarse Attitude}}
+\rightarrow
+\boxed{\text{Star Tracker Acquisition}}
+\rightarrow
+\boxed{\text{Fine Attitude Knowledge}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.67 Safe-Mode Considerations</h3>
+<!-- ========================================================= -->
+
+<p>
+A star tracker is not always sufficient as the only safe-mode attitude
+sensor because it may require
+</p>
+
+<ul>
+  <li>an acceptable spacecraft angular rate,</li>
+  <li>sufficient visible stars,</li>
+  <li>acceptable Sun/Earth/Moon geometry,</li>
+  <li>successful image processing,</li>
+  <li>functional processing electronics.</li>
+</ul>
+
+<p>
+A possible recovery sequence is
+</p>
+
+<p>
+\[
+\boxed{\text{Safe Mode}}
+\rightarrow
+\boxed{\text{Detumbling}}
+\rightarrow
+\boxed{\text{Coarse Sun / Magnetic Attitude}}
+\rightarrow
+\boxed{\text{Star Tracker Acquisition}}
+\rightarrow
+\boxed{\text{Fine Pointing}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.68 Fine Pointing Applications</h3>
+<!-- ========================================================= -->
+
+<p>
+Star trackers are particularly important for missions requiring fine
+pointing.
+</p>
+
+<p>
+Examples include
+</p>
+
+<ul>
+  <li>high-resolution Earth observation,</li>
+  <li>space astronomy,</li>
+  <li>laser communication,</li>
+  <li>formation flying,</li>
+  <li>precision rendezvous,</li>
+  <li>deep-space missions,</li>
+  <li>high-gain antenna pointing,</li>
+  <li>payload line-of-sight stabilization.</li>
+</ul>
+
+<p>
+The control chain may be represented as
+</p>
+
+<p>
+\[
+\boxed{\text{Star Tracker}}
+\rightarrow
+\boxed{\text{Attitude Estimator}}
+\rightarrow
+\boxed{\text{Attitude Error}}
+\rightarrow
+\boxed{\text{Controller}}
+\rightarrow
+\boxed{\text{Reaction Wheels / CMGs / Thrusters}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.69 Attitude Knowledge, Pointing Error and Stability</h3>
+<!-- ========================================================= -->
+
+<p>
+Three related but different concepts should be distinguished.
+</p>
+
+<h4>Attitude Knowledge Error</h4>
+
+<p>
+The uncertainty in the estimated spacecraft attitude.
+</p>
+
+<h4>Pointing Error</h4>
+
+<p>
+The difference between the actual spacecraft pointing direction and the
+commanded pointing direction.
+</p>
+
+<h4>Pointing Stability</h4>
+
+<p>
+The variation of the pointing direction over a specified time interval.
+</p>
+
+<p>
+Therefore,
+</p>
+
+<p>
+\[
+\boxed{
+\text{Sensor Accuracy}
+\rightarrow
+\text{Attitude Knowledge}
+\rightarrow
+\text{Control Performance}
+\rightarrow
+\text{Pointing Performance}.
+}
+\]
+</p>
+
+<p>
+They should not be treated as interchangeable specifications.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.70 Jitter and High-Frequency Motion</h3>
+<!-- ========================================================= -->
+
+<p>
+A star tracker has finite exposure time and finite update rate.
+It may therefore not fully observe very high-frequency spacecraft
+motion.
+</p>
+
+<p>
+Potential jitter sources include
+</p>
+
+<ul>
+  <li>reaction-wheel imbalance,</li>
+  <li>control-moment gyros,</li>
+  <li>mechanisms,</li>
+  <li>cryocoolers,</li>
+  <li>flexible solar arrays,</li>
+  <li>structural vibration modes.</li>
+</ul>
+
+<p>
+A tracker can therefore provide excellent low-frequency absolute
+attitude knowledge while additional sensors may be needed for
+high-frequency line-of-sight stabilization.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.71 Payload Boresight and Structural Alignment</h3>
+<!-- ========================================================= -->
+
+<p>
+The star tracker measures the orientation of the
+<strong>star-tracker frame</strong>. The payload is interested in the
+orientation of its own boresight.
+</p>
+
+<p>
+The complete transformation may be written as
+</p>
+
+<p>
+\[
+\boxed{
+C_I^{Payload}
+=
+C_B^{Payload}
+C_S^B
+C_I^S.
+}
+\]
+</p>
+
+<p>
+Therefore, even a highly accurate star tracker cannot guarantee
+equivalent payload pointing if the star-tracker-to-payload alignment is
+poorly known.
+</p>
+
+<p>
+This leads to an important spacecraft-level principle:
+</p>
+
+<p>
+\[
+\boxed{
+\text{Excellent Sensor Accuracy}
+\not\Rightarrow
+\text{Excellent Payload Pointing}
+}
+\]
+</p>
+
+<p>
+unless the structural and alignment chain is also accurately
+characterized.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.72 Ground Alignment Calibration</h3>
+<!-- ========================================================= -->
+
+<p>
+Before launch, the orientation of the star tracker relative to the
+spacecraft reference frame can be measured using precision metrology.
+</p>
+
+<p>
+Methods may involve
+</p>
+
+<ul>
+  <li>optical alignment equipment,</li>
+  <li>theodolites,</li>
+  <li>laser trackers,</li>
+  <li>reference cubes,</li>
+  <li>precision mechanical datums.</li>
+</ul>
+
+<p>
+The result is the calibrated mounting transformation
+</p>
+
+<p>
+\[
+\boxed{
+C_S^B.
+}
+\]
+</p>
+
+<p>
+The uncertainty of this transformation must be included in the
+spacecraft attitude knowledge error budget.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.73 In-Orbit Alignment Calibration</h3>
+<!-- ========================================================= -->
+
+<p>
+Launch loads and the orbital thermal environment may change alignment
+slightly after ground calibration.
+</p>
+
+<p>
+In some missions, alignment can be refined in orbit using
+</p>
+
+<ul>
+  <li>known celestial targets,</li>
+  <li>payload observations,</li>
+  <li>Earth landmarks,</li>
+  <li>Sun observations,</li>
+  <li>other precision attitude references.</li>
+</ul>
+
+<p>
+Let the alignment parameters be
+</p>
+
+<p>
+\[
+\mathbf p_{align}.
+\]
+</p>
+
+<p>
+An estimation process can seek
+</p>
+
+<p>
+\[
+\boxed{
+\hat{\mathbf p}_{align}
+=
+\arg\min_{\mathbf p_{align}}
+J(\mathbf p_{align}).
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.74 Complete Star Tracker Error Budget</h3>
+<!-- ========================================================= -->
+
+<p>
+The total attitude error may be decomposed conceptually as
+</p>
+
+<p>
+\[
+\boxed{
+\begin{aligned}
+\delta\boldsymbol{\theta}_{ST}
+={}&
+\delta\boldsymbol{\theta}_{centroid}
++
+\delta\boldsymbol{\theta}_{optics}
++
+\delta\boldsymbol{\theta}_{catalogue}
+\\
+&+
+\delta\boldsymbol{\theta}_{alignment}
++
+\delta\boldsymbol{\theta}_{thermal}
++
+\delta\boldsymbol{\theta}_{timing}
+\\
+&+
+\delta\boldsymbol{\theta}_{motion}
++
+\delta\boldsymbol{\theta}_{processing}
++
+\delta\boldsymbol{\theta}_{noise}.
+\end{aligned}
+}
+\]
+</p>
+
+<p>
+If independent zero-mean contributions can reasonably be assumed, an
+approximate root-sum-square uncertainty can be written as
+</p>
+
+<p>
+\[
+\boxed{
+\sigma_{total}
+=
+\sqrt{
+\sigma_1^2+
+\sigma_2^2+
+\cdots+
+\sigma_n^2
+}.
+}
+\]
+</p>
+
+<p>
+For correlated errors, the complete covariance must be propagated rather
+than simply using root-sum-square addition.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.75 High-Fidelity Attitude Measurement Model</h3>
+<!-- ========================================================= -->
+
+<p>
+At spacecraft GNC level, a useful high-fidelity model is
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_{ST}(t_k)
+=
+\delta\mathbf q_{err}
+\otimes
+\mathbf q_{true}(t_k-\tau)
+}
+\]
+</p>
+
+<p>
+where \(\tau\) represents measurement timing or latency effects as
+defined by the simulation.
+</p>
+
+<p>
+The total attitude-error quaternion can depend on
+</p>
+
+<p>
+\[
+\delta\mathbf q_{err}
+=
+f(
+\delta\boldsymbol{\theta}_{noise},
+\delta\boldsymbol{\theta}_{align},
+\delta\boldsymbol{\theta}_{thermal},
+\delta\boldsymbol{\theta}_{optics},
+\delta\boldsymbol{\theta}_{timing},
+\ldots
+).
+\]
+</p>
+
+<p>
+The measurement is supplied to the estimator only when
+</p>
+
+<p>
+\[
+\boxed{
+valid_{ST}=1.
+}
+\]
+</p>
+
+<p>
+A realistic star-tracker model must therefore represent both
+<strong>measurement error</strong> and
+<strong>measurement availability</strong>.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.76 Vector-Level Star Tracker Model</h3>
+<!-- ========================================================= -->
+
+<p>
+A more detailed model generates individual star measurements.
+</p>
+
+<p>
+For each catalogue star,
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s_i^I
+}
+\]
+</p>
+
+<p>
+is transformed according to spacecraft attitude:
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s_i^S
+=
+C_I^S(\mathbf q)
+\mathbf s_i^I.
+}
+\]
+</p>
+
+<p>
+The direction is then processed through
+</p>
+
+<p>
+\[
+\boxed{\text{FOV Selection}}
+\rightarrow
+\boxed{\text{Optical Projection}}
+\rightarrow
+\boxed{\text{Distortion}}
+\rightarrow
+\boxed{\text{Centroid Error}}
+\rightarrow
+\boxed{\text{Measured LOS}}.
+\]
+</p>
+
+<p>
+The resulting noisy vectors are passed to an attitude solver such as
+QUEST.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.77 Image-Level Star Tracker Model</h3>
+<!-- ========================================================= -->
+
+<p>
+The highest-fidelity simulation creates a synthetic focal-plane image.
+</p>
+
+<pre>
+Star Catalogue
+      |
+      v
+Reference Star Directions
+      |
+      v
+Spacecraft Attitude
+      |
+      v
+Sensor-Frame Star Directions
+      |
+      v
+Field-of-View Selection
+      |
+      v
+Optical Projection
+      |
+      v
+Lens Distortion
+      |
+      v
+Point-Spread Function
+      |
+      v
+Motion Blur
+      |
+      v
+Photon Statistics
+      |
+      v
+Detector Noise
+      |
+      v
+Background + Stray Light
+      |
+      v
+Synthetic Pixel Image
+      |
+      v
+Star Detection
+      |
+      v
+Centroiding
+      |
+      v
+Star Identification
+      |
+      v
+QUEST / Wahba Solver
+      |
+      v
+Attitude Quaternion
+</pre>
+
+<p>
+This level is appropriate when developing or validating the star tracker
+itself. It is usually unnecessary for early spacecraft controller
+design.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.78 Three Levels of Simulation Fidelity</h3>
+<!-- ========================================================= -->
+
+<h4>Level 1 — Attitude Measurement Model</h4>
+
+<p>
+Start with truth attitude and add
+</p>
+
+<ul>
+  <li>attitude noise,</li>
+  <li>alignment error,</li>
+  <li>thermal drift,</li>
+  <li>sampling,</li>
+  <li>latency,</li>
+  <li>dropout.</li>
+</ul>
+
+<p>
+For example,
+</p>
+
+<p>
+\[
+\boxed{
+q_{ST}
+=
+\delta q_{err}
+\otimes
+q_{true}.
+}
+\]
+</p>
+
+<p>
+This level is suitable for most GNC Monte Carlo analysis.
+</p>
+
+<h4>Level 2 — Star Vector Model</h4>
+
+<p>
+Generate visible star directions and solve the attitude using QUEST or
+another Wahba solver.
+</p>
+
+<p>
+This tests the attitude-determination algorithm as well as the estimator.
+</p>
+
+<h4>Level 3 — Image-Level Model</h4>
+
+<p>
+Generate synthetic focal-plane images containing optics, detector noise,
+PSF, motion blur, stray light, centroiding, and pattern recognition.
+</p>
+
+<p>
+This level is appropriate for detailed star-tracker development.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.79 Simulink Star Tracker Model</h3>
+<!-- ========================================================= -->
+
+<p>
+For spacecraft GNC simulation, a practical Simulink architecture is
+</p>
+
+<pre>
+True Spacecraft Attitude
+          |
+          v
+Sensor Mounting Transformation
+          |
+          v
+Star Tracker Frame Attitude
+          |
+          v
+Alignment Error
+          |
+          v
+Thermal Alignment Drift
+          |
+          v
+Attitude Measurement Noise
+          |
+          v
+Sample / Update-Rate Logic
+          |
+          v
+Latency / Delay
+          |
+          v
+Sun / Earth / Moon Exclusion Logic
+          |
+          v
+Angular-Rate Validity Logic
+          |
+          v
+Dropout / Availability Logic
+          |
+          v
+Measured Quaternion
+          |
+          +---------> Measurement Covariance
+          |
+          +---------> Validity Flag
+          |
+          +---------> Measurement Timestamp
+          |
+          v
+       MEKF / EKF
+</pre>
+
+<p>
+Useful Simulink blocks include
+</p>
+
+<ul>
+  <li>Quaternion or DCM transformation blocks,</li>
+  <li>MATLAB Function blocks for quaternion perturbations,</li>
+  <li>Random Number blocks for angular noise,</li>
+  <li>Zero-Order Hold for measurement sampling,</li>
+  <li>Transport Delay or explicit timestamp logic for latency,</li>
+  <li>Switch blocks for measurement validity,</li>
+  <li>Stateflow for acquisition/tracking/fault modes.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.80 Star Visibility Model</h3>
+<!-- ========================================================= -->
+
+<p>
+For vector-level simulation, the model must determine which catalogue
+stars lie inside the tracker field of view.
+</p>
+
+<p>
+Let the star-tracker boresight expressed in the inertial frame be
+</p>
+
+<p>
+\[
+\mathbf b^I.
+\]
+</p>
+
+<p>
+For catalogue star \(i\),
+</p>
+
+<p>
+\[
+\mathbf s_i^I,
+\]
+</p>
+
+<p>
+the angular separation from the boresight is
+</p>
+
+<p>
+\[
+\boxed{
+\theta_i
+=
+\cos^{-1}
+\left[
+(\mathbf b^I)^T
+\mathbf s_i^I
+\right].
+}
+\]
+</p>
+
+<p>
+For a circular field of view with half-angle
+\(\theta_{FOV}\),
+</p>
+
+<p>
+\[
+\boxed{
+\theta_i
+\leq
+\theta_{FOV}
+}
+\]
+</p>
+
+<p>
+is the basic geometric visibility condition.
+</p>
+
+<p>
+Further checks should then consider magnitude, occultation, exclusion
+angles, and detector boundaries.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.81 Star Occultation</h3>
+<!-- ========================================================= -->
+
+<p>
+A star may lie inside the instrument field of view but still be blocked
+by a celestial body.
+</p>
+
+<p>
+For example, in low Earth orbit the Earth can occult a large portion of
+the celestial sphere.
+</p>
+
+<p>
+Therefore,
+</p>
+
+<p>
+\[
+\boxed{
+\text{Inside FOV}
+\neq
+\text{Visible Star}.
+}
+\]
+</p>
+
+<p>
+A realistic star-selection algorithm should evaluate both
+</p>
+
+<ul>
+  <li>field-of-view geometry,</li>
+  <li>line-of-sight occultation.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.82 Probability of Detection</h3>
+<!-- ========================================================= -->
+
+<p>
+A high-fidelity star model need not treat star detection as perfectly
+deterministic.
+</p>
+
+<p>
+Detection probability may depend on
+</p>
+
+<p>
+\[
+\boxed{
+P_D
+=
+f(
+m,
+SNR,
+T_e,
+\omega,
+I_{background}
+).
+}
+\]
+</p>
+
+<p>
+A bright star under low-background conditions may have a detection
+probability close to unity, while a star near the limiting magnitude may
+be detected only intermittently.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.83 False-Alarm Probability</h3>
+<!-- ========================================================= -->
+
+<p>
+Noise, hot pixels, and radiation events can generate false star
+candidates.
+</p>
+
+<p>
+A detailed model may therefore include
+</p>
+
+<p>
+\[
+\boxed{
+P_{FA}
+=
+P(\text{false detection}).
+}
+\]
+</p>
+
+<p>
+The pattern-recognition algorithm must remain robust when the candidate
+set contains both real and false objects.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.84 Dynamic Exposure Control</h3>
+<!-- ========================================================= -->
+
+<p>
+Some star trackers can adjust exposure according to the current
+operating condition.
+</p>
+
+<p>
+Conceptually,
+</p>
+
+<p>
+\[
+\boxed{
+T_e
+=
+f(
+\omega,
+I_{background},
+\text{star brightness}
+).
+}
+\]
+</p>
+
+<p>
+At low spacecraft angular rates, a longer exposure can improve
+sensitivity.
+</p>
+
+<p>
+At high angular rates, a shorter exposure reduces star streaking.
+</p>
+
+<p>
+Thus adaptive exposure helps balance
+</p>
+
+<p>
+\[
+\boxed{
+\text{Sensitivity}
+\leftrightarrow
+\text{Motion Blur}.
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.85 Rolling-Shutter Effects</h3>
+<!-- ========================================================= -->
+
+<p>
+Some CMOS detectors use rolling-shutter readout. In this architecture,
+different detector rows correspond to slightly different observation
+times.
+</p>
+
+<p>
+The effective observation time can be represented as
+</p>
+
+<p>
+\[
+\boxed{
+t=t(v)
+}
+\]
+</p>
+
+<p>
+where \(v\) is the detector row.
+</p>
+
+<p>
+If the spacecraft rotates during readout, the star pattern can become
+geometrically distorted.
+</p>
+
+<p>
+A global-shutter detector exposes the complete image more nearly at the
+same time and therefore avoids this particular row-dependent temporal
+distortion.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.86 Optical Defocus and PSF Design</h3>
+<!-- ========================================================= -->
+
+<p>
+It might appear that the ideal star image should always occupy the
+smallest possible number of pixels. In practice, controlled spreading of
+the star image can be useful.
+</p>
+
+<p>
+A PSF distributed over several pixels provides intensity information
+that supports sub-pixel centroiding.
+</p>
+
+<p>
+However, excessive spreading can
+</p>
+
+<ul>
+  <li>reduce peak intensity,</li>
+  <li>reduce detection margin,</li>
+  <li>increase sensitivity to background,</li>
+  <li>cause neighbouring star images to overlap.</li>
+</ul>
+
+<p>
+The optical PSF is therefore part of the complete centroiding and
+accuracy design.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.87 Calibration Parameters</h3>
+<!-- ========================================================= -->
+
+<p>
+A detailed star-tracker calibration model may contain
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf p_{cal}
+=
+[
+f_x,
+f_y,
+c_x,
+c_y,
+k_1,
+k_2,
+\ldots,
+\delta\boldsymbol{\theta}_{align}
+]^T.
+}
+\]
+</p>
+
+<p>
+Calibration can estimate
+</p>
+
+<ul>
+  <li>focal length,</li>
+  <li>principal point,</li>
+  <li>radial distortion,</li>
+  <li>tangential distortion,</li>
+  <li>pixel scale,</li>
+  <li>detector orientation,</li>
+  <li>boresight alignment,</li>
+  <li>thermal calibration coefficients.</li>
+</ul>
+
+<p>
+The calibrated line-of-sight vector can be represented as
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s_{cal}
+=
+f_{cal}
+(
+u,v,\mathbf p_{cal}
+).
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.88 Reading a Star Tracker Datasheet</h3>
+<!-- ========================================================= -->
+
+<p>
+Star-tracker selection requires careful interpretation of the datasheet.
+The following parameters are particularly important.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Parameter</th>
+      <th>GNC Significance</th>
+    </tr>
+  </thead>
+
+  <tbody>
+
+    <tr>
+      <td>Attitude accuracy</td>
+      <td>Accuracy of the absolute attitude measurement.</td>
+    </tr>
+
+    <tr>
+      <td>Cross-boresight accuracy</td>
+      <td>Angular accuracy perpendicular to the optical axis.</td>
+    </tr>
+
+    <tr>
+      <td>Roll accuracy</td>
+      <td>Accuracy for rotation around the optical boresight.</td>
+    </tr>
+
+    <tr>
+      <td>Noise-equivalent angle</td>
+      <td>Short-term angular measurement noise.</td>
+    </tr>
+
+    <tr>
+      <td>Field of view</td>
+      <td>Determines sky coverage and available star population.</td>
+    </tr>
+
+    <tr>
+      <td>Limiting magnitude</td>
+      <td>Indicates the faintest usable star population.</td>
+    </tr>
+
+    <tr>
+      <td>Update rate</td>
+      <td>Frequency of attitude solutions.</td>
+    </tr>
+
+    <tr>
+      <td>Acquisition time</td>
+      <td>Time required to establish an initial attitude solution.</td>
+    </tr>
+
+    <tr>
+      <td>Reacquisition time</td>
+      <td>Recovery time following loss of tracking.</td>
+    </tr>
+
+    <tr>
+      <td>Lost-in-space capability</td>
+      <td>Ability to determine attitude without a prior attitude estimate.</td>
+    </tr>
+
+    <tr>
+      <td>Maximum tracking rate</td>
+      <td>Maximum angular rate while maintaining tracking.</td>
+    </tr>
+
+    <tr>
+      <td>Maximum acquisition rate</td>
+      <td>Maximum angular rate for successful acquisition.</td>
+    </tr>
+
+    <tr>
+      <td>Sun exclusion angle</td>
+      <td>Minimum allowable angular separation from the Sun.</td>
+    </tr>
+
+    <tr>
+      <td>Earth exclusion angle</td>
+      <td>Minimum allowable separation from the bright Earth or limb.</td>
+    </tr>
+
+    <tr>
+      <td>Moon exclusion angle</td>
+      <td>Minimum allowable separation from the Moon.</td>
+    </tr>
+
+    <tr>
+      <td>Latency</td>
+      <td>Delay between observation and availability of attitude data.</td>
+    </tr>
+
+    <tr>
+      <td>Timestamp accuracy</td>
+      <td>Determines how accurately the attitude measurement is associated with time.</td>
+    </tr>
+
+    <tr>
+      <td>Number of tracked stars</td>
+      <td>Affects robustness and attitude-solution geometry.</td>
+    </tr>
+
+    <tr>
+      <td>Output format</td>
+      <td>Quaternion, DCM, star vectors, covariance, status, etc.</td>
+    </tr>
+
+    <tr>
+      <td>Electrical interface</td>
+      <td>Compatibility with spacecraft avionics.</td>
+    </tr>
+
+    <tr>
+      <td>Power</td>
+      <td>Spacecraft electrical power requirement.</td>
+    </tr>
+
+    <tr>
+      <td>Mass</td>
+      <td>Spacecraft mass allocation.</td>
+    </tr>
+
+    <tr>
+      <td>Dimensions</td>
+      <td>Mechanical accommodation requirement.</td>
+    </tr>
+
+    <tr>
+      <td>Operating temperature</td>
+      <td>Thermal compatibility during normal operation.</td>
+    </tr>
+
+    <tr>
+      <td>Survival temperature</td>
+      <td>Allowable non-operating temperature range.</td>
+    </tr>
+
+    <tr>
+      <td>Radiation tolerance</td>
+      <td>Suitability for the expected mission environment.</td>
+    </tr>
+
+    <tr>
+      <td>Shock and vibration qualification</td>
+      <td>Compatibility with launch loads.</td>
+    </tr>
+
+    <tr>
+      <td>Mission lifetime</td>
+      <td>Compatibility with required spacecraft lifetime.</td>
+    </tr>
+
+    <tr>
+      <td>Space heritage</td>
+      <td>Evidence of prior operational use in space.</td>
+    </tr>
+
+  </tbody>
+</table>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.89 Important Datasheet Distinctions</h3>
+<!-- ========================================================= -->
+
+<h4>Accuracy vs Resolution</h4>
+
+<p>
+Fine detector resolution does not automatically imply equivalent
+absolute attitude accuracy.
+</p>
+
+<h4>Update Rate vs Measurement Bandwidth</h4>
+
+<p>
+A high numerical output rate does not necessarily mean that all
+high-frequency spacecraft motion is measured accurately.
+</p>
+
+<h4>Tracking Rate vs Acquisition Rate</h4>
+
+<p>
+The maximum rate for maintaining an existing star lock may differ
+significantly from the maximum rate at which a lost-in-space attitude
+solution can be acquired.
+</p>
+
+<h4>Latency vs Timestamp Accuracy</h4>
+
+<p>
+A known processing delay can often be compensated. An unknown timing
+error can directly become an attitude error during spacecraft rotation.
+</p>
+
+<h4>Sensor Accuracy vs Spacecraft Attitude Knowledge</h4>
+
+<p>
+The final spacecraft attitude knowledge also includes mounting,
+thermal, timing, structural, and estimation errors.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.90 Star Tracker Selection for a Space Mission</h3>
+<!-- ========================================================= -->
+
+<p>
+Sensor selection should begin with the mission-level pointing and
+attitude-knowledge requirements.
+</p>
+
+<p>
+A useful requirements flow is
+</p>
+
+<p>
+\[
+\boxed{\text{Mission / Payload Requirement}}
+\rightarrow
+\boxed{\text{Pointing Requirement}}
+\rightarrow
+\boxed{\text{Attitude Knowledge Requirement}}
+\rightarrow
+\boxed{\text{Sensor Requirement}}
+\rightarrow
+\boxed{\text{Star Tracker Selection}}.
+\]
+</p>
+
+<p>
+Important selection questions include:
+</p>
+
+<ol>
+  <li>What absolute attitude knowledge is required?</li>
+  <li>What pointing stability is required?</li>
+  <li>What is the spacecraft maximum angular rate?</li>
+  <li>What is the expected slew rate?</li>
+  <li>Is lost-in-space acquisition required?</li>
+  <li>What acquisition time is acceptable?</li>
+  <li>What update rate is required?</li>
+  <li>How much latency can the estimator tolerate?</li>
+  <li>What timestamp accuracy is required?</li>
+  <li>What Sun exclusion angle can the mission accommodate?</li>
+  <li>Will Earth frequently approach the FOV?</li>
+  <li>Is Moon exclusion important?</li>
+  <li>What star-tracker outage duration can be tolerated?</li>
+  <li>Is one tracker sufficient?</li>
+  <li>Is redundant or multi-head architecture required?</li>
+  <li>What alignment stability is required?</li>
+  <li>What thermal environment is expected?</li>
+  <li>What radiation environment is expected?</li>
+  <li>What mass and power are available?</li>
+  <li>Is the communication interface compatible?</li>
+  <li>What environmental qualification is required?</li>
+  <li>What space heritage is available?</li>
+</ol>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.91 Example Star Tracker Error Model</h3>
+<!-- ========================================================= -->
+
+<p>
+Consider a simplified star tracker having small-angle standard
+deviations
+</p>
+
+<p>
+\[
+\sigma_x=10~\text{arcsec},
+\]
+</p>
+
+<p>
+\[
+\sigma_y=10~\text{arcsec},
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\sigma_z=40~\text{arcsec}.
+\]
+</p>
+
+<p>
+Since
+</p>
+
+<p>
+\[
+1^\circ=3600~\text{arcsec},
+\]
+</p>
+
+<p>
+the equivalent values in degrees are
+</p>
+
+<p>
+\[
+\sigma_x
+=
+\frac{10}{3600}
+\approx
+0.00278^\circ,
+\]
+</p>
+
+<p>
+\[
+\sigma_y
+\approx
+0.00278^\circ,
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\sigma_z
+=
+\frac{40}{3600}
+\approx
+0.0111^\circ.
+\]
+</p>
+
+<p>
+The simplified covariance is
+</p>
+
+<p>
+\[
+\boxed{
+R_{ST}
+=
+\begin{bmatrix}
+\sigma_x^2&0&0\\
+0&\sigma_y^2&0\\
+0&0&\sigma_z^2
+\end{bmatrix}.
+}
+\]
+</p>
+
+<p>
+For implementation in attitude algorithms, the angular quantities should
+normally be converted into radians.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.92 Monte Carlo Star Tracker Model</h3>
+<!-- ========================================================= -->
+
+<p>
+Monte Carlo analysis can be used to evaluate the sensitivity of the
+spacecraft GNC system to star-tracker uncertainties.
+</p>
+
+<p>
+Parameters that can be randomized include
+</p>
+
+<ul>
+  <li>cross-boresight measurement noise,</li>
+  <li>roll measurement noise,</li>
+  <li>fixed mounting error,</li>
+  <li>thermal alignment error,</li>
+  <li>timestamp error,</li>
+  <li>latency,</li>
+  <li>update timing,</li>
+  <li>dropout duration,</li>
+  <li>reacquisition time.</li>
+</ul>
+
+<p>
+One realization can be represented schematically as
+</p>
+
+<p>
+\[
+\boxed{
+q_{ST}
+=
+\delta q_{noise}
+\otimes
+\delta q_{align}
+\otimes
+q_{true}(t-\tau).
+}
+\]
+</p>
+
+<p>
+A corresponding validity signal is
+</p>
+
+<p>
+\[
+\boxed{
+valid_{ST}(t)\in\{0,1\}.
+}
+\]
+</p>
+
+<p>
+This allows Monte Carlo analysis to evaluate not only measurement
+accuracy but also loss and recovery of absolute attitude measurements.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.93 Failure Modes</h3>
+<!-- ========================================================= -->
+
+<p>
+Potential star-tracker failure modes include
+</p>
+
+<ul>
+  <li>no attitude solution,</li>
+  <li>incorrect attitude solution,</li>
+  <li>stale attitude data,</li>
+  <li>corrupted quaternion,</li>
+  <li>excessive measurement noise,</li>
+  <li>optical contamination,</li>
+  <li>detector degradation,</li>
+  <li>thermal misalignment,</li>
+  <li>catalogue corruption,</li>
+  <li>processor reset,</li>
+  <li>communication failure,</li>
+  <li>false star identification,</li>
+  <li>repeated loss of tracking,</li>
+  <li>bright-object blinding.</li>
+</ul>
+
+<p>
+A critical distinction is
+</p>
+
+<p>
+\[
+\boxed{\text{No Measurement}}
+\]
+</p>
+
+<p>
+versus
+</p>
+
+<p>
+\[
+\boxed{\text{Incorrect Measurement}}.
+\]
+</p>
+
+<p>
+An incorrect measurement can be particularly dangerous because it may
+appear valid unless additional consistency checks are performed.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.94 Fault Detection, Isolation and Recovery</h3>
+<!-- ========================================================= -->
+
+<h4>Quaternion Norm Check</h4>
+
+<p>
+A valid attitude quaternion should satisfy
+</p>
+
+<p>
+\[
+\boxed{
+\left|
+\|\mathbf q_{ST}\|-1
+\right|
+<
+\epsilon_q.
+}
+\]
+</p>
+
+<h4>Innovation Check</h4>
+
+<p>
+The difference from the gyro-propagated attitude should remain within an
+appropriate uncertainty-dependent bound.
+</p>
+
+<h4>Timestamp Check</h4>
+
+<p>
+Measurements with invalid, repeated, or stale timestamps can be
+rejected.
+</p>
+
+<h4>Tracker Status Check</h4>
+
+<p>
+Internal hardware status and validity flags should be interpreted by the
+flight software.
+</p>
+
+<h4>Star-Count Check</h4>
+
+<p>
+A solution based on insufficient or poor-quality stars may be rejected.
+</p>
+
+<h4>Cross-Sensor Check</h4>
+
+<p>
+The tracker solution can be compared with
+</p>
+
+<ul>
+  <li>gyro propagation,</li>
+  <li>Sun sensor measurements,</li>
+  <li>magnetometer measurements,</li>
+  <li>another star tracker.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.95 Accuracy vs Availability</h3>
+<!-- ========================================================= -->
+
+<p>
+A star tracker may provide extremely accurate measurements when valid,
+yet be unavailable during some orbital or spacecraft attitude
+conditions.
+</p>
+
+<p>
+Therefore, mission analysis must consider both
+</p>
+
+<p>
+\[
+\boxed{\text{Measurement Accuracy}}
+\]
+</p>
+
+<p>
+and
+</p>
+
+<p>
+\[
+\boxed{\text{Measurement Availability}}.
+\]
+</p>
+
+<p>
+Availability may be represented statistically by
+</p>
+
+<p>
+\[
+\boxed{
+P(valid_{ST}).
+}
+\]
+</p>
+
+<p>
+It depends on
+</p>
+
+<ul>
+  <li>orbit geometry,</li>
+  <li>spacecraft attitude profile,</li>
+  <li>Sun/Earth/Moon exclusion,</li>
+  <li>spacecraft angular rate,</li>
+  <li>visible-star density,</li>
+  <li>thermal state,</li>
+  <li>hardware reliability.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.96 Spacecraft Placement</h3>
+<!-- ========================================================= -->
+
+<p>
+Star-tracker placement is a spacecraft-level design problem.
+The sensor should have a sufficiently clear view of the celestial sphere
+while remaining mechanically and thermally stable.
+</p>
+
+<p>
+Placement should consider
+</p>
+
+<ul>
+  <li>Sun exclusion geometry,</li>
+  <li>Earth limb geometry,</li>
+  <li>Moon geometry,</li>
+  <li>payload obstructions,</li>
+  <li>solar-array motion,</li>
+  <li>antenna motion,</li>
+  <li>thruster plume direction,</li>
+  <li>contamination sources,</li>
+  <li>structural stiffness,</li>
+  <li>thermal gradients,</li>
+  <li>harness routing.</li>
+</ul>
+
+<p>
+For precision missions, the tracker should ideally be mounted on a
+stable structure whose alignment relative to the precision payload is
+well characterized.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.97 Optical Contamination</h3>
+<!-- ========================================================= -->
+
+<p>
+Because a star tracker is an optical sensor, contamination can directly
+affect its performance.
+</p>
+
+<p>
+Possible contamination sources include
+</p>
+
+<ul>
+  <li>outgassing products,</li>
+  <li>thruster products,</li>
+  <li>launch-environment contamination,</li>
+  <li>condensed volatile materials,</li>
+  <li>dust or particulate contamination.</li>
+</ul>
+
+<p>
+Contamination can reduce optical transmission or increase scattering,
+thereby reducing star-detection margin.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.98 Operational Modes</h3>
+<!-- ========================================================= -->
+
+<p>
+A star tracker may operate through several internal modes:
+</p>
+
+<p>
+\[
+\boxed{\text{OFF}}
+\rightarrow
+\boxed{\text{BOOT}}
+\rightarrow
+\boxed{\text{ACQUISITION}}
+\rightarrow
+\boxed{\text{TRACKING}}.
+\]
+</p>
+
+<p>
+Additional states may include
+</p>
+
+<ul>
+  <li>lost-in-space,</li>
+  <li>reacquisition,</li>
+  <li>degraded mode,</li>
+  <li>fault mode.</li>
+</ul>
+
+<p>
+The GNC system should use the tracker mode and quality information rather
+than treating every received quaternion as equally reliable.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.99 Initialization Sequence</h3>
+<!-- ========================================================= -->
+
+<p>
+A representative startup sequence is
+</p>
+
+<p>
+\[
+\boxed{\text{Power On}}
+\rightarrow
+\boxed{\text{Self Test}}
+\rightarrow
+\boxed{\text{Detector Initialization}}
+\rightarrow
+\boxed{\text{Image Acquisition}}
+\rightarrow
+\boxed{\text{Star Detection}}
+\rightarrow
+\boxed{\text{Star Identification}}
+\rightarrow
+\boxed{\text{Initial Attitude}}
+\rightarrow
+\boxed{\text{Tracking}}.
+\]
+</p>
+
+<p>
+The spacecraft operations concept must account for the time required to
+reach a valid tracking solution.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.100 Performance During Spacecraft Slews</h3>
+<!-- ========================================================= -->
+
+<p>
+During a large spacecraft slew, angular rate may become too high for
+normal star-tracker operation.
+</p>
+
+<p>
+Possible strategies include
+</p>
+
+<ul>
+  <li>maintain tracking if the rate remains within limits,</li>
+  <li>reduce exposure time,</li>
+  <li>temporarily rely on gyroscope propagation,</li>
+  <li>reject degraded star-tracker measurements,</li>
+  <li>reacquire after the manoeuvre.</li>
+</ul>
+
+<p>
+A common operational sequence is
+</p>
+
+<p>
+\[
+\boxed{\text{Fine Pointing}}
+\rightarrow
+\boxed{\text{High-Rate Slew}}
+\rightarrow
+\boxed{\text{Gyro Propagation}}
+\rightarrow
+\boxed{\text{Slew Completion}}
+\rightarrow
+\boxed{\text{Star Tracker Reacquisition}}
+\rightarrow
+\boxed{\text{Fine Pointing}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.101 Star Tracker and Spacecraft Autonomy</h3>
+<!-- ========================================================= -->
+
+<p>
+An autonomous star tracker can determine spacecraft attitude without
+ground intervention.
+</p>
+
+<p>
+This capability is particularly valuable following
+</p>
+
+<ul>
+  <li>initial deployment,</li>
+  <li>processor reset,</li>
+  <li>unexpected attitude loss,</li>
+  <li>safe-mode recovery,</li>
+  <li>long-duration autonomous operation.</li>
+</ul>
+
+<p>
+The autonomy chain is
+</p>
+
+<p>
+\[
+\boxed{\text{Unknown Attitude}}
+\rightarrow
+\boxed{\text{Star Image}}
+\rightarrow
+\boxed{\text{Lost-in-Space Identification}}
+\rightarrow
+\boxed{\text{Absolute Attitude}}
+\rightarrow
+\boxed{\text{Autonomous GNC}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.102 Comparison with Other Attitude Sensors</h3>
+<!-- ========================================================= -->
+
+<table>
+
+<thead>
+<tr>
+  <th>Sensor</th>
+  <th>Primary Measurement</th>
+  <th>Main Strength</th>
+  <th>Main Limitation</th>
+</tr>
+</thead>
+
+<tbody>
+
+<tr>
+  <td>Gyroscope</td>
+  <td>Angular rate</td>
+  <td>High-rate attitude propagation</td>
+  <td>Bias causes long-term drift</td>
+</tr>
+
+<tr>
+  <td>Magnetometer</td>
+  <td>Magnetic-field vector</td>
+  <td>Simple absolute reference</td>
+  <td>Magnetic disturbances and moderate/coarse accuracy</td>
+</tr>
+
+<tr>
+  <td>Sun Sensor</td>
+  <td>Sun direction</td>
+  <td>Simple celestial reference</td>
+  <td>Sun availability and single-vector limitation</td>
+</tr>
+
+<tr>
+  <td>Star Tracker</td>
+  <td>Absolute celestial attitude</td>
+  <td>Very high absolute attitude accuracy</td>
+  <td>Bright-object sensitivity, rate limits and greater complexity</td>
+</tr>
+
+<tr>
+  <td>Earth / Horizon Sensor</td>
+  <td>Earth limb or nadir information</td>
+  <td>Useful Earth reference</td>
+  <td>Mission geometry and lower precision for many applications</td>
+</tr>
+
+<tr>
+  <td>Fine Guidance Sensor</td>
+  <td>Precision line of sight</td>
+  <td>Very high pointing precision</td>
+  <td>Usually payload or mission specific</td>
+</tr>
+
+</tbody>
+</table>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.103 Star Sensor vs Star Tracker</h3>
+<!-- ========================================================= -->
+
+<p>
+The terms are sometimes used interchangeably, but a useful conceptual
+distinction can be made.
+</p>
+
+<p>
+A <strong>star sensor</strong> may primarily detect stars or provide star
+directions.
+</p>
+
+<p>
+A modern autonomous <strong>star tracker</strong> typically combines
+</p>
+
+<p>
+\[
+\boxed{\text{Optical Sensor}}
++
+\boxed{\text{Image Processing}}
++
+\boxed{\text{Star Catalogue}}
++
+\boxed{\text{Star Identification}}
++
+\boxed{\text{Attitude Determination}}.
+\]
+</p>
+
+<p>
+It therefore provides a complete attitude solution rather than only raw
+optical measurements.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.104 Complete Star Tracker Signal Flow</h3>
+<!-- ========================================================= -->
+
+<pre>
+Celestial Star Catalogue
+          |
+          v
+Reference Star Directions
+          |
+          +------------------------------------+
+                                               |
+                                               v
+Spacecraft True Attitude --------------> Rotate Star Vectors
+                                               |
+                                               v
+                                     Star Tracker Frame
+                                               |
+                                               v
+                                      FOV / Occultation
+                                               |
+                                               v
+                                        Optical System
+                                               |
+                                               v
+                                      Focal Plane Image
+                                               |
+               +-------------------------------+-------------------+
+               |                               |                   |
+               v                               v                   v
+       Optical Distortion                Detector Noise       Stray Light
+               |                               |                   |
+               +-------------------------------+-------------------+
+                                               |
+                                               v
+                                         Digital Image
+                                               |
+                                               v
+                                         Star Detection
+                                               |
+                                               v
+                                           Centroiding
+                                               |
+                                               v
+                                      LOS Reconstruction
+                                               |
+                                               v
+                                      Star Identification
+                                               |
+                                               v
+                                    Catalogue Correspondence
+                                               |
+                                               v
+                                      Wahba / QUEST Solver
+                                               |
+                                               v
+                                    Sensor-Frame Attitude
+                                               |
+                                               v
+                                    Mounting Calibration
+                                               |
+                                               v
+                                      Body-Frame Attitude
+                                               |
+                                               v
+                              Timing / Quality / Validity Logic
+                                               |
+                                               v
+                                     Star Tracker Output
+                                               |
+                                               v
+                                           MEKF
+                                               |
+                                               v
+                                Estimated Spacecraft Attitude
+                                               |
+                                               v
+                                    Guidance and Control
+</pre>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.105 General GNC Measurement Equation</h3>
+<!-- ========================================================= -->
+
+<p>
+The star tracker fits into the general spacecraft sensor model
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf z_k
+=
+h(\mathbf x_k)
++
+\mathbf v_k.
+}
+\]
+</p>
+
+<p>
+If the spacecraft navigation state is
+</p>
+
+<p>
+\[
+\mathbf x
+=
+\begin{bmatrix}
+\mathbf r\\
+\mathbf v\\
+\mathbf q\\
+\boldsymbol{\omega}\\
+\mathbf b_g\\
+\vdots
+\end{bmatrix},
+\]
+</p>
+
+<p>
+the star-tracker measurement function depends primarily on spacecraft
+attitude:
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf z_{ST,k}
+=
+h_{ST}(\mathbf q_k)
++
+\mathbf v_{ST,k}.
+}
+\]
+</p>
+
+<p>
+For an error-state filter, the attitude innovation is normally expressed
+using a three-component small-angle error rather than treating the four
+quaternion elements as independent linear states.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.106 Major Star Tracker Design Trade-Offs</h3>
+<!-- ========================================================= -->
+
+<h4>Field of View vs Angular Resolution</h4>
+
+<p>
+For a fixed detector,
+</p>
+
+<p>
+\[
+\boxed{
+\text{Wide FOV}
+\leftrightarrow
+\text{Fine Angular Sampling}.
+}
+\]
+</p>
+
+<h4>Exposure Time vs Motion Blur</h4>
+
+<p>
+\[
+\boxed{
+\text{Long Exposure}
+\rightarrow
+\text{More Photons}
+}
+\]
+</p>
+
+<p>
+but
+</p>
+
+<p>
+\[
+\boxed{
+\text{Long Exposure}
+\rightarrow
+\text{More Motion Blur}.
+}
+\]
+</p>
+
+<h4>Aperture vs Size and Mass</h4>
+
+<p>
+A larger aperture can collect more light but generally increases optical
+size and accommodation demands.
+</p>
+
+<h4>Accuracy vs Update Rate</h4>
+
+<p>
+Higher update rates can require shorter exposure and increased processing
+throughput.
+</p>
+
+<h4>Baffle Performance vs Accommodation</h4>
+
+<p>
+Greater bright-source rejection can require a larger or longer baffle.
+</p>
+
+<h4>Redundancy vs Resources</h4>
+
+<p>
+Additional trackers improve availability and fault tolerance but increase
+mass, power, cost, thermal load, and avionics interfaces.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.107 What Matters Most for Spacecraft GNC?</h3>
+<!-- ========================================================= -->
+
+<p>
+If the objective is spacecraft GNC design rather than development of the
+star tracker itself, the most important star-tracker parameters are
+typically
+</p>
+
+<ol>
+  <li>absolute attitude accuracy,</li>
+  <li>cross-boresight measurement noise,</li>
+  <li>roll measurement noise,</li>
+  <li>mounting alignment error,</li>
+  <li>thermoelastic alignment drift,</li>
+  <li>update rate,</li>
+  <li>latency,</li>
+  <li>timestamp accuracy,</li>
+  <li>maximum acquisition rate,</li>
+  <li>maximum tracking rate,</li>
+  <li>Sun exclusion angle,</li>
+  <li>Earth exclusion angle,</li>
+  <li>Moon exclusion angle,</li>
+  <li>dropout behaviour,</li>
+  <li>reacquisition time,</li>
+  <li>measurement covariance,</li>
+  <li>validity and quality flags.</li>
+</ol>
+
+<p>
+These parameters can be modelled without generating a complete synthetic
+star image.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.108 What Matters for Star Tracker Development?</h3>
+<!-- ========================================================= -->
+
+<p>
+If the objective is to design or validate the star tracker itself, a
+much more detailed model is required.
+</p>
+
+<p>
+Important quantities include
+</p>
+
+<ul>
+  <li>star catalogue generation,</li>
+  <li>star magnitude,</li>
+  <li>spectral response,</li>
+  <li>optical aperture,</li>
+  <li>optical transmission,</li>
+  <li>detector quantum efficiency,</li>
+  <li>photon statistics,</li>
+  <li>focal length,</li>
+  <li>pixel pitch,</li>
+  <li>point-spread function,</li>
+  <li>lens distortion,</li>
+  <li>dark current,</li>
+  <li>read noise,</li>
+  <li>hot pixels,</li>
+  <li>radiation events,</li>
+  <li>background illumination,</li>
+  <li>stray light,</li>
+  <li>motion blur,</li>
+  <li>rolling-shutter effects,</li>
+  <li>centroid algorithms,</li>
+  <li>pattern-recognition algorithms,</li>
+  <li>lost-in-space processing,</li>
+  <li>QUEST or other Wahba solvers,</li>
+  <li>calibration algorithms,</li>
+  <li>embedded processing time.</li>
+</ul>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.109 Recommended GNC Star Tracker Model</h3>
+<!-- ========================================================= -->
+
+<p>
+For a spacecraft attitude simulation, a useful model is
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_{true}
+}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Sensor Mounting}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Fixed Alignment Error}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Thermal Alignment Error}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Random Attitude Noise}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Sampling / Update Rate}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Latency / Timestamp}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Sun / Earth / Moon Exclusion}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Angular-Rate Validity}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{Dropout / Reacquisition}}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf q_{ST},
+R_{ST},
+valid_{ST},
+t_{ST}
+}
+\]
+</p>
+
+<p>
+\[
+\downarrow
+\]
+</p>
+
+<p>
+\[
+\boxed{\text{MEKF / EKF}}.
+\]
+</p>
+
+<p>
+This model provides enough fidelity to investigate most spacecraft
+attitude-estimation and control questions while remaining computationally
+manageable.
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.110 Example End-to-End Spacecraft Operation</h3>
+<!-- ========================================================= -->
+
+<p>
+Consider a spacecraft that has just completed a large slew.
+During the manoeuvre, the star tracker may temporarily be unavailable
+because the angular rate is too high.
+</p>
+
+<p>
+The estimator therefore propagates attitude using
+</p>
+
+<p>
+\[
+\boldsymbol{\omega}_m-\hat{\mathbf b}_g.
+\]
+</p>
+
+<p>
+After the spacecraft rate decreases, the tracker begins acquisition.
+It captures a star-field image, detects candidate stars, computes their
+centroids, converts those centroids into line-of-sight vectors, identifies
+the stars against its catalogue, and solves Wahba's problem.
+</p>
+
+<p>
+It then outputs
+</p>
+
+<p>
+\[
+\mathbf q_{ST}.
+\]
+</p>
+
+<p>
+The navigation filter forms an attitude residual between
+\(\mathbf q_{ST}\) and the gyro-propagated attitude.
+</p>
+
+<p>
+If the measurement passes validity and innovation checks, the filter
+updates the attitude and gyro-bias estimates.
+</p>
+
+<p>
+The corrected attitude estimate is then supplied to the spacecraft
+controller.
+</p>
+
+<p>
+The complete sequence is
+</p>
+
+<p>
+\[
+\boxed{\text{Slew}}
+\rightarrow
+\boxed{\text{Gyro Propagation}}
+\rightarrow
+\boxed{\text{Star Tracker Acquisition}}
+\rightarrow
+\boxed{\text{Absolute Attitude}}
+\rightarrow
+\boxed{\text{MEKF Correction}}
+\rightarrow
+\boxed{\text{Fine Pointing}}.
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.111 Key Equations</h3>
+<!-- ========================================================= -->
+
+<h4>Star Vector Transformation</h4>
+
+<p>
+\[
+\boxed{
+\mathbf s_i^S
+=
+C_I^S\mathbf s_i^I
+}
+\]
+</p>
+
+<h4>Catalogue Vector from Right Ascension and Declination</h4>
+
+<p>
+\[
+\boxed{
+\mathbf s_i^I
+=
+\begin{bmatrix}
+\cos\delta_i\cos\alpha_i\\
+\cos\delta_i\sin\alpha_i\\
+\sin\delta_i
+\end{bmatrix}
+}
+\]
+</p>
+
+<h4>Pinhole Projection</h4>
+
+<p>
+\[
+\boxed{
+x_f=f\frac{s_x}{s_z},
+\qquad
+y_f=f\frac{s_y}{s_z}
+}
+\]
+</p>
+
+<h4>Centroid</h4>
+
+<p>
+\[
+\boxed{
+u_c
+=
+\frac{\sum I_i u_i}{\sum I_i},
+\qquad
+v_c
+=
+\frac{\sum I_i v_i}{\sum I_i}
+}
+\]
+</p>
+
+<h4>Inter-Star Angle</h4>
+
+<p>
+\[
+\boxed{
+\theta_{ij}
+=
+\cos^{-1}
+\left(
+\mathbf s_i^T\mathbf s_j
+\right)
+}
+\]
+</p>
+
+<h4>Wahba's Problem</h4>
+
+<p>
+\[
+\boxed{
+J(C)
+=
+\frac12
+\sum_i
+a_i
+\|
+\mathbf b_i-C\mathbf r_i
+\|^2
+}
+\]
+</p>
+
+<h4>Small-Angle Measurement Error</h4>
+
+<p>
+\[
+\boxed{
+\delta\mathbf q
+\approx
+\begin{bmatrix}
+1\\
+\frac12\delta\boldsymbol{\theta}
+\end{bmatrix}
+}
+\]
+</p>
+
+<h4>Timing Error</h4>
+
+<p>
+\[
+\boxed{
+\delta\boldsymbol{\theta}_{time}
+\approx
+\boldsymbol{\omega}\delta t
+}
+\]
+</p>
+
+<h4>Motion Blur</h4>
+
+<p>
+\[
+\boxed{
+\Delta\theta_{blur}
+\approx
+\omega T_e
+}
+\]
+</p>
+
+<h4>Centroid-to-Angular Error</h4>
+
+<p>
+\[
+\boxed{
+\sigma_\theta
+\approx
+\frac{p}{f}\sigma_c
+}
+\]
+</p>
+
+<h4>Measurement Covariance</h4>
+
+<p>
+\[
+\boxed{
+\delta\boldsymbol{\theta}_{ST}
+\sim
+\mathcal N(0,R_{ST})
+}
+\]
+</p>
+
+
+<!-- ========================================================= -->
+<h3>4.1.4.112 Summary</h3>
+<!-- ========================================================= -->
+
+<p>
+A star tracker is a precision celestial attitude sensor that determines
+spacecraft orientation by observing stars and comparing their measured
+directions with known directions from an onboard star catalogue.
+</p>
+
+<p>
+At the most fundamental level,
+</p>
+
+<p>
+\[
+\boxed{
+\mathbf s_i^S
+=
+C_I^S
+\mathbf s_i^I.
+}
+\]
+</p>
+
+<p>
+The tracker determines the unknown attitude \(C_I^S\) from several such
+vector correspondences.
+</p>
+
+<p>
+Internally, the complete process is
+</p>
+
+<p>
+\[
+\boxed{\text{Starlight}}
+\rightarrow
+\boxed{\text{Optics}}
+\rightarrow
+\boxed{\text{Detector}}
+\rightarrow
+\boxed{\text{Star Detection}}
+\rightarrow
+\boxed{\text{Centroiding}}
+\rightarrow
+\boxed{\text{Star Identification}}
+\rightarrow
+\boxed{\text{Wahba / QUEST}}
+\rightarrow
+\boxed{\text{Attitude}}.
+\]
+</p>
+
+<p>
+The principal error mechanisms include
+</p>
+
+<p>
+\[
+\boxed{
+\begin{aligned}
+&\text{Centroid Noise}\\
+&+\text{Optical Calibration Error}\\
+&+\text{Mounting / Boresight Error}\\
+&+\text{Thermoelastic Alignment Error}\\
+&+\text{Timing Error}\\
+&+\text{Motion Blur}\\
+&+\text{Detector Noise}\\
+&+\text{Catalogue / Processing Error}\\
+&+\text{Stray-Light Effects}.
+\end{aligned}
+}
+\]
+</p>
+
+<p>
+For spacecraft GNC, the star tracker is normally combined with a
+gyroscope:
+</p>
+
+<p>
+\[
+\boxed{\text{Gyroscope}}
++
+\boxed{\text{Star Tracker}}
+\rightarrow
+\boxed{\text{MEKF}}
+\rightarrow
+\boxed{\text{Accurate Attitude + Gyro Bias Estimate}}.
+\]
+</p>
+
+<p>
+The gyro provides high-rate propagation while the star tracker provides
+the absolute celestial reference needed to prevent long-term attitude
+drift.
+</p>
+
+<p>
+For system-level simulation, it is also essential to model
+<strong>availability</strong>, not only accuracy. Sun/Earth/Moon
+exclusion, high spacecraft rates, dropout, latency, timestamp error, and
+reacquisition behaviour can all affect the GNC system even when the
+nominal star-tracker accuracy is extremely high.
+</p>
+
+<p>
+Ultimately, spacecraft attitude knowledge depends on the complete chain:
+</p>
+
+<p>
+\[
+\boxed{
+\text{Celestial Reference}
+\rightarrow
+\text{Optics}
+\rightarrow
+\text{Image Processing}
+\rightarrow
+\text{Attitude Solution}
+\rightarrow
+\text{Mounting Calibration}
+\rightarrow
+\text{Timing}
+\rightarrow
+\text{Sensor Fusion}
+\rightarrow
+\text{Spacecraft Attitude Knowledge}.
+}
+\]
+</p>
+
+</section>
+
+
+<!-- ========================================================= -->
+<!-- PREVIOUS / NEXT -->
+<!-- ========================================================= -->
+
+<nav class="notes-prev-next">
+
+  <a href="magnetometer.html">
+    &larr; 4.1.3 Magnetometers
+  </a>
+
+  <a href="sun-sensor.html">
+    4.1.5 Sun Sensors &rarr;
+  </a>
+
+</nav>
+
+</main>
+
+
+<!-- ========================================================= -->
+<!-- FOOTER -->
+<!-- ========================================================= -->
+
+<footer class="site-footer">
+  <p>
+    © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+    Educational resource for spacecraft dynamics, orbital mechanics,
+    and guidance–navigation–control systems.
+  </p>
+</footer>
+
+</body>
+</html>
