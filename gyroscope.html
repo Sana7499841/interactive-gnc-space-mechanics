@@ -1,0 +1,2688 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.1.1 Gyroscopes | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+</head>
+
+
+<body>
+
+<header class="notes-hero">
+
+  <h1>Gyroscopes</h1>
+
+  <p class="notes-tagline">
+    Angular-rate measurement, error modelling, quaternion propagation,
+    and gyro-bias estimation for spacecraft GNC.
+  </p>
+
+  <nav class="pill-nav">
+    <a href="index.html" class="pill">Home</a>
+    <a href="tools.html" class="pill">Tools</a>
+    <a href="notes.html" class="pill active">Theory Notes</a>
+    <a href="references.html" class="pill">References</a>
+    <a href="problems.html" class="pill">Problem Bank</a>
+    <a href="about.html" class="pill">About</a>
+  </nav>
+
+</header>
+
+
+<main class="page-main">
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1 GYROSCOPES                                       -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h2>4.1.1 Gyroscopes</h2>
+
+    <p>
+      Gyroscopes are among the most important sensors used in spacecraft
+      guidance, navigation, and control. They provide measurements of
+      spacecraft angular velocity and are therefore central to attitude
+      propagation, attitude control, manoeuvre monitoring, inertial
+      navigation, and state estimation.
+    </p>
+
+    <p>
+      A gyroscope does not directly measure spacecraft attitude. Instead,
+      it measures the angular rate of the spacecraft about one or more
+      sensing axes.
+    </p>
+
+    <p>
+      For a three-axis spacecraft gyroscope, the measured angular-rate vector
+      is typically written as
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_m
+      =
+      \begin{bmatrix}
+      \omega_{mx}\\
+      \omega_{my}\\
+      \omega_{mz}
+      \end{bmatrix}.
+      \]
+    </p>
+
+    <p>
+      A simple gyroscope measurement model is
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_m
+      =
+      \boldsymbol{\omega}_{true}
+      +
+      \mathbf b_g
+      +
+      \mathbf n_g
+      }
+      \]
+    </p>
+
+    <p>
+      where
+    </p>
+
+    <ul>
+      <li>
+        \(\boldsymbol{\omega}_{true}\) is the true spacecraft angular velocity,
+      </li>
+      <li>
+        \(\mathbf b_g\) is the gyroscope bias,
+      </li>
+      <li>
+        \(\mathbf n_g\) is measurement noise.
+      </li>
+    </ul>
+
+    <p>
+      A more complete engineering model additionally includes scale-factor
+      errors and axis misalignment:
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_m
+      =
+      \left(
+      \mathbf I+\mathbf S_g+\mathbf M_g
+      \right)
+      \boldsymbol{\omega}_{true}
+      +
+      \mathbf b_g
+      +
+      \mathbf n_g
+      }
+      \]
+    </p>
+
+    <p>
+      Here, \(\mathbf S_g\) represents scale-factor error and
+      \(\mathbf M_g\) represents axis misalignment and cross-axis sensitivity.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.1 ROLE OF GYROSCOPES IN GNC                      -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.1 Role of Gyroscopes in GNC</h3>
+
+    <p>
+      The primary role of a spacecraft gyroscope is to provide the angular
+      velocity required to determine how rapidly the spacecraft body frame is
+      rotating relative to a reference frame.
+    </p>
+
+    <p>
+      Gyroscope measurements are used in a wide range of GNC functions,
+      including
+    </p>
+
+    <ul>
+      <li>attitude propagation,</li>
+      <li>closed-loop attitude control,</li>
+      <li>rate damping,</li>
+      <li>spacecraft slew manoeuvres,</li>
+      <li>reaction-wheel feedback control,</li>
+      <li>thruster-based attitude manoeuvres,</li>
+      <li>safe-mode control,</li>
+      <li>detumbling,</li>
+      <li>inertial navigation,</li>
+      <li>fault detection,</li>
+      <li>rendezvous and docking,</li>
+      <li>attitude-estimator propagation.</li>
+    </ul>
+
+    <p>
+      The basic information flow is
+    </p>
+
+    <p>
+      \[
+      \boxed{\text{Spacecraft Rotation}}
+      \rightarrow
+      \boxed{\text{Gyroscope}}
+      \rightarrow
+      \boxed{\boldsymbol{\omega}_m}
+      \rightarrow
+      \boxed{\text{Attitude Propagation}}
+      \rightarrow
+      \boxed{\hat{\mathbf q}}.
+      \]
+    </p>
+
+    <p>
+      A star tracker may provide a highly accurate absolute attitude
+      measurement, but it usually operates at a lower update rate than the
+      gyroscope. The gyro therefore provides high-rate angular-rate information
+      between absolute attitude updates.
+    </p>
+
+    <p>
+      This complementary behaviour is one of the main reasons spacecraft
+      frequently combine gyroscopes with star trackers or other absolute
+      reference sensors.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.2 WHAT A GYROSCOPE MEASURES                      -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.2 What a Gyroscope Measures</h3>
+
+    <p>
+      A gyroscope measures <strong>angular velocity</strong>.
+    </p>
+
+    <p>
+      For a rigid spacecraft, the angular velocity expressed in body-frame
+      coordinates is
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}^{B}
+      =
+      \begin{bmatrix}
+      \omega_x\\
+      \omega_y\\
+      \omega_z
+      \end{bmatrix}.
+      \]
+    </p>
+
+    <p>
+      The components correspond to rotation about the three spacecraft body
+      axes.
+    </p>
+
+    <ul>
+      <li>
+        \(\omega_x\): rotation about the body \(x\)-axis,
+      </li>
+      <li>
+        \(\omega_y\): rotation about the body \(y\)-axis,
+      </li>
+      <li>
+        \(\omega_z\): rotation about the body \(z\)-axis.
+      </li>
+    </ul>
+
+    <p>
+      In conventional aerospace terminology, these may correspond
+      approximately to roll, pitch, and yaw rates.
+    </p>
+
+    <h4>Units</h4>
+
+    <p>
+      The SI unit of angular velocity is
+    </p>
+
+    <p>
+      \[
+      \mathrm{rad/s}.
+      \]
+    </p>
+
+    <p>
+      Gyroscope datasheets also commonly specify angular rate in
+    </p>
+
+    <p>
+      \[
+      ^\circ/\mathrm{s}.
+      \]
+    </p>
+
+    <p>
+      The conversion is
+    </p>
+
+    <p>
+      \[
+      1^\circ/\mathrm{s}
+      =
+      \frac{\pi}{180}
+      \mathrm{rad/s}.
+      \]
+    </p>
+
+    <h4>Angular Rate Is Not Attitude</h4>
+
+    <p>
+      A gyroscope does not directly measure Euler angles,
+    </p>
+
+    <p>
+      \[
+      \phi,\qquad \theta,\qquad \psi,
+      \]
+    </p>
+
+    <p>
+      nor does it directly measure the spacecraft quaternion
+    </p>
+
+    <p>
+      \[
+      \mathbf q.
+      \]
+    </p>
+
+    <p>
+      Instead, the measured angular velocity is supplied to the attitude
+      kinematic equations, which propagate the spacecraft attitude with time.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.3 PHYSICAL OPERATING PRINCIPLE                    -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.3 Physical Operating Principle</h3>
+
+    <p>
+      Different gyroscope technologies measure angular velocity using different
+      physical principles. The three most common categories relevant to GNC
+      are MEMS gyroscopes, Fiber-Optic Gyroscopes, and Ring-Laser Gyroscopes.
+    </p>
+
+
+    <h4>MEMS Gyroscope</h4>
+
+    <p>
+      A MEMS gyroscope typically contains a vibrating proof mass. When the
+      sensor rotates, the moving proof mass experiences a Coriolis acceleration.
+    </p>
+
+    <p>
+      The Coriolis acceleration is
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \mathbf a_C
+      =
+      2
+      \boldsymbol{\omega}
+      \times
+      \mathbf v
+      }
+      \]
+    </p>
+
+    <p>
+      where
+    </p>
+
+    <ul>
+      <li>
+        \(\boldsymbol{\omega}\) is the angular velocity of the sensor,
+      </li>
+      <li>
+        \(\mathbf v\) is the velocity of the vibrating proof mass.
+      </li>
+    </ul>
+
+    <p>
+      The resulting Coriolis-induced motion is detected electrically and
+      converted into an estimate of angular velocity.
+    </p>
+
+    <p>
+      MEMS gyroscopes are attractive for spacecraft because of their compact
+      size, low mass, low power consumption, and relatively low cost.
+    </p>
+
+    <p>
+      However, depending on performance grade, MEMS gyroscopes generally
+      exhibit larger bias instability, noise, and thermal sensitivity than
+      high-performance optical gyroscopes.
+    </p>
+
+
+    <h4>Fiber-Optic Gyroscope</h4>
+
+    <p>
+      A Fiber-Optic Gyroscope, or FOG, uses the
+      <strong>Sagnac effect</strong>.
+    </p>
+
+    <p>
+      Two light beams travel in opposite directions around an optical-fibre
+      coil. If the coil rotates, the two beams experience slightly different
+      effective optical path lengths.
+    </p>
+
+    <p>
+      The resulting phase difference is proportional to angular velocity:
+    </p>
+
+    <p>
+      \[
+      \Delta\phi
+      \propto
+      \omega.
+      \]
+    </p>
+
+    <p>
+      Because FOGs do not require a mechanically rotating rotor, they can
+      provide excellent reliability and significantly improved bias stability
+      compared with many MEMS gyroscopes.
+    </p>
+
+
+    <h4>Ring-Laser Gyroscope</h4>
+
+    <p>
+      A Ring-Laser Gyroscope, or RLG, also uses the Sagnac effect, but light
+      propagates around a closed laser cavity rather than through a fibre coil.
+    </p>
+
+    <p>
+      Clockwise and counter-clockwise laser beams experience different optical
+      path lengths when the system rotates.
+    </p>
+
+    <p>
+      This creates a measurable frequency difference
+    </p>
+
+    <p>
+      \[
+      \Delta f
+      \propto
+      \omega.
+      \]
+    </p>
+
+    <p>
+      RLGs can achieve extremely high performance and are commonly associated
+      with high-grade inertial-navigation systems.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.4 GYROSCOPE COORDINATE FRAMES                    -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.4 Gyroscope Coordinate Frames</h3>
+
+    <p>
+      A gyroscope measures angular velocity along its own physical sensing
+      axes. These axes are not always perfectly aligned with the spacecraft
+      body frame.
+    </p>
+
+    <p>
+      Let
+    </p>
+
+    <ul>
+      <li>
+        \(B\) denote the spacecraft body frame,
+      </li>
+      <li>
+        \(G\) denote the gyroscope sensor frame.
+      </li>
+    </ul>
+
+    <p>
+      If the gyroscope is perfectly aligned with the spacecraft body frame,
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}^{G}
+      =
+      \boldsymbol{\omega}^{B}.
+      \]
+    </p>
+
+    <p>
+      More generally,
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}^{G}
+      =
+      C_B^G
+      \boldsymbol{\omega}^{B}
+      }
+      \]
+    </p>
+
+    <p>
+      where \(C_B^G\) is the DCM that transforms body-frame angular-velocity
+      components into the gyroscope frame.
+    </p>
+
+    <p>
+      Ideally,
+    </p>
+
+    <p>
+      \[
+      C_B^G=I.
+      \]
+    </p>
+
+    <p>
+      For small mounting errors,
+    </p>
+
+    <p>
+      \[
+      C_B^G
+      \approx
+      I+M_g.
+      \]
+    </p>
+
+    <p>
+      The matrix \(M_g\) represents small sensor-axis misalignment terms.
+    </p>
+
+    <p>
+      Coordinate-frame consistency is essential. Even a highly accurate gyro
+      can produce incorrect attitude propagation if its measurements are
+      interpreted in the wrong frame.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.5 IDEAL GYROSCOPE MODEL                          -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.5 Ideal Gyroscope Model</h3>
+
+    <p>
+      An ideal gyroscope reproduces the true angular velocity exactly:
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_m
+      =
+      \boldsymbol{\omega}_{true}
+      }
+      \]
+    </p>
+
+    <p>
+      For the three individual axes,
+    </p>
+
+    <p>
+      \[
+      \omega_{mx}=\omega_x,
+      \qquad
+      \omega_{my}=\omega_y,
+      \qquad
+      \omega_{mz}=\omega_z.
+      \]
+    </p>
+
+    <p>
+      The ideal model assumes
+    </p>
+
+    <ul>
+      <li>zero bias,</li>
+      <li>zero scale-factor error,</li>
+      <li>perfect axis alignment,</li>
+      <li>zero measurement noise,</li>
+      <li>infinite resolution,</li>
+      <li>unlimited measurement range,</li>
+      <li>zero latency.</li>
+    </ul>
+
+    <p>
+      This model is useful during early algorithm development because it allows
+      the attitude-propagation equations to be validated independently of
+      sensor imperfections.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.6 CONSTANT BIAS                                  -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.6 Constant Bias</h3>
+
+    <p>
+      Gyroscope bias is an offset added to the true angular-rate signal.
+    </p>
+
+    <p>
+      For a single axis,
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \omega_m
+      =
+      \omega_{true}
+      +
+      b
+      }
+      \]
+    </p>
+
+    <p>
+      If the spacecraft is perfectly stationary,
+    </p>
+
+    <p>
+      \[
+      \omega_{true}=0,
+      \]
+    </p>
+
+    <p>
+      but a biased gyroscope may still report
+    </p>
+
+    <p>
+      \[
+      \omega_m=b.
+      \]
+    </p>
+
+    <p>
+      For a three-axis gyroscope,
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_m
+      =
+      \boldsymbol{\omega}_{true}
+      +
+      \mathbf b_g.
+      \]
+    </p>
+
+    <h4>Effect on Attitude</h4>
+
+    <p>
+      Constant bias is especially important because the angular-rate
+      measurement is integrated during attitude propagation.
+    </p>
+
+    <p>
+      If
+    </p>
+
+    <p>
+      \[
+      b_g=\text{constant},
+      \]
+    </p>
+
+    <p>
+      the approximate attitude error grows as
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \theta_{error}(t)
+      \approx
+      b_g t
+      }.
+      \]
+    </p>
+
+    <p>
+      For example, if
+    </p>
+
+    <p>
+      \[
+      b_g=0.01^\circ/\mathrm{s},
+      \]
+    </p>
+
+    <p>
+      then after
+    </p>
+
+    <p>
+      \[
+      t=100~\mathrm{s},
+      \]
+    </p>
+
+    <p>
+      the approximate accumulated attitude error is
+    </p>
+
+    <p>
+      \[
+      \theta_{error}
+      \approx
+      1^\circ.
+      \]
+    </p>
+
+    <p>
+      This is why gyro bias is often included explicitly as an estimated state
+      in spacecraft attitude filters.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.7 BIAS DRIFT AND BIAS RANDOM WALK                -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.7 Bias Drift and Bias Random Walk</h3>
+
+    <p>
+      Real gyroscope bias is rarely perfectly constant.
+    </p>
+
+    <p>
+      It may change because of
+    </p>
+
+    <ul>
+      <li>temperature variation,</li>
+      <li>electronic drift,</li>
+      <li>mechanical stress,</li>
+      <li>aging,</li>
+      <li>radiation effects,</li>
+      <li>stochastic internal processes.</li>
+    </ul>
+
+    <p>
+      A time-varying bias can be written as
+    </p>
+
+    <p>
+      \[
+      \mathbf b_g(t).
+      \]
+    </p>
+
+    <h4>Random-Walk Bias Model</h4>
+
+    <p>
+      A common stochastic model is
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \dot{\mathbf b}_g
+      =
+      \mathbf n_b
+      }
+      \]
+    </p>
+
+    <p>
+      where \(\mathbf n_b\) is a zero-mean stochastic driving process.
+    </p>
+
+    <p>
+      In discrete time,
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \mathbf b_{g,k+1}
+      =
+      \mathbf b_{g,k}
+      +
+      \mathbf w_{b,k}
+      }
+      \]
+    </p>
+
+    <p>
+      where \(\mathbf w_{b,k}\) represents the stochastic bias increment over
+      one sampling interval.
+    </p>
+
+    <h4>First-Order Gauss-Markov Bias</h4>
+
+    <p>
+      A bounded correlated bias can instead be represented using a first-order
+      Gauss-Markov process:
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \dot{\mathbf b}_g
+      =
+      -\frac{1}{\tau_b}\mathbf b_g
+      +
+      \mathbf n_b
+      }
+      \]
+    </p>
+
+    <p>
+      where \(\tau_b\) is the bias correlation time.
+    </p>
+
+    <p>
+      This model allows the bias to vary gradually while preventing it from
+      growing without bound.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.8 SCALE-FACTOR ERROR                             -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.8 Scale-Factor Error</h3>
+
+    <p>
+      Scale-factor error represents an error in the relationship between the
+      actual angular rate and the rate reported by the sensor.
+    </p>
+
+    <p>
+      For a single axis,
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \omega_m
+      =
+      (1+s)\omega_{true}
+      }
+      \]
+    </p>
+
+    <p>
+      where \(s\) is the fractional scale-factor error.
+    </p>
+
+    <p>
+      For example,
+    </p>
+
+    <p>
+      \[
+      s=0.001
+      \]
+    </p>
+
+    <p>
+      corresponds to a
+    </p>
+
+    <p>
+      \[
+      0.1\%
+      \]
+    </p>
+
+    <p>
+      scale-factor error.
+    </p>
+
+    <p>
+      For three axes,
+    </p>
+
+    <p>
+      \[
+      S_g
+      =
+      \begin{bmatrix}
+      s_x & 0 & 0\\
+      0 & s_y & 0\\
+      0 & 0 & s_z
+      \end{bmatrix}.
+      \]
+    </p>
+
+    <p>
+      The measurement becomes
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_m
+      =
+      (I+S_g)
+      \boldsymbol{\omega}_{true}.
+      \]
+    </p>
+
+    <p>
+      Scale-factor errors become especially important during high-rate
+      spacecraft manoeuvres because the absolute error grows with angular rate.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.9 AXIS MISALIGNMENT                              -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.9 Axis Misalignment / Cross-Axis Sensitivity</h3>
+
+    <p>
+      Ideally, each gyroscope sensing axis responds only to angular velocity
+      about that particular axis.
+    </p>
+
+    <p>
+      For example, an \(x\)-axis gyro should ideally measure only
+    </p>
+
+    <p>
+      \[
+      \omega_x.
+      \]
+    </p>
+
+    <p>
+      Small manufacturing and mounting errors can cause angular motion about
+      the other axes to influence the measurement.
+    </p>
+
+    <p>
+      A convenient misalignment matrix is
+    </p>
+
+    <p>
+      \[
+      M_g
+      =
+      \begin{bmatrix}
+      0 & m_{xy} & m_{xz}\\
+      m_{yx} & 0 & m_{yz}\\
+      m_{zx} & m_{zy} & 0
+      \end{bmatrix}.
+      \]
+    </p>
+
+    <p>
+      The measurement becomes
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_m
+      =
+      (I+M_g)
+      \boldsymbol{\omega}_{true}.
+      \]
+    </p>
+
+    <p>
+      For the \(x\)-axis,
+    </p>
+
+    <p>
+      \[
+      \omega_{mx}
+      =
+      \omega_x
+      +
+      m_{xy}\omega_y
+      +
+      m_{xz}\omega_z.
+      \]
+    </p>
+
+    <p>
+      Therefore, angular motion about the \(y\)- and \(z\)-axes can appear as
+      false angular-rate components in the \(x\)-axis measurement.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.10 WHITE NOISE                                   -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.10 White Noise and Noise Density</h3>
+
+    <p>
+      Gyroscope outputs contain high-frequency random fluctuations caused by
+      electronics, sensing mechanisms, thermal effects, and other stochastic
+      processes.
+    </p>
+
+    <p>
+      A simple noise model is
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_m
+      =
+      \boldsymbol{\omega}_{true}
+      +
+      \mathbf n_g
+      }
+      \]
+    </p>
+
+    <p>
+      with
+    </p>
+
+    <p>
+      \[
+      E[\mathbf n_g]=0.
+      \]
+    </p>
+
+    <p>
+      Ideal continuous white noise may be represented as
+    </p>
+
+    <p>
+      \[
+      E
+      \left[
+      \mathbf n_g(t)
+      \mathbf n_g^T(t')
+      \right]
+      =
+      Q_g
+      \delta(t-t').
+      \]
+    </p>
+
+    <h4>Noise Density</h4>
+
+    <p>
+      Gyroscope datasheets frequently specify random noise using a noise-density
+      parameter.
+    </p>
+
+    <p>
+      One common unit is
+    </p>
+
+    <p>
+      \[
+      \frac{^\circ/\mathrm{s}}
+      {\sqrt{\mathrm{Hz}}}.
+      \]
+    </p>
+
+    <p>
+      If \(N_g\) is the noise density and \(B\) is the effective measurement
+      bandwidth, the RMS rate noise approximately scales as
+    </p>
+
+    <p>
+      \[
+      \sigma_\omega
+      \propto
+      N_g\sqrt{B}.
+      \]
+    </p>
+
+    <p>
+      Increasing bandwidth therefore increases the amount of high-frequency
+      noise admitted into the measurement.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.11 ANGLE RANDOM WALK                             -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.11 Angle Random Walk</h3>
+
+    <p>
+      White rate noise accumulates when angular velocity is integrated to
+      obtain attitude.
+    </p>
+
+    <p>
+      This produces <strong>Angle Random Walk</strong>, or ARW.
+    </p>
+
+    <p>
+      A common unit is
+    </p>
+
+    <p>
+      \[
+      ^\circ/\sqrt{\mathrm{hr}}.
+      \]
+    </p>
+
+    <p>
+      If the ARW coefficient is \(N\), the attitude uncertainty due to
+      white-rate noise approximately grows as
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \sigma_\theta(t)
+      \propto
+      N\sqrt{t}
+      }.
+      \]
+    </p>
+
+    <p>
+      This behaviour differs from constant bias.
+    </p>
+
+    <p>
+      Bias-driven attitude error approximately grows as
+    </p>
+
+    <p>
+      \[
+      \theta_{bias}\propto t,
+      \]
+    </p>
+
+    <p>
+      while angle random walk grows approximately as
+    </p>
+
+    <p>
+      \[
+      \sqrt{t}.
+      \]
+    </p>
+
+    <p>
+      ARW is therefore an important parameter when selecting gyroscopes for
+      precision spacecraft attitude propagation.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.12 RATE RANDOM WALK                              -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.12 Rate Random Walk</h3>
+
+    <p>
+      Rate Random Walk represents slowly varying stochastic changes in the
+      gyroscope rate error.
+    </p>
+
+    <p>
+      A simple conceptual model is
+    </p>
+
+    <p>
+      \[
+      \dot b(t)
+      =
+      w(t),
+      \]
+    </p>
+
+    <p>
+      where \(w(t)\) is white noise.
+    </p>
+
+    <p>
+      The bias therefore performs a random walk with time.
+    </p>
+
+    <p>
+      Rate Random Walk can become important over longer time intervals and is
+      one reason a gyroscope bias cannot always be represented accurately as a
+      fixed constant.
+    </p>
+
+    <p>
+      This behaviour can be identified from long-duration gyro data using
+      techniques such as Allan deviation.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.13 BIAS INSTABILITY                              -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.13 Bias Instability</h3>
+
+    <p>
+      Bias instability describes the tendency of the gyroscope zero-rate
+      output to vary slowly even when the true angular velocity is constant.
+    </p>
+
+    <p>
+      For a stationary sensor,
+    </p>
+
+    <p>
+      \[
+      \omega_{true}=0,
+      \]
+    </p>
+
+    <p>
+      but the measured output may behave approximately as
+    </p>
+
+    <p>
+      \[
+      \omega_m(t)
+      =
+      b(t)
+      +
+      n(t).
+      \]
+    </p>
+
+    <p>
+      Bias instability is commonly specified in units such as
+    </p>
+
+    <p>
+      \[
+      ^\circ/\mathrm{hr}.
+      \]
+    </p>
+
+    <p>
+      Lower bias-instability values indicate a more stable sensor.
+    </p>
+
+    <p>
+      This parameter is especially important for spacecraft that must maintain
+      accurate attitude propagation for long periods without frequent
+      correction from an absolute attitude sensor.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.14 QUANTISATION AND SATURATION                   -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.14 Quantisation and Saturation</h3>
+
+
+    <h4>Quantisation</h4>
+
+    <p>
+      Digital gyroscopes have finite measurement resolution.
+    </p>
+
+    <p>
+      If the smallest output increment is
+    </p>
+
+    <p>
+      \[
+      \Delta\omega,
+      \]
+    </p>
+
+    <p>
+      the quantised output can be represented approximately as
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \omega_q
+      =
+      \Delta\omega
+      \operatorname{round}
+      \left(
+      \frac{\omega}{\Delta\omega}
+      \right)
+      }
+      \]
+    </p>
+
+    <p>
+      The corresponding quantisation error is approximately bounded by
+    </p>
+
+    <p>
+      \[
+      -\frac{\Delta\omega}{2}
+      \leq
+      e_q
+      \leq
+      \frac{\Delta\omega}{2}.
+      \]
+    </p>
+
+
+    <h4>Saturation</h4>
+
+    <p>
+      A gyroscope also has a finite measurable angular-rate range.
+    </p>
+
+    <p>
+      If
+    </p>
+
+    <p>
+      \[
+      -\omega_{max}
+      \leq
+      \omega
+      \leq
+      \omega_{max},
+      \]
+    </p>
+
+    <p>
+      then the measured value may be modelled as
+    </p>
+
+    <p>
+      \[
+      \omega_m
+      =
+      \begin{cases}
+      -\omega_{max},
+      & \omega<-\omega_{max}\\[4pt]
+      \omega,
+      & |\omega|\leq\omega_{max}\\[4pt]
+      +\omega_{max},
+      & \omega>\omega_{max}.
+      \end{cases}
+      \]
+    </p>
+
+    <p>
+      If spacecraft rotation exceeds the sensor range, the measurement is
+      clipped and no longer represents the true angular velocity.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.15 TEMPERATURE EFFECTS                            -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.15 Temperature Effects</h3>
+
+    <p>
+      Gyroscope bias and scale factor may depend significantly on temperature.
+    </p>
+
+    <p>
+      A simple linear bias-temperature model is
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      b_g(T)
+      =
+      b_0
+      +
+      k_T(T-T_0)
+      }
+      \]
+    </p>
+
+    <p>
+      where
+    </p>
+
+    <ul>
+      <li>
+        \(b_0\) is the bias at reference temperature \(T_0\),
+      </li>
+      <li>
+        \(k_T\) is the bias temperature coefficient.
+      </li>
+    </ul>
+
+    <p>
+      A higher-order approximation may be written as
+    </p>
+
+    <p>
+      \[
+      b_g(T)
+      =
+      b_0
+      +
+      k_1(T-T_0)
+      +
+      k_2(T-T_0)^2.
+      \]
+    </p>
+
+    <p>
+      Scale factor can also depend on temperature:
+    </p>
+
+    <p>
+      \[
+      s_g=s_g(T).
+      \]
+    </p>
+
+    <p>
+      Thermal calibration and temperature compensation can therefore be
+      important for spacecraft that experience significant orbital thermal
+      cycling.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.16 COMPLETE THREE-AXIS MODEL                     -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.16 Complete Three-Axis Measurement Model</h3>
+
+    <p>
+      Combining the principal deterministic and stochastic error sources gives
+      the three-axis gyroscope model
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_m
+      =
+      \left(
+      I+S_g+M_g
+      \right)
+      \boldsymbol{\omega}_{true}
+      +
+      \mathbf b_g
+      +
+      \mathbf n_g
+      }
+      \]
+    </p>
+
+    <p>
+      A more complete simulation model can also include sensor mounting,
+      temperature dependence, saturation, and quantisation:
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_m
+      =
+      Q
+      \left[
+      \operatorname{sat}
+      \left(
+      (I+S_g+M_g)
+      C_B^G
+      \boldsymbol{\omega}^{B}_{true}
+      +
+      \mathbf b_g(T)
+      +
+      \mathbf n_g
+      \right)
+      \right]
+      }
+      \]
+    </p>
+
+    <p>
+      where
+    </p>
+
+    <ul>
+      <li>
+        \(C_B^G\) represents the body-to-gyro mounting transformation,
+      </li>
+      <li>
+        \(S_g\) represents scale-factor error,
+      </li>
+      <li>
+        \(M_g\) represents axis misalignment,
+      </li>
+      <li>
+        \(\mathbf b_g(T)\) represents temperature-dependent bias,
+      </li>
+      <li>
+        \(\mathbf n_g\) represents stochastic measurement noise,
+      </li>
+      <li>
+        \(\operatorname{sat}(\cdot)\) represents saturation,
+      </li>
+      <li>
+        \(Q[\cdot]\) represents quantisation.
+      </li>
+    </ul>
+
+    <p>
+      This model provides a practical basis for software simulation,
+      Monte-Carlo analysis, and estimator development.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.17 CONTINUOUS VS DISCRETE MODEL                  -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.17 Continuous vs Discrete-Time Model</h3>
+
+    <p>
+      The physical gyroscope can be represented in continuous time, while
+      spacecraft flight software normally processes measurements at discrete
+      sampling instants.
+    </p>
+
+    <h4>Continuous-Time Measurement</h4>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_m(t)
+      =
+      \boldsymbol{\omega}(t)
+      +
+      \mathbf b_g(t)
+      +
+      \mathbf n_g(t).
+      \]
+    </p>
+
+    <p>
+      Bias dynamics may be represented as
+    </p>
+
+    <p>
+      \[
+      \dot{\mathbf b}_g(t)
+      =
+      \mathbf n_b(t).
+      \]
+    </p>
+
+
+    <h4>Discrete-Time Measurement</h4>
+
+    <p>
+      Let
+    </p>
+
+    <p>
+      \[
+      t_k=kT_s.
+      \]
+    </p>
+
+    <p>
+      The discrete measurement becomes
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_{m,k}
+      =
+      \boldsymbol{\omega}_k
+      +
+      \mathbf b_{g,k}
+      +
+      \mathbf v_k
+      }
+      \]
+    </p>
+
+    <p>
+      and a random-walk bias model becomes
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \mathbf b_{g,k+1}
+      =
+      \mathbf b_{g,k}
+      +
+      \mathbf w_k
+      }.
+      \]
+    </p>
+
+    <p>
+      For a first-order Gauss-Markov model,
+    </p>
+
+    <p>
+      \[
+      \mathbf b_{k+1}
+      =
+      e^{-T_s/\tau_b}
+      \mathbf b_k
+      +
+      \mathbf w_k.
+      \]
+    </p>
+
+    <p>
+      This form is particularly convenient for Kalman-filter and EKF
+      implementation.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.18 SIMULINK SENSOR MODEL                         -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.18 Simulink Sensor Model</h3>
+
+    <p>
+      A practical Simulink gyroscope model should reproduce the measurement
+      chain from true angular velocity to the digital rate delivered to the
+      estimator.
+    </p>
+
+    <h4>Signal Flow</h4>
+
+    <pre>
+True Angular Velocity
+        |
+        v
+Sensor-Frame Transformation
+        |
+        v
+Scale-Factor Error
+        |
+        v
+Axis Misalignment
+        |
+        v
+      Sum  &lt;----- Constant Bias
+       ^   &lt;----- Bias Drift
+       ^   &lt;----- White Noise
+        |
+        v
+Saturation
+        |
+        v
+Quantisation
+        |
+        v
+Sample and Hold
+        |
+        v
+Measured Angular Velocity
+    </pre>
+
+    <h4>Recommended Simulink Blocks</h4>
+
+    <ul>
+      <li>
+        Matrix Gain for \(C_B^G\),
+      </li>
+      <li>
+        Matrix Gain for \(I+S_g+M_g\),
+      </li>
+      <li>
+        Constant block for fixed bias,
+      </li>
+      <li>
+        Random Number or Band-Limited White Noise block,
+      </li>
+      <li>
+        Integrator for bias random walk,
+      </li>
+      <li>
+        Sum block for additive errors,
+      </li>
+      <li>
+        Saturation block,
+      </li>
+      <li>
+        Quantizer block,
+      </li>
+      <li>
+        Zero-Order Hold or discrete sampling block,
+      </li>
+      <li>
+        output \(\boldsymbol{\omega}_m\).
+      </li>
+    </ul>
+
+    <p>
+      The bias branch can be generated using
+    </p>
+
+    <p>
+      \[
+      \dot{\mathbf b}_g
+      =
+      \mathbf n_b
+      \]
+    </p>
+
+    <p>
+      with a noise source feeding an Integrator block.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.19 EXAMPLE SIMULATION                            -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.19 Example Simulation</h3>
+
+    <p>
+      Consider a spacecraft with true body angular velocity
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_{true}
+      =
+      \begin{bmatrix}
+      0.10\\
+      -0.05\\
+      0.02
+      \end{bmatrix}
+      ^\circ/\mathrm{s}.
+      \]
+    </p>
+
+    <p>
+      Suppose the constant gyro bias is
+    </p>
+
+    <p>
+      \[
+      \mathbf b_g
+      =
+      \begin{bmatrix}
+      0.005\\
+      -0.003\\
+      0.002
+      \end{bmatrix}
+      ^\circ/\mathrm{s}.
+      \]
+    </p>
+
+    <p>
+      Assume one instantaneous noise realization of
+    </p>
+
+    <p>
+      \[
+      \mathbf n_g
+      =
+      \begin{bmatrix}
+      0.001\\
+      -0.001\\
+      0.0005
+      \end{bmatrix}
+      ^\circ/\mathrm{s}.
+      \]
+    </p>
+
+    <p>
+      Ignoring scale-factor and misalignment errors,
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_m
+      =
+      \boldsymbol{\omega}_{true}
+      +
+      \mathbf b_g
+      +
+      \mathbf n_g.
+      \]
+    </p>
+
+    <p>
+      Therefore,
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_m
+      =
+      \begin{bmatrix}
+      0.106\\
+      -0.054\\
+      0.0225
+      \end{bmatrix}
+      ^\circ/\mathrm{s}
+      }
+      \]
+    </p>
+
+    <p>
+      Even though each individual error is small, the measured rate differs
+      from the actual spacecraft rate.
+    </p>
+
+    <h4>Accumulated Bias Effect</h4>
+
+    <p>
+      If an \(x\)-axis bias of
+    </p>
+
+    <p>
+      \[
+      0.005^\circ/\mathrm{s}
+      \]
+    </p>
+
+    <p>
+      remains uncompensated for
+    </p>
+
+    <p>
+      \[
+      600~\mathrm{s},
+      \]
+    </p>
+
+    <p>
+      then the approximate accumulated attitude error is
+    </p>
+
+    <p>
+      \[
+      0.005\times600
+      =
+      3^\circ.
+      \]
+    </p>
+
+    <p>
+      This simple example demonstrates why even small gyro biases can become
+      important during long periods of attitude propagation.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.20 READING A GYROSCOPE DATASHEET                 -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.20 Reading a Gyroscope Datasheet</h3>
+
+    <p>
+      Gyroscope selection requires more than simply checking the maximum
+      measurable angular rate.
+    </p>
+
+    <p>
+      Important specifications include the following.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Specification</th>
+          <th>Meaning</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr>
+          <td>Measurement range</td>
+          <td>Maximum measurable angular rate</td>
+        </tr>
+
+        <tr>
+          <td>Bias</td>
+          <td>Zero-rate output offset</td>
+        </tr>
+
+        <tr>
+          <td>Bias stability</td>
+          <td>Long-term stability of the zero-rate output</td>
+        </tr>
+
+        <tr>
+          <td>Bias repeatability</td>
+          <td>Change in bias between power cycles</td>
+        </tr>
+
+        <tr>
+          <td>Noise density</td>
+          <td>High-frequency random rate noise</td>
+        </tr>
+
+        <tr>
+          <td>Angle Random Walk</td>
+          <td>Accumulated angular uncertainty caused by rate noise</td>
+        </tr>
+
+        <tr>
+          <td>Scale-factor error</td>
+          <td>Error in angular-rate sensitivity</td>
+        </tr>
+
+        <tr>
+          <td>Scale-factor stability</td>
+          <td>Variation of scale factor with time or temperature</td>
+        </tr>
+
+        <tr>
+          <td>Misalignment</td>
+          <td>Angular error between sensing axes</td>
+        </tr>
+
+        <tr>
+          <td>Cross-axis sensitivity</td>
+          <td>Response to rotation about orthogonal axes</td>
+        </tr>
+
+        <tr>
+          <td>Bandwidth</td>
+          <td>Frequency range over which rates are measured accurately</td>
+        </tr>
+
+        <tr>
+          <td>Update rate</td>
+          <td>Frequency at which measurements become available</td>
+        </tr>
+
+        <tr>
+          <td>Resolution</td>
+          <td>Smallest distinguishable angular-rate increment</td>
+        </tr>
+
+        <tr>
+          <td>Latency</td>
+          <td>Delay between physical motion and output availability</td>
+        </tr>
+
+        <tr>
+          <td>Operating temperature</td>
+          <td>Temperature range over which specified performance is valid</td>
+        </tr>
+
+        <tr>
+          <td>Power</td>
+          <td>Electrical power consumption</td>
+        </tr>
+
+        <tr>
+          <td>Mass</td>
+          <td>Physical mass of the sensor</td>
+        </tr>
+
+        <tr>
+          <td>Radiation tolerance</td>
+          <td>Suitability for the expected spacecraft radiation environment</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>
+      A wide measurement range does not automatically imply high accuracy.
+    </p>
+
+    <p>
+      For precision spacecraft attitude determination, parameters such as
+    </p>
+
+    <p>
+      \[
+      \text{bias instability},
+      \qquad
+      \text{ARW},
+      \qquad
+      \text{scale-factor stability}
+      \]
+    </p>
+
+    <p>
+      may be more important than the maximum angular-rate range.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.21 MEMS VS FOG VS RLG                            -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.21 MEMS vs FOG vs RLG</h3>
+
+    <p>
+      The choice of gyroscope technology depends on the required performance,
+      mission class, spacecraft resources, and environmental constraints.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Characteristic</th>
+          <th>MEMS</th>
+          <th>FOG</th>
+          <th>RLG</th>
+        </tr>
+      </thead>
+
+      <tbody>
+
+        <tr>
+          <td>Operating principle</td>
+          <td>Coriolis vibration</td>
+          <td>Sagnac effect in optical fibre</td>
+          <td>Sagnac effect in a laser cavity</td>
+        </tr>
+
+        <tr>
+          <td>Size</td>
+          <td>Very small</td>
+          <td>Medium</td>
+          <td>Usually larger</td>
+        </tr>
+
+        <tr>
+          <td>Power</td>
+          <td>Low</td>
+          <td>Moderate</td>
+          <td>Moderate to high</td>
+        </tr>
+
+        <tr>
+          <td>Cost</td>
+          <td>Low to moderate</td>
+          <td>High</td>
+          <td>High</td>
+        </tr>
+
+        <tr>
+          <td>Bias stability</td>
+          <td>Moderate to poor depending on grade</td>
+          <td>Very good</td>
+          <td>Excellent</td>
+        </tr>
+
+        <tr>
+          <td>Noise</td>
+          <td>Higher</td>
+          <td>Low</td>
+          <td>Very low</td>
+        </tr>
+
+        <tr>
+          <td>Moving mechanical rotor</td>
+          <td>No conventional rotor</td>
+          <td>No</td>
+          <td>No</td>
+        </tr>
+
+        <tr>
+          <td>Typical application</td>
+          <td>CubeSats, UAVs, compact IMUs</td>
+          <td>Precision spacecraft and navigation</td>
+          <td>High-grade inertial navigation</td>
+        </tr>
+
+      </tbody>
+    </table>
+
+    <p>
+      Technology selection should consider required attitude accuracy, angular
+      rate range, bias stability, mass, volume, power, cost, radiation
+      environment, mission duration, redundancy philosophy, and heritage.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.22 SPACECRAFT APPLICATIONS                       -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.22 Spacecraft Applications</h3>
+
+    <p>
+      Gyroscopes are used throughout nearly every phase of spacecraft
+      operation.
+    </p>
+
+    <p>
+      Typical applications include
+    </p>
+
+    <ul>
+      <li>attitude-rate measurement,</li>
+      <li>quaternion propagation,</li>
+      <li>reaction-wheel feedback control,</li>
+      <li>control-moment-gyro control systems,</li>
+      <li>thruster-based attitude manoeuvres,</li>
+      <li>rate damping,</li>
+      <li>detumbling,</li>
+      <li>safe mode,</li>
+      <li>spacecraft slew manoeuvres,</li>
+      <li>rendezvous and docking,</li>
+      <li>formation flying,</li>
+      <li>inertial navigation,</li>
+      <li>star-tracker propagation between updates,</li>
+      <li>sensor fault detection and redundancy management.</li>
+    </ul>
+
+    <h4>Rendezvous and Docking</h4>
+
+    <p>
+      During rendezvous and docking operations, accurate angular-rate
+      knowledge is especially important because relative attitude and body-rate
+      errors directly influence docking alignment, capture conditions, sensor
+      pointing, and thruster-control performance.
+    </p>
+
+    <h4>Safe Mode</h4>
+
+    <p>
+      In safe mode, the spacecraft may rely on gyroscopes together with coarse
+      attitude sensors to reduce body rates or maintain a recoverable attitude.
+    </p>
+
+    <h4>Precision Pointing</h4>
+
+    <p>
+      For high-precision pointing missions, gyro measurements can be used to
+      propagate the attitude at high rate between star-tracker measurements,
+      allowing the controller to operate at a much higher frequency than the
+      absolute attitude sensor alone.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.23 GYRO TO QUATERNION PROPAGATION                -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.23 Gyroscope &rarr; Quaternion Propagation</h3>
+
+    <p>
+      The direct connection between a gyroscope and spacecraft attitude
+      kinematics occurs through the quaternion differential equation.
+    </p>
+
+    <p>
+      Let the spacecraft quaternion be
+    </p>
+
+    <p>
+      \[
+      \mathbf q
+      =
+      \begin{bmatrix}
+      q_0\\
+      q_1\\
+      q_2\\
+      q_3
+      \end{bmatrix}
+      \]
+    </p>
+
+    <p>
+      and let the body angular velocity be
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}
+      =
+      \begin{bmatrix}
+      \omega_x\\
+      \omega_y\\
+      \omega_z
+      \end{bmatrix}.
+      \]
+    </p>
+
+    <p>
+      One common quaternion kinematic equation is
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \dot{\mathbf q}
+      =
+      \frac{1}{2}
+      \Omega(\boldsymbol{\omega})
+      \mathbf q
+      }
+      \]
+    </p>
+
+    <p>
+      with
+    </p>
+
+    <p>
+      \[
+      \Omega(\boldsymbol{\omega})
+      =
+      \begin{bmatrix}
+      0 & -\omega_x & -\omega_y & -\omega_z\\
+      \omega_x & 0 & \omega_z & -\omega_y\\
+      \omega_y & -\omega_z & 0 & \omega_x\\
+      \omega_z & \omega_y & -\omega_x & 0
+      \end{bmatrix}.
+      \]
+    </p>
+
+    <p>
+      In practice, the true angular velocity is not available to the flight
+      computer. Instead, it receives
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_m.
+      \]
+    </p>
+
+    <p>
+      If an estimate of the gyro bias is available, a corrected angular rate
+      is formed:
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \hat{\boldsymbol{\omega}}
+      =
+      \boldsymbol{\omega}_m
+      -
+      \hat{\mathbf b}_g
+      }
+      \]
+    </p>
+
+    <p>
+      and the attitude propagation becomes
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \dot{\hat{\mathbf q}}
+      =
+      \frac{1}{2}
+      \Omega
+      \left(
+      \boldsymbol{\omega}_m
+      -
+      \hat{\mathbf b}_g
+      \right)
+      \hat{\mathbf q}
+      }.
+      \]
+    </p>
+
+    <p>
+      The signal chain is therefore
+    </p>
+
+    <p>
+      \[
+      \boxed{\boldsymbol{\omega}_{true}}
+      \rightarrow
+      \boxed{\text{Gyroscope}}
+      \rightarrow
+      \boxed{\boldsymbol{\omega}_m}
+      \rightarrow
+      \boxed{\text{Bias Correction}}
+      \rightarrow
+      \boxed{\text{Quaternion Kinematics}}
+      \rightarrow
+      \boxed{\hat{\mathbf q}}.
+      \]
+    </p>
+
+    <p>
+      Because gyro bias and measurement noise are integrated during
+      propagation, attitude uncertainty grows with time unless the propagated
+      solution is periodically corrected using an absolute reference sensor.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- 4.1.1.24 GYRO TO EKF BIAS ESTIMATION                   -->
+  <!-- ======================================================= -->
+
+  <section class="notes-section-card">
+
+    <h3>4.1.1.24 Gyroscope &rarr; EKF Bias Estimation</h3>
+
+    <p>
+      One of the most important applications of an Extended Kalman Filter in
+      spacecraft attitude determination is the simultaneous estimation of
+      attitude error and gyroscope bias.
+    </p>
+
+    <p>
+      A typical error-state vector may be written as
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \mathbf x
+      =
+      \begin{bmatrix}
+      \delta\boldsymbol{\theta}\\
+      \mathbf b_g
+      \end{bmatrix}
+      }
+      \]
+    </p>
+
+    <p>
+      where
+    </p>
+
+    <ul>
+      <li>
+        \(\delta\boldsymbol{\theta}\) is a small attitude-error vector,
+      </li>
+      <li>
+        \(\mathbf b_g\) is the gyroscope bias.
+      </li>
+    </ul>
+
+
+    <h4>Gyro Propagation</h4>
+
+    <p>
+      The gyroscope measurement is
+    </p>
+
+    <p>
+      \[
+      \boldsymbol{\omega}_m
+      =
+      \boldsymbol{\omega}_{true}
+      +
+      \mathbf b_g
+      +
+      \mathbf n_g.
+      \]
+    </p>
+
+    <p>
+      The estimator subtracts the current bias estimate:
+    </p>
+
+    <p>
+      \[
+      \hat{\boldsymbol{\omega}}
+      =
+      \boldsymbol{\omega}_m
+      -
+      \hat{\mathbf b}_g.
+      \]
+    </p>
+
+    <p>
+      This corrected angular rate is then used to propagate the quaternion.
+    </p>
+
+
+    <h4>Absolute Attitude Measurement</h4>
+
+    <p>
+      An absolute reference sensor such as a star tracker provides an
+      independent attitude observation,
+    </p>
+
+    <p>
+      \[
+      \mathbf q_{ST}.
+      \]
+    </p>
+
+    <p>
+      The predicted attitude obtained from gyro propagation is compared with
+      the star-tracker measurement.
+    </p>
+
+    <p>
+      The difference forms the measurement innovation used by the EKF.
+    </p>
+
+
+    <h4>Bias Correction</h4>
+
+    <p>
+      If the filter observes a persistent attitude discrepancy, part of the
+      error may be attributed to gyro bias.
+    </p>
+
+    <p>
+      The bias estimate is updated approximately as
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \hat{\mathbf b}_{g,k}^{+}
+      =
+      \hat{\mathbf b}_{g,k}^{-}
+      +
+      K_b\mathbf y_k
+      }
+      \]
+    </p>
+
+    <p>
+      where
+    </p>
+
+    <ul>
+      <li>
+        \(\mathbf y_k\) is the measurement innovation,
+      </li>
+      <li>
+        \(K_b\) is the bias-related portion of the Kalman gain.
+      </li>
+    </ul>
+
+    <p>
+      The corrected gyro measurement then becomes
+    </p>
+
+    <p>
+      \[
+      \boxed{
+      \boldsymbol{\omega}_{corr}
+      =
+      \boldsymbol{\omega}_m
+      -
+      \hat{\mathbf b}_g
+      }
+      \]
+    </p>
+
+    <p>
+      and is fed back into the quaternion propagator.
+    </p>
+
+
+    <h4>Estimator Architecture</h4>
+
+    <pre>
+Gyroscope
+    |
+    v
+Measured Angular Rate
+    |
+    v
+Subtract Estimated Bias
+    |
+    v
+Quaternion Propagation
+    |
+    v
+Predicted Attitude
+    |
+    +------------------------------+
+                                   |
+Star Tracker                       |
+    |                              |
+    v                              v
+Measured Attitude ------------> Innovation
+                                   |
+                                   v
+                                  EKF
+                                   |
+                    +--------------+--------------+
+                    |                             |
+                    v                             v
+          Attitude Correction               Bias Estimate
+                                                  |
+                                                  |
+                                                  +------>
+                                                   Gyro
+                                                Bias Correction
+    </pre>
+
+    <p>
+      The gyroscope provides high-rate relative attitude information, while the
+      star tracker or another absolute reference sensor prevents long-term drift.
+    </p>
+
+    <p>
+      The EKF combines the two sources and continuously estimates both attitude
+      error and gyroscope bias.
+    </p>
+
+    <p>
+      The complete architecture can therefore be summarised as
+    </p>
+
+    <p>
+      \[
+      \boxed{\text{True Angular Rate}}
+      \rightarrow
+      \boxed{\text{Gyroscope Model}}
+      \rightarrow
+      \boxed{\text{Measured Angular Rate}}
+      \rightarrow
+      \boxed{\text{Quaternion Propagation}}
+      \rightarrow
+      \boxed{\text{Absolute Sensor Correction}}
+      \rightarrow
+      \boxed{\text{EKF}}
+      \rightarrow
+      \boxed{\text{Attitude + Bias Estimate}}.
+      \]
+    </p>
+
+    <p>
+      This creates the bridge from the gyroscope sensor model into the sensor
+      fusion and attitude-estimation algorithms developed later in the GNC
+      theory notes.
+    </p>
+
+  </section>
+
+
+
+  <!-- ======================================================= -->
+  <!-- PREVIOUS / NEXT                                         -->
+  <!-- ======================================================= -->
+
+  <nav class="notes-prev-next">
+
+    <a href="sensor-models.html">
+      &larr; 4.1 Sensor Models
+    </a>
+
+    <a href="accelerometer.html">
+      4.1.2 Accelerometers &rarr;
+    </a>
+
+  </nav>
+
+
+</main>
+
+
+<footer class="site-footer">
+
+  <p>
+    © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+    Educational resource for spacecraft dynamics, orbital mechanics,
+    and guidance–navigation–control systems.
+  </p>
+
+</footer>
+
+
+</body>
+</html>
