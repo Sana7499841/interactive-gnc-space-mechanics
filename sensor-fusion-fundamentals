@@ -1,0 +1,5724 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.1 Fundamentals of Sensor Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <!-- Main website stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax for equations -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+</head>
+
+
+<body>
+
+  <!-- ========================================================= -->
+  <!-- PAGE HEADER                                                -->
+  <!-- ========================================================= -->
+
+  <header class="notes-hero">
+
+    <h1>Fundamentals of Sensor Fusion</h1>
+
+    <p class="notes-tagline">
+      State estimation, prediction and correction, uncertainty, observability,
+      timing, sensor confidence, and the mathematical foundations required
+      before developing spacecraft Kalman-filter-based navigation systems.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN CONTENT                                               -->
+  <!-- ========================================================= -->
+
+  <main class="page-main">
+
+
+    <!-- ======================================================= -->
+    <!-- 4.2.1 INTRODUCTION                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h2>4.2.1 Fundamentals of Sensor Fusion</h2>
+
+      <p>
+        A spacecraft does not directly know its own position, velocity,
+        attitude, angular velocity, acceleration, or relative state with respect
+        to another spacecraft.
+      </p>
+
+      <p>
+        These quantities exist as part of the true physical state of the
+        spacecraft, but the onboard flight computer cannot directly observe
+        that truth.
+      </p>
+
+      <p>
+        Instead, the flight computer receives measurements from sensors.
+        Different sensors observe different physical quantities, and each
+        measurement contains uncertainty.
+      </p>
+
+      <p>
+        A representative spacecraft state may be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf{x}
+        =
+        \begin{bmatrix}
+        \mathbf r \\
+        \mathbf v \\
+        \mathbf q \\
+        \boldsymbol{\omega} \\
+        \mathbf b_g \\
+        \mathbf b_a \\
+        \cdots
+        \end{bmatrix}
+        }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          \(\mathbf r\) represents spacecraft position,
+        </li>
+
+        <li>
+          \(\mathbf v\) represents spacecraft velocity,
+        </li>
+
+        <li>
+          \(\mathbf q\) represents spacecraft attitude,
+        </li>
+
+        <li>
+          \(\boldsymbol{\omega}\) represents spacecraft angular velocity,
+        </li>
+
+        <li>
+          \(\mathbf b_g\) represents gyroscope bias,
+        </li>
+
+        <li>
+          \(\mathbf b_a\) represents accelerometer bias.
+        </li>
+
+      </ul>
+
+      <p>
+        Additional states may be included depending on the mission. These may
+        include GNSS clock bias, sensor alignment errors, target-relative
+        position, target-relative velocity, relative attitude, target angular
+        rate, or slowly varying environmental parameters.
+      </p>
+
+
+      <h4>Different Sensors Observe Different Quantities</h4>
+
+      <p>
+        No single spacecraft sensor normally measures the complete state.
+      </p>
+
+      <p>
+        Instead,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        \rightarrow
+        \boldsymbol{\omega}_m
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Accelerometer}}
+        \rightarrow
+        \mathbf f_m
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker}}
+        \rightarrow
+        \mathbf q_m
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS}}
+        \rightarrow
+        \mathbf r_m,
+        \mathbf v_m
+        \]
+      </p>
+
+      <p>
+        while relative-navigation sensors may provide measurements such as
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera}}
+        \rightarrow
+        \text{bearing, features, line of sight, relative pose}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{LiDAR}}
+        \rightarrow
+        \text{range, geometry, point cloud, relative pose}.
+        \]
+      </p>
+
+
+      <h4>Measurements Are Not Perfect Truth</h4>
+
+      <p>
+        Every real sensor contains imperfections. Measurements may contain
+        bias, noise, drift, scale-factor error, axis misalignment, sampling
+        effects, latency, quantisation, saturation, or temporary loss of
+        validity.
+      </p>
+
+      <p>
+        A general sensor measurement can therefore be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z_k
+        =
+        h(\mathbf x_k)
+        +
+        \mathbf v_k
+        }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          \(\mathbf x_k\) is the true spacecraft state,
+        </li>
+
+        <li>
+          \(\mathbf z_k\) is the measurement supplied by the sensor,
+        </li>
+
+        <li>
+          \(h(\cdot)\) maps the spacecraft state into the quantity observed by
+          the sensor,
+        </li>
+
+        <li>
+          \(\mathbf v_k\) represents measurement uncertainty.
+        </li>
+
+      </ul>
+
+      <p>
+        The navigation problem is therefore not simply:
+      </p>
+
+      <p>
+        <strong>What did the sensor measure?</strong>
+      </p>
+
+      <p>
+        The deeper question is:
+      </p>
+
+      <p>
+        <strong>
+          Given several imperfect measurements and knowledge of how the
+          spacecraft moves, what is the best available estimate of the
+          spacecraft state?
+        </strong>
+      </p>
+
+      <p>
+        This is the fundamental problem addressed by
+        <strong>sensor fusion and state estimation</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- WHAT IS SENSOR FUSION                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Is Sensor Fusion?</h3>
+
+      <p>
+        Sensor fusion is the process of combining information from several
+        sensors, measurements, mathematical models, or previous state estimates
+        to obtain a state estimate that is more useful than the information
+        supplied by any individual source.
+      </p>
+
+      <p>
+        A useful conceptual representation is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sensor Fusion}
+        =
+        \text{Measurements}
+        +
+        \text{System Model}
+        +
+        \text{Uncertainty Information}
+        }.
+        \]
+      </p>
+
+      <p>
+        The output is therefore not normally only a state estimate.
+      </p>
+
+      <p>
+        A probabilistic estimator conceptually produces
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_k,
+        \mathbf P_k
+        }.
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <ul>
+
+        <li>
+          \(\hat{\mathbf x}_k\) is the estimated state,
+        </li>
+
+        <li>
+          \(\mathbf P_k\) describes uncertainty associated with that estimate.
+        </li>
+
+      </ul>
+
+
+      <h4>Measurement Path</h4>
+
+      <p>
+        One information path begins with the physical spacecraft:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{True State}}
+        \rightarrow
+        \boxed{\text{Sensors}}
+        \rightarrow
+        \boxed{\text{Measurements}}.
+        \]
+      </p>
+
+
+      <h4>Prediction Path</h4>
+
+      <p>
+        Model-based estimation introduces another path:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Previous Estimate}}
+        \rightarrow
+        \boxed{\text{Dynamic Model}}
+        \rightarrow
+        \boxed{\text{Predicted State}}.
+        \]
+      </p>
+
+      <p>
+        The estimator then combines both sources:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predicted State}}
+        +
+        \boxed{\text{New Measurements}}
+        \rightarrow
+        \boxed{\text{Updated State Estimate}}.
+        \]
+      </p>
+
+      <p>
+        This continuous cycle of prediction, measurement, comparison, and
+        correction forms the basis of many spacecraft estimation algorithms.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SENSOR FUSION IS NOT AVERAGING                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Fusion Is Not Simple Averaging</h3>
+
+      <p>
+        A common misconception is that sensor fusion simply means averaging
+        measurements from several sensors.
+      </p>
+
+      <p>
+        Consider two sensors measuring the same scalar quantity \(x\):
+      </p>
+
+      <p>
+        \[
+        z_1=x+v_1
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        z_2=x+v_2.
+        \]
+      </p>
+
+      <p>
+        A simple arithmetic average would be
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{x}
+        =
+        \frac{z_1+z_2}{2}
+        }.
+        \]
+      </p>
+
+      <p>
+        This gives both measurements equal influence.
+      </p>
+
+      <p>
+        But suppose sensor 1 has standard deviation
+      </p>
+
+      <p>
+        \[
+        \sigma_1=0.01
+        \]
+      </p>
+
+      <p>
+        while sensor 2 has
+      </p>
+
+      <p>
+        \[
+        \sigma_2=1.
+        \]
+      </p>
+
+      <p>
+        Sensor 1 is substantially more precise than sensor 2. Giving the two
+        measurements equal influence ignores useful information about their
+        measurement quality.
+      </p>
+
+
+      <h4>Uncertainty-Weighted Fusion</h4>
+
+      <p>
+        A better approach is to assign greater influence to measurements with
+        lower uncertainty.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{High Confidence}}
+        \Rightarrow
+        \boxed{\text{Greater Influence}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Low Confidence}}
+        \Rightarrow
+        \boxed{\text{Smaller Influence}}.
+        \]
+      </p>
+
+      <p>
+        For two independent scalar measurements with variances
+        \(\sigma_1^2\) and \(\sigma_2^2\), an inverse-variance-weighted estimate
+        is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{x}
+        =
+        \frac{
+        z_1/\sigma_1^2
+        +
+        z_2/\sigma_2^2
+        }{
+        1/\sigma_1^2
+        +
+        1/\sigma_2^2
+        }
+        }.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        w_i
+        \propto
+        \frac{1}{\sigma_i^2}.
+        \]
+      </p>
+
+      <p>
+        This simple result introduces one of the most important principles in
+        state estimation:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sensor Fusion}
+        \neq
+        \text{Simple Averaging}
+        }.
+        \]
+      </p>
+
+      <p>
+        Instead,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sensor Fusion}
+        \approx
+        \text{Information Combination According to Confidence}
+        }.
+        \]
+      </p>
+
+      <p>
+        The Kalman Filter later extends this idea to multidimensional dynamic
+        systems in which both the predicted state and sensor measurements
+        contain uncertainty.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- WHY MULTIPLE SENSORS                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Why Multiple Sensors Are Required</h3>
+
+      <p>
+        Different spacecraft sensors possess different strengths,
+        weaknesses, bandwidths, update rates, accuracy levels, failure modes,
+        and environmental limitations.
+      </p>
+
+      <p>
+        Multiple sensors are therefore used for two broad reasons:
+      </p>
+
+      <ul>
+        <li>to provide complementary information,</li>
+        <li>to provide redundant information.</li>
+      </ul>
+
+
+      <h4>Complementary Measurement Characteristics</h4>
+
+      <p>
+        Consider a gyroscope and star tracker.
+      </p>
+
+      <p>
+        The gyroscope can provide high-rate angular-rate information and is
+        therefore excellent for short-term attitude propagation.
+      </p>
+
+      <p>
+        However, even small bias and noise errors accumulate when angular-rate
+        measurements are integrated.
+      </p>
+
+      <p>
+        A star tracker provides an absolute attitude reference that does not
+        suffer from the same integration drift, but it usually operates at a
+        lower measurement rate.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        +
+        \boxed{\text{Star Tracker}}
+        \rightarrow
+        \boxed{\text{Improved Attitude Estimate}}.
+        \]
+      </p>
+
+      <p>
+        The gyro contributes short-term propagation, while the star tracker
+        provides long-term correction.
+      </p>
+
+
+      <h4>Different Sensors May Observe Different Physical Quantities</h4>
+
+      <p>
+        Sensor fusion does not require two sensors to measure the same
+        quantity.
+      </p>
+
+      <p>
+        An IMU may provide
+      </p>
+
+      <p>
+        \[
+        \boldsymbol{\omega}_m,
+        \qquad
+        \mathbf f_m
+        \]
+      </p>
+
+      <p>
+        while GNSS provides
+      </p>
+
+      <p>
+        \[
+        \mathbf r_m,
+        \qquad
+        \mathbf v_m.
+        \]
+      </p>
+
+      <p>
+        These quantities are different, but spacecraft kinematics and dynamics
+        establish relationships between them.
+      </p>
+
+      <p>
+        The estimator uses those relationships to combine the measurements
+        into a common state estimate.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- REDUNDANCY AND COMPLEMENTARITY                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Redundancy Versus Complementarity</h3>
+
+      <p>
+        Redundant and complementary sensors serve different purposes and should
+        not be confused.
+      </p>
+
+
+      <h4>Redundant Sensors</h4>
+
+      <p>
+        Redundant sensors provide similar or overlapping information.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker 1}}
+        +
+        \boxed{\text{Star Tracker 2}}.
+        \]
+      </p>
+
+      <p>
+        Redundancy can improve
+      </p>
+
+      <ul>
+
+        <li>system reliability,</li>
+        <li>fault detection,</li>
+        <li>navigation availability,</li>
+        <li>robustness,</li>
+        <li>measurement continuity,</li>
+        <li>potentially estimation accuracy.</li>
+
+      </ul>
+
+      <p>
+        If one sensor becomes invalid or fails, another may continue supplying
+        the required information.
+      </p>
+
+
+      <h4>Complementary Sensors</h4>
+
+      <p>
+        Complementary sensors provide different types of information or possess
+        different error characteristics.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        +
+        \boxed{\text{Star Tracker}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU}}
+        +
+        \boxed{\text{GNSS}}.
+        \]
+      </p>
+
+      <p>
+        The first combination provides high-rate angular propagation and
+        absolute attitude correction.
+      </p>
+
+      <p>
+        The second provides high-rate inertial propagation and external
+        position/velocity correction.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Redundancy}}
+        \rightarrow
+        \boxed{\text{Similar Information from Multiple Sources}}
+        \]
+      </p>
+
+      <p>
+        whereas
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complementarity}}
+        \rightarrow
+        \boxed{\text{Different Information with Complementary Strengths}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- TRUE / MEASURED / ESTIMATED                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>True State, Measured Quantity, and Estimated State</h3>
+
+      <p>
+        A fundamental distinction in navigation must be maintained between
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf x}
+        \qquad
+        \boxed{\mathbf z}
+        \qquad
+        \boxed{\hat{\mathbf x}}.
+        \]
+      </p>
+
+      <p>
+        These quantities represent different levels of knowledge.
+      </p>
+
+
+      <h4>True State</h4>
+
+      <p>
+        The true state
+      </p>
+
+      <p>
+        \[
+        \mathbf x_k
+        \]
+      </p>
+
+      <p>
+        represents the actual physical state of the spacecraft.
+      </p>
+
+      <p>
+        For a simple translational problem,
+      </p>
+
+      <p>
+        \[
+        \mathbf x_k
+        =
+        \begin{bmatrix}
+        \mathbf r_k \\
+        \mathbf v_k
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The true state exists physically but is normally unknown to the flight
+        computer.
+      </p>
+
+
+      <h4>Measurement</h4>
+
+      <p>
+        A sensor supplies a measurement
+      </p>
+
+      <p>
+        \[
+        \mathbf z_k.
+        \]
+      </p>
+
+      <p>
+        For example, GNSS may provide
+      </p>
+
+      <p>
+        \[
+        \mathbf z_{GNSS}
+        =
+        \begin{bmatrix}
+        \mathbf r_m \\
+        \mathbf v_m
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Because the measurements contain error,
+      </p>
+
+      <p>
+        \[
+        \mathbf r_m
+        \neq
+        \mathbf r_{true}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf v_m
+        \neq
+        \mathbf v_{true}.
+        \]
+      </p>
+
+
+      <h4>Estimated State</h4>
+
+      <p>
+        The estimator combines measurements and models to produce
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}_k}.
+        \]
+      </p>
+
+      <p>
+        Ideally,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_k
+        \approx
+        \mathbf x_k
+        }.
+        \]
+      </p>
+
+      <p>
+        The difference between truth and estimate is the estimation error:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e_k
+        =
+        \mathbf x_k
+        -
+        \hat{\mathbf x}_k
+        }.
+        \]
+      </p>
+
+
+      <h4>Importance in Closed-Loop Simulation</h4>
+
+      <p>
+        In a realistic GNC simulation, guidance and control should normally use
+        the estimated state rather than the perfect truth state.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf x_{truth}}
+        \rightarrow
+        \boxed{\text{Sensor Models}}
+        \rightarrow
+        \boxed{\mathbf z}
+        \rightarrow
+        \boxed{\text{Estimator}}
+        \rightarrow
+        \boxed{\hat{\mathbf x}}
+        \rightarrow
+        \boxed{\text{Guidance / Control}}.
+        \]
+      </p>
+
+      <p>
+        If the controller is accidentally supplied with
+        \(\mathbf x_{truth}\), navigation errors are bypassed and the simulation
+        no longer represents a realistic closed-loop system.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- STATE SELECTION                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Does the Estimator Actually Estimate?</h3>
+
+      <p>
+        The estimated state vector is selected according to the navigation
+        problem.
+      </p>
+
+      <p>
+        There is no single universal state vector for every spacecraft
+        estimator.
+      </p>
+
+
+      <h4>Simple Translational State</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf r \\
+        \mathbf v
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+
+      <h4>Attitude State</h4>
+
+      <p>
+        A spacecraft attitude estimator may include
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf q \\
+        \mathbf b_g
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        Here, the estimator determines both spacecraft attitude and gyroscope
+        bias.
+      </p>
+
+
+      <h4>Inertial Navigation State</h4>
+
+      <p>
+        A more complete inertial-navigation state may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf r \\
+        \mathbf v \\
+        \mathbf q \\
+        \mathbf b_a \\
+        \mathbf b_g
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+
+      <h4>Relative Navigation State</h4>
+
+      <p>
+        During rendezvous and proximity operations, a relative-navigation
+        estimator may use
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{rel}
+        =
+        \begin{bmatrix}
+        \mathbf r_{rel} \\
+        \mathbf v_{rel} \\
+        \mathbf q_{rel} \\
+        \boldsymbol{\omega}_{rel}
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        Additional states may include
+      </p>
+
+      <ul>
+
+        <li>gyroscope bias,</li>
+        <li>accelerometer bias,</li>
+        <li>scale-factor errors,</li>
+        <li>alignment errors,</li>
+        <li>GNSS clock bias,</li>
+        <li>GNSS clock drift,</li>
+        <li>target motion parameters,</li>
+        <li>environmental or disturbance parameters.</li>
+
+      </ul>
+
+      <p>
+        The state should therefore contain quantities that are both important
+        to the mission and sufficiently observable from the available
+        measurements.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INDIRECT ESTIMATION                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Directly Measured and Indirectly Estimated States</h3>
+
+      <p>
+        An important principle of state estimation is that a state variable
+        does not necessarily require a sensor that measures it directly.
+      </p>
+
+      <p>
+        Consider the simple state
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        =
+        \begin{bmatrix}
+        r\\
+        v
+        \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        while only position is measured:
+      </p>
+
+      <p>
+        \[
+        z
+        =
+        r
+        +
+        v_m.
+        \]
+      </p>
+
+      <p>
+        The measurement equation is
+      </p>
+
+      <p>
+        \[
+        z
+        =
+        \begin{bmatrix}
+        1 & 0
+        \end{bmatrix}
+        \begin{bmatrix}
+        r\\
+        v
+        \end{bmatrix}
+        +
+        v_m.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf H
+        =
+        \begin{bmatrix}
+        1 & 0
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        Velocity does not appear directly in the sensor measurement.
+      </p>
+
+      <p>
+        However, the dynamics contain the relationship
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot r=v
+        }.
+        \]
+      </p>
+
+      <p>
+        Measurements of position over time therefore contain information about
+        velocity.
+      </p>
+
+      <p>
+        The estimator may consequently reconstruct velocity even though the
+        sensor does not measure velocity directly.
+      </p>
+
+      <p>
+        This gives an important distinction:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Not Directly Measured}
+        \neq
+        \text{Not Estimable}
+        }.
+        \]
+      </p>
+
+      <p>
+        Whether indirect estimation is actually possible depends on
+        observability.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PROCESS AND MEASUREMENT MODELS                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>The Two Fundamental Models in State Estimation</h3>
+
+      <p>
+        Most model-based estimators require two mathematical descriptions:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Process / Dynamic Model}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Model}}.
+        \]
+      </p>
+
+      <p>
+        The process model describes how the spacecraft state evolves.
+      </p>
+
+      <p>
+        The measurement model describes how that state appears to a particular
+        sensor.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PROCESS MODEL                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Process or Dynamic Model</h3>
+
+      <p>
+        The process model describes how the state evolves as time advances.
+      </p>
+
+      <p>
+        For a nonlinear continuous-time system,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf x}
+        =
+        f(\mathbf x,\mathbf u,t)
+        +
+        \mathbf w
+        }.
+        \]
+      </p>
+
+      <p>
+        In discrete time,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{k+1}
+        =
+        f(\mathbf x_k,\mathbf u_k)
+        +
+        \mathbf w_k
+        }.
+        \]
+      </p>
+
+      <p>
+        For a linear discrete system,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{k+1}
+        =
+        \mathbf F_k\mathbf x_k
+        +
+        \mathbf B_k\mathbf u_k
+        +
+        \mathbf w_k
+        }.
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <ul>
+
+        <li>
+          \(\mathbf F_k\) is the state-transition matrix,
+        </li>
+
+        <li>
+          \(\mathbf B_k\) maps known inputs into the state,
+        </li>
+
+        <li>
+          \(\mathbf w_k\) represents process uncertainty.
+        </li>
+
+      </ul>
+
+
+      <h4>What Can the Process Model Contain?</h4>
+
+      <p>
+        Depending on the mission, the process model may include
+      </p>
+
+      <ul>
+
+        <li>orbital translational dynamics,</li>
+        <li>relative orbital dynamics,</li>
+        <li>rigid-body rotational dynamics,</li>
+        <li>quaternion kinematics,</li>
+        <li>IMU mechanisation equations,</li>
+        <li>sensor-bias dynamics,</li>
+        <li>GNSS receiver clock dynamics,</li>
+        <li>target motion dynamics.</li>
+
+      </ul>
+
+
+      <h4>Simple Constant-Velocity Example</h4>
+
+      <p>
+        Consider the scalar state
+      </p>
+
+      <p>
+        \[
+        \mathbf x_k
+        =
+        \begin{bmatrix}
+        r_k\\
+        v_k
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        If velocity is assumed constant during the short interval
+        \(\Delta t\),
+      </p>
+
+      <p>
+        \[
+        r_{k+1}
+        =
+        r_k
+        +
+        v_k\Delta t
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        v_{k+1}
+        =
+        v_k.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{k+1}
+        =
+        \begin{bmatrix}
+        1 & \Delta t\\
+        0 & 1
+        \end{bmatrix}
+        \mathbf x_k
+        }.
+        \]
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf F
+        =
+        \begin{bmatrix}
+        1 & \Delta t\\
+        0 & 1
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        The dynamic model tells the estimator that position and velocity are
+        physically connected.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MEASUREMENT MODEL                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Measurement Model</h3>
+
+      <p>
+        The measurement model describes the measurement that a sensor should
+        produce for a particular spacecraft state.
+      </p>
+
+      <p>
+        The general nonlinear form is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z_k
+        =
+        h(\mathbf x_k)
+        +
+        \mathbf v_k
+        }.
+        \]
+      </p>
+
+      <p>
+        For a linear measurement,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z_k
+        =
+        \mathbf H_k\mathbf x_k
+        +
+        \mathbf v_k
+        }.
+        \]
+      </p>
+
+
+      <h4>Position-Only Measurement</h4>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        =
+        \begin{bmatrix}
+        r\\
+        v
+        \end{bmatrix},
+        \]
+      </p>
+
+      <p>
+        if the sensor measures position only,
+      </p>
+
+      <p>
+        \[
+        z
+        =
+        \begin{bmatrix}
+        1 & 0
+        \end{bmatrix}
+        \mathbf x
+        +
+        v_m.
+        \]
+      </p>
+
+
+      <h4>Velocity-Only Measurement</h4>
+
+      <p>
+        If the sensor measures velocity,
+      </p>
+
+      <p>
+        \[
+        z
+        =
+        \begin{bmatrix}
+        0 & 1
+        \end{bmatrix}
+        \mathbf x
+        +
+        v_m.
+        \]
+      </p>
+
+
+      <h4>Position and Velocity Measurement</h4>
+
+      <p>
+        If both quantities are measured,
+      </p>
+
+      <p>
+        \[
+        \mathbf z
+        =
+        \begin{bmatrix}
+        1 & 0\\
+        0 & 1
+        \end{bmatrix}
+        \mathbf x
+        +
+        \mathbf v.
+        \]
+      </p>
+
+      <p>
+        The measurement model therefore maps information from
+        <strong>state space</strong> into
+        <strong>measurement or sensor space</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PREDICTION                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Prediction: What Should the State Be Now?</h3>
+
+      <p>
+        Assume that the estimator possesses an updated state estimate at
+        time \(k-1\):
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_{k-1}^{+}.
+        \]
+      </p>
+
+      <p>
+        The process model is used to propagate this state to the next
+        measurement time.
+      </p>
+
+      <p>
+        For a nonlinear system,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_{k}^{-}
+        =
+        f(
+        \hat{\mathbf x}_{k-1}^{+},
+        \mathbf u_{k-1}
+        )
+        }.
+        \]
+      </p>
+
+      <p>
+        For a linear system,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_{k}^{-}
+        =
+        \mathbf F_{k-1}
+        \hat{\mathbf x}_{k-1}^{+}
+        +
+        \mathbf B_{k-1}\mathbf u_{k-1}
+        }.
+        \]
+      </p>
+
+      <p>
+        The notation
+      </p>
+
+      <p>
+        \[
+        (-)
+        \]
+      </p>
+
+      <p>
+        denotes a <strong>prior</strong> or
+        <strong>predicted estimate</strong>.
+      </p>
+
+      <p>
+        The notation
+      </p>
+
+      <p>
+        \[
+        (+)
+        \]
+      </p>
+
+      <p>
+        denotes a <strong>posterior</strong> or
+        <strong>updated estimate</strong>.
+      </p>
+
+      <p>
+        Prediction therefore answers the question:
+      </p>
+
+      <p>
+        <strong>
+          Based on the previous estimate, known inputs, and spacecraft
+          dynamics, where should the state be now?
+        </strong>
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PREDICTED MEASUREMENT                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Predicted Measurement</h3>
+
+      <p>
+        Once the state has been predicted, the estimator must determine what
+        the sensor should observe if the predicted state were correct.
+      </p>
+
+      <p>
+        For a nonlinear measurement model,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf z}_k
+        =
+        h(\hat{\mathbf x}_k^-)
+        }.
+        \]
+      </p>
+
+      <p>
+        For a linear model,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf z}_k
+        =
+        \mathbf H_k
+        \hat{\mathbf x}_k^-.
+        }
+        \]
+      </p>
+
+      <p>
+        This is the <strong>predicted measurement</strong>.
+      </p>
+
+      <p>
+        The estimator should compare quantities expressed in the same
+        measurement space.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_k^-
+        \xrightarrow{h(\cdot)}
+        \hat{\mathbf z}_k
+        \]
+      </p>
+
+      <p>
+        and then
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf z_k}
+        \quad\text{is compared with}\quad
+        \boxed{\hat{\mathbf z}_k}.
+        \]
+      </p>
+
+      <p>
+        This distinction becomes particularly important for nonlinear sensors,
+        such as cameras, star trackers, Sun sensors, range sensors, and
+        relative-navigation systems.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INNOVATION                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Innovation or Measurement Residual</h3>
+
+      <p>
+        The difference between the actual sensor measurement and predicted
+        measurement is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y_k
+        =
+        \mathbf z_k
+        -
+        \hat{\mathbf z}_k
+        }
+        \]
+      </p>
+
+      <p>
+        or equivalently,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y_k
+        =
+        \mathbf z_k
+        -
+        h(\hat{\mathbf x}_k^-)
+        }.
+        \]
+      </p>
+
+      <p>
+        This quantity is commonly called the
+        <strong>measurement residual</strong>.
+      </p>
+
+      <p>
+        In Kalman-filter terminology it is usually called the
+        <strong>innovation</strong>.
+      </p>
+
+
+      <h4>Simple Example</h4>
+
+      <p>
+        Suppose the estimator predicts
+      </p>
+
+      <p>
+        \[
+        \hat r^-
+        =
+        10.0~\text{m}
+        \]
+      </p>
+
+      <p>
+        while the sensor measures
+      </p>
+
+      <p>
+        \[
+        r_m
+        =
+        10.3~\text{m}.
+        \]
+      </p>
+
+      <p>
+        The innovation is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        y
+        =
+        10.3
+        -
+        10.0
+        =
+        0.3~\text{m}
+        }.
+        \]
+      </p>
+
+      <p>
+        The estimator now knows that the sensor and prediction disagree by
+        \(0.3\) m.
+      </p>
+
+      <p>
+        However, the innovation alone cannot determine how much the state
+        estimate should change.
+      </p>
+
+      <p>
+        The estimator must also know how uncertain the prediction and
+        measurement are.
+      </p>
+
+      <p>
+        This leads directly to covariance.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- STATE UNCERTAINTY                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>State-Estimation Uncertainty</h3>
+
+      <p>
+        A state estimate alone does not completely describe what the estimator
+        knows.
+      </p>
+
+      <p>
+        Consider two navigation systems that both report
+      </p>
+
+      <p>
+        \[
+        \hat r
+        =
+        1.00~\text{m}.
+        \]
+      </p>
+
+      <p>
+        System A may have uncertainty
+      </p>
+
+      <p>
+        \[
+        \sigma_r
+        =
+        0.01~\text{m},
+        \]
+      </p>
+
+      <p>
+        while system B may have
+      </p>
+
+      <p>
+        \[
+        \sigma_r
+        =
+        1.0~\text{m}.
+        \]
+      </p>
+
+      <p>
+        Although both state estimates have the same numerical value, their
+        confidence is very different.
+      </p>
+
+      <p>
+        Therefore, state estimation must represent both
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Estimated Value}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Estimated Uncertainty}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COVARIANCE                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Error Covariance Matrix</h3>
+
+      <p>
+        Define the estimation error as
+      </p>
+
+      <p>
+        \[
+        \mathbf e_k
+        =
+        \mathbf x_k
+        -
+        \hat{\mathbf x}_k.
+        \]
+      </p>
+
+      <p>
+        The uncertainty associated with this error can be represented by the
+        covariance matrix
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P_k
+        =
+        E
+        \left[
+        \mathbf e_k
+        \mathbf e_k^T
+        \right]
+        }.
+        \]
+      </p>
+
+
+      <h4>Two-State Example</h4>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        =
+        \begin{bmatrix}
+        r\\
+        v
+        \end{bmatrix},
+        \]
+      </p>
+
+      <p>
+        the covariance matrix may be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P
+        =
+        \begin{bmatrix}
+        \sigma_r^2 & P_{rv}\\
+        P_{vr} & \sigma_v^2
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        The diagonal terms describe the variance associated with the
+        individual state components.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        P_{11}
+        =
+        \sigma_r^2
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        P_{22}
+        =
+        \sigma_v^2.
+        \]
+      </p>
+
+
+      <h4>Off-Diagonal Terms</h4>
+
+      <p>
+        The off-diagonal terms describe correlations between state-estimation
+        errors.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        P_{rv}
+        \neq
+        0
+        \]
+      </p>
+
+      <p>
+        means that position and velocity estimation errors are statistically
+        related.
+      </p>
+
+      <p>
+        This occurs naturally because spacecraft dynamics couple different
+        state variables.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- STANDARD DEVIATION                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Standard Deviation and Covariance</h3>
+
+      <p>
+        If a diagonal covariance element is
+      </p>
+
+      <p>
+        \[
+        P_{ii}
+        =
+        \sigma_i^2,
+        \]
+      </p>
+
+      <p>
+        then the corresponding standard deviation is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \sigma_i
+        =
+        \sqrt{P_{ii}}
+        }.
+        \]
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        P_{rr}
+        =
+        10^{-4}~\text{m}^2
+        \]
+      </p>
+
+      <p>
+        corresponds to
+      </p>
+
+      <p>
+        \[
+        \sigma_r
+        =
+        0.01~\text{m}.
+        \]
+      </p>
+
+      <p>
+        Standard deviation therefore provides a physically intuitive way to
+        interpret individual covariance terms.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PROCESS NOISE                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Process Noise</h3>
+
+      <p>
+        No mathematical spacecraft model perfectly reproduces the real
+        physical system.
+      </p>
+
+      <p>
+        Even a detailed model may contain uncertainty associated with
+      </p>
+
+      <ul>
+
+        <li>disturbance forces,</li>
+        <li>disturbance torques,</li>
+        <li>thruster magnitude uncertainty,</li>
+        <li>thruster misalignment,</li>
+        <li>aerodynamic drag,</li>
+        <li>solar-radiation pressure,</li>
+        <li>gravity-model approximation,</li>
+        <li>flexible-body dynamics,</li>
+        <li>target motion,</li>
+        <li>sensor-bias evolution.</li>
+
+      </ul>
+
+      <p>
+        These effects are represented through the process-noise term
+      </p>
+
+      <p>
+        \[
+        \mathbf w_k.
+        \]
+      </p>
+
+      <p>
+        Its covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf Q_k
+        =
+        E
+        \left[
+        \mathbf w_k
+        \mathbf w_k^T
+        \right]
+        }.
+        \]
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf Q}
+        \rightarrow
+        \boxed{\text{Uncertainty Introduced by the Process Model}}.
+        \]
+      </p>
+
+      <p>
+        A common intuitive interpretation is that \(Q\) influences how much
+        confidence the estimator places in its state-propagation model.
+      </p>
+
+      <p>
+        Formally, however, \(Q\) is the covariance assigned to the process
+        disturbance rather than a purely subjective tuning parameter.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MEASUREMENT NOISE                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Measurement Noise</h3>
+
+      <p>
+        Sensor measurements also contain uncertainty.
+      </p>
+
+      <p>
+        In the measurement equation
+      </p>
+
+      <p>
+        \[
+        \mathbf z_k
+        =
+        h(\mathbf x_k)
+        +
+        \mathbf v_k,
+        \]
+      </p>
+
+      <p>
+        the term
+      </p>
+
+      <p>
+        \[
+        \mathbf v_k
+        \]
+      </p>
+
+      <p>
+        represents measurement uncertainty.
+      </p>
+
+      <p>
+        Its covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf R_k
+        =
+        E
+        \left[
+        \mathbf v_k
+        \mathbf v_k^T
+        \right]
+        }.
+        \]
+      </p>
+
+
+      <h4>Scalar Example</h4>
+
+      <p>
+        Suppose a position sensor has measurement standard deviation
+      </p>
+
+      <p>
+        \[
+        \sigma_r
+        =
+        0.02~\text{m}.
+        \]
+      </p>
+
+      <p>
+        The corresponding measurement variance is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        R
+        =
+        \sigma_r^2
+        =
+        (0.02)^2
+        =
+        4\times10^{-4}~\text{m}^2
+        }.
+        \]
+      </p>
+
+      <p>
+        For multi-dimensional measurements, \(\mathbf R\) becomes a matrix.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- P Q R                                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>P, Q, and R — Three Covariances to Distinguish</h3>
+
+      <p>
+        These three matrices are central to Kalman-filter-based estimation and
+        are frequently confused.
+      </p>
+
+
+      <h4>State-Estimate Covariance — P</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P
+        =
+        \text{Uncertainty of the Estimated State}
+        }.
+        \]
+      </p>
+
+
+      <h4>Process-Noise Covariance — Q</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf Q
+        =
+        \text{Uncertainty Introduced by the Process Model}
+        }.
+        \]
+      </p>
+
+
+      <h4>Measurement-Noise Covariance — R</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf R
+        =
+        \text{Uncertainty Associated with the Measurement}
+        }.
+        \]
+      </p>
+
+
+      <h4>Compact Interpretation</h4>
+
+      <p>
+        \[
+        \boxed{\mathbf Q}
+        \rightarrow
+        \boxed{\text{Prediction / Model Uncertainty}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf R}
+        \rightarrow
+        \boxed{\text{Measurement Uncertainty}}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf P}
+        \rightarrow
+        \boxed{\text{Estimated-State Uncertainty}}.
+        \]
+      </p>
+
+      <p>
+        Understanding these three quantities is essential before developing the
+        Kalman Filter.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COVARIANCE PROPAGATION                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Prediction Also Propagates Uncertainty</h3>
+
+      <p>
+        State prediction changes not only the estimated state but also the
+        uncertainty associated with that state.
+      </p>
+
+      <p>
+        For a linear system,
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_k^-
+        =
+        \mathbf F
+        \hat{\mathbf x}_{k-1}^+
+        \]
+      </p>
+
+      <p>
+        and the covariance is propagated as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P_k^-
+        =
+        \mathbf F
+        \mathbf P_{k-1}^+
+        \mathbf F^T
+        +
+        \mathbf Q
+        }.
+        \]
+      </p>
+
+
+      <h4>Physical Interpretation</h4>
+
+      <p>
+        The previous uncertainty is transformed by the state dynamics:
+      </p>
+
+      <p>
+        \[
+        \mathbf F
+        \mathbf P^+
+        \mathbf F^T.
+        \]
+      </p>
+
+      <p>
+        Additional uncertainty from imperfect modelling is then added:
+      </p>
+
+      <p>
+        \[
+        +\mathbf Q.
+        \]
+      </p>
+
+      <p>
+        Consequently, when no correcting measurements are available,
+        uncertainty generally grows.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Propagation}}
+        \Rightarrow
+        \boxed{\text{Uncertainty Accumulation}}.
+        \]
+      </p>
+
+      <p>
+        This is one reason inertial-navigation systems cannot normally
+        propagate indefinitely without external corrections.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MEASUREMENT UPDATE EFFECT                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Measurement Updates and Uncertainty Reduction</h3>
+
+      <p>
+        When an informative independent measurement becomes available, the
+        estimator receives new information about the spacecraft state.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Prediction}}
+        +
+        \boxed{\text{Measurement}}
+        \rightarrow
+        \boxed{\text{Updated Estimate}}.
+        \]
+      </p>
+
+      <p>
+        The measurement can reduce uncertainty in states that are directly
+        observed and, through state correlations and dynamics, may also reduce
+        uncertainty in indirectly observed states.
+      </p>
+
+      <p>
+        A typical conceptual behaviour is therefore
+      </p>
+
+      <p>
+        \[
+        \mathbf P
+        \nearrow
+        \qquad
+        \text{during propagation}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf P
+        \searrow
+        \qquad
+        \text{after informative measurement updates}.
+        \]
+      </p>
+
+      <p>
+        This is a useful conceptual picture, although not every covariance
+        element must decrease after every measurement update.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MODEL VS MEASUREMENT TRUST                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Prediction Versus Measurement Trust</h3>
+
+      <p>
+        Suppose the dynamic model predicts
+      </p>
+
+      <p>
+        \[
+        \hat{x}^-
+        =
+        10.0
+        \]
+      </p>
+
+      <p>
+        while a sensor measures
+      </p>
+
+      <p>
+        \[
+        z
+        =
+        10.5.
+        \]
+      </p>
+
+      <p>
+        The updated estimate should not automatically become \(10.5\), nor
+        should the measurement automatically be ignored.
+      </p>
+
+
+      <h4>Accurate Model, Noisy Sensor</h4>
+
+      <p>
+        If the predicted state has low uncertainty and the measurement has high
+        uncertainty, the updated estimate should remain relatively close to
+        \(10.0\).
+      </p>
+
+
+      <h4>Uncertain Model, Accurate Sensor</h4>
+
+      <p>
+        If the model prediction is uncertain while the sensor measurement is
+        precise, the updated estimate should move more strongly toward
+        \(10.5\).
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Correction Strength}
+        =
+        f(
+        \text{Prediction Uncertainty},
+        \text{Measurement Uncertainty}
+        )
+        }.
+        \]
+      </p>
+
+      <p>
+        This principle ultimately produces the Kalman gain.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}^{+}
+        =
+        \hat{\mathbf x}^{-}
+        +
+        \text{Gain}
+        \times
+        \text{Innovation}
+        }.
+        \]
+      </p>
+
+      <p>
+        Later this becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}^{+}
+        =
+        \hat{\mathbf x}^{-}
+        +
+        \mathbf K\mathbf y
+        }.
+        \]
+      </p>
+
+      <p>
+        The full derivation of \(\mathbf K\) is developed in the Kalman Filter
+        section rather than here.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- HIGH-RATE PROPAGATION                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>High-Rate Propagation and Low-Rate Correction</h3>
+
+      <p>
+        Many spacecraft navigation systems combine high-rate inertial sensors
+        with lower-rate absolute reference sensors.
+      </p>
+
+
+      <h4>Attitude Example</h4>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        \rightarrow
+        \boxed{\text{High-Rate Attitude Propagation}}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker}}
+        \rightarrow
+        \boxed{\text{Absolute Attitude Correction}}.
+        \]
+      </p>
+
+
+      <h4>Translational Navigation Example</h4>
+
+      <p>
+        \[
+        \boxed{\text{IMU}}
+        \rightarrow
+        \boxed{\text{High-Rate Navigation Propagation}}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS}}
+        \rightarrow
+        \boxed{\text{Absolute Position / Velocity Correction}}.
+        \]
+      </p>
+
+      <p>
+        The estimator may therefore operate as
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predict}}
+        \rightarrow
+        \boxed{\text{Predict}}
+        \rightarrow
+        \boxed{\text{Predict}}
+        \rightarrow
+        \boxed{\text{Predict}}
+        \rightarrow
+        \boxed{\text{Update}}.
+        \]
+      </p>
+
+      <p>
+        Prediction and correction therefore do not need to occur at the same
+        frequency.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MULTI-RATE FUSION                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Multi-Rate Sensor Fusion</h3>
+
+      <p>
+        Consider an IMU operating at
+      </p>
+
+      <p>
+        \[
+        f_{IMU}
+        =
+        100~\text{Hz}
+        \]
+      </p>
+
+      <p>
+        and GNSS operating at
+      </p>
+
+      <p>
+        \[
+        f_{GNSS}
+        =
+        10~\text{Hz}.
+        \]
+      </p>
+
+      <p>
+        One GNSS measurement is available every
+      </p>
+
+      <p>
+        \[
+        0.1~\text{s},
+        \]
+      </p>
+
+      <p>
+        while the IMU provides measurements every
+      </p>
+
+      <p>
+        \[
+        0.01~\text{s}.
+        \]
+      </p>
+
+      <p>
+        Therefore, approximately ten IMU-driven propagation steps may occur
+        between two GNSS updates.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU}}
+        \rightarrow
+        P_1
+        \rightarrow
+        P_2
+        \rightarrow
+        P_3
+        \rightarrow
+        \cdots
+        \rightarrow
+        P_{10}
+        \rightarrow
+        \boxed{\text{GNSS Update}}.
+        \]
+      </p>
+
+      <p>
+        Here \(P_1,P_2,\ldots\) represent successive propagation operations,
+        not the covariance matrix \(\mathbf P\).
+      </p>
+
+      <p>
+        The estimator must maintain both state and uncertainty continuously
+        between absolute sensor updates.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ASYNCHRONOUS MEASUREMENTS                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Asynchronous Measurements</h3>
+
+      <p>
+        Real spacecraft sensors do not necessarily operate from the same clock
+        or at integer multiples of one another.
+      </p>
+
+      <p>
+        A representative system might contain
+      </p>
+
+      <ul>
+
+        <li>IMU at 200 Hz,</li>
+        <li>GNSS at 10 Hz,</li>
+        <li>star tracker at 5 Hz,</li>
+        <li>camera at 20 Hz,</li>
+        <li>LiDAR at 10 Hz.</li>
+
+      </ul>
+
+      <p>
+        These measurements may arrive at different times.
+      </p>
+
+      <p>
+        A practical estimator therefore often follows the sequence
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Propagate State to Measurement Time}}
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Apply the Available Measurement Update}}.
+        \]
+      </p>
+
+      <p>
+        Accurate timestamping is therefore part of the navigation problem, not
+        merely a communication-system detail.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- LATENCY                                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Latency</h3>
+
+      <p>
+        Measurement arrival time and measurement observation time are not
+        necessarily the same.
+      </p>
+
+      <p>
+        Suppose a camera measurement becomes available at
+      </p>
+
+      <p>
+        \[
+        t
+        =
+        10.10~\text{s}
+        \]
+      </p>
+
+      <p>
+        but the image was actually captured at
+      </p>
+
+      <p>
+        \[
+        t
+        =
+        10.00~\text{s}.
+        \]
+      </p>
+
+      <p>
+        The measurement represents the spacecraft state at \(10.00\) s rather
+        than \(10.10\) s.
+      </p>
+
+      <p>
+        If the estimator incorrectly applies the measurement as though it were
+        current, a timing-induced navigation error is introduced.
+      </p>
+
+      <p>
+        Therefore, a fusion algorithm should distinguish
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Time}}
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Arrival Time}}.
+        \]
+      </p>
+
+      <p>
+        This becomes especially important during fast manoeuvres, close-range
+        RPO, docking, and high-rate attitude motion.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COORDINATE FRAMES                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Coordinate Frames Must Be Consistent</h3>
+
+      <p>
+        Different sensors often express their measurements in different
+        coordinate frames.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <ul>
+
+        <li>an IMU may report measurements in the IMU sensor frame,</li>
+
+        <li>a camera may provide measurements in the camera frame,</li>
+
+        <li>a LiDAR may use its own instrument frame,</li>
+
+        <li>a star tracker may provide attitude relative to an inertial frame,</li>
+
+        <li>relative navigation may use Hill or LVLH coordinates,</li>
+
+        <li>a controller may require quantities in the spacecraft body frame.</li>
+
+      </ul>
+
+      <p>
+        Measurements must therefore be transformed consistently before they
+        are compared or fused.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Measurement}}
+        \rightarrow
+        \boxed{\text{Frame Transformation}}
+        \rightarrow
+        \boxed{\text{Estimator-Compatible Measurement}}.
+        \]
+      </p>
+
+      <p>
+        For a vector transformed from frame \(A\) to frame \(B\),
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z^B
+        =
+        \mathbf C_A^B
+        \mathbf z^A
+        }.
+        \]
+      </p>
+
+      <p>
+        A mathematically correct estimator can still produce physically
+        incorrect results if frame definitions, axis directions, quaternion
+        conventions, or transformation directions are inconsistent.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SENSOR BIASES                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Biases as Estimated States</h3>
+
+      <p>
+        Many sensor errors are not purely instantaneous random noise.
+      </p>
+
+      <p>
+        Consider a gyroscope measurement:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \boldsymbol{\omega}_m
+        =
+        \boldsymbol{\omega}_{true}
+        +
+        \mathbf b_g
+        +
+        \mathbf n_g
+        }.
+        \]
+      </p>
+
+      <p>
+        If the gyro bias \(\mathbf b_g\) is ignored, it accumulates during
+        attitude propagation and produces growing attitude error.
+      </p>
+
+      <p>
+        Instead, the estimator may augment the state:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf q\\
+        \mathbf b_g
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        The estimator then determines both spacecraft attitude and gyroscope
+        bias.
+      </p>
+
+      <p>
+        Similarly, an inertial-navigation state may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf r\\
+        \mathbf v\\
+        \mathbf q\\
+        \mathbf b_a\\
+        \mathbf b_g
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        Bias estimation is therefore an important link between the sensor-error
+        models developed in Section 4.1 and the state-estimation algorithms
+        developed in Section 4.2.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- BIAS DYNAMICS                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Bias Dynamics</h3>
+
+      <p>
+        Sensor bias may itself evolve with time.
+      </p>
+
+
+      <h4>Constant Bias Model</h4>
+
+      <p>
+        The simplest model assumes the bias remains constant:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf b}
+        =
+        0
+        }.
+        \]
+      </p>
+
+
+      <h4>Random-Walk Bias Model</h4>
+
+      <p>
+        Slowly varying bias may be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf b}
+        =
+        \mathbf w_b
+        }.
+        \]
+      </p>
+
+      <p>
+        Here \(\mathbf w_b\) is a random driving process.
+      </p>
+
+
+      <h4>First-Order Gauss-Markov Model</h4>
+
+      <p>
+        A correlated bias process may be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf b}
+        =
+        -
+        \frac{1}{\tau}
+        \mathbf b
+        +
+        \mathbf w_b
+        }.
+        \]
+      </p>
+
+      <p>
+        The parameter \(\tau\) is the correlation time constant.
+      </p>
+
+      <p>
+        The estimator process model must therefore be selected consistently
+        with the physical error behaviour assumed for the sensor.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- OBSERVABILITY                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observability</h3>
+
+      <p>
+        Adding a quantity to the estimator state vector does not guarantee that
+        the estimator can actually determine that quantity.
+      </p>
+
+      <p>
+        The measurements and dynamics must contain enough information to
+        distinguish changes in the state.
+      </p>
+
+      <p>
+        This property is called <strong>observability</strong>.
+      </p>
+
+
+      <h4>Linear Observability</h4>
+
+      <p>
+        Consider the linear system
+      </p>
+
+      <p>
+        \[
+        \mathbf x_{k+1}
+        =
+        \mathbf F
+        \mathbf x_k
+        \]
+      </p>
+
+      <p>
+        with measurements
+      </p>
+
+      <p>
+        \[
+        \mathbf z_k
+        =
+        \mathbf H
+        \mathbf x_k.
+        \]
+      </p>
+
+      <p>
+        The observability matrix is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathcal O
+        =
+        \begin{bmatrix}
+        \mathbf H\\
+        \mathbf H\mathbf F\\
+        \mathbf H\mathbf F^2\\
+        \vdots\\
+        \mathbf H\mathbf F^{n-1}
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \operatorname{rank}(\mathcal O)
+        =
+        n
+        },
+        \]
+      </p>
+
+      <p>
+        the linear system is observable.
+      </p>
+
+      <p>
+        This means the complete state can, in principle, be reconstructed from
+        measurements collected over time.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- OBSERVABILITY GEOMETRY                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observability Depends on More Than Sensor Count</h3>
+
+      <p>
+        Simply adding more sensors does not automatically guarantee that every
+        state becomes observable.
+      </p>
+
+      <p>
+        Observability depends on
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Type}}
+        +
+        \boxed{\text{Geometry}}
+        +
+        \boxed{\text{Dynamics}}
+        +
+        \boxed{\text{Vehicle Motion}}.
+        \]
+      </p>
+
+
+      <h4>Relative Navigation Example</h4>
+
+      <p>
+        A monocular camera may provide accurate line-of-sight information to a
+        target but relatively weak instantaneous information about absolute
+        range.
+      </p>
+
+      <p>
+        A LiDAR can directly provide range information.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera Bearing}}
+        +
+        \boxed{\text{LiDAR Range}}
+        \rightarrow
+        \boxed{\text{Improved Relative-State Observability}}.
+        \]
+      </p>
+
+      <p>
+        This demonstrates why sensor geometry and measurement type are as
+        important as nominal sensor accuracy.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MEASUREMENT GEOMETRY                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Measurement Geometry</h3>
+
+      <p>
+        Navigation uncertainty is generally directional rather than identical
+        in every axis.
+      </p>
+
+      <p>
+        A measurement may strongly constrain one direction while providing
+        weak information in another.
+      </p>
+
+      <p>
+        The resulting estimator uncertainty might therefore satisfy
+      </p>
+
+      <p>
+        \[
+        \sigma_x
+        \ll
+        \sigma_y.
+        \]
+      </p>
+
+      <p>
+        Geometry plays an important role in
+      </p>
+
+      <ul>
+
+        <li>GNSS navigation,</li>
+        <li>bearing-only navigation,</li>
+        <li>optical relative navigation,</li>
+        <li>LiDAR-based pose estimation,</li>
+        <li>formation flying,</li>
+        <li>rendezvous and docking.</li>
+
+      </ul>
+
+      <p>
+        This is another reason why navigation uncertainty must be represented
+        using covariance matrices rather than a single accuracy number.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MEASUREMENT VALIDATION                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Measurement Validation</h3>
+
+      <p>
+        A practical estimator should not assume that every received
+        measurement is valid.
+      </p>
+
+      <p>
+        A measurement may be corrupted by
+      </p>
+
+      <ul>
+
+        <li>statistical outliers,</li>
+        <li>tracking loss,</li>
+        <li>incorrect optical feature association,</li>
+        <li>GNSS solution corruption,</li>
+        <li>LiDAR false returns,</li>
+        <li>star-tracker invalid solutions,</li>
+        <li>communication errors.</li>
+
+      </ul>
+
+      <p>
+        The estimator already computes the innovation
+      </p>
+
+      <p>
+        \[
+        \mathbf y_k
+        =
+        \mathbf z_k
+        -
+        \hat{\mathbf z}_k.
+        \]
+      </p>
+
+      <p>
+        This residual provides a natural basis for determining whether the
+        incoming measurement agrees with the predicted spacecraft state.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement}}
+        \rightarrow
+        \boxed{\text{Validation}}
+        \rightarrow
+        \begin{cases}
+        \text{Accept}\\
+        \text{Reject}\\
+        \text{Down-weight}
+        \end{cases}.
+        \]
+      </p>
+
+      <p>
+        This process is commonly called
+        <strong>measurement gating</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INNOVATION COVARIANCE                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Innovation Covariance</h3>
+
+      <p>
+        The magnitude of the innovation alone is not sufficient for determining
+        whether a measurement is reasonable.
+      </p>
+
+      <p>
+        For example, a residual of
+      </p>
+
+      <p>
+        \[
+        0.5~\text{m}
+        \]
+      </p>
+
+      <p>
+        would be very large for a centimetre-level measurement system but may
+        be perfectly reasonable for a sensor with metre-level uncertainty.
+      </p>
+
+      <p>
+        The innovation must therefore be interpreted relative to its expected
+        uncertainty.
+      </p>
+
+      <p>
+        In the linear Kalman Filter, this uncertainty is represented by the
+        innovation covariance
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf S}.
+        \]
+      </p>
+
+      <p>
+        For the linear filter,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf S
+        =
+        \mathbf H
+        \mathbf P^-
+        \mathbf H^T
+        +
+        \mathbf R
+        }.
+        \]
+      </p>
+
+      <p>
+        This combines
+      </p>
+
+      <ul>
+
+        <li>uncertainty in the predicted state,</li>
+        <li>uncertainty in the sensor measurement.</li>
+
+      </ul>
+
+      <p>
+        Innovation covariance later becomes important for
+      </p>
+
+      <ul>
+
+        <li>Kalman gain calculation,</li>
+        <li>measurement gating,</li>
+        <li>Mahalanobis-distance testing,</li>
+        <li>Normalised Innovation Squared testing,</li>
+        <li>filter consistency analysis.</li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SENSOR DROPOUT                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Dropout</h3>
+
+      <p>
+        Spacecraft sensors may temporarily become unavailable.
+      </p>
+
+      <p>
+        A star tracker may lose tracking, GNSS may experience a temporary loss
+        of navigation solution, or a camera may lose the target.
+      </p>
+
+
+      <h4>Star Tracker Loss</h4>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker Lost}}
+        \]
+      </p>
+
+      <p>
+        does not necessarily mean attitude estimation stops immediately.
+      </p>
+
+      <p>
+        The estimator may continue using
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro Propagation}}
+        \rightarrow
+        \boxed{\text{Temporary Attitude Estimate}}.
+        \]
+      </p>
+
+      <p>
+        However, the uncertainty generally grows because the absolute
+        correction is no longer available.
+      </p>
+
+
+      <h4>GNSS Loss</h4>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS Loss}}
+        \rightarrow
+        \boxed{\text{IMU Propagation}}
+        \]
+      </p>
+
+      <p>
+        can maintain a navigation solution temporarily, but inertial errors
+        accumulate with time.
+      </p>
+
+      <p>
+        A robust fusion system must therefore be designed to operate not only
+        when measurements are available but also when they disappear.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SENSOR AVAILABILITY / MISSION PHASE                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Availability and Mission Phase</h3>
+
+      <p>
+        The most useful sensor combination may change during different mission
+        phases.
+      </p>
+
+      <p>
+        Rendezvous and proximity operations provide a clear example.
+      </p>
+
+
+      <h4>Far Range</h4>
+
+      <p>
+        \[
+        \boxed{\text{GNSS / Relative GNSS}}
+        \]
+      </p>
+
+      <p>
+        may provide the primary relative translational navigation information.
+      </p>
+
+
+      <h4>Mid Range</h4>
+
+      <p>
+        \[
+        \boxed{\text{GNSS + Camera}}
+        \]
+      </p>
+
+      <p>
+        may provide both absolute/relative translational information and
+        optical line-of-sight observations.
+      </p>
+
+
+      <h4>Close Range</h4>
+
+      <p>
+        \[
+        \boxed{\text{Camera + LiDAR}}
+        \]
+      </p>
+
+      <p>
+        may become more important as range, target geometry, and relative pose
+        must be determined accurately.
+      </p>
+
+
+      <h4>Capture Phase</h4>
+
+      <p>
+        The navigation solution may need accurate estimates of
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r_{rel},
+        \mathbf v_{rel},
+        \mathbf q_{rel},
+        \boldsymbol{\omega}_{rel}
+        }.
+        \]
+      </p>
+
+      <p>
+        Sensor fusion may therefore need to change dynamically as the
+        spacecraft progresses through the mission.
+      </p>
+
+      <p>
+        This concept is developed later in
+        <strong>Sensor Handover and Mode-Dependent Fusion</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INITIALIZATION                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Filter Initialization</h3>
+
+      <p>
+        Every recursive estimator requires an initial state estimate.
+      </p>
+
+      <p>
+        The estimator begins with
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_0
+        }
+        \]
+      </p>
+
+      <p>
+        and probabilistic filters also require an initial covariance
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P_0
+        }.
+        \]
+      </p>
+
+      <p>
+        These quantities describe
+      </p>
+
+      <ul>
+
+        <li>what the estimator initially believes the spacecraft state to be,</li>
+        <li>how uncertain it is about that initial estimate.</li>
+
+      </ul>
+
+      <p>
+        Poor initialization can result in
+      </p>
+
+      <ul>
+
+        <li>large initial transients,</li>
+        <li>slow convergence,</li>
+        <li>inconsistent covariance,</li>
+        <li>poor nonlinear-filter behaviour,</li>
+        <li>possible estimator divergence.</li>
+
+      </ul>
+
+      <p>
+        Initialization is therefore part of estimator design rather than only a
+        software startup detail.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CONVERGENCE                                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Estimator Convergence</h3>
+
+      <p>
+        The initial estimate may differ from the true state:
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_0
+        \neq
+        \mathbf x_0.
+        \]
+      </p>
+
+      <p>
+        As valid measurements are processed, the estimate should ideally move
+        toward the true state:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_k
+        \rightarrow
+        \mathbf x_k
+        }.
+        \]
+      </p>
+
+      <p>
+        This process is called <strong>convergence</strong>.
+      </p>
+
+      <p>
+        Convergence depends on
+      </p>
+
+      <ul>
+
+        <li>observability,</li>
+        <li>initial-state error,</li>
+        <li>sensor accuracy,</li>
+        <li>measurement update rate,</li>
+        <li>process-model accuracy,</li>
+        <li>filter tuning,</li>
+        <li>system nonlinearities,</li>
+        <li>measurement geometry,</li>
+        <li>vehicle manoeuvres.</li>
+
+      </ul>
+
+      <p>
+        A flight estimator must therefore answer not only
+      </p>
+
+      <p>
+        <strong>Is the estimator stable?</strong>
+      </p>
+
+      <p>
+        but also
+      </p>
+
+      <p>
+        <strong>
+          Does the estimator converge sufficiently quickly for the mission
+          phase?
+        </strong>
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ACCURACY PRECISION CONSISTENCY                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Accuracy, Precision, and Consistency</h3>
+
+      <p>
+        Accuracy, precision, and filter consistency are related but different
+        concepts.
+      </p>
+
+
+      <h4>Accuracy</h4>
+
+      <p>
+        Accuracy describes how close the estimated state is to the true state.
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e
+        =
+        \mathbf x
+        -
+        \hat{\mathbf x}
+        }.
+        \]
+      </p>
+
+      <p>
+        Smaller estimation error generally means greater accuracy.
+      </p>
+
+
+      <h4>Precision</h4>
+
+      <p>
+        Precision describes the spread of repeated estimates or measurements.
+      </p>
+
+      <p>
+        A system may be highly precise but biased, meaning repeated estimates
+        cluster tightly around the wrong value.
+      </p>
+
+
+      <h4>Consistency</h4>
+
+      <p>
+        Filter consistency asks whether the estimator's reported uncertainty
+        realistically represents its actual estimation error.
+      </p>
+
+      <p>
+        A filter may report very small covariance even though the true
+        estimation error is large.
+      </p>
+
+      <p>
+        Such a filter is overconfident.
+      </p>
+
+      <p>
+        Good estimation therefore requires both
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Small Estimation Error}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Realistic Estimated Uncertainty}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INFORMATION LEVELS                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Fusion at Different Information Levels</h3>
+
+      <p>
+        Sensor fusion can occur at different stages of the measurement
+        processing chain.
+      </p>
+
+
+      <h4>Raw or Data-Level Fusion</h4>
+
+      <p>
+        Low-level sensor measurements are combined directly.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <ul>
+
+        <li>GNSS pseudoranges,</li>
+        <li>GNSS Doppler measurements,</li>
+        <li>raw inertial measurements,</li>
+        <li>raw range measurements.</li>
+
+      </ul>
+
+
+      <h4>Feature-Level Fusion</h4>
+
+      <p>
+        Features extracted from sensor data are fused.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera Features}}
+        +
+        \boxed{\text{LiDAR Features}}
+        \rightarrow
+        \boxed{\text{Relative Pose}}.
+        \]
+      </p>
+
+
+      <h4>State-Level Fusion</h4>
+
+      <p>
+        Individual navigation subsystems may each produce their own state
+        estimates:
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_1,
+        \qquad
+        \hat{\mathbf x}_2.
+        \]
+      </p>
+
+      <p>
+        These state estimates can then be fused:
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}_1}
+        +
+        \boxed{\hat{\mathbf x}_2}
+        \rightarrow
+        \boxed{\hat{\mathbf x}_{fused}}.
+        \]
+      </p>
+
+      <p>
+        These levels of fusion lead directly to the centralized,
+        decentralized, federated, loosely coupled, tightly coupled, and deeply
+        coupled architectures developed in Section 4.2.2.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- RECURSIVE ESTIMATION                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Central Idea of Recursive State Estimation</h3>
+
+      <p>
+        The complete estimator process can now be expressed as a repeated
+        sequence of propagation, measurement processing, validation, and
+        correction.
+      </p>
+
+      <p>
+        Begin with the previous updated estimate
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_{k-1}^{+},
+        \mathbf P_{k-1}^{+}
+        }.
+        \]
+      </p>
+
+
+      <h4>Step 1 — Propagate the State</h4>
+
+      <p>
+        \[
+        \hat{\mathbf x}_{k-1}^{+}
+        \rightarrow
+        \hat{\mathbf x}_k^{-}.
+        \]
+      </p>
+
+
+      <h4>Step 2 — Propagate the Uncertainty</h4>
+
+      <p>
+        \[
+        \mathbf P_{k-1}^{+}
+        \rightarrow
+        \mathbf P_k^{-}.
+        \]
+      </p>
+
+
+      <h4>Step 3 — Receive a Measurement</h4>
+
+      <p>
+        \[
+        \mathbf z_k.
+        \]
+      </p>
+
+
+      <h4>Step 4 — Predict the Measurement</h4>
+
+      <p>
+        \[
+        \hat{\mathbf z}_k
+        =
+        h(\hat{\mathbf x}_k^-).
+        \]
+      </p>
+
+
+      <h4>Step 5 — Compute the Innovation</h4>
+
+      <p>
+        \[
+        \mathbf y_k
+        =
+        \mathbf z_k
+        -
+        \hat{\mathbf z}_k.
+        \]
+      </p>
+
+
+      <h4>Step 6 — Validate the Measurement</h4>
+
+      <p>
+        \[
+        \mathbf y_k
+        \rightarrow
+        \boxed{\text{Measurement Gate}}.
+        \]
+      </p>
+
+
+      <h4>Step 7 — Correct the State</h4>
+
+      <p>
+        \[
+        \hat{\mathbf x}_k^-
+        \rightarrow
+        \hat{\mathbf x}_k^+.
+        \]
+      </p>
+
+
+      <h4>Step 8 — Correct the Covariance</h4>
+
+      <p>
+        \[
+        \mathbf P_k^-
+        \rightarrow
+        \mathbf P_k^+.
+        \]
+      </p>
+
+
+      <h4>Step 9 — Repeat</h4>
+
+      <p>
+        \[
+        k
+        \rightarrow
+        k+1.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predict}}
+        \rightarrow
+        \boxed{\text{Measure}}
+        \rightarrow
+        \boxed{\text{Compare}}
+        \rightarrow
+        \boxed{\text{Validate}}
+        \rightarrow
+        \boxed{\text{Correct}}
+        \rightarrow
+        \boxed{\text{Repeat}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ATTITUDE EXAMPLE                                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Example: Attitude Sensor Fusion</h3>
+
+      <p>
+        Consider a spacecraft equipped with
+      </p>
+
+      <ul>
+        <li>a gyroscope,</li>
+        <li>a star tracker.</li>
+      </ul>
+
+      <p>
+        The gyroscope measurement may be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \boldsymbol{\omega}_m
+        =
+        \boldsymbol{\omega}
+        +
+        \mathbf b_g
+        +
+        \mathbf n_g
+        }.
+        \]
+      </p>
+
+      <p>
+        The estimator subtracts its current bias estimate:
+      </p>
+
+      <p>
+        \[
+        \hat{\boldsymbol{\omega}}
+        =
+        \boldsymbol{\omega}_m
+        -
+        \hat{\mathbf b}_g.
+        \]
+      </p>
+
+      <p>
+        This angular-rate estimate can be used to propagate the quaternion:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf q}
+        =
+        \frac{1}{2}
+        \mathbf\Omega
+        \left(
+        \boldsymbol{\omega}_m
+        -
+        \hat{\mathbf b}_g
+        \right)
+        \mathbf q
+        }.
+        \]
+      </p>
+
+      <p>
+        The propagated attitude is
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}^{-}.
+        \]
+      </p>
+
+      <p>
+        The star tracker then provides an absolute attitude observation
+      </p>
+
+      <p>
+        \[
+        \mathbf q_{ST}.
+        \]
+      </p>
+
+      <p>
+        The disagreement between propagated and measured attitude provides
+        information about
+      </p>
+
+      <ul>
+
+        <li>attitude error,</li>
+        <li>potential gyroscope bias error.</li>
+
+      </ul>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        \rightarrow
+        \boxed{\text{Quaternion Propagation}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker}}
+        \rightarrow
+        \boxed{\text{Attitude Correction}}.
+        \]
+      </p>
+
+      <p>
+        This is the basic architecture later formalised through the
+        <strong>Multiplicative Extended Kalman Filter</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- IMU GNSS EXAMPLE                                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Example: IMU/GNSS Sensor Fusion</h3>
+
+      <p>
+        Consider an inertial-navigation estimator with the state
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf r\\
+        \mathbf v\\
+        \mathbf q\\
+        \mathbf b_a\\
+        \mathbf b_g
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        The IMU supplies specific-force measurements
+      </p>
+
+      <p>
+        \[
+        \mathbf f_m
+        \]
+      </p>
+
+      <p>
+        and angular-rate measurements
+      </p>
+
+      <p>
+        \[
+        \boldsymbol{\omega}_m.
+        \]
+      </p>
+
+      <p>
+        These measurements are used to propagate
+      </p>
+
+      <p>
+        \[
+        \mathbf q,
+        \qquad
+        \mathbf v,
+        \qquad
+        \mathbf r.
+        \]
+      </p>
+
+      <p>
+        However, accelerometer bias, gyro bias, attitude error, and inertial
+        sensor noise accumulate with time.
+      </p>
+
+      <p>
+        GNSS provides external navigation observations:
+      </p>
+
+      <p>
+        \[
+        \mathbf r_{GNSS},
+        \qquad
+        \mathbf v_{GNSS}.
+        \]
+      </p>
+
+
+      <h4>Position Innovation</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y_r
+        =
+        \mathbf r_{GNSS}
+        -
+        \hat{\mathbf r}^{-}
+        }.
+        \]
+      </p>
+
+
+      <h4>Velocity Innovation</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y_v
+        =
+        \mathbf v_{GNSS}
+        -
+        \hat{\mathbf v}^{-}
+        }.
+        \]
+      </p>
+
+      <p>
+        These residuals can directly correct position and velocity.
+      </p>
+
+      <p>
+        Through covariance coupling and observability, they can also contribute
+        information about
+      </p>
+
+      <ul>
+
+        <li>attitude error,</li>
+        <li>accelerometer bias,</li>
+        <li>gyroscope bias.</li>
+
+      </ul>
+
+      <p>
+        This demonstrates why sensor fusion is more powerful than processing
+        each sensor independently.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- RPO EXAMPLE                                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Example: Relative Navigation Sensor Fusion for RPO</h3>
+
+      <p>
+        During rendezvous and proximity operations, the chaser spacecraft may
+        need an estimate of the target-relative state.
+      </p>
+
+      <p>
+        A representative state is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{rel}
+        =
+        \begin{bmatrix}
+        \mathbf r_{rel}\\
+        \mathbf v_{rel}\\
+        \mathbf q_{rel}\\
+        \boldsymbol{\omega}_{rel}
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+
+      <h4>GNSS Contribution</h4>
+
+      <p>
+        At longer range, GNSS or relative GNSS may provide relative
+        translational information.
+      </p>
+
+
+      <h4>Camera Contribution</h4>
+
+      <p>
+        A camera may provide
+      </p>
+
+      <p>
+        \[
+        \text{bearing},
+        \qquad
+        \text{features},
+        \qquad
+        \text{relative orientation}.
+        \]
+      </p>
+
+
+      <h4>LiDAR Contribution</h4>
+
+      <p>
+        LiDAR may provide
+      </p>
+
+      <p>
+        \[
+        \text{range},
+        \qquad
+        \text{geometry},
+        \qquad
+        \text{relative pose}.
+        \]
+      </p>
+
+      <p>
+        The sensor-fusion architecture may therefore evolve with range:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS}}
+        \rightarrow
+        \boxed{\text{GNSS + Vision}}
+        \rightarrow
+        \boxed{\text{Vision + LiDAR}}
+        \rightarrow
+        \boxed{\text{Capture Pose Estimate}}.
+        \]
+      </p>
+
+      <p>
+        The estimator must maintain continuity of
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_{rel}
+        \]
+      </p>
+
+      <p>
+        and its covariance while sensor availability and relative-navigation
+        geometry change.
+      </p>
+
+      <p>
+        This continuity is particularly important because guidance and control
+        should not receive abrupt discontinuities when navigation sensors are
+        handed over.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- GNC LOOP                                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Fusion and the GNC Loop</h3>
+
+      <p>
+        Sensor fusion is not an isolated algorithm.
+      </p>
+
+      <p>
+        It is part of the complete closed-loop guidance, navigation, and
+        control architecture.
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Spacecraft Dynamics}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{True State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensors}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurements}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Fusion / Navigation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Guidance}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Control}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Actuators}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Spacecraft Dynamics}}.
+        \]
+      </p>
+
+      <p>
+        Because the controller operates using the estimated state,
+        navigation error directly affects control behaviour.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}
+        \neq
+        \mathbf x,
+        \]
+      </p>
+
+      <p>
+        the controller is acting on an imperfect representation of the real
+        spacecraft.
+      </p>
+
+      <p>
+        Navigation requirements should therefore ultimately be connected to
+        guidance and control performance requirements.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- TRUTH NAV CONTROL                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Truth, Navigation, and Control in Simulation</h3>
+
+      <p>
+        A well-structured spacecraft GNC simulation should maintain three
+        logically separate information paths.
+      </p>
+
+
+      <h4>Truth Path</h4>
+
+      <p>
+        \[
+        \boxed{\mathbf x_{truth}}
+        \]
+      </p>
+
+      <p>
+        represents the actual simulated spacecraft motion.
+      </p>
+
+
+      <h4>Navigation Path</h4>
+
+      <p>
+        \[
+        \boxed{\mathbf x_{truth}}
+        \rightarrow
+        \boxed{\text{Sensor Models}}
+        \rightarrow
+        \boxed{\text{Measurements}}
+        \rightarrow
+        \boxed{\text{Estimator}}
+        \rightarrow
+        \boxed{\hat{\mathbf x}}.
+        \]
+      </p>
+
+
+      <h4>Control Path</h4>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}}
+        \rightarrow
+        \boxed{\text{Guidance / Control}}.
+        \]
+      </p>
+
+      <p>
+        The controller should not receive
+      </p>
+
+      <p>
+        \[
+        \mathbf x_{truth}
+        \]
+      </p>
+
+      <p>
+        unless the simulation is intentionally testing an ideal-navigation
+        case.
+      </p>
+
+      <p>
+        Keeping truth, navigation, and control separate is essential for
+        evaluating realistic closed-loop GNC behaviour.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- FUNDAMENTAL ARCHITECTURE                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Fundamental Sensor-Fusion Architecture</h3>
+
+      <p>
+        The concepts developed throughout this page can now be combined into a
+        complete estimator architecture.
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{True Spacecraft Dynamics}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Physics and Error Models}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf z_1,\mathbf z_2,\ldots,\mathbf z_n}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Time Synchronization}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Coordinate-Frame Transformation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Validation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \begin{array}{c}
+        \text{State Prediction}\\
+        +\\
+        \text{Measurement Correction}
+        \end{array}
+        }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{State Estimator}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x},\mathbf P}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Guidance and Control}}.
+        \]
+      </p>
+
+      <p>
+        This architecture forms the foundation for the individual fusion
+        methods developed throughout Section 4.2.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- FIVE FUNDAMENTAL QUESTIONS                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>The Five Questions Every Sensor-Fusion System Must Answer</h3>
+
+      <p>
+        Almost every spacecraft state-estimation problem can be reduced to five
+        fundamental questions.
+      </p>
+
+
+      <h4>1. What Are We Trying to Estimate?</h4>
+
+      <p>
+        \[
+        \boxed{\mathbf x=?}
+        \]
+      </p>
+
+      <p>
+        The required state may contain position, velocity, attitude, sensor
+        biases, relative pose, target motion, or other parameters.
+      </p>
+
+
+      <h4>2. How Does the State Evolve?</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{k+1}
+        =
+        f(\mathbf x_k,\mathbf u_k)
+        +
+        \mathbf w_k
+        }.
+        \]
+      </p>
+
+      <p>
+        This defines the process or dynamic model.
+      </p>
+
+
+      <h4>3. What Does Each Sensor Actually Measure?</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z_k
+        =
+        h(\mathbf x_k)
+        +
+        \mathbf v_k
+        }.
+        \]
+      </p>
+
+      <p>
+        This defines the measurement model.
+      </p>
+
+
+      <h4>4. How Uncertain Are the Model, Measurement, and Estimate?</h4>
+
+      <p>
+        Process and measurement uncertainty are represented using
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf Q,\mathbf R}
+        \]
+      </p>
+
+      <p>
+        while state-estimate uncertainty is represented using
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf P}.
+        \]
+      </p>
+
+
+      <h4>5. Is There Enough Information to Estimate the Desired State?</h4>
+
+      <p>
+        \[
+        \boxed{\text{Observability}}.
+        \]
+      </p>
+
+      <p>
+        If the available measurements and dynamics do not contain sufficient
+        independent information, adding a variable to the filter state does not
+        make it estimable.
+      </p>
+
+      <p>
+        Most advanced state-estimation methods are extensions or refinements of
+        these five fundamental questions.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- KEY EQUATIONS                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Key Mathematical Framework</h3>
+
+      <p>
+        The fundamental state-estimation problem can now be summarized using a
+        compact set of equations.
+      </p>
+
+
+      <h4>Process Model</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{k+1}
+        =
+        f(\mathbf x_k,\mathbf u_k)
+        +
+        \mathbf w_k
+        }
+        \]
+      </p>
+
+
+      <h4>Measurement Model</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z_k
+        =
+        h(\mathbf x_k)
+        +
+        \mathbf v_k
+        }
+        \]
+      </p>
+
+
+      <h4>Process-Noise Covariance</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf Q_k
+        =
+        E
+        [
+        \mathbf w_k
+        \mathbf w_k^T
+        ]
+        }
+        \]
+      </p>
+
+
+      <h4>Measurement-Noise Covariance</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf R_k
+        =
+        E
+        [
+        \mathbf v_k
+        \mathbf v_k^T
+        ]
+        }
+        \]
+      </p>
+
+
+      <h4>State Estimate</h4>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_k
+        }
+        \]
+      </p>
+
+
+      <h4>Estimation Error</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e_k
+        =
+        \mathbf x_k
+        -
+        \hat{\mathbf x}_k
+        }
+        \]
+      </p>
+
+
+      <h4>State-Estimate Covariance</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P_k
+        =
+        E
+        [
+        \mathbf e_k
+        \mathbf e_k^T
+        ]
+        }
+        \]
+      </p>
+
+
+      <h4>Predicted Measurement</h4>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf z}_k
+        =
+        h(\hat{\mathbf x}_k^-)
+        }
+        \]
+      </p>
+
+
+      <h4>Innovation</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y_k
+        =
+        \mathbf z_k
+        -
+        \hat{\mathbf z}_k
+        }
+        \]
+      </p>
+
+
+      <h4>Conceptual Bayesian Update</h4>
+
+      <p>
+        At the most general level,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Prior Estimate}}
+        +
+        \boxed{\text{Measurement Information}}
+        \rightarrow
+        \boxed{\text{Posterior Estimate}}.
+        \]
+      </p>
+
+      <p>
+        These equations form the mathematical language used throughout the
+        remainder of the sensor-fusion chapter.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CONCEPT SUMMARY                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Concept Summary</h3>
+
+      <p>
+        The fundamental sensor-fusion problem can be understood as a repeating
+        flow of information:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Previous State Estimate}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Dynamic Prediction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}^{-},\mathbf P^{-}}
+        \]
+      </p>
+
+      <p>
+        \[
+        +
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Measurements}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation / Measurement Residual}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Validation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{State Correction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}^{+},\mathbf P^{+}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Repeat at the Next Time Step}}.
+        \]
+      </p>
+
+      <p>
+        More advanced filters differ mainly in how they represent probability,
+        nonlinear dynamics, attitude errors, uncertainty, and measurement
+        updates.
+      </p>
+
+      <p>
+        The fundamental architecture remains the same:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Predict}
+        \rightarrow
+        \text{Compare}
+        \rightarrow
+        \text{Correct}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NEXT SECTION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h2>Next: 4.2.2 Sensor Fusion Architectures</h2>
+
+      <p>
+        Once the fundamentals of state estimation are established, the next
+        question is how multiple sensors and estimation subsystems should be
+        organised.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        <strong>
+          Should raw IMU, GNSS, camera, and LiDAR measurements all enter one
+          central estimator?
+        </strong>
+      </p>
+
+      <p>
+        Or:
+      </p>
+
+      <p>
+        <strong>
+          Should individual sensors or navigation subsystems first produce
+          their own estimates, which are then combined at a higher level?
+        </strong>
+      </p>
+
+      <p>
+        These choices lead to different sensor-fusion architectures.
+      </p>
+
+      <p>
+        The next section develops
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Centralized Fusion}}
+        \]
+      </p>
+
+      <p>
+        versus
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Decentralized Fusion}}
+        \]
+      </p>
+
+      <p>
+        versus
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Federated Fusion}}
+        \]
+      </p>
+
+      <p>
+        together with
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Loose Coupling}}
+        \rightarrow
+        \boxed{\text{Tight Coupling}}
+        \rightarrow
+        \boxed{\text{Deep Coupling}}.
+        \]
+      </p>
+
+      <a href="sensor-fusion-architectures.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.2 Sensor Fusion Architectures</h3>
+
+          <p>
+            Centralized, decentralized, federated, cascaded, loosely coupled,
+            tightly coupled, and deeply coupled sensor-fusion architectures for
+            spacecraft attitude, navigation, GNSS/IMU integration, and
+            relative-navigation systems.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Sensor Fusion Architectures &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+    </section>
+
+
+  </main>
+
+
+
+  <!-- ========================================================= -->
+  <!-- FOOTER                                                    -->
+  <!-- ========================================================= -->
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+
+</body>
+
+</html>
