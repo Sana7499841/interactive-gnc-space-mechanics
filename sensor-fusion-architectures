@@ -1,0 +1,4806 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.2 Sensor Fusion Architectures | Interactive GNC &amp; Space Mechanics</title>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+</head>
+
+
+<body>
+
+  <!-- ========================================================= -->
+  <!-- PAGE HEADER                                                -->
+  <!-- ========================================================= -->
+
+  <header class="notes-hero">
+
+    <h1>Sensor Fusion Architectures</h1>
+
+    <p class="notes-tagline">
+      Centralized, decentralized, federated, cascaded, loosely coupled,
+      tightly coupled, and deeply coupled architectures for spacecraft
+      attitude determination, navigation, and relative-navigation systems.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN PAGE CONTENT                                          -->
+  <!-- ========================================================= -->
+
+  <main class="page-main">
+
+
+    <!-- ======================================================= -->
+    <!-- INTRODUCTION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h2>4.2.2 Sensor Fusion Architectures</h2>
+
+      <p>
+        Section 4.2.1 introduced the fundamental state-estimation cycle:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predict}}
+        \rightarrow
+        \boxed{\text{Measure}}
+        \rightarrow
+        \boxed{\text{Compare}}
+        \rightarrow
+        \boxed{\text{Correct}}.
+        \]
+      </p>
+
+      <p>
+        That cycle explains how an estimator combines a dynamic model with
+        sensor information.
+      </p>
+
+      <p>
+        A real spacecraft, however, may contain many different sensors and
+        navigation subsystems.
+      </p>
+
+      <p>
+        A representative spacecraft sensor suite may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{IMU}
+        +
+        \text{GNSS}
+        +
+        \text{Star Tracker}
+        +
+        \text{Sun Sensor}
+        +
+        \text{Magnetometer}
+        +
+        \text{Camera}
+        +
+        \text{LiDAR}
+        +\cdots
+        }.
+        \]
+      </p>
+
+      <p>
+        The engineering problem therefore becomes larger than simply choosing
+        a filtering algorithm.
+      </p>
+
+      <p>
+        We must also determine
+      </p>
+
+      <ul>
+
+        <li>where sensor information should be combined,</li>
+
+        <li>which measurements should enter which estimator,</li>
+
+        <li>whether individual subsystems should estimate states independently,</li>
+
+        <li>how uncertainty should be transferred between estimators,</li>
+
+        <li>how statistical correlations should be handled,</li>
+
+        <li>how sensor failures should be isolated,</li>
+
+        <li>how navigation should reconfigure when sensors become unavailable.</li>
+
+      </ul>
+
+      <p>
+        These choices define the
+        <strong>sensor-fusion architecture</strong>.
+      </p>
+
+
+      <h4>Fusion Algorithm vs Fusion Architecture</h4>
+
+      <p>
+        A fusion algorithm and a fusion architecture are not the same thing.
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Fusion Algorithm}
+        \neq
+        \text{Fusion Architecture}
+        }.
+        \]
+      </p>
+
+      <p>
+        A <strong>fusion algorithm</strong> describes the mathematical method
+        used to estimate the state.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <ul>
+
+        <li>Complementary Filter,</li>
+        <li>Kalman Filter,</li>
+        <li>Extended Kalman Filter,</li>
+        <li>Error-State Kalman Filter,</li>
+        <li>Multiplicative EKF,</li>
+        <li>Unscented Kalman Filter,</li>
+        <li>Particle Filter.</li>
+
+      </ul>
+
+      <p>
+        A <strong>fusion architecture</strong> describes how sensors,
+        preprocessing functions, local estimators, master estimators, health
+        monitoring, and guidance/control interfaces are interconnected.
+      </p>
+
+      <p>
+        The same EKF could therefore be used inside several completely
+        different sensor-fusion architectures.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- WHAT INFORMATION IS FUSED                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Information Can Be Fused?</h3>
+
+      <p>
+        Before distinguishing centralized and decentralized systems, it is
+        useful to determine <strong>what level of information</strong> is being
+        combined.
+      </p>
+
+      <p>
+        Sensor information normally passes through several processing levels:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Raw Measurements}}
+        \rightarrow
+        \boxed{\text{Extracted Features}}
+        \rightarrow
+        \boxed{\text{State Estimates}}
+        \rightarrow
+        \boxed{\text{Decisions}}.
+        \]
+      </p>
+
+      <p>
+        Fusion can therefore occur at several levels.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DATA LEVEL FUSION                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Measurement-Level or Data-Level Fusion</h3>
+
+      <p>
+        Measurement-level fusion occurs when raw or minimally processed sensor
+        measurements enter a common estimator.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <ul>
+
+        <li>gyroscope angular-rate measurements,</li>
+
+        <li>accelerometer specific-force measurements,</li>
+
+        <li>GNSS pseudoranges,</li>
+
+        <li>GNSS Doppler or pseudorange-rate measurements,</li>
+
+        <li>star-vector measurements,</li>
+
+        <li>camera line-of-sight measurements,</li>
+
+        <li>LiDAR range measurements.</li>
+
+      </ul>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z_{IMU},
+        \mathbf z_{GNSS},
+        \mathbf z_{ST},
+        \mathbf z_{CAM},
+        \mathbf z_{LiDAR}
+        }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Navigation Estimator}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x},\mathbf P}.
+        \]
+      </p>
+
+
+      <h4>Why Measurement-Level Fusion Can Be Powerful</h4>
+
+      <p>
+        The estimator receives information before another subsystem has
+        compressed it into a navigation solution.
+      </p>
+
+      <p>
+        Consider GNSS.
+      </p>
+
+      <p>
+        A loosely integrated system may receive only
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r_{GNSS},
+        \mathbf v_{GNSS}
+        }.
+        \]
+      </p>
+
+      <p>
+        A more tightly integrated estimator may instead receive
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Pseudorange}
+        +
+        \text{Doppler}
+        +
+        \text{Other Raw GNSS Observables}
+        }.
+        \]
+      </p>
+
+      <p>
+        Lower-level measurements may retain information that would otherwise
+        be lost when a complete standalone navigation solution is generated.
+      </p>
+
+      <p>
+        This can improve observability and allow useful measurements to be used
+        even when a complete local sensor solution cannot be formed.
+      </p>
+
+      <p>
+        The trade-off is greater estimator complexity.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- FEATURE LEVEL FUSION                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Feature-Level Fusion</h3>
+
+      <p>
+        Feature-level fusion is particularly important for camera, LiDAR, radar,
+        and other perception-based navigation systems.
+      </p>
+
+      <p>
+        A navigation filter does not necessarily process raw camera pixels or a
+        complete LiDAR point cloud directly.
+      </p>
+
+      <p>
+        Instead, lower-level processing extracts useful geometric features.
+      </p>
+
+
+      <h4>Camera Example</h4>
+
+      <p>
+        \[
+        \boxed{\text{Camera Image}}
+        \rightarrow
+        \boxed{\text{Image Processing}}
+        \rightarrow
+        \boxed{
+        \begin{array}{c}
+        \text{Centroid}\\
+        \text{Edges}\\
+        \text{Corners}\\
+        \text{Keypoints}\\
+        \text{Line of Sight}\\
+        \text{Pose Features}
+        \end{array}}
+        \]
+      </p>
+
+
+      <h4>LiDAR Example</h4>
+
+      <p>
+        \[
+        \boxed{\text{LiDAR Point Cloud}}
+        \rightarrow
+        \boxed{\text{Point-Cloud Processing}}
+        \rightarrow
+        \boxed{
+        \begin{array}{c}
+        \text{Range}\\
+        \text{Surface Features}\\
+        \text{Target Geometry}\\
+        \text{Relative Pose}
+        \end{array}}
+        \]
+      </p>
+
+      <p>
+        These features can then be combined.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera Bearing}}
+        +
+        \boxed{\text{LiDAR Range}}
+        \rightarrow
+        \boxed{\text{Improved Relative Position / Pose}}.
+        \]
+      </p>
+
+      <p>
+        This form of fusion is highly relevant to rendezvous, proximity
+        operations, docking, and robotic capture.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- STATE LEVEL FUSION                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>State-Level Fusion</h3>
+
+      <p>
+        In state-level fusion, individual navigation subsystems first estimate
+        their own state solutions.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS}}
+        \rightarrow
+        \boxed{
+        \hat{\mathbf x}_{GNSS},
+        \mathbf P_{GNSS}
+        }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Vision Navigation}}
+        \rightarrow
+        \boxed{
+        \hat{\mathbf x}_{VIS},
+        \mathbf P_{VIS}
+        }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{LiDAR Navigation}}
+        \rightarrow
+        \boxed{
+        \hat{\mathbf x}_{LIDAR},
+        \mathbf P_{LIDAR}
+        }.
+        \]
+      </p>
+
+      <p>
+        These solutions are then supplied to another fusion stage:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_{GNSS},
+        \hat{\mathbf x}_{VIS},
+        \hat{\mathbf x}_{LIDAR}
+        }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Master Fusion}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_{NAV},
+        \mathbf P_{NAV}
+        }.
+        \]
+      </p>
+
+      <p>
+        This approach is common in decentralized, federated, and hierarchical
+        architectures.
+      </p>
+
+
+      <h4>The Important Correlation Problem</h4>
+
+      <p>
+        The local estimates should not automatically be assumed statistically
+        independent.
+      </p>
+
+      <p>
+        Two local filters may share
+      </p>
+
+      <ul>
+
+        <li>the same IMU measurements,</li>
+        <li>the same process model,</li>
+        <li>the same initial state,</li>
+        <li>the same previous fused estimate,</li>
+        <li>the same disturbance assumptions.</li>
+
+      </ul>
+
+      <p>
+        Their errors may therefore be correlated.
+      </p>
+
+      <p>
+        If the master filter ignores this correlation, the same information may
+        be counted more than once.
+      </p>
+
+      <p>
+        This is called
+        <strong>information double counting</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DECISION LEVEL FUSION                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Decision-Level Fusion</h3>
+
+      <p>
+        Fusion can also occur above the state-estimation level.
+      </p>
+
+      <p>
+        Instead of supplying measurements or state estimates, subsystems may
+        provide decisions or validity indicators.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker 1}}
+        \rightarrow
+        \boxed{\text{VALID}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker 2}}
+        \rightarrow
+        \boxed{\text{VALID}}
+        \]
+      </p>
+
+      <p>
+        and a supervisor may determine
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Attitude Solution Trusted}}.
+        \]
+      </p>
+
+      <p>
+        During RPO, decision-level outputs may include
+      </p>
+
+      <ul>
+
+        <li>Target Detected,</li>
+        <li>Pose Valid,</li>
+        <li>Navigation Quality Acceptable,</li>
+        <li>Capture Corridor Valid,</li>
+        <li>Capture Ready,</li>
+        <li>Abort Required.</li>
+
+      </ul>
+
+      <p>
+        Decision-level fusion normally interacts closely with mission
+        management and fault-detection logic.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MAIN ARCHITECTURE FAMILIES                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Main Families of Sensor-Fusion Architectures</h3>
+
+      <p>
+        At the estimator-organization level, the most common architectural
+        families are
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \begin{array}{c}
+        \text{Centralized}\\
+        \text{Decentralized}\\
+        \text{Federated}\\
+        \text{Cascaded / Hierarchical}
+        \end{array}
+        }.
+        \]
+      </p>
+
+      <p>
+        These terms describe where estimation occurs and how information moves
+        between estimation subsystems.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CENTRALIZED FUSION                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Centralized Sensor Fusion</h3>
+
+      <p>
+        In a centralized architecture, measurements from multiple sensors enter
+        one common navigation estimator.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \begin{array}{c}
+        \boxed{\text{IMU}}\\
+        \boxed{\text{GNSS}}\\
+        \boxed{\text{Star Tracker}}\\
+        \boxed{\text{Camera}}\\
+        \boxed{\text{LiDAR}}
+        \end{array}
+        \longrightarrow
+        \boxed{\text{Central Estimator}}
+        \longrightarrow
+        \boxed{\hat{\mathbf x},\mathbf P}.
+        \]
+      </p>
+
+      <p>
+        The estimator maintains a common state vector.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf r\\
+        \mathbf v\\
+        \mathbf q\\
+        \mathbf b_a\\
+        \mathbf b_g\\
+        \mathbf r_{rel}\\
+        \mathbf v_{rel}\\
+        \mathbf q_{rel}\\
+        \cdots
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Each sensor has an independent measurement model:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z_i
+        =
+        h_i(\mathbf x)
+        +
+        \mathbf v_i
+        }.
+        \]
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \mathbf z_{GNSS}
+        =
+        h_{GNSS}(\mathbf x)
+        +
+        \mathbf v_{GNSS},
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf z_{ST}
+        =
+        h_{ST}(\mathbf x)
+        +
+        \mathbf v_{ST},
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf z_{CAM}
+        =
+        h_{CAM}(\mathbf x)
+        +
+        \mathbf v_{CAM},
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf z_{LiDAR}
+        =
+        h_{LiDAR}(\mathbf x)
+        +
+        \mathbf v_{LiDAR}.
+        \]
+      </p>
+
+      <p>
+        Whenever a valid measurement arrives, the same estimator updates the
+        common state.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ASYNCHRONOUS CENTRALIZED FUSION                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Centralized Fusion Does Not Require Synchronous Sensors</h3>
+
+      <p>
+        A centralized architecture does not mean that all sensors must produce
+        measurements at the same instant.
+      </p>
+
+      <p>
+        The estimator may continuously propagate
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_{k-1}^{+}
+        \rightarrow
+        \hat{\mathbf x}_{k}^{-}
+        \]
+      </p>
+
+      <p>
+        while processing sensor updates whenever they become available.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        t_1:\quad \text{IMU}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_2:\quad \text{IMU}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_3:\quad \text{Star Tracker}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_4:\quad \text{IMU}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_5:\quad \text{GNSS}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_6:\quad \text{Camera}.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Centralized}}
+        \]
+      </p>
+
+      <p>
+        describes <strong>where estimation occurs</strong>, not whether sensors
+        share the same sampling rate.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CENTRALIZED ADVANTAGES                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Advantages of Centralized Fusion</h3>
+
+      <p>
+        One of the strongest advantages of centralized estimation is that the
+        full state covariance can be maintained inside one estimator.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \mathbf P
+        =
+        \begin{bmatrix}
+        P_{rr} & P_{rv} & P_{rq} & \cdots\\
+        P_{vr} & P_{vv} & P_{vq} & \cdots\\
+        P_{qr} & P_{qv} & P_{qq} & \cdots\\
+        \vdots & \vdots & \vdots & \ddots
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        These cross-covariance terms allow information from one sensor update
+        to influence states that are not directly measured by that sensor.
+      </p>
+
+      <p>
+        For example, a GNSS velocity residual may directly constrain velocity
+        but may also provide information about
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Accelerometer Bias}}
+        \]
+      </p>
+
+      <p>
+        and, depending on the dynamics and motion,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Attitude Error}}.
+        \]
+      </p>
+
+      <p>
+        Similarly, a star-tracker update can improve attitude and indirectly
+        help estimate gyro bias.
+      </p>
+
+      <p>
+        Other potential advantages include
+      </p>
+
+      <ul>
+
+        <li>consistent common-state representation,</li>
+
+        <li>direct measurement-level innovation testing,</li>
+
+        <li>strong use of cross-state statistical relationships,</li>
+
+        <li>no need to combine separately estimated states,</li>
+
+        <li>potentially high information efficiency.</li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CENTRALIZED DISADVANTAGES                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Disadvantages of Centralized Fusion</h3>
+
+      <p>
+        Centralized estimation can become computationally and operationally
+        complex.
+      </p>
+
+      <p>
+        For an \(n\)-state estimator,
+      </p>
+
+      <p>
+        \[
+        \mathbf P
+        \in
+        \mathbb R^{n\times n}.
+        \]
+      </p>
+
+      <p>
+        As the state dimension increases, covariance propagation and
+        measurement processing become more expensive.
+      </p>
+
+      <p>
+        A large centralized system may also introduce
+      </p>
+
+      <ul>
+
+        <li>large software complexity,</li>
+
+        <li>increased verification burden,</li>
+
+        <li>strong coupling between subsystems,</li>
+
+        <li>complex timing and interface requirements,</li>
+
+        <li>difficult ownership between engineering teams,</li>
+
+        <li>potential sensitivity to invalid measurements if validation is weak.</li>
+
+      </ul>
+
+      <p>
+        It can also create a
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Single Point of Failure}}
+        \]
+      </p>
+
+      <p>
+        if all navigation depends on one estimator or processor.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Maximum Information Integration}}
+        \]
+      </p>
+
+      <p>
+        may come at the cost of
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complexity + Coupling}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DECENTRALIZED FUSION                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Decentralized Sensor Fusion</h3>
+
+      <p>
+        A decentralized architecture distributes estimation across multiple
+        local estimators.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS}}
+        \rightarrow
+        \boxed{\text{GNSS Filter}}
+        \rightarrow
+        \boxed{\hat{\mathbf x}_{GNSS}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera}}
+        \rightarrow
+        \boxed{\text{Vision Filter}}
+        \rightarrow
+        \boxed{\hat{\mathbf x}_{VIS}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{LiDAR}}
+        \rightarrow
+        \boxed{\text{LiDAR Filter}}
+        \rightarrow
+        \boxed{\hat{\mathbf x}_{LIDAR}}.
+        \]
+      </p>
+
+      <p>
+        These estimators may operate independently or may later pass their
+        state information to another fusion stage.
+      </p>
+
+
+      <h4>Why Decentralization Is Natural in Spacecraft</h4>
+
+      <p>
+        A spacecraft is often already divided into functional subsystems such
+        as
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{ADCS}}
+        \qquad
+        \boxed{\text{Absolute Navigation}}
+        \qquad
+        \boxed{\text{Relative Navigation}}
+        \qquad
+        \boxed{\text{Vision Processing}}.
+        \]
+      </p>
+
+      <p>
+        Each subsystem may have its own
+      </p>
+
+      <ul>
+
+        <li>processor,</li>
+
+        <li>software team,</li>
+
+        <li>sensor interfaces,</li>
+
+        <li>update rate,</li>
+
+        <li>health monitoring,</li>
+
+        <li>verification process.</li>
+
+      </ul>
+
+      <p>
+        A decentralized fusion architecture can therefore align naturally with
+        spacecraft hardware and software modularity.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DECENTRALIZED ADVANTAGES                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Advantages of Decentralized Fusion</h3>
+
+      <h4>Modularity</h4>
+
+      <p>
+        Each local estimator can be designed, implemented, tested, and
+        qualified independently.
+      </p>
+
+
+      <h4>Fault Isolation</h4>
+
+      <p>
+        Failure of one navigation source does not necessarily destroy the
+        complete navigation system.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Vision Navigation Failure}}
+        \]
+      </p>
+
+      <p>
+        need not imply
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complete Navigation Failure}}.
+        \]
+      </p>
+
+
+      <h4>Distributed Processing</h4>
+
+      <p>
+        Computational load can be shared between several processors.
+      </p>
+
+
+      <h4>Scalability</h4>
+
+      <p>
+        New navigation subsystems may sometimes be added without redesigning
+        the complete estimator.
+      </p>
+
+
+      <h4>Graceful Degradation</h4>
+
+      <p>
+        The spacecraft may continue operating using a reduced sensor set after
+        a partial failure.
+      </p>
+
+      <p>
+        This is particularly valuable for autonomous spacecraft and RPO
+        missions.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CORRELATION PROBLEM                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>The Correlation Problem in Decentralized Fusion</h3>
+
+      <p>
+        The main mathematical difficulty in distributed state-level fusion is
+        that local estimates may not be statistically independent.
+      </p>
+
+      <p>
+        Suppose two local filters both use the same IMU:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU}}
+        \rightarrow
+        \boxed{\text{Filter A}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU}}
+        \rightarrow
+        \boxed{\text{Filter B}}.
+        \]
+      </p>
+
+      <p>
+        Their estimates
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_A
+        \qquad
+        \text{and}
+        \qquad
+        \hat{\mathbf x}_B
+        \]
+      </p>
+
+      <p>
+        share information from the same inertial sensor.
+      </p>
+
+      <p>
+        Their errors may therefore contain common components caused by
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Shared IMU Noise}
+        +
+        \text{Shared Bias}
+        +
+        \text{Shared Process Model}
+        }.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P_{AB}
+        \neq
+        0
+        }
+        \]
+      </p>
+
+      <p>
+        in general.
+      </p>
+
+      <p>
+        If the master estimator incorrectly assumes
+      </p>
+
+      <p>
+        \[
+        \mathbf P_{AB}
+        =
+        0,
+        \]
+      </p>
+
+      <p>
+        it may treat correlated information as though it were independent.
+      </p>
+
+      <p>
+        The fused covariance can then become artificially small:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        P_{\text{reported}}
+        <
+        P_{\text{actual}}
+        }.
+        \]
+      </p>
+
+      <p>
+        The estimator becomes overconfident and inconsistent.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INFORMATION DOUBLE COUNTING                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Information Double Counting</h3>
+
+      <p>
+        Consider two local navigation filters.
+      </p>
+
+      <p>
+        Filter A receives
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS + IMU}}
+        \]
+      </p>
+
+      <p>
+        while filter B receives
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera + IMU}}.
+        \]
+      </p>
+
+      <p>
+        Both filters therefore contain information derived from the same IMU.
+      </p>
+
+      <p>
+        If their state estimates are later combined as though they were
+        completely independent,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU Information}}
+        \]
+      </p>
+
+      <p>
+        may effectively enter the global solution twice.
+      </p>
+
+      <p>
+        This is known as
+        <strong>information double counting</strong>.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Common IMU Information}}
+        \rightarrow
+        \begin{cases}
+        \boxed{\text{Filter A}}\\
+        \boxed{\text{Filter B}}
+        \end{cases}
+        \]
+      </p>
+
+      <p>
+        and both paths later return to
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Master Fusion}}.
+        \]
+      </p>
+
+      <p>
+        Correct distributed fusion must therefore account for correlation or
+        use conservative methods when the correlation is not known.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CROSS COVARIANCE                                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Cross-Covariance Between Local Estimates</h3>
+
+      <p>
+        Let two local estimates be
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_1
+        \qquad
+        \text{and}
+        \qquad
+        \hat{\mathbf x}_2.
+        \]
+      </p>
+
+      <p>
+        Their estimation errors are
+      </p>
+
+      <p>
+        \[
+        \mathbf e_1
+        =
+        \mathbf x
+        -
+        \hat{\mathbf x}_1
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf e_2
+        =
+        \mathbf x
+        -
+        \hat{\mathbf x}_2.
+        \]
+      </p>
+
+      <p>
+        The cross-covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P_{12}
+        =
+        E
+        \left[
+        \mathbf e_1
+        \mathbf e_2^T
+        \right]
+        }.
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \mathbf P_{12}
+        =
+        0,
+        \]
+      </p>
+
+      <p>
+        the errors are uncorrelated.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \mathbf P_{12}
+        \neq
+        0,
+        \]
+      </p>
+
+      <p>
+        the estimates contain correlated error.
+      </p>
+
+      <p>
+        Correct state-level fusion may therefore require knowledge of
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P_1,
+        \mathbf P_2,
+        \mathbf P_{12}
+        }.
+        \]
+      </p>
+
+      <p>
+        This concept becomes important in federated and distributed filtering.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- FEDERATED FUSION                                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Federated Sensor Fusion</h3>
+
+      <p>
+        Federated filtering is a structured form of distributed estimation.
+      </p>
+
+      <p>
+        The architecture normally contains
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Local Filters}}
+        +
+        \boxed{\text{Master Fusion Stage}}.
+        \]
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU + GNSS}}
+        \rightarrow
+        \boxed{\text{Local Filter 1}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU + Camera}}
+        \rightarrow
+        \boxed{\text{Local Filter 2}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU + LiDAR}}
+        \rightarrow
+        \boxed{\text{Local Filter 3}}.
+        \]
+      </p>
+
+      <p>
+        Their local solutions are then supplied to
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Master Fusion}}
+        \rightarrow
+        \boxed{\hat{\mathbf x}_{global}}.
+        \]
+      </p>
+
+      <p>
+        Federated approaches are attractive when modularity, fault isolation,
+        and local autonomy are important.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INFORMATION FORM                                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Information Representation of State Estimates</h3>
+
+      <p>
+        Distributed and federated fusion can also be expressed using an
+        information representation.
+      </p>
+
+      <p>
+        For covariance
+      </p>
+
+      <p>
+        \[
+        \mathbf P,
+        \]
+      </p>
+
+      <p>
+        define the information matrix
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf Y
+        =
+        \mathbf P^{-1}
+        }.
+        \]
+      </p>
+
+      <p>
+        Define the information vector
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y
+        =
+        \mathbf P^{-1}
+        \hat{\mathbf x}
+        }.
+        \]
+      </p>
+
+      <p>
+        A small covariance corresponds to high information, while a large
+        covariance corresponds to low information.
+      </p>
+
+
+      <h4>Combining Independent Information</h4>
+
+      <p>
+        For appropriately independent estimates,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf Y_f
+        =
+        \sum_i
+        \mathbf Y_i
+        }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y_f
+        =
+        \sum_i
+        \mathbf y_i
+        }.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf P_f
+        =
+        \mathbf Y_f^{-1}
+        }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_f
+        =
+        \mathbf P_f
+        \mathbf y_f
+        }.
+        \]
+      </p>
+
+      <p>
+        This representation provides a convenient mathematical framework for
+        distributed fusion.
+      </p>
+
+      <p>
+        However, direct addition of information is valid only when the
+        information sources are sufficiently independent or their correlations
+        have been handled correctly.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- FEDERATED FEEDBACK                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Federated Filter Feedback</h3>
+
+      <p>
+        A major architectural decision in federated systems is whether the
+        global estimate should be sent back to the local filters.
+      </p>
+
+
+      <h4>No-Feedback Architecture</h4>
+
+      <p>
+        In a no-feedback configuration,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Local Filters}}
+        \rightarrow
+        \boxed{\text{Master}}
+        \]
+      </p>
+
+      <p>
+        but
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Master}}
+        \nrightarrow
+        \boxed{\text{Local Filters}}.
+        \]
+      </p>
+
+      <p>
+        This preserves greater independence between local filters.
+      </p>
+
+
+      <h4>Feedback / Reset Architecture</h4>
+
+      <p>
+        After master fusion,
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_{global},
+        \mathbf P_{global}
+        \]
+      </p>
+
+      <p>
+        may be returned to the local estimators.
+      </p>
+
+      <p>
+        This can improve local estimates and keep them aligned with the global
+        navigation solution.
+      </p>
+
+      <p>
+        However, feedback also creates additional statistical dependence.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{More Feedback}}
+        \Rightarrow
+        \boxed{\text{More Information Sharing}}
+        \]
+      </p>
+
+      <p>
+        but also potentially
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{More Correlation Complexity}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CASCADED FUSION                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Cascaded Sensor Fusion</h3>
+
+      <p>
+        Cascaded fusion occurs when the output from one estimator is used as an
+        input to another estimator.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro + Star Tracker}}
+        \rightarrow
+        \boxed{\text{Attitude Estimator}}
+        \rightarrow
+        \boxed{\hat{\mathbf q}}
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf q}}
+        +
+        \boxed{\text{GNSS}}
+        +
+        \boxed{\text{Accelerometer}}
+        \rightarrow
+        \boxed{\text{Translational Navigation Estimator}}.
+        \]
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Estimator 1}}
+        \rightarrow
+        \boxed{\text{Estimator 2}}.
+        \]
+      </p>
+
+
+      <h4>Why Cascaded Architectures Are Common</h4>
+
+      <p>
+        Cascaded architectures allow functional separation.
+      </p>
+
+      <p>
+        Attitude determination can be developed independently from translational
+        or relative navigation.
+      </p>
+
+      <p>
+        This can simplify software development and verification.
+      </p>
+
+
+      <h4>The Important Uncertainty Issue</h4>
+
+      <p>
+        Suppose estimator 2 receives
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}.
+        \]
+      </p>
+
+      <p>
+        If estimator 2 treats this value as perfect, attitude-estimation
+        uncertainty is ignored.
+      </p>
+
+      <p>
+        In reality,
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}
+        =
+        \mathbf q
+        +
+        \text{Estimation Error}
+        \]
+      </p>
+
+      <p>
+        conceptually.
+      </p>
+
+      <p>
+        Therefore, uncertainty from the upstream estimator should ideally be
+        propagated through the interface.
+      </p>
+
+      <p>
+        This is called
+        <strong>uncertainty propagation across estimator interfaces</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- HIERARCHICAL FUSION                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Hierarchical Fusion</h3>
+
+      <p>
+        Hierarchical fusion extends cascaded processing into multiple
+        information-processing layers.
+      </p>
+
+
+      <h4>Level 1 — Sensor Processing</h4>
+
+      <p>
+        \[
+        \boxed{\text{Camera}}
+        \rightarrow
+        \boxed{\text{Feature Extraction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{LiDAR}}
+        \rightarrow
+        \boxed{\text{Point-Cloud Processing}}.
+        \]
+      </p>
+
+
+      <h4>Level 2 — Local Navigation</h4>
+
+      <p>
+        \[
+        \boxed{\text{Vision Pose Estimator}}
+        \qquad
+        \boxed{\text{LiDAR Pose Estimator}}.
+        \]
+      </p>
+
+
+      <h4>Level 3 — Navigation Fusion</h4>
+
+      <p>
+        \[
+        \boxed{\text{Relative Navigation Filter}}.
+        \]
+      </p>
+
+
+      <h4>Level 4 — Mission Decision Logic</h4>
+
+      <p>
+        \[
+        \boxed{\text{Capture Ready}}
+        \qquad
+        \boxed{\text{Continue}}
+        \qquad
+        \boxed{\text{Abort}}.
+        \]
+      </p>
+
+      <p>
+        Hierarchical architectures are particularly natural for autonomous
+        rendezvous and docking systems because perception, navigation, and
+        mission decisions are naturally separated into processing layers.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COUPLING DEPTH                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Loose, Tight, and Deep Coupling</h3>
+
+      <p>
+        Centralized, decentralized, federated, and cascaded describe
+        <strong>where estimation occurs</strong>.
+      </p>
+
+      <p>
+        Another architecture dimension is
+        <strong>how deeply navigation subsystems are integrated</strong>.
+      </p>
+
+      <p>
+        A common example is GNSS/INS integration.
+      </p>
+
+      <p>
+        The usual progression is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Loose Coupling}}
+        \rightarrow
+        \boxed{\text{Tight Coupling}}
+        \rightarrow
+        \boxed{\text{Deep Coupling}}.
+        \]
+      </p>
+
+      <p>
+        As coupling depth increases,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Information Sharing}}
+        \uparrow
+        \]
+      </p>
+
+      <p>
+        but generally
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complexity}}
+        \uparrow
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Subsystem Independence}}
+        \downarrow.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- LOOSE COUPLING                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Loosely Coupled Fusion</h3>
+
+      <p>
+        In loosely coupled fusion, one subsystem first produces a complete
+        navigation solution.
+      </p>
+
+      <p>
+        For GNSS,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS Measurements}}
+        \rightarrow
+        \boxed{\text{GNSS Receiver}}
+        \rightarrow
+        \boxed{
+        \mathbf r_{GNSS},
+        \mathbf v_{GNSS}
+        }.
+        \]
+      </p>
+
+      <p>
+        These outputs are then fused with inertial navigation:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r_{GNSS},
+        \mathbf v_{GNSS}
+        }
+        +
+        \boxed{\text{INS}}
+        \rightarrow
+        \boxed{\text{Fusion Filter}}.
+        \]
+      </p>
+
+      <p>
+        The fusion estimator does not process the individual GNSS satellite
+        observations directly.
+      </p>
+
+
+      <h4>Advantages</h4>
+
+      <ul>
+
+        <li>simple subsystem interfaces,</li>
+
+        <li>high modularity,</li>
+
+        <li>lower integration complexity,</li>
+
+        <li>easier replacement of GNSS hardware,</li>
+
+        <li>independent operation of the GNSS receiver.</li>
+
+      </ul>
+
+
+      <h4>Main Limitation</h4>
+
+      <p>
+        If the GNSS receiver cannot form a valid position/velocity solution,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{No GNSS Navigation Solution}}
+        \]
+      </p>
+
+      <p>
+        then the fusion filter may receive
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{No GNSS Update}}.
+        \]
+      </p>
+
+      <p>
+        Individual satellite measurements that still contain useful
+        information may therefore be unavailable to the integrated estimator.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- TIGHT COUPLING                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Tightly Coupled Fusion</h3>
+
+      <p>
+        In tightly coupled GNSS/INS fusion, lower-level GNSS observables are
+        processed directly inside the navigation estimator.
+      </p>
+
+      <p>
+        Instead of receiving only
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r_{GNSS},
+        \mathbf v_{GNSS}
+        },
+        \]
+      </p>
+
+      <p>
+        the estimator may process
+      </p>
+
+      <p>
+        \[
+        \boxed{\rho_i}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\dot{\rho}_i}
+        \]
+      </p>
+
+      <p>
+        for individual GNSS satellites.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS Raw Observables}}
+        +
+        \boxed{\text{IMU}}
+        \rightarrow
+        \boxed{\text{Integrated Navigation Filter}}.
+        \]
+      </p>
+
+
+      <h4>Pseudorange Measurement Example</h4>
+
+      <p>
+        A simplified GNSS pseudorange model is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \rho_i
+        =
+        \left\|
+        \mathbf r
+        -
+        \mathbf r_i^{sat}
+        \right\|
+        +
+        c\delta t
+        +
+        \epsilon_i
+        }.
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          \(\mathbf r\) is receiver position,
+        </li>
+
+        <li>
+          \(\mathbf r_i^{sat}\) is satellite \(i\) position,
+        </li>
+
+        <li>
+          \(c\delta t\) represents receiver clock bias,
+        </li>
+
+        <li>
+          \(\epsilon_i\) collects remaining measurement errors.
+        </li>
+
+      </ul>
+
+      <p>
+        The navigation state may therefore need to include receiver clock
+        states.
+      </p>
+
+
+      <h4>Why Tight Coupling Can Be Better</h4>
+
+      <p>
+        Because individual observables are retained, the estimator may continue
+        using useful GNSS information even when the receiver cannot form a full
+        standalone navigation solution.
+      </p>
+
+      <p>
+        Potential benefits include
+      </p>
+
+      <ul>
+
+        <li>better use of available measurements,</li>
+
+        <li>improved operation with reduced satellite visibility,</li>
+
+        <li>direct measurement-level residual testing,</li>
+
+        <li>stronger integration with inertial states.</li>
+
+      </ul>
+
+      <p>
+        The cost is greater measurement-model, timing, software, and
+        verification complexity.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DEEP COUPLING                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Deeply Coupled / Ultra-Tightly Coupled Fusion</h3>
+
+      <p>
+        Deep integration moves the interaction between navigation and GNSS even
+        further toward the receiver signal-processing level.
+      </p>
+
+      <p>
+        Inertial or navigation predictions may assist the internal GNSS
+        tracking loops.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU / Navigation Prediction}}
+        \rightarrow
+        \boxed{\text{GNSS Signal Tracking}}
+        \rightarrow
+        \boxed{\text{Improved Code / Carrier Tracking}}.
+        \]
+      </p>
+
+      <p>
+        This creates a feedback relationship between navigation estimation and
+        signal tracking.
+      </p>
+
+      <p>
+        Deep integration may offer benefits under difficult signal dynamics or
+        degraded signal conditions, but it also produces strong hardware,
+        software, timing, and verification coupling.
+      </p>
+
+      <p>
+        Detailed receiver-loop mathematics is beyond the scope of this
+        architecture page.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- IMPORTANT DISTINCTION                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Centralized vs Decentralized Is Not the Same as Loose vs Tight</h3>
+
+      <p>
+        These architecture terms describe different design dimensions and
+        should not be confused.
+      </p>
+
+
+      <h4>Architecture Distribution</h4>
+
+      <p>
+        Centralized and decentralized describe
+      </p>
+
+      <p>
+        <strong>where the estimation computations occur.</strong>
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Centralized}
+        \leftrightarrow
+        \text{Distributed}
+        }.
+        \]
+      </p>
+
+
+      <h4>Coupling Depth</h4>
+
+      <p>
+        Loose, tight, and deep coupling describe
+      </p>
+
+      <p>
+        <strong>how low in the information-processing chain integration occurs.</strong>
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Loose}}
+        \rightarrow
+        \boxed{\text{Tight}}
+        \rightarrow
+        \boxed{\text{Deep}}.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Centralization}
+        \neq
+        \text{Coupling Depth}
+        }.
+        \]
+      </p>
+
+      <p>
+        A centralized estimator could use tightly coupled GNSS measurements,
+        while a decentralized system could combine loosely coupled state
+        solutions.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- BATCH VS SEQUENTIAL                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sequential Versus Combined Measurement Updates</h3>
+
+      <p>
+        Measurements from several sensors may become available at the same
+        epoch.
+      </p>
+
+      <p>
+        One approach is to stack them into a single measurement vector:
+      </p>
+
+      <p>
+        \[
+        \mathbf z
+        =
+        \begin{bmatrix}
+        \mathbf z_{GNSS}\\
+        \mathbf z_{LiDAR}
+        \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        with measurement matrix
+      </p>
+
+      <p>
+        \[
+        \mathbf H
+        =
+        \begin{bmatrix}
+        \mathbf H_{GNSS}\\
+        \mathbf H_{LiDAR}
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        This gives a combined update.
+      </p>
+
+      <p>
+        Another approach is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS Update}}
+        \rightarrow
+        \boxed{\text{LiDAR Update}}.
+        \]
+      </p>
+
+      <p>
+        For appropriately independent measurement errors in a linear Gaussian
+        formulation, sequential and stacked processing can produce equivalent
+        results when implemented consistently.
+      </p>
+
+      <p>
+        Sequential updates are often convenient for asynchronous spacecraft
+        sensors.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PARALLEL VS SEQUENTIAL                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Parallel Versus Sequential Estimator Organization</h3>
+
+      <h4>Parallel Estimation</h4>
+
+      <p>
+        Several local estimators operate simultaneously:
+      </p>
+
+      <p>
+        \[
+        \begin{cases}
+        \boxed{\text{Filter 1}}\\
+        \boxed{\text{Filter 2}}\\
+        \boxed{\text{Filter 3}}
+        \end{cases}
+        \rightarrow
+        \boxed{\text{Master Fusion}}.
+        \]
+      </p>
+
+
+      <h4>Sequential Estimation</h4>
+
+      <p>
+        Information passes through multiple estimation stages:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor}}
+        \rightarrow
+        \boxed{\text{Estimator 1}}
+        \rightarrow
+        \boxed{\text{Estimator 2}}.
+        \]
+      </p>
+
+      <p>
+        Therefore, parallel decentralized fusion and sequential cascaded fusion
+        represent different architectural concepts.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- HOMOGENEOUS VS HETEROGENEOUS                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Homogeneous Versus Heterogeneous Fusion</h3>
+
+      <h4>Homogeneous Fusion</h4>
+
+      <p>
+        Homogeneous fusion combines sensors that provide similar measurements.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker A}}
+        +
+        \boxed{\text{Star Tracker B}}
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS Receiver A}}
+        +
+        \boxed{\text{GNSS Receiver B}}.
+        \]
+      </p>
+
+      <p>
+        This is commonly associated with redundancy and fault tolerance.
+      </p>
+
+
+      <h4>Heterogeneous Fusion</h4>
+
+      <p>
+        Heterogeneous fusion combines sensors based on different physical
+        measurement principles.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU}}
+        +
+        \boxed{\text{GNSS}}
+        +
+        \boxed{\text{Camera}}
+        +
+        \boxed{\text{LiDAR}}.
+        \]
+      </p>
+
+      <p>
+        Heterogeneous fusion is valuable because different sensors provide
+        complementary observability and different error characteristics.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- STATIC VS ADAPTIVE                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Static Versus Adaptive Fusion Architectures</h3>
+
+      <p>
+        A static architecture uses essentially the same set of measurements and
+        estimator configuration throughout operation.
+      </p>
+
+      <p>
+        Real spacecraft missions often experience changing sensor quality,
+        geometry, availability, and mission phase.
+      </p>
+
+      <p>
+        An adaptive architecture may therefore modify
+      </p>
+
+      <ul>
+
+        <li>which sensors are active,</li>
+
+        <li>measurement covariance,</li>
+
+        <li>measurement weighting,</li>
+
+        <li>state definition,</li>
+
+        <li>estimator configuration.</li>
+
+      </ul>
+
+      <p>
+        For example, if camera image quality deteriorates,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf R_{camera}
+        \uparrow
+        }
+        \]
+      </p>
+
+      <p>
+        may be used to reduce the influence of camera measurements.
+      </p>
+
+      <p>
+        If the target leaves the field of view,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera Update}}
+        \rightarrow
+        \boxed{\text{Disabled}}.
+        \]
+      </p>
+
+      <p>
+        Detailed adaptive filtering methods are developed later in the chapter.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MODE DEPENDENT RPO FUSION                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Mode-Dependent Fusion for Rendezvous and Proximity Operations</h3>
+
+      <p>
+        RPO provides a particularly useful example because the useful sensor
+        suite changes significantly with range.
+      </p>
+
+
+      <h4>Far Range</h4>
+
+      <p>
+        \[
+        \boxed{\text{GNSS + IMU}}.
+        \]
+      </p>
+
+      <p>
+        Absolute or relative GNSS can dominate translational navigation while
+        the IMU maintains high-rate propagation.
+      </p>
+
+
+      <h4>Mid Range</h4>
+
+      <p>
+        \[
+        \boxed{\text{GNSS + IMU + Camera}}.
+        \]
+      </p>
+
+      <p>
+        Camera measurements begin providing line-of-sight or target-relative
+        information while GNSS remains available for cross-checking.
+      </p>
+
+
+      <h4>Close Range</h4>
+
+      <p>
+        \[
+        \boxed{\text{IMU + Camera + LiDAR}}.
+        \]
+      </p>
+
+      <p>
+        LiDAR can strengthen range and pose observability while optical
+        navigation becomes increasingly important.
+      </p>
+
+
+      <h4>Capture</h4>
+
+      <p>
+        The estimator may need accurate estimates of
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r_{rel},
+        \mathbf v_{rel},
+        \mathbf q_{rel},
+        \boldsymbol{\omega}_{rel}
+        }.
+        \]
+      </p>
+
+      <p>
+        Sensor transitions should preferably contain overlap regions rather
+        than abrupt switching.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS Dominant}}
+        \rightarrow
+        \boxed{\text{GNSS + Vision}}
+        \rightarrow
+        \boxed{\text{Vision + LiDAR}}.
+        \]
+      </p>
+
+      <p>
+        Overlap supports
+      </p>
+
+      <ul>
+
+        <li>cross-validation,</li>
+
+        <li>bias detection,</li>
+
+        <li>smooth covariance transition,</li>
+
+        <li>consistency checking,</li>
+
+        <li>safer handover.</li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SENSOR VS ESTIMATOR HANDOVER                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Handover Versus Estimator Handover</h3>
+
+      <p>
+        These two concepts should be distinguished.
+      </p>
+
+
+      <h4>Sensor Handover</h4>
+
+      <p>
+        The same estimator remains active while the available measurement set
+        changes.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{EKF}}
+        :
+        \quad
+        \text{GNSS}
+        \rightarrow
+        \text{GNSS + Camera}
+        \rightarrow
+        \text{Camera + LiDAR}.
+        \]
+      </p>
+
+
+      <h4>Estimator Handover</h4>
+
+      <p>
+        Different estimators become responsible for navigation during
+        different mission phases.
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Far-Range Navigation Filter}}
+        \rightarrow
+        \boxed{\text{Close-Range Relative Navigation Filter}}.
+        \]
+      </p>
+
+      <p>
+        Estimator handover is more difficult because
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_A,
+        \mathbf P_A
+        }
+        \]
+      </p>
+
+      <p>
+        must be transferred consistently into
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_B,
+        \mathbf P_B
+        }.
+        \]
+      </p>
+
+      <p>
+        This requires careful handling of
+      </p>
+
+      <ul>
+
+        <li>state definitions,</li>
+
+        <li>coordinate frames,</li>
+
+        <li>covariance mapping,</li>
+
+        <li>timestamps,</li>
+
+        <li>bias states,</li>
+
+        <li>relative-state conventions.</li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- FAULT TOLERANCE                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Fault-Tolerant Fusion Architecture</h3>
+
+      <p>
+        Sensor failures should be considered when designing the architecture,
+        not only after the estimator has been implemented.
+      </p>
+
+      <p>
+        Suppose the nominal close-range navigation architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera + LiDAR + IMU}}.
+        \]
+      </p>
+
+      <p>
+        If the camera fails, the system may reconfigure to
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{LiDAR + IMU}}
+        \]
+      </p>
+
+      <p>
+        provided the remaining sensors still satisfy observability and mission
+        accuracy requirements.
+      </p>
+
+      <p>
+        A fault-tolerant architecture therefore includes more than the
+        estimator itself:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensors}}
+        \rightarrow
+        \boxed{\text{Health Monitoring}}
+        \rightarrow
+        \boxed{\text{Measurement Validation}}
+        \rightarrow
+        \boxed{\text{Fusion Manager}}
+        \rightarrow
+        \boxed{\text{Estimator}}.
+        \]
+      </p>
+
+      <p>
+        The fusion manager determines which measurement sources are currently
+        trusted.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- FDIR                                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Fusion and FDIR</h3>
+
+      <p>
+        The navigation estimator itself can provide useful information for
+        fault detection, isolation, and recovery.
+      </p>
+
+      <p>
+        For each sensor,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y_i
+        =
+        \mathbf z_i
+        -
+        \hat{\mathbf z}_i
+        }.
+        \]
+      </p>
+
+      <p>
+        If the innovation becomes persistently inconsistent with its expected
+        uncertainty, the measurement source may be
+      </p>
+
+      <ul>
+
+        <li>degraded,</li>
+
+        <li>biased,</li>
+
+        <li>misaligned,</li>
+
+        <li>incorrectly timestamped,</li>
+
+        <li>faulty.</li>
+
+      </ul>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation Monitoring}}
+        \rightarrow
+        \boxed{\text{Fault Detection and Isolation}}.
+        \]
+      </p>
+
+      <p>
+        This is especially powerful in architectures containing redundant
+        sensors.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COMMON MODE FAILURES                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Redundancy Does Not Guarantee Independence</h3>
+
+      <p>
+        Two sensors may be redundant without being truly independent.
+      </p>
+
+      <p>
+        For example, two star trackers may share
+      </p>
+
+      <ul>
+
+        <li>the same power supply,</li>
+
+        <li>the same software implementation,</li>
+
+        <li>the same thermal environment,</li>
+
+        <li>the same structural mounting region,</li>
+
+        <li>similar fields of view.</li>
+
+      </ul>
+
+      <p>
+        A common environmental or system failure may therefore affect both.
+      </p>
+
+      <p>
+        Similarly, two navigation filters that share the same IMU do not
+        provide completely independent navigation.
+      </p>
+
+      <p>
+        Architecture design should therefore distinguish
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Redundancy}}
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Independence}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COMPUTATIONAL ARCHITECTURE                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Computational Architecture</h3>
+
+      <p>
+        Sensor-fusion architecture is not only mathematical.
+      </p>
+
+      <p>
+        The estimator must execute on actual flight hardware.
+      </p>
+
+
+      <h4>Single-Processor Architecture</h4>
+
+      <p>
+        \[
+        \boxed{\text{All Sensor Data}}
+        \rightarrow
+        \boxed{\text{Single Flight Computer}}.
+        \]
+      </p>
+
+
+      <h4>Distributed Processing</h4>
+
+      <p>
+        A spacecraft may instead contain
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Vision Processor}}
+        \qquad
+        \boxed{\text{GNSS Receiver}}
+        \qquad
+        \boxed{\text{ADCS Computer}}
+        \qquad
+        \boxed{\text{Main OBC}}.
+        \]
+      </p>
+
+      <p>
+        These processors communicate through spacecraft data buses and
+        interfaces.
+      </p>
+
+      <p>
+        The physical processor architecture influences
+      </p>
+
+      <ul>
+
+        <li>communication latency,</li>
+
+        <li>available bandwidth,</li>
+
+        <li>clock synchronization,</li>
+
+        <li>fault containment,</li>
+
+        <li>processor load,</li>
+
+        <li>software interfaces,</li>
+
+        <li>redundancy strategy.</li>
+
+      </ul>
+
+      <p>
+        Mathematical fusion architecture and flight-computer architecture
+        should therefore be designed together.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COMMUNICATION REQUIREMENTS                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Communication Requirements for Fusion</h3>
+
+      <p>
+        A distributed estimator needs substantially more interface information
+        than only the numerical sensor value.
+      </p>
+
+      <p>
+        A useful navigation interface should normally identify
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Data}
+        +
+        \text{Timestamp}
+        +
+        \text{Frame}
+        +
+        \text{Units}
+        +
+        \text{Uncertainty}
+        +
+        \text{Validity}
+        +
+        \text{Status}
+        }.
+        \]
+      </p>
+
+      <p>
+        For example, transmitting
+      </p>
+
+      <p>
+        \[
+        \mathbf r
+        =
+        \begin{bmatrix}
+        x\\
+        y\\
+        z
+        \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        is not sufficient by itself.
+      </p>
+
+      <p>
+        The receiving estimator also needs to know
+      </p>
+
+      <ul>
+
+        <li>which coordinate frame is used,</li>
+
+        <li>the measurement timestamp,</li>
+
+        <li>the measurement units,</li>
+
+        <li>the uncertainty or covariance,</li>
+
+        <li>whether the solution is currently valid,</li>
+
+        <li>whether the measurement is delayed,</li>
+
+        <li>what status or health flags apply.</li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INTERFACE CONTROL                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Interface Control for Sensor Fusion</h3>
+
+      <p>
+        A measurement-level interface may conceptually carry
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \{
+        \mathbf z,\;
+        t,\;
+        \mathbf R,\;
+        FrameID,\;
+        Validity,\;
+        Status
+        \}
+        }.
+        \]
+      </p>
+
+      <p>
+        A state-level fusion interface may instead carry
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \{
+        \hat{\mathbf x},\;
+        t,\;
+        \mathbf P,\;
+        FrameID,\;
+        Validity,\;
+        Status
+        \}
+        }.
+        \]
+      </p>
+
+      <p>
+        This demonstrates how sensor-fusion architecture directly connects to
+        Interface Control Document design.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ARCHITECTURE AND OBSERVABILITY                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Architecture and Observability</h3>
+
+      <p>
+        Architecture can affect how much useful measurement information reaches
+        the state estimator.
+      </p>
+
+      <p>
+        Suppose a camera bearing measurement is processed inside a local
+        subsystem and converted into a partial state estimate before being
+        passed to the master estimator.
+      </p>
+
+      <p>
+        Some of the original measurement geometry may no longer be available to
+        the global estimator.
+      </p>
+
+      <p>
+        A lower-level tightly integrated estimator may retain more of the
+        original measurement information.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Architecture Choice}}
+        \rightarrow
+        \boxed{\text{Available Information}}
+        \rightarrow
+        \boxed{\text{Observability}}.
+        \]
+      </p>
+
+      <p>
+        Architecture should therefore not be selected only for software
+        convenience.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ARCHITECTURE AND LATENCY                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Architecture and Latency</h3>
+
+      <p>
+        Cascaded and distributed navigation systems may introduce significant
+        processing and communication delay.
+      </p>
+
+      <p>
+        Consider
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera}}
+        \rightarrow
+        \boxed{\text{Image Processing}}
+        \rightarrow
+        \boxed{\text{Pose Estimator}}
+        \rightarrow
+        \boxed{\text{Navigation Fusion}}.
+        \]
+      </p>
+
+      <p>
+        Each stage introduces latency.
+      </p>
+
+      <p>
+        The total delay can be represented approximately as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \tau_{total}
+        =
+        \tau_{camera}
+        +
+        \tau_{processing}
+        +
+        \tau_{pose}
+        +
+        \tau_{communication}
+        }.
+        \]
+      </p>
+
+      <p>
+        During slow navigation this delay may be acceptable.
+      </p>
+
+      <p>
+        During close-range docking,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Latency}}
+        \rightarrow
+        \boxed{\text{Navigation Error}}
+        \rightarrow
+        \boxed{\text{Control Error}}
+        \]
+      </p>
+
+      <p>
+        can become mission-critical.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ARCHITECTURE AND UPDATE RATE                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Architecture and Update Rate</h3>
+
+      <p>
+        Different sensors may operate at very different rates.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        f_{IMU}
+        =
+        200~\text{Hz},
+        \]
+      </p>
+
+      <p>
+        \[
+        f_{camera}
+        =
+        20~\text{Hz},
+        \]
+      </p>
+
+      <p>
+        \[
+        f_{LiDAR}
+        =
+        10~\text{Hz},
+        \]
+      </p>
+
+      <p>
+        \[
+        f_{GNSS}
+        =
+        5~\text{Hz}.
+        \]
+      </p>
+
+      <p>
+        The navigation system must still provide a sufficiently high-rate state
+        estimate to guidance and control.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{High-Rate Propagation}}
+        +
+        \boxed{\text{Asynchronous Corrections}}
+        \]
+      </p>
+
+      <p>
+        is normally more appropriate than forcing every sensor onto a single
+        artificial update rate.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NAVIGATION AVAILABILITY                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Architecture and Navigation Availability</h3>
+
+      <p>
+        Architecture should not be selected only by asking which configuration
+        produces the lowest nominal estimation error.
+      </p>
+
+      <p>
+        A navigation system must also consider
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Availability}}.
+        \]
+      </p>
+
+      <p>
+        Navigation availability answers:
+      </p>
+
+      <p>
+        <strong>
+          How often is a valid navigation solution available to the spacecraft?
+        </strong>
+      </p>
+
+      <p>
+        A highly accurate architecture with one critical point of failure may
+        be less desirable than a slightly less accurate architecture capable
+        of graceful degradation.
+      </p>
+
+      <p>
+        Architecture evaluation should therefore consider
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Accuracy}
+        +
+        \text{Availability}
+        +
+        \text{Integrity}
+        +
+        \text{Continuity}
+        +
+        \text{Robustness}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NAVIGATION INTEGRITY                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Architecture and Navigation Integrity</h3>
+
+      <p>
+        Accuracy and integrity are not the same.
+      </p>
+
+      <p>
+        Accuracy asks:
+      </p>
+
+      <p>
+        <strong>How close is the navigation estimate to the true state?</strong>
+      </p>
+
+      <p>
+        Integrity asks:
+      </p>
+
+      <p>
+        <strong>
+          Can the navigation system determine when its own solution should not
+          be trusted?
+        </strong>
+      </p>
+
+      <p>
+        This is particularly important during autonomous rendezvous and
+        docking.
+      </p>
+
+      <p>
+        A spacecraft should not declare
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{CAPTURE READY}}
+        \]
+      </p>
+
+      <p>
+        merely because
+      </p>
+
+      <p>
+        \[
+        \left|
+        \hat{\mathbf r}_{rel}
+        \right|
+        \le
+        r_{capture}.
+        \]
+      </p>
+
+      <p>
+        The system should also consider
+      </p>
+
+      <p>
+        \[
+        \left|
+        \hat{\mathbf v}_{rel}
+        \right|
+        \le
+        v_{capture}
+        \]
+      </p>
+
+      <p>
+        together with uncertainty requirements such as
+      </p>
+
+      <p>
+        \[
+        \sigma_r
+        \le
+        \sigma_{r,max}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \sigma_v
+        \le
+        \sigma_{v,max}.
+        \]
+      </p>
+
+      <p>
+        A navigation-valid flag should also be required.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Capture Ready}
+        =
+        \text{State Requirements}
+        +
+        \text{Uncertainty Requirements}
+        +
+        \text{Navigation Validity}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ATTITUDE ARCHITECTURE EXAMPLE                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Example: Spacecraft Attitude Fusion Architecture</h3>
+
+      <p>
+        A representative attitude-determination system may use
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        \rightarrow
+        \boxed{\text{High-Rate Attitude Propagation}}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker}},
+        \qquad
+        \boxed{\text{Sun Sensor}},
+        \qquad
+        \boxed{\text{Magnetometer}}
+        \]
+      </p>
+
+      <p>
+        provide absolute or reference-vector corrections.
+      </p>
+
+      <p>
+        One architecture could use a centralized attitude estimator receiving
+        all measurements.
+      </p>
+
+      <p>
+        Another architecture may retain
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker}}
+        \rightarrow
+        \boxed{\text{Primary Attitude Solution}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sun Sensor + Magnetometer}}
+        \rightarrow
+        \boxed{\text{Backup Attitude Solution}}.
+        \]
+      </p>
+
+      <p>
+        The preferred architecture therefore depends not only on accuracy but
+        also on reliability and fault-tolerance requirements.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- GNSS IMU ARCHITECTURE EXAMPLE                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Example: IMU/GNSS Navigation Architectures</h3>
+
+      <h4>Loose Coupling</h4>
+
+      <p>
+        \[
+        \boxed{\text{GNSS}}
+        \rightarrow
+        \boxed{
+        \mathbf r_{GNSS},
+        \mathbf v_{GNSS}
+        }
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r_{GNSS},
+        \mathbf v_{GNSS}
+        }
+        +
+        \boxed{\text{INS}}
+        \rightarrow
+        \boxed{\text{EKF}}.
+        \]
+      </p>
+
+
+      <h4>Tight Coupling</h4>
+
+      <p>
+        \[
+        \boxed{\text{GNSS Pseudorange / Doppler}}
+        +
+        \boxed{\text{IMU}}
+        \rightarrow
+        \boxed{\text{Integrated EKF}}.
+        \]
+      </p>
+
+
+      <h4>Deep Coupling</h4>
+
+      <p>
+        \[
+        \boxed{\text{INS Prediction}}
+        \leftrightarrow
+        \boxed{\text{GNSS Tracking Loops}}.
+        \]
+      </p>
+
+      <p>
+        These architectures demonstrate how increasing coupling depth exposes
+        lower-level sensor information to the navigation system.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- RPO ARCHITECTURE EXAMPLE                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Example: RPO Navigation Architecture</h3>
+
+      <p>
+        Rendezvous and proximity operations often require a navigation
+        architecture that changes progressively with range.
+      </p>
+
+
+      <h4>Far Range</h4>
+
+      <p>
+        \[
+        \boxed{\text{GNSS}}
+        +
+        \boxed{\text{IMU}}
+        \rightarrow
+        \boxed{
+        \hat{\mathbf r}_{rel},
+        \hat{\mathbf v}_{rel}
+        }.
+        \]
+      </p>
+
+
+      <h4>Mid Range</h4>
+
+      <p>
+        Camera measurements can be introduced:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS + IMU + Camera}}.
+        \]
+      </p>
+
+      <p>
+        GNSS and optical relative navigation can be cross-checked during this
+        transition region.
+      </p>
+
+
+      <h4>Close Range</h4>
+
+      <p>
+        LiDAR may be added:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU + Camera + LiDAR}}.
+        \]
+      </p>
+
+      <p>
+        LiDAR strengthens range and relative-pose observability.
+      </p>
+
+
+      <h4>Capture</h4>
+
+      <p>
+        The navigation system may need to maintain
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf r}_{rel},
+        \hat{\mathbf v}_{rel},
+        \hat{\mathbf q}_{rel},
+        \hat{\boldsymbol{\omega}}_{rel}
+        }
+        \]
+      </p>
+
+      <p>
+        together with covariance and validity information.
+      </p>
+
+      <p>
+        A useful conceptual architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU}}
+        \rightarrow
+        \boxed{\text{High-Rate Propagation}}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS}},
+        \qquad
+        \boxed{\text{Camera}},
+        \qquad
+        \boxed{\text{LiDAR}}
+        \]
+      </p>
+
+      <p>
+        provide phase-dependent corrections.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ARCHITECTURE SELECTION CRITERIA                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Architecture Selection Criteria</h3>
+
+      <p>
+        Sensor-fusion architecture should be selected from mission and system
+        requirements rather than from estimator preference alone.
+      </p>
+
+      <p>
+        Important questions include:
+      </p>
+
+      <ul>
+
+        <li>
+          <strong>What states must be estimated?</strong>
+        </li>
+
+        <li>
+          <strong>Which sensors observe those states?</strong>
+        </li>
+
+        <li>
+          <strong>What are the sensor update rates?</strong>
+        </li>
+
+        <li>
+          <strong>What are the measurement latencies?</strong>
+        </li>
+
+        <li>
+          <strong>Which sensors share common information?</strong>
+        </li>
+
+        <li>
+          <strong>What are the observability requirements?</strong>
+        </li>
+
+        <li>
+          <strong>What navigation availability is required?</strong>
+        </li>
+
+        <li>
+          <strong>What fault tolerance is required?</strong>
+        </li>
+
+        <li>
+          <strong>What processor resources are available?</strong>
+        </li>
+
+        <li>
+          <strong>How much communication bandwidth is available?</strong>
+        </li>
+
+        <li>
+          <strong>How difficult will implementation and verification be?</strong>
+        </li>
+
+      </ul>
+
+      <p>
+        Architecture selection is therefore a system-level engineering problem.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ARCHITECTURE COMPARISON TABLE                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Centralized, Decentralized, Federated, and Cascaded Comparison</h3>
+
+      <p>
+        The following table gives typical characteristics. These are general
+        tendencies rather than strict rules.
+      </p>
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Centralized</th>
+              <th>Decentralized</th>
+              <th>Federated</th>
+              <th>Cascaded</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>Measurement access</td>
+              <td>Often global</td>
+              <td>Usually local</td>
+              <td>Local filters + master</td>
+              <td>Stage dependent</td>
+            </tr>
+
+            <tr>
+              <td>State covariance</td>
+              <td>Common covariance</td>
+              <td>Distributed</td>
+              <td>Local + master covariance</td>
+              <td>Usually separated between stages</td>
+            </tr>
+
+            <tr>
+              <td>Computational load</td>
+              <td>Concentrated</td>
+              <td>Distributed</td>
+              <td>Distributed</td>
+              <td>Staged</td>
+            </tr>
+
+            <tr>
+              <td>Modularity</td>
+              <td>Lower</td>
+              <td>High</td>
+              <td>High</td>
+              <td>High</td>
+            </tr>
+
+            <tr>
+              <td>Fault isolation</td>
+              <td>More difficult</td>
+              <td>Good</td>
+              <td>Very good</td>
+              <td>Depends on stage design</td>
+            </tr>
+
+            <tr>
+              <td>Correlation handling</td>
+              <td>Easier internally</td>
+              <td>Difficult</td>
+              <td>Critical</td>
+              <td>Often overlooked</td>
+            </tr>
+
+            <tr>
+              <td>Single-point failure risk</td>
+              <td>Potentially higher</td>
+              <td>Lower</td>
+              <td>Lower</td>
+              <td>Architecture dependent</td>
+            </tr>
+
+            <tr>
+              <td>Typical use</td>
+              <td>Integrated navigation</td>
+              <td>Modular systems</td>
+              <td>Fault-tolerant navigation</td>
+              <td>Layered processing</td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COUPLING COMPARISON TABLE                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Loose, Tight, and Deep Coupling Comparison</h3>
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Loose Coupling</th>
+              <th>Tight Coupling</th>
+              <th>Deep Coupling</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>Information fused</td>
+              <td>Navigation solution</td>
+              <td>Lower-level observables</td>
+              <td>Navigation + signal tracking</td>
+            </tr>
+
+            <tr>
+              <td>Integration depth</td>
+              <td>Low</td>
+              <td>Medium / high</td>
+              <td>Very high</td>
+            </tr>
+
+            <tr>
+              <td>Complexity</td>
+              <td>Lower</td>
+              <td>Higher</td>
+              <td>Highest</td>
+            </tr>
+
+            <tr>
+              <td>Subsystem independence</td>
+              <td>High</td>
+              <td>Reduced</td>
+              <td>Low</td>
+            </tr>
+
+            <tr>
+              <td>Measurement information retained</td>
+              <td>Lower</td>
+              <td>Higher</td>
+              <td>Highest</td>
+            </tr>
+
+            <tr>
+              <td>Degraded measurement operation</td>
+              <td>More limited</td>
+              <td>Improved</td>
+              <td>Potentially strongest</td>
+            </tr>
+
+            <tr>
+              <td>Verification burden</td>
+              <td>Lower</td>
+              <td>Higher</td>
+              <td>Highest</td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+      <p>
+        Exact performance depends on sensor quality, measurement models,
+        processing architecture, estimator tuning, and implementation.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ARCHITECTURE TRADEOFF                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Architecture Is a System-Level Trade-Off</h3>
+
+      <p>
+        There is no universally best sensor-fusion architecture.
+      </p>
+
+      <p>
+        A centralized estimator may provide excellent information sharing but
+        increase software coupling and single-point failure risk.
+      </p>
+
+      <p>
+        A decentralized architecture may improve modularity and fault
+        isolation but make statistical correlation management more difficult.
+      </p>
+
+      <p>
+        Loose coupling may simplify implementation but discard useful
+        lower-level information.
+      </p>
+
+      <p>
+        Tight coupling may use measurements more efficiently but increase
+        development and verification complexity.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Best Architecture}
+        =
+        f(
+        \text{Mission},
+        \text{Sensors},
+        \text{Dynamics},
+        \text{Reliability},
+        \text{Computing},
+        \text{Verification}
+        )
+        }.
+        \]
+      </p>
+
+      <p>
+        There is no
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{One Architecture Fits Every Spacecraft}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DESIGN PRINCIPLE                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Practical Architecture Design Principle</h3>
+
+      <p>
+        A useful engineering principle is:
+      </p>
+
+      <p>
+        <strong>
+          Fuse information at the lowest practical level that preserves useful
+          measurement information, but not at a level that creates unjustified
+          complexity, unmanageable correlation, or unacceptable verification
+          burden.
+        </strong>
+      </p>
+
+      <p>
+        This is more useful than assuming that tighter integration is always
+        better.
+      </p>
+
+      <p>
+        The correct architecture is the one that satisfies the complete mission
+        requirements with acceptable complexity and risk.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COMPLETE CONCEPTUAL ARCHITECTURE                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complete Conceptual Spacecraft Sensor-Fusion Architecture</h3>
+
+      <p>
+        A realistic flight-navigation architecture can now be assembled from
+        the concepts introduced above.
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensors}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \begin{array}{c}
+        \text{Timestamping}\\
+        \text{Calibration}\\
+        \text{Frame Transformation}\\
+        \text{Validity / Health}
+        \end{array}
+        }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        then one or more of
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Raw Measurement Fusion}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Feature Extraction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Local Estimators}}
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Central / Master Navigation Estimator}}
+        \]
+      </p>
+
+      <p>
+        producing
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x},
+        \mathbf P,
+        \text{Navigation Validity},
+        \text{Sensor Status}
+        }.
+        \]
+      </p>
+
+      <p>
+        These outputs are supplied to
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Guidance}}
+        \rightarrow
+        \boxed{\text{Control}}
+        \rightarrow
+        \boxed{\text{Actuators}}.
+        \]
+      </p>
+
+
+      <h4>Parallel Health and FDIR Path</h4>
+
+      <p>
+        At the same time,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation Monitoring}}
+        \rightarrow
+        \boxed{\text{FDIR / Fusion Manager}}
+        \]
+      </p>
+
+      <p>
+        determines
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Which Sensors May Participate in Fusion}}.
+        \]
+      </p>
+
+      <p>
+        This architecture is much closer to a real spacecraft navigation
+        system than the simplified representation
+      </p>
+
+      <p>
+        \[
+        \text{Sensor 1}
+        +
+        \text{Sensor 2}
+        \rightarrow
+        \text{Kalman Filter}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- KEY TAKEAWAYS                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Key Takeaways</h3>
+
+      <p>
+        The most important concepts from this section are:
+      </p>
+
+      <ul>
+
+        <li>
+          A fusion algorithm and a fusion architecture are different design
+          concepts.
+        </li>
+
+        <li>
+          Fusion can occur at measurement, feature, state, or decision level.
+        </li>
+
+        <li>
+          Centralized fusion provides strong information integration but can
+          increase complexity and coupling.
+        </li>
+
+        <li>
+          Decentralized fusion improves modularity but creates correlation and
+          information-management challenges.
+        </li>
+
+        <li>
+          Federated fusion combines local estimators through a master fusion
+          stage.
+        </li>
+
+        <li>
+          Cascaded fusion passes estimated information from one estimator into
+          another.
+        </li>
+
+        <li>
+          Loose, tight, and deep coupling describe integration depth, not
+          estimator distribution.
+        </li>
+
+        <li>
+          State-level fusion must carefully handle cross-covariance and
+          information double counting.
+        </li>
+
+        <li>
+          Timing, latency, coordinate frames, covariance, validity, and health
+          information are all part of the fusion interface.
+        </li>
+
+        <li>
+          RPO navigation architectures should support sensor overlap,
+          phase-dependent measurements, and safe handover.
+        </li>
+
+        <li>
+          The best architecture is mission-dependent rather than universally
+          centralized, decentralized, loose, or tight.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NEXT SECTION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h2>Next: 4.2.3 Complementary Filters</h2>
+
+      <p>
+        Sensor-fusion architecture determines
+        <strong>where and how information is organised</strong>.
+      </p>
+
+      <p>
+        The next question is how two complementary sensor signals can be
+        combined mathematically.
+      </p>
+
+      <p>
+        A classic example is spacecraft attitude estimation:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        +
+        \boxed{\text{Absolute Attitude Reference}}
+        \rightarrow
+        \boxed{\text{Improved Attitude Estimate}}.
+        \]
+      </p>
+
+      <p>
+        Section 4.2.3 develops this idea using complementary filtering,
+        frequency separation, high-pass and low-pass behaviour, filter tuning,
+        discrete implementation, and spacecraft attitude examples.
+      </p>
+
+      <a href="complementary-filters.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.3 Complementary Filters</h3>
+
+          <p>
+            High-pass and low-pass fusion, gyroscope and absolute-attitude
+            reference integration, cutoff-frequency selection, tuning,
+            discrete implementation, and spacecraft attitude applications.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Complementary Filters &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+    </section>
+
+
+  </main>
+
+
+
+  <!-- ========================================================= -->
+  <!-- FOOTER                                                    -->
+  <!-- ========================================================= -->
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+
+</body>
+
+</html>
