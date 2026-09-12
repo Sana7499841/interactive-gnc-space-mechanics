@@ -1,0 +1,4752 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.3 Complementary Filters | Interactive GNC &amp; Space Mechanics</title>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+</head>
+
+
+<body>
+
+  <!-- ========================================================= -->
+  <!-- PAGE HEADER                                                -->
+  <!-- ========================================================= -->
+
+  <header class="notes-hero">
+
+    <h1>Complementary Filters</h1>
+
+    <p class="notes-tagline">
+      High-pass and low-pass sensor combination, gyroscope and absolute
+      attitude reference fusion, cutoff-frequency selection, tuning,
+      discrete implementation, quaternion attitude correction, and spacecraft
+      attitude applications.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN CONTENT                                               -->
+  <!-- ========================================================= -->
+
+  <main class="page-main">
+
+
+    <!-- ======================================================= -->
+    <!-- INTRODUCTION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h2>4.2.3 Complementary Filters</h2>
+
+      <p>
+        A <strong>complementary filter</strong> is one of the simplest and most
+        useful sensor-fusion methods for combining measurements from sensors
+        that possess <strong>complementary error characteristics</strong>.
+      </p>
+
+      <p>
+        The central idea is not to simply average two measurements.
+      </p>
+
+      <p>
+        Instead, each sensor is trusted in the portion of the frequency spectrum
+        where it provides the most useful information.
+      </p>
+
+      <p>
+        For spacecraft attitude estimation, a classic example is the combination
+        of
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Gyroscope}
+        +
+        \text{Absolute Attitude Reference}
+        }.
+        \]
+      </p>
+
+      <p>
+        The gyroscope provides excellent short-term information about changes in
+        attitude. It normally operates at a relatively high rate and captures
+        rapid rotational motion well.
+      </p>
+
+      <p>
+        However, gyroscope bias and noise accumulate when angular-rate
+        measurements are integrated, causing the attitude estimate to drift with
+        time.
+      </p>
+
+      <p>
+        An absolute attitude reference—such as a star tracker, Sun-sensor-based
+        attitude solution, magnetometer-based attitude solution, or another
+        externally referenced measurement—does not suffer from the same
+        unbounded integration drift.
+      </p>
+
+      <p>
+        However, the absolute reference may update more slowly, contain
+        measurement noise, experience dropouts, or become unavailable under
+        certain operating conditions.
+      </p>
+
+      <p>
+        The complementary filter exploits these different characteristics:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Gyro}
+        \rightarrow
+        \text{Short-Term / High-Frequency Information}
+        }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Absolute Reference}
+        \rightarrow
+        \text{Long-Term / Low-Frequency Information}
+        }.
+        \]
+      </p>
+
+      <p>
+        The two are combined to obtain
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Stable + Responsive Attitude Estimate}
+        }.
+        \]
+      </p>
+
+      <p>
+        The fundamental principle is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Use Each Sensor Where It Is Strongest}
+        }
+        \]
+      </p>
+
+      <p>
+        rather than
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Simply Average All Measurements}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- WHY COMPLEMENTARY FILTER                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Why Is a Complementary Filter Needed?</h3>
+
+      <p>
+        Consider a spacecraft equipped with a gyroscope and an absolute
+        attitude sensor.
+      </p>
+
+      <p>
+        Suppose the gyroscope measures angular velocity
+      </p>
+
+      <p>
+        \[
+        \boldsymbol{\omega}_m
+        \]
+      </p>
+
+      <p>
+        and the absolute attitude sensor provides a reference measurement
+      </p>
+
+      <p>
+        \[
+        \boldsymbol{\theta}_{abs}.
+        \]
+      </p>
+
+      <p>
+        For a simple single-axis example, the gyro measurement can be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \omega_m(t)
+        =
+        \omega(t)
+        +
+        b_g(t)
+        +
+        n_g(t)
+        }.
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          \(\omega(t)\) is the true angular rate,
+        </li>
+
+        <li>
+          \(b_g(t)\) is gyroscope bias,
+        </li>
+
+        <li>
+          \(n_g(t)\) is gyroscope measurement noise.
+        </li>
+
+      </ul>
+
+      <p>
+        Attitude can be obtained by integrating angular rate:
+      </p>
+
+      <p>
+        \[
+        \theta_g(t)
+        =
+        \theta_g(0)
+        +
+        \int_0^t
+        \omega_m(\tau)
+        d\tau.
+        \]
+      </p>
+
+      <p>
+        Substituting the measurement model gives
+      </p>
+
+      <p>
+        \[
+        \theta_g(t)
+        =
+        \theta(0)
+        +
+        \int_0^t \omega(\tau)d\tau
+        +
+        \int_0^t b_g(\tau)d\tau
+        +
+        \int_0^t n_g(\tau)d\tau.
+        \]
+      </p>
+
+      <p>
+        The desired attitude information is contained in the first two terms.
+      </p>
+
+      <p>
+        The remaining terms create estimation error.
+      </p>
+
+
+      <h4>Effect of Constant Gyro Bias</h4>
+
+      <p>
+        If the bias is approximately constant,
+      </p>
+
+      <p>
+        \[
+        b_g(t)
+        \approx
+        b_g,
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \int_0^t
+        b_g
+        d\tau
+        =
+        b_g t.
+        \]
+      </p>
+
+      <p>
+        Therefore, the attitude error grows approximately as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \delta\theta_g(t)
+        \approx
+        b_g t
+        }.
+        \]
+      </p>
+
+      <p>
+        This explains a fundamental property of inertial attitude propagation:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Excellent Short-Term Response}
+        +
+        \text{Poor Long-Term Absolute Stability}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- WHY NOT ABSOLUTE ONLY                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Why Not Use Only the Absolute Attitude Sensor?</h3>
+
+      <p>
+        Suppose the absolute attitude measurement is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \theta_a(t)
+        =
+        \theta(t)
+        +
+        n_a(t)
+        }.
+        \]
+      </p>
+
+      <p>
+        Unlike the gyro-integrated attitude, this measurement is referenced to
+        an external physical quantity.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <ul>
+
+        <li>
+          a star tracker uses observed star directions,
+        </li>
+
+        <li>
+          a Sun sensor uses the Sun direction,
+        </li>
+
+        <li>
+          a magnetometer uses the local geomagnetic-field direction.
+        </li>
+
+      </ul>
+
+      <p>
+        Its error therefore does not necessarily accumulate indefinitely simply
+        because time passes.
+      </p>
+
+      <p>
+        This makes the absolute sensor valuable for long-term reference.
+      </p>
+
+      <p>
+        However, an absolute sensor may also suffer from
+      </p>
+
+      <ul>
+
+        <li>lower update rate,</li>
+
+        <li>measurement noise,</li>
+
+        <li>processing latency,</li>
+
+        <li>field-of-view restrictions,</li>
+
+        <li>blinding conditions,</li>
+
+        <li>temporary dropouts,</li>
+
+        <li>acquisition time,</li>
+
+        <li>invalid solutions for certain spacecraft geometries.</li>
+
+      </ul>
+
+      <p>
+        Therefore, in the complementary-filter context,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Absolute Sensor}
+        =
+        \text{Good Long-Term Reference}
+        +
+        \text{Limited Short-Term Dynamic Capability}
+        }.
+        \]
+      </p>
+
+      <p>
+        The exact behaviour depends on the actual instrument. The important
+        point is the complementary nature of the errors rather than a universal
+        assumption that every absolute sensor is slow.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CHARACTERISTICS TABLE                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complementary Sensor Characteristics</h3>
+
+      <p>
+        The gyroscope and absolute attitude reference contribute different kinds
+        of useful information.
+      </p>
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Gyroscope</th>
+              <th>Absolute Attitude Reference</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>Measured quantity</td>
+              <td>Angular rate</td>
+              <td>Absolute/reference attitude information</td>
+            </tr>
+
+            <tr>
+              <td>Typical role</td>
+              <td>Propagation</td>
+              <td>Correction</td>
+            </tr>
+
+            <tr>
+              <td>Short-term response</td>
+              <td>Excellent</td>
+              <td>Sensor dependent</td>
+            </tr>
+
+            <tr>
+              <td>Rapid rotational motion</td>
+              <td>Excellent</td>
+              <td>May be limited by update rate or processing</td>
+            </tr>
+
+            <tr>
+              <td>Long-term drift</td>
+              <td>Yes, after integration</td>
+              <td>Bounded by reference errors</td>
+            </tr>
+
+            <tr>
+              <td>Bias sensitivity</td>
+              <td>High</td>
+              <td>Different error mechanism</td>
+            </tr>
+
+            <tr>
+              <td>Update rate</td>
+              <td>Usually high</td>
+              <td>Often lower</td>
+            </tr>
+
+            <tr>
+              <td>Dropout vulnerability</td>
+              <td>Usually low while operating</td>
+              <td>Can be significant</td>
+            </tr>
+
+            <tr>
+              <td>Main contribution</td>
+              <td>High-frequency attitude dynamics</td>
+              <td>Low-frequency absolute reference</td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+      <p>
+        The complementarity can therefore be summarised as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Gyro}
+        \Rightarrow
+        \text{High-Frequency Motion}
+        }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Absolute Reference}
+        \Rightarrow
+        \text{Low-Frequency Correction}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- FREQUENCY DOMAIN                                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Frequency-Domain Interpretation</h3>
+
+      <p>
+        Let the gyro-derived attitude estimate be
+      </p>
+
+      <p>
+        \[
+        \Theta_g(s)
+        \]
+      </p>
+
+      <p>
+        and the absolute attitude measurement be
+      </p>
+
+      <p>
+        \[
+        \Theta_a(s).
+        \]
+      </p>
+
+      <p>
+        A complementary filter combines the two using a high-pass and low-pass
+        transfer function:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\Theta}(s)
+        =
+        H_{HP}(s)\Theta_g(s)
+        +
+        H_{LP}(s)\Theta_a(s)
+        }.
+        \]
+      </p>
+
+      <p>
+        For a first-order complementary filter,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        H_{LP}(s)
+        =
+        \frac{1}{\tau s+1}
+        }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        H_{HP}(s)
+        =
+        \frac{\tau s}{\tau s+1}
+        }.
+        \]
+      </p>
+
+      <p>
+        Adding the two transfer functions gives
+      </p>
+
+      <p>
+        \[
+        H_{LP}(s)
+        +
+        H_{HP}(s)
+        =
+        \frac{1+\tau s}{1+\tau s}
+        =
+        1.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        H_{LP}(s)
+        +
+        H_{HP}(s)
+        =
+        1
+        }.
+        \]
+      </p>
+
+      <p>
+        This is the mathematical reason the filter is called
+        <strong>complementary</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- LOW PASS                                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Does the Low-Pass Branch Do?</h3>
+
+      <p>
+        The low-pass transfer function is
+      </p>
+
+      <p>
+        \[
+        H_{LP}(s)
+        =
+        \frac{1}{1+\tau s}.
+        \]
+      </p>
+
+      <p>
+        At low frequency,
+      </p>
+
+      <p>
+        \[
+        s
+        \rightarrow
+        0,
+        \]
+      </p>
+
+      <p>
+        so
+      </p>
+
+      <p>
+        \[
+        H_{LP}(s)
+        \rightarrow
+        1.
+        \]
+      </p>
+
+      <p>
+        Slowly varying information from the absolute reference therefore passes
+        strongly into the estimate.
+      </p>
+
+      <p>
+        At high frequency,
+      </p>
+
+      <p>
+        \[
+        \left|
+        H_{LP}(j\omega)
+        \right|
+        \rightarrow
+        0.
+        \]
+      </p>
+
+      <p>
+        High-frequency measurement fluctuations are therefore attenuated.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Absolute Attitude}}
+        \rightarrow
+        \boxed{\text{Low-Pass Filter}}
+        \rightarrow
+        \boxed{\text{Long-Term Reference}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- HIGH PASS                                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Does the High-Pass Branch Do?</h3>
+
+      <p>
+        The complementary high-pass transfer function is
+      </p>
+
+      <p>
+        \[
+        H_{HP}(s)
+        =
+        \frac{\tau s}{1+\tau s}.
+        \]
+      </p>
+
+      <p>
+        At very low frequency,
+      </p>
+
+      <p>
+        \[
+        H_{HP}(s)
+        \rightarrow
+        0.
+        \]
+      </p>
+
+      <p>
+        Slowly varying gyro-derived errors, including long-term drift, are
+        therefore suppressed.
+      </p>
+
+      <p>
+        At sufficiently high frequency,
+      </p>
+
+      <p>
+        \[
+        \left|
+        H_{HP}(j\omega)
+        \right|
+        \rightarrow
+        1.
+        \]
+      </p>
+
+      <p>
+        Rapid attitude changes represented by the gyro-derived solution are
+        retained.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        \rightarrow
+        \boxed{\text{High-Pass Contribution}}
+        \rightarrow
+        \boxed{\text{Short-Term Dynamics}}.
+        \]
+      </p>
+
+      <p>
+        The filter therefore seeks
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Fast Gyro Response}
+        +
+        \text{Slow Absolute Correction}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CUTOFF FREQUENCY                                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Cutoff Frequency</h3>
+
+      <p>
+        The first-order cutoff frequency is related to the filter time constant
+        by
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \omega_c
+        =
+        \frac{1}{\tau}
+        }
+        \]
+      </p>
+
+      <p>
+        in rad/s, or
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        f_c
+        =
+        \frac{1}{2\pi\tau}
+        }
+        \]
+      </p>
+
+      <p>
+        in Hz.
+      </p>
+
+      <p>
+        The cutoff frequency determines approximately where responsibility
+        transitions from the absolute reference to the gyro-derived attitude.
+      </p>
+
+      <p>
+        Below the crossover region,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Absolute Reference Dominates}}
+        \]
+      </p>
+
+      <p>
+        while above the crossover region,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro-Derived Dynamics Dominate}}.
+        \]
+      </p>
+
+      <p>
+        At
+      </p>
+
+      <p>
+        \[
+        \omega
+        =
+        \omega_c,
+        \]
+      </p>
+
+      <p>
+        the branch magnitudes are
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        |H_{LP}(j\omega_c)|
+        =
+        |H_{HP}(j\omega_c)|
+        =
+        \frac{1}{\sqrt{2}}
+        }.
+        \]
+      </p>
+
+      <p>
+        This corresponds to approximately \(-3\) dB.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- TIME CONSTANT                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Physical Meaning of the Time Constant</h3>
+
+      <p>
+        The parameter
+      </p>
+
+      <p>
+        \[
+        \tau
+        \]
+      </p>
+
+      <p>
+        controls how quickly the estimate is pulled back toward the absolute
+        attitude reference.
+      </p>
+
+      <p>
+        A smaller \(\tau\) produces a higher cutoff frequency:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \tau
+        \downarrow
+        \Rightarrow
+        \text{Faster Absolute-Sensor Correction}
+        }.
+        \]
+      </p>
+
+      <p>
+        A larger \(\tau\) produces a lower cutoff frequency:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \tau
+        \uparrow
+        \Rightarrow
+        \text{Greater Short-Term Reliance on Gyro}
+        }.
+        \]
+      </p>
+
+      <p>
+        Therefore \(\tau\) is one of the main tuning parameters of a
+        first-order complementary filter.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DISCRETE TIME                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Discrete-Time Complementary Filter</h3>
+
+      <p>
+        For implementation, the complementary filter is often more intuitive in
+        discrete time.
+      </p>
+
+      <p>
+        Suppose the previous fused attitude estimate is
+      </p>
+
+      <p>
+        \[
+        \hat{\theta}_{k-1}.
+        \]
+      </p>
+
+      <p>
+        The gyro predicts the next attitude:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \theta_{g,k}
+        =
+        \hat{\theta}_{k-1}
+        +
+        \omega_{m,k}\Delta t
+        }.
+        \]
+      </p>
+
+      <p>
+        The absolute sensor provides
+      </p>
+
+      <p>
+        \[
+        \theta_{a,k}.
+        \]
+      </p>
+
+      <p>
+        The complementary estimate is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\theta}_k
+        =
+        \alpha
+        \left(
+        \hat{\theta}_{k-1}
+        +
+        \omega_{m,k}\Delta t
+        \right)
+        +
+        (1-\alpha)\theta_{a,k}
+        }.
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        0
+        <
+        \alpha
+        <
+        1.
+        \]
+      </p>
+
+      <p>
+        This equation contains three operations:
+      </p>
+
+      <ol>
+
+        <li>
+          propagate the previous attitude using the gyro,
+        </li>
+
+        <li>
+          receive an independent absolute attitude observation,
+        </li>
+
+        <li>
+          combine the propagated state with the reference.
+        </li>
+
+      </ol>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ALPHA TAU DT                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Relationship Between \(\alpha\), \(\tau\), and Sampling Time</h3>
+
+      <p>
+        For one common first-order discretization,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \alpha
+        =
+        \frac{\tau}{\tau+\Delta t}
+        }.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        1-\alpha
+        =
+        \frac{\Delta t}{\tau+\Delta t}
+        }.
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \alpha
+        \approx
+        1,
+        \]
+      </p>
+
+      <p>
+        the filter relies strongly on the gyro-propagated attitude.
+      </p>
+
+      <p>
+        As \(\alpha\) decreases, the absolute reference receives greater
+        influence.
+      </p>
+
+      <p>
+        However, \(\alpha\) should not be interpreted as a simple
+        “percentage trust” parameter without considering the sampling interval.
+      </p>
+
+      <p>
+        The same numerical \(\alpha\) at two different values of
+        \(\Delta t\) corresponds to different effective filter dynamics.
+      </p>
+
+      <p>
+        Therefore, tuning should preferably begin from
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \tau
+        \quad\text{or}\quad
+        f_c
+        }
+        \]
+      </p>
+
+      <p>
+        and then derive the discrete coefficient.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PREDICTION CORRECTION                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Prediction–Correction Interpretation</h3>
+
+      <p>
+        The same complementary filter can be rewritten in a form that connects
+        directly with the state-estimation framework introduced earlier.
+      </p>
+
+      <p>
+        First, predict the attitude:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\theta}_k^-
+        =
+        \hat{\theta}_{k-1}^+
+        +
+        \omega_{m,k}\Delta t
+        }.
+        \]
+      </p>
+
+      <p>
+        The absolute sensor provides
+      </p>
+
+      <p>
+        \[
+        z_k
+        =
+        \theta_{a,k}.
+        \]
+      </p>
+
+      <p>
+        Define the attitude residual:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        e_k
+        =
+        z_k
+        -
+        \hat{\theta}_k^-
+        }.
+        \]
+      </p>
+
+      <p>
+        Then apply the correction:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\theta}_k^+
+        =
+        \hat{\theta}_k^-
+        +
+        K_c e_k
+        }.
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        K_c
+        =
+        1-\alpha.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predict with Gyro}}
+        \rightarrow
+        \boxed{\text{Compare with Reference}}
+        \rightarrow
+        \boxed{\text{Correct}}.
+        \]
+      </p>
+
+      <p>
+        This already resembles the general estimation structure
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Prediction}
+        +
+        \text{Innovation}
+        +
+        \text{Correction}
+        }.
+        \]
+      </p>
+
+      <p>
+        The key difference is that complementary-filter gains are normally
+        selected explicitly by the designer, rather than computed from a
+        propagated covariance as in a Kalman filter.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NOT SIMPLE AVERAGING                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Why This Is Not Just Weighted Averaging</h3>
+
+      <p>
+        The expression
+      </p>
+
+      <p>
+        \[
+        \hat{\theta}
+        =
+        \alpha\theta_g
+        +
+        (1-\alpha)\theta_a
+        \]
+      </p>
+
+      <p>
+        may look like an ordinary weighted average.
+      </p>
+
+      <p>
+        However,
+      </p>
+
+      <p>
+        \[
+        \theta_g
+        \]
+      </p>
+
+      <p>
+        is not simply another static sensor reading.
+      </p>
+
+      <p>
+        It contains the dynamically propagated history of angular-rate
+        measurements.
+      </p>
+
+      <p>
+        Therefore, the complementary filter should be understood as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Dynamic Propagation}
+        +
+        \text{Reference Correction}
+        }
+        \]
+      </p>
+
+      <p>
+        rather than
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sensor A Average Sensor B}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SINGLE AXIS EXAMPLE                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Example: Single-Axis Spacecraft Attitude</h3>
+
+      <p>
+        Consider a spacecraft rotating about one body axis.
+      </p>
+
+      <p>
+        The gyroscope measures
+      </p>
+
+      <p>
+        \[
+        \omega_m
+        =
+        \omega
+        +
+        b_g
+        +
+        n_g.
+        \]
+      </p>
+
+      <p>
+        The propagated attitude is
+      </p>
+
+      <p>
+        \[
+        \hat{\theta}_k^-
+        =
+        \hat{\theta}_{k-1}
+        +
+        \omega_{m,k}\Delta t.
+        \]
+      </p>
+
+      <p>
+        Suppose a star tracker supplies
+      </p>
+
+      <p>
+        \[
+        \theta_{ST,k}.
+        \]
+      </p>
+
+      <p>
+        The complementary estimate becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\theta}_k
+        =
+        \alpha\hat{\theta}_k^-
+        +
+        (1-\alpha)\theta_{ST,k}
+        }.
+        \]
+      </p>
+
+      <p>
+        If the gyro drifts slowly, the star tracker repeatedly pulls the
+        solution back toward the absolute reference.
+      </p>
+
+      <p>
+        If the spacecraft performs a rapid maneuver between star-tracker
+        measurements, the gyro continues to propagate attitude at high rate.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- GYRO + STAR TRACKER                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Gyroscope + Star Tracker Fusion</h3>
+
+      <p>
+        One of the most useful spacecraft applications is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Gyroscope}
+        +
+        \text{Star Tracker}
+        }.
+        \]
+      </p>
+
+      <p>
+        The gyro supplies high-rate angular-motion information.
+      </p>
+
+      <p>
+        The star tracker supplies highly accurate absolute attitude information.
+      </p>
+
+      <p>
+        A simplified architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        \rightarrow
+        \boxed{\text{Attitude Propagation}}
+        \]
+      </p>
+
+      <p>
+        in parallel with
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker}}
+        \rightarrow
+        \boxed{\text{Absolute Attitude Correction}}
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complementary Fusion}}
+        \rightarrow
+        \boxed{\hat{\mathbf q}}.
+        \]
+      </p>
+
+      <p>
+        This provides an intuitive conceptual bridge to more advanced spacecraft
+        attitude estimators such as the MEKF.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SUN SENSOR                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Gyroscope + Sun Sensor Fusion</h3>
+
+      <p>
+        A Sun sensor provides a measured Sun direction in the sensor or
+        spacecraft body frame.
+      </p>
+
+      <p>
+        A simplified measurement model is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf s_m^B
+        =
+        \mathbf C_I^B(\mathbf q)
+        \mathbf s^I
+        +
+        \mathbf n_s
+        }.
+        \]
+      </p>
+
+      <p>
+        The gyro propagates attitude between Sun-sensor measurements.
+      </p>
+
+      <p>
+        The Sun direction can then correct the attitude components that are
+        observable from that vector.
+      </p>
+
+      <p>
+        However, one reference vector alone does not generally determine the
+        full three-axis spacecraft attitude.
+      </p>
+
+      <p>
+        Rotation about the measured vector remains unobservable from that vector
+        alone.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Gyro + One Sun Vector}
+        }
+        \]
+      </p>
+
+      <p>
+        does not automatically provide complete three-axis absolute attitude
+        observability.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MAGNETOMETER                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Gyroscope + Magnetometer Fusion</h3>
+
+      <p>
+        A magnetometer measures the geomagnetic-field vector in the spacecraft
+        frame.
+      </p>
+
+      <p>
+        A simplified model is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf B_m^B
+        =
+        \mathbf C_I^B(\mathbf q)
+        \mathbf B^I
+        +
+        \mathbf b_m
+        +
+        \mathbf n_m
+        }.
+        \]
+      </p>
+
+      <p>
+        The gyroscope again provides high-rate attitude propagation.
+      </p>
+
+      <p>
+        The magnetometer provides an external reference vector.
+      </p>
+
+      <p>
+        However, magnetometer measurements can be affected by
+      </p>
+
+      <ul>
+
+        <li>spacecraft-generated magnetic fields,</li>
+
+        <li>hard-iron effects,</li>
+
+        <li>soft-iron effects,</li>
+
+        <li>current-dependent disturbances,</li>
+
+        <li>sensor misalignment,</li>
+
+        <li>geomagnetic-model error.</li>
+
+      </ul>
+
+      <p>
+        A complementary filter cannot compensate for a fundamentally incorrect
+        measurement model.
+      </p>
+
+      <p>
+        In practical terms,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Fusion Quality}
+        \le
+        \text{Quality of Models and Measurements}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SUN + MAG                                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Gyro + Sun Sensor + Magnetometer</h3>
+
+      <p>
+        Two non-collinear reference vectors provide much stronger attitude
+        observability than a single vector.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sun Direction}
+        +
+        \text{Magnetic Field Direction}
+        }
+        \]
+      </p>
+
+      <p>
+        can be used to construct an absolute attitude solution using an
+        algorithm such as TRIAD or another vector-based attitude-determination
+        method.
+      </p>
+
+      <p>
+        That attitude solution can then be fused with gyro propagation:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Gyro Propagation}
+        +
+        \text{Sun/Magnetic Absolute Attitude}
+        }
+        \rightarrow
+        \boxed{\text{Complementary Attitude Estimate}}.
+        \]
+      </p>
+
+      <p>
+        This is a more realistic three-axis spacecraft example than treating a
+        single vector measurement as a complete attitude observation.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- GYRO BIAS                                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Why Gyroscope Bias Is So Important</h3>
+
+      <p>
+        Recall the gyro measurement
+      </p>
+
+      <p>
+        \[
+        \omega_m
+        =
+        \omega
+        +
+        b_g
+        +
+        n_g.
+        \]
+      </p>
+
+      <p>
+        A simple complementary filter can suppress the attitude drift created by
+        the bias whenever a valid absolute reference is available.
+      </p>
+
+      <p>
+        However, the bias remains present in the raw gyro signal.
+      </p>
+
+      <p>
+        During a long absolute-sensor outage, the attitude estimate will again
+        begin to drift.
+      </p>
+
+      <p>
+        This motivates estimating the gyro bias explicitly:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Estimate Attitude}
+        +
+        \text{Estimate Gyro Bias}
+        }.
+        \]
+      </p>
+
+      <p>
+        A bias-corrected angular rate is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \omega_c
+        =
+        \omega_m
+        -
+        \hat b_g
+        }.
+        \]
+      </p>
+
+      <p>
+        Attitude propagation then uses \(\omega_c\) rather than the raw gyro
+        measurement.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PI FILTER                                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>PI-Type Complementary Filter</h3>
+
+      <p>
+        A more advanced complementary filter can use proportional and integral
+        correction.
+      </p>
+
+      <p>
+        Let the attitude error signal be
+      </p>
+
+      <p>
+        \[
+        e(t)
+        =
+        \theta_a(t)
+        -
+        \hat{\theta}(t).
+        \]
+      </p>
+
+      <p>
+        A simple continuous-time structure is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\theta}}
+        =
+        \omega_m
+        -
+        \hat b_g
+        +
+        K_P e
+        }
+        \]
+      </p>
+
+      <p>
+        with bias estimate
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat b}_g
+        =
+        -K_I e
+        }.
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <ul>
+
+        <li>
+          \(K_P\) corrects the attitude error,
+        </li>
+
+        <li>
+          \(K_I\) adjusts the estimated gyro bias more slowly.
+        </li>
+
+      </ul>
+
+      <p>
+        The integral action allows persistent attitude disagreement to be
+        interpreted as evidence of gyro bias.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Attitude Residual}}
+        \rightarrow
+        \begin{cases}
+        \text{Fast Attitude Correction}\\
+        \text{Slow Bias Correction}
+        \end{cases}
+        \]
+      </p>
+
+      <p>
+        This begins to resemble a practical attitude observer rather than a
+        simple weighted average.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- 3D ATTITUDE                                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Three-Axis Attitude Is Not Three Independent Angles</h3>
+
+      <p>
+        For simple educational examples, roll, pitch, and yaw may be filtered
+        independently.
+      </p>
+
+      <p>
+        For a real spacecraft, this approach becomes problematic.
+      </p>
+
+      <p>
+        Spacecraft attitude belongs to the nonlinear rotation group
+      </p>
+
+      <p>
+        \[
+        SO(3).
+        \]
+      </p>
+
+      <p>
+        Large rotations are coupled, and Euler angles contain singularities and
+        coordinate-dependent behaviour.
+      </p>
+
+      <p>
+        Practical spacecraft attitude fusion therefore normally uses
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Quaternion}}
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Rotation Matrix}}
+        \]
+      </p>
+
+      <p>
+        rather than three independent scalar complementary filters.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- QUATERNION PROPAGATION                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Quaternion Attitude Propagation</h3>
+
+      <p>
+        Let the attitude quaternion be
+      </p>
+
+      <p>
+        \[
+        \mathbf q
+        =
+        \begin{bmatrix}
+        q_0\\
+        q_1\\
+        q_2\\
+        q_3
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Using the bias-corrected angular rate
+      </p>
+
+      <p>
+        \[
+        \boldsymbol{\omega}_c
+        =
+        \boldsymbol{\omega}_m
+        -
+        \hat{\mathbf b}_g,
+        \]
+      </p>
+
+      <p>
+        quaternion kinematics can be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf q}
+        =
+        \frac{1}{2}
+        \Omega(\boldsymbol{\omega}_c)
+        \mathbf q
+        }.
+        \]
+      </p>
+
+      <p>
+        One common form of the angular-rate matrix is
+      </p>
+
+      <p>
+        \[
+        \Omega(\boldsymbol{\omega})
+        =
+        \begin{bmatrix}
+        0 & -\omega_x & -\omega_y & -\omega_z\\
+        \omega_x & 0 & \omega_z & -\omega_y\\
+        \omega_y & -\omega_z & 0 & \omega_x\\
+        \omega_z & \omega_y & -\omega_x & 0
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The exact signs depend on the quaternion convention, multiplication
+        order, and frame definition.
+      </p>
+
+      <p>
+        Therefore, the convention must be documented and used consistently.
+      </p>
+
+
+      <h4>Quaternion Normalization</h4>
+
+      <p>
+        Numerical propagation may cause small deviations from unit norm.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf q
+        \leftarrow
+        \frac{\mathbf q}
+        {\|\mathbf q\|}
+        }
+        \]
+      </p>
+
+      <p>
+        should be applied as appropriate to maintain a valid unit quaternion.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- QUATERNION CORRECTION                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Quaternion Correction</h3>
+
+      <p>
+        Suppose gyro propagation produces
+      </p>
+
+      <p>
+        \[
+        \mathbf q_k^-
+        \]
+      </p>
+
+      <p>
+        while the absolute attitude sensor supplies
+      </p>
+
+      <p>
+        \[
+        \mathbf q_{a,k}.
+        \]
+      </p>
+
+      <p>
+        A quaternion attitude error can be formed as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \delta\mathbf q
+        =
+        \mathbf q_{a,k}
+        \otimes
+        (\mathbf q_k^-)^{-1}
+        }
+        \]
+      </p>
+
+      <p>
+        for one chosen convention.
+      </p>
+
+      <p>
+        This quaternion represents the rotation required to move the predicted
+        attitude toward the measured attitude.
+      </p>
+
+      <p>
+        For small attitude errors,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q
+        \approx
+        \begin{bmatrix}
+        1\\
+        \frac{1}{2}\delta\boldsymbol{\theta}
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The vector
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol{\theta}
+        \]
+      </p>
+
+      <p>
+        can therefore be used as a small-angle correction signal.
+      </p>
+
+      <p>
+        The geometric correction process is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Propagate Quaternion with Gyro}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Compute Rotation Error from Reference}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Apply Partial Correction}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- QUATERNION SIGN                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Quaternion Sign Ambiguity</h3>
+
+      <p>
+        A quaternion possesses the property
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf q
+        \equiv
+        -\mathbf q
+        }.
+        \]
+      </p>
+
+      <p>
+        Both quaternions represent the same physical orientation.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \mathbf q_1
+        =
+        \begin{bmatrix}
+        1\\0\\0\\0
+        \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf q_2
+        =
+        \begin{bmatrix}
+        -1\\0\\0\\0
+        \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        describe the same attitude.
+      </p>
+
+      <p>
+        A naive arithmetic blend could incorrectly treat them as opposite
+        orientations.
+      </p>
+
+      <p>
+        Therefore quaternion sign consistency should be enforced before
+        interpolation or attitude-error computation.
+      </p>
+
+      <p>
+        A common test is
+      </p>
+
+      <p>
+        \[
+        \mathbf q_1^T
+        \mathbf q_2.
+        \]
+      </p>
+
+      <p>
+        If the dot product is negative, one quaternion may be sign-flipped
+        before further processing.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- VECTOR COMPLEMENTARY                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complementary Filtering Using Reference Vectors</h3>
+
+      <p>
+        A spacecraft does not always receive a complete absolute attitude
+        quaternion.
+      </p>
+
+      <p>
+        It may instead receive physical reference vectors.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \mathbf s^B
+        \]
+      </p>
+
+      <p>
+        from a Sun sensor and
+      </p>
+
+      <p>
+        \[
+        \mathbf B^B
+        \]
+      </p>
+
+      <p>
+        from a magnetometer.
+      </p>
+
+      <p>
+        The expected body-frame Sun vector can be calculated from the current
+        attitude estimate:
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf s}^B
+        =
+        \mathbf C_I^B(\hat{\mathbf q})
+        \mathbf s^I.
+        \]
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf B}^B
+        =
+        \mathbf C_I^B(\hat{\mathbf q})
+        \mathbf B^I.
+        \]
+      </p>
+
+      <p>
+        A vector misalignment error can be constructed using a cross product:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e_s
+        =
+        \hat{\mathbf s}^B
+        \times
+        \mathbf s_m^B
+        }.
+        \]
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e_B
+        =
+        \hat{\mathbf B}^B
+        \times
+        \mathbf B_m^B
+        }.
+        \]
+      </p>
+
+      <p>
+        A combined correction can be formed as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e
+        =
+        w_s\mathbf e_s
+        +
+        w_B\mathbf e_B
+        }.
+        \]
+      </p>
+
+      <p>
+        The weights \(w_s\) and \(w_B\) reflect the relative confidence
+        assigned to the two reference vectors.
+      </p>
+
+      <p>
+        This idea forms the basis of nonlinear geometric complementary attitude
+        observers.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- HIGH PASS GYRO CLARIFICATION                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Does “High-Pass the Gyro” Really Mean?</h3>
+
+      <p>
+        This phrase is useful but can be misleading.
+      </p>
+
+      <p>
+        A gyroscope measures angular rate, not attitude.
+      </p>
+
+      <p>
+        The angular-rate measurement is first integrated or otherwise used to
+        propagate attitude.
+      </p>
+
+      <p>
+        In a scalar Laplace-domain representation,
+      </p>
+
+      <p>
+        \[
+        \Theta_g(s)
+        =
+        \frac{1}{s}
+        \Omega_m(s).
+        \]
+      </p>
+
+      <p>
+        The complementary structure is therefore more accurately written as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\Theta}(s)
+        =
+        \frac{\tau s}{1+\tau s}
+        \left[
+        \frac{1}{s}
+        \Omega_m(s)
+        \right]
+        +
+        \frac{1}{1+\tau s}
+        \Theta_a(s)
+        }.
+        \]
+      </p>
+
+      <p>
+        The gyro branch simplifies to
+      </p>
+
+      <p>
+        \[
+        \frac{\tau}{1+\tau s}
+        \Omega_m(s).
+        \]
+      </p>
+
+      <p>
+        Therefore, “high-pass gyro” is shorthand for high-pass weighting of the
+        <strong>gyro-derived attitude contribution</strong>, not necessarily a
+        literal high-pass filter applied directly to raw angular-rate samples.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- TUNING                                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Selecting the Cutoff Frequency</h3>
+
+      <p>
+        The cutoff frequency should not be chosen arbitrarily.
+      </p>
+
+      <p>
+        It should reflect the actual measurement and error characteristics of
+        the sensor pair.
+      </p>
+
+      <p>
+        Important considerations include
+      </p>
+
+      <ul>
+
+        <li>gyro bias stability,</li>
+
+        <li>angle random walk,</li>
+
+        <li>gyro noise density,</li>
+
+        <li>absolute-sensor measurement noise,</li>
+
+        <li>absolute-sensor update rate,</li>
+
+        <li>expected spacecraft rotational dynamics,</li>
+
+        <li>sensor latency,</li>
+
+        <li>slew bandwidth,</li>
+
+        <li>disturbance environment,</li>
+
+        <li>expected sensor dropout duration.</li>
+
+      </ul>
+
+      <p>
+        A useful design goal is to place the crossover near the region where
+        the relative quality of the two sensor sources changes.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CUTOFF TOO HIGH                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Happens If the Cutoff Frequency Is Too High?</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        f_c
+        \]
+      </p>
+
+      <p>
+        is too high, the absolute reference influences too much of the frequency
+        spectrum.
+      </p>
+
+      <p>
+        Possible consequences include
+      </p>
+
+      <ul>
+
+        <li>more absolute-sensor noise entering the fused estimate,</li>
+
+        <li>greater sensitivity to star-tracker jitter,</li>
+
+        <li>greater sensitivity to vision noise,</li>
+
+        <li>more visible jumps from discrete reference updates,</li>
+
+        <li>reduced short-term smoothness.</li>
+
+      </ul>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        f_c
+        \text{ too high}
+        \Rightarrow
+        \text{Too Much Absolute-Sensor Influence}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CUTOFF TOO LOW                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Happens If the Cutoff Frequency Is Too Low?</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        f_c
+        \]
+      </p>
+
+      <p>
+        is too low, gyro propagation dominates for too long.
+      </p>
+
+      <p>
+        Possible consequences include
+      </p>
+
+      <ul>
+
+        <li>slower removal of gyro drift,</li>
+
+        <li>greater sensitivity to bias,</li>
+
+        <li>slower convergence after initialization,</li>
+
+        <li>larger error during long propagation intervals.</li>
+
+      </ul>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        f_c
+        \text{ too low}
+        \Rightarrow
+        \text{Too Much Gyro Reliance}
+        }.
+        \]
+      </p>
+
+      <p>
+        Tuning therefore balances
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Drift Rejection}}
+        \]
+      </p>
+
+      <p>
+        against
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Noise Rejection}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MULTIRATE                                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Update Rates and Multi-Rate Operation</h3>
+
+      <p>
+        Spacecraft attitude sensors rarely operate at identical rates.
+      </p>
+
+      <p>
+        Commonly,
+      </p>
+
+      <p>
+        \[
+        f_{gyro}
+        \gg
+        f_{star}.
+        \]
+      </p>
+
+      <p>
+        The gyro may propagate attitude at every navigation cycle:
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}_{k+1}^{-}
+        =
+        f_q
+        \left(
+        \hat{\mathbf q}_k^+,
+        \boldsymbol{\omega}_{m,k},
+        \Delta t
+        \right).
+        \]
+      </p>
+
+      <p>
+        The star tracker performs a correction only when a new valid
+        measurement is available.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro Update}}
+        \rightarrow
+        \boxed{\text{Propagate}}
+        \]
+      </p>
+
+      <p>
+        occurs frequently, whereas
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker Available}}
+        \rightarrow
+        \boxed{\text{Correct}}
+        \]
+      </p>
+
+      <p>
+        occurs less frequently.
+      </p>
+
+      <p>
+        The same old absolute measurement should not be repeatedly applied as
+        though it were new information.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- LATENCY                                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Latency</h3>
+
+      <p>
+        Suppose a star tracker reports a measurement at processing time
+      </p>
+
+      <p>
+        \[
+        t_k
+        \]
+      </p>
+
+      <p>
+        but the measurement actually corresponds to
+      </p>
+
+      <p>
+        \[
+        t_k-\tau.
+        \]
+      </p>
+
+      <p>
+        If that measurement is compared directly with the current predicted
+        attitude
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}(t_k),
+        \]
+      </p>
+
+      <p>
+        the residual contains not only estimation error but also spacecraft
+        motion over the latency interval.
+      </p>
+
+      <p>
+        During rapid slew,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Latency}}
+        \rightarrow
+        \boxed{\text{Apparent Attitude Error}}
+        \]
+      </p>
+
+      <p>
+        even if the sensor and gyro propagation are individually accurate.
+      </p>
+
+      <p>
+        Practical implementations therefore require accurate timestamps and,
+        when necessary, time alignment or delayed-measurement handling.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DROPOUT                                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Dropout</h3>
+
+      <p>
+        An absolute attitude sensor may temporarily become unavailable because
+        of
+      </p>
+
+      <ul>
+
+        <li>Sun intrusion,</li>
+
+        <li>Earth-limb interference,</li>
+
+        <li>excessive spacecraft angular rate,</li>
+
+        <li>acquisition failure,</li>
+
+        <li>field-of-view limitations,</li>
+
+        <li>invalid quality flags.</li>
+
+      </ul>
+
+      <p>
+        During the outage,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Absolute Correction}=0}
+        \]
+      </p>
+
+      <p>
+        and the estimator operates using
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro-Only Propagation}}.
+        \]
+      </p>
+
+      <p>
+        The estimate remains available, but drift accumulates.
+      </p>
+
+      <p>
+        When the absolute sensor becomes valid again, the correction should be
+        reintroduced carefully.
+      </p>
+
+      <p>
+        An abrupt replacement
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}
+        \leftarrow
+        \mathbf q_{ST}
+        \]
+      </p>
+
+      <p>
+        can create a discontinuity.
+      </p>
+
+      <p>
+        Complementary correction allows the estimate to return smoothly toward
+        the reference.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- VALIDATION                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Measurement Validation Before Fusion</h3>
+
+      <p>
+        A complementary filter should not automatically use every received
+        absolute measurement.
+      </p>
+
+      <p>
+        The measurement should first pass validity and consistency checks.
+      </p>
+
+      <p>
+        A practical sequence is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Absolute Sensor Measurement}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Quality / Validity Check}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Residual Check}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complementary Correction}}.
+        \]
+      </p>
+
+      <p>
+        If the measurement is invalid,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Reject Measurement}}
+        \]
+      </p>
+
+      <p>
+        and continue propagation.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ADAPTIVE                                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Fixed-Gain Versus Adaptive Complementary Filters</h3>
+
+      <p>
+        A basic complementary filter uses fixed gains such as
+      </p>
+
+      <p>
+        \[
+        \alpha
+        =
+        \text{constant}
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        K_P
+        =
+        \text{constant}.
+        \]
+      </p>
+
+      <p>
+        However, sensor quality may change during the mission.
+      </p>
+
+      <p>
+        If star-tracker quality degrades,
+      </p>
+
+      <p>
+        \[
+        K_{abs}
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        can reduce its influence.
+      </p>
+
+      <p>
+        When measurement quality improves,
+      </p>
+
+      <p>
+        \[
+        K_{abs}
+        \uparrow.
+        \]
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Quality}}
+        \rightarrow
+        \boxed{\text{Correction Gain}}.
+        \]
+      </p>
+
+      <p>
+        Once the weighting is determined systematically from uncertainty
+        models, however, the design begins to approach probabilistic filtering
+        methods such as the Kalman filter.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- INITIALIZATION                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Initialization</h3>
+
+      <p>
+        A complementary attitude filter requires an initial attitude estimate.
+      </p>
+
+      <p>
+        If a valid absolute attitude measurement is available,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf q}_0
+        =
+        \mathbf q_{abs,0}
+        }
+        \]
+      </p>
+
+      <p>
+        is a natural initialization.
+      </p>
+
+      <p>
+        If only reference vectors are available, an initial attitude
+        determination algorithm may be needed.
+      </p>
+
+      <p>
+        If no absolute attitude reference is initially available, the estimator
+        may propagate from a coarse or previously stored attitude, but absolute
+        uncertainty may remain large.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ACCELEROMETER CAUTION                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Important Spacecraft Note: Gyro + Accelerometer Tilt Fusion</h3>
+
+      <p>
+        In terrestrial UAV applications, a common complementary filter combines
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope + Accelerometer}}
+        \]
+      </p>
+
+      <p>
+        because the accelerometer can provide a gravity-related tilt reference
+        under suitable conditions.
+      </p>
+
+      <p>
+        This logic must not be transferred blindly to an orbiting spacecraft.
+      </p>
+
+      <p>
+        An accelerometer measures
+        <strong>specific force</strong>, not gravitational acceleration
+        directly.
+      </p>
+
+      <p>
+        In orbital free fall, the spacecraft and accelerometer are accelerating
+        together under gravity.
+      </p>
+
+      <p>
+        Therefore, the accelerometer does not provide the same gravity-vector
+        attitude reference that is available to a stationary terrestrial
+        vehicle.
+      </p>
+
+      <p>
+        Hence,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Gyro + Accelerometer Tilt Complementary Filter}
+        }
+        \]
+      </p>
+
+      <p>
+        commonly used for drones should not be copied directly into spacecraft
+        attitude determination.
+      </p>
+
+      <p>
+        Suitable spacecraft references may instead include
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Star Tracker}
+        +
+        \text{Sun Sensor}
+        +
+        \text{Magnetometer}
+        +\cdots
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- BEYOND ATTITUDE                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complementary Filtering Beyond Attitude</h3>
+
+      <p>
+        The complementary-filter principle is broader than spacecraft attitude
+        estimation.
+      </p>
+
+      <p>
+        If one information source is reliable mainly at higher frequencies and
+        another is reliable mainly at lower frequencies,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat X(s)
+        =
+        H_{HP}(s)X_1(s)
+        +
+        H_{LP}(s)X_2(s)
+        }
+        \]
+      </p>
+
+      <p>
+        may be useful.
+      </p>
+
+      <p>
+        Possible applications include
+      </p>
+
+      <ul>
+
+        <li>inertial/GNSS velocity blending,</li>
+
+        <li>altitude estimation,</li>
+
+        <li>angular-rate estimation,</li>
+
+        <li>relative-navigation smoothing,</li>
+
+        <li>combining differentiated and integrated measurements,</li>
+
+        <li>terrestrial IMU/barometer altitude fusion.</li>
+
+      </ul>
+
+      <p>
+        The physical error spectra must justify the complementary relationship.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- VS LOW PASS                                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complementary Filter vs Low-Pass Filtering</h3>
+
+      <p>
+        A low-pass filter applied to one noisy sensor gives
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Noisy Measurement}}
+        \rightarrow
+        \boxed{\text{Low-Pass Filter}}
+        \rightarrow
+        \boxed{\text{Smoothed Measurement}}.
+        \]
+      </p>
+
+      <p>
+        This is not necessarily sensor fusion.
+      </p>
+
+      <p>
+        A complementary filter combines multiple information sources:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor A}}
+        +
+        \boxed{\text{Sensor B}}
+        \rightarrow
+        \boxed{\text{Combined Estimate}}.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Signal Filtering}
+        \neq
+        \text{Sensor Fusion}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- VS KALMAN                                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complementary Filter vs Kalman Filter</h3>
+
+      <h4>Complementary Filter</h4>
+
+      <p>
+        The correction weighting is typically designed explicitly:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        K_c
+        =
+        \text{Designed Gain}
+        }.
+        \]
+      </p>
+
+      <p>
+        The gain is selected from sensor characteristics and desired bandwidth.
+      </p>
+
+      <p>
+        A basic complementary filter generally does not propagate a complete
+        state covariance matrix.
+      </p>
+
+
+      <h4>Kalman Filter</h4>
+
+      <p>
+        A Kalman filter calculates its gain from predicted state uncertainty
+        and measurement uncertainty:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf K_k
+        =
+        \mathbf P_k^-
+        \mathbf H_k^T
+        \left(
+        \mathbf H_k
+        \mathbf P_k^-
+        \mathbf H_k^T
+        +
+        \mathbf R_k
+        \right)^{-1}
+        }.
+        \]
+      </p>
+
+      <p>
+        The Kalman filter therefore answers:
+      </p>
+
+      <p>
+        <strong>
+          Given the current uncertainty of my prediction and the uncertainty of
+          this measurement, how strongly should I correct the state?
+        </strong>
+      </p>
+
+      <p>
+        A complementary filter instead uses a designed frequency or
+        observer-based weighting.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- RELATIONSHIP TO KF                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Relationship Between Complementary and Kalman Filtering</h3>
+
+      <p>
+        Complementary and Kalman filters are not completely unrelated.
+      </p>
+
+      <p>
+        For certain linear stationary systems with approximately constant noise
+        characteristics, a Kalman filter can approach a steady-state condition
+        in which the Kalman gain changes very little.
+      </p>
+
+      <p>
+        Its behaviour may then resemble a properly tuned fixed-gain
+        complementary estimator.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Complementary Filter}
+        \approx
+        \text{Fixed-Gain Estimator}
+        }
+        \]
+      </p>
+
+      <p>
+        whereas
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Kalman Filter}
+        =
+        \text{Covariance-Based Estimator}
+        }.
+        \]
+      </p>
+
+      <p>
+        Complementary filtering therefore provides an excellent conceptual
+        bridge from simple sensor fusion to recursive probabilistic estimation.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ADVANTAGES                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Advantages of Complementary Filters</h3>
+
+      <h4>Simplicity</h4>
+
+      <p>
+        The mathematical structure is compact and relatively easy to
+        understand.
+      </p>
+
+
+      <h4>Low Computational Cost</h4>
+
+      <p>
+        A large covariance matrix does not need to be propagated.
+      </p>
+
+
+      <h4>High Update Rate</h4>
+
+      <p>
+        The algorithm can run efficiently at IMU or gyroscope rate.
+      </p>
+
+
+      <h4>Intuitive Tuning</h4>
+
+      <p>
+        Parameters such as
+      </p>
+
+      <p>
+        \[
+        \tau,
+        \qquad
+        f_c,
+        \qquad
+        \alpha,
+        \qquad
+        K_P,
+        \qquad
+        K_I
+        \]
+      </p>
+
+      <p>
+        have clear physical interpretations.
+      </p>
+
+
+      <h4>Real-Time Suitability</h4>
+
+      <p>
+        Complementary attitude filters are well suited to embedded real-time
+        implementation when the estimation problem is relatively compact.
+      </p>
+
+
+      <h4>Educational Value</h4>
+
+      <p>
+        Complementary filtering clearly demonstrates the fundamental
+        sensor-fusion principle
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Propagation}
+        +
+        \text{Independent Correction}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- LIMITATIONS                                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Limitations of Complementary Filters</h3>
+
+      <p>
+        The same simplicity that makes complementary filtering attractive also
+        creates important limitations.
+      </p>
+
+      <p>
+        A basic complementary filter does not naturally provide a complete
+        covariance estimate
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf P}.
+        \]
+      </p>
+
+      <p>
+        It also does not automatically calculate optimal weighting from
+      </p>
+
+      <p>
+        \[
+        \mathbf Q
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf R.
+        \]
+      </p>
+
+      <p>
+        Difficulties increase when dealing with
+      </p>
+
+      <ul>
+
+        <li>many coupled states,</li>
+
+        <li>multiple sensor biases,</li>
+
+        <li>correlated errors,</li>
+
+        <li>strong nonlinearities,</li>
+
+        <li>changing measurement quality,</li>
+
+        <li>delayed measurements,</li>
+
+        <li>large asynchronous sensor networks,</li>
+
+        <li>formal navigation integrity requirements,</li>
+
+        <li>covariance-based capture or handover criteria.</li>
+
+      </ul>
+
+      <p>
+        Therefore, complementary filtering is excellent for
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Simple / Fast / Robust Fusion}
+        }
+        \]
+      </p>
+
+      <p>
+        but can become insufficient for
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Complex Multi-Sensor Navigation Estimation}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- WHEN APPROPRIATE                                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>When Is a Complementary Filter Appropriate?</h3>
+
+      <p>
+        A complementary filter is particularly attractive when
+      </p>
+
+      <ul>
+
+        <li>the estimated state is relatively small,</li>
+
+        <li>sensor characteristics are clearly complementary,</li>
+
+        <li>computational resources are limited,</li>
+
+        <li>deterministic real-time execution is important,</li>
+
+        <li>a full covariance estimate is not required,</li>
+
+        <li>measurement conditions are reasonably predictable,</li>
+
+        <li>a robust attitude observer is desired.</li>
+
+      </ul>
+
+      <p>
+        A natural example is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Gyro}
+        +
+        \text{Absolute Attitude Reference}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- WHEN ADVANCED                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>When Should a More Advanced Estimator Be Considered?</h3>
+
+      <p>
+        More advanced state estimation becomes attractive when the state
+        includes quantities such as
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf r\\
+        \mathbf v\\
+        \mathbf q\\
+        \mathbf b_g\\
+        \mathbf b_a\\
+        \mathbf r_{rel}\\
+        \mathbf v_{rel}\\
+        \cdots
+        \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        and measurements originate from several nonlinear sensor models.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{IMU}
+        +
+        \text{GNSS}
+        +
+        \text{Star Tracker}
+        +
+        \text{Camera}
+        +
+        \text{LiDAR}
+        }
+        \]
+      </p>
+
+      <p>
+        may require an EKF, ESKF, MEKF, UKF, or another estimator depending on
+        mission needs.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SIMULINK IMPLEMENTATION                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Simulink Implementation Concept</h3>
+
+      <p>
+        A basic single-axis complementary filter can be represented by the
+        following signal chain.
+      </p>
+
+      <p>
+        \[
+        \boxed{\omega_m}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Bias Correction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Integrator}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro-Derived Attitude}}.
+        \]
+      </p>
+
+      <p>
+        The absolute branch is
+      </p>
+
+      <p>
+        \[
+        \boxed{\theta_{abs}}
+        \rightarrow
+        \boxed{\text{Low-Frequency Reference}}.
+        \]
+      </p>
+
+      <p>
+        Both branches are combined in
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complementary Fusion}}
+        \]
+      </p>
+
+      <p>
+        to produce
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\theta}}.
+        \]
+      </p>
+
+
+      <h4>Prediction–Correction Simulink Form</h4>
+
+      <p>
+        A more practical implementation is
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\theta}_{k-1}}
+        \rightarrow
+        \boxed{+\omega_m\Delta t}
+        \rightarrow
+        \boxed{\hat{\theta}_k^-}
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \theta_{abs,k}
+        -
+        \hat{\theta}_k^-
+        }
+        \rightarrow
+        \boxed{\text{Gain}}
+        \rightarrow
+        \boxed{\text{Correction}}
+        \]
+      </p>
+
+      <p>
+        producing
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\theta}_k^+}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- VERIFICATION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Verification of a Complementary Filter</h3>
+
+      <p>
+        A complementary filter should not be assessed using only one nominal
+        simulation.
+      </p>
+
+      <p>
+        Several test cases should be considered.
+      </p>
+
+
+      <h4>Static Attitude Test</h4>
+
+      <p>
+        Set
+      </p>
+
+      <p>
+        \[
+        \omega
+        =
+        0.
+        \]
+      </p>
+
+      <p>
+        Verify that the estimate remains stable despite gyro bias.
+      </p>
+
+
+      <h4>Constant-Rate Rotation</h4>
+
+      <p>
+        Apply
+      </p>
+
+      <p>
+        \[
+        \omega
+        =
+        \text{constant}.
+        \]
+      </p>
+
+      <p>
+        Evaluate tracking accuracy and phase behaviour.
+      </p>
+
+
+      <h4>Slew Maneuver</h4>
+
+      <p>
+        Apply a representative spacecraft attitude maneuver and evaluate
+      </p>
+
+      <ul>
+
+        <li>peak error,</li>
+
+        <li>settling time,</li>
+
+        <li>lag,</li>
+
+        <li>overshoot.</li>
+
+      </ul>
+
+
+      <h4>Gyro Bias Test</h4>
+
+      <p>
+        Introduce
+      </p>
+
+      <p>
+        \[
+        b_g
+        \neq
+        0.
+        \]
+      </p>
+
+      <p>
+        Verify that the absolute reference prevents unbounded attitude drift.
+      </p>
+
+
+      <h4>Absolute-Sensor Noise Test</h4>
+
+      <p>
+        Increase
+      </p>
+
+      <p>
+        \[
+        \sigma_{abs}.
+        \]
+      </p>
+
+      <p>
+        Evaluate how strongly the measurement noise enters the fused estimate.
+      </p>
+
+
+      <h4>Absolute-Sensor Dropout Test</h4>
+
+      <p>
+        Disable the absolute reference for a period and observe gyro-only drift
+        and reacquisition behaviour.
+      </p>
+
+
+      <h4>Latency Test</h4>
+
+      <p>
+        Introduce measurement delay and determine whether rapid motion creates
+        systematic correction errors.
+      </p>
+
+
+      <h4>Outlier Test</h4>
+
+      <p>
+        Inject an erroneous attitude measurement and verify that validation
+        logic prevents an unsafe correction.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PERFORMANCE METRICS                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Performance Metrics</h3>
+
+      <p>
+        For a scalar attitude example, the estimation error is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        e_\theta
+        =
+        \theta_{true}
+        -
+        \hat{\theta}
+        }.
+        \]
+      </p>
+
+      <p>
+        The RMS attitude error is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        RMSE_\theta
+        =
+        \sqrt{
+        \frac{1}{N}
+        \sum_{k=1}^{N}
+        e_{\theta,k}^{2}
+        }
+        }.
+        \]
+      </p>
+
+      <p>
+        For quaternion attitude, a useful metric is the principal rotation angle
+        obtained from the attitude-error quaternion.
+      </p>
+
+      <p>
+        Additional useful quantities include
+      </p>
+
+      <ul>
+
+        <li>maximum attitude error,</li>
+
+        <li>steady-state error,</li>
+
+        <li>convergence time,</li>
+
+        <li>drift during sensor outage,</li>
+
+        <li>post-reacquisition transient,</li>
+
+        <li>gyro-bias estimation error,</li>
+
+        <li>noise level in the fused estimate.</li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MONTE CARLO                                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Monte Carlo Verification</h3>
+
+      <p>
+        Sensor errors are stochastic.
+      </p>
+
+      <p>
+        Therefore, the complementary filter should also be evaluated using
+        repeated Monte Carlo simulations.
+      </p>
+
+      <p>
+        Variables may include
+      </p>
+
+      <ul>
+
+        <li>initial attitude error,</li>
+
+        <li>gyro bias,</li>
+
+        <li>gyro noise,</li>
+
+        <li>absolute-sensor noise,</li>
+
+        <li>sensor update timing,</li>
+
+        <li>dropout duration,</li>
+
+        <li>latency,</li>
+
+        <li>sensor alignment error.</li>
+
+      </ul>
+
+      <p>
+        For Monte Carlo run \(i\),
+      </p>
+
+      <p>
+        \[
+        e_\theta^{(i)}(t)
+        \]
+      </p>
+
+      <p>
+        can be recorded.
+      </p>
+
+      <p>
+        The ensemble can then be used to calculate
+      </p>
+
+      <ul>
+
+        <li>mean error,</li>
+
+        <li>RMS error,</li>
+
+        <li>percentile bounds,</li>
+
+        <li>worst-case error,</li>
+
+        <li>convergence probability,</li>
+
+        <li>mission-requirement success rate.</li>
+
+      </ul>
+
+      <p>
+        This provides stronger evidence of filter robustness than a single
+        nominal simulation.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COMPLETE SPACECRAFT ARCHITECTURE                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complete Spacecraft Complementary-Filter Architecture</h3>
+
+      <p>
+        A realistic spacecraft attitude-estimation chain can now be assembled.
+      </p>
+
+      <p>
+        The gyroscope branch is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Calibration + Bias Compensation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{High-Rate Quaternion Propagation}}.
+        \]
+      </p>
+
+      <p>
+        The absolute-reference branch is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Star Tracker / Sun Sensor / Magnetometer}
+        }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Calibration + Frame Transformation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Validity + Quality Checking}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Attitude / Vector Residual}}.
+        \]
+      </p>
+
+      <p>
+        The two paths meet at
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complementary Correction}}
+        \]
+      </p>
+
+      <p>
+        producing
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf q},
+        \hat{\mathbf b}_g
+        }.
+        \]
+      </p>
+
+      <p>
+        These estimates are then supplied to
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Guidance + Attitude Control}}.
+        \]
+      </p>
+
+      <p>
+        A more complete flight implementation also includes
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Timestamping}
+        +
+        \text{Dropout Handling}
+        +
+        \text{Outlier Rejection}
+        +
+        \text{Mode Logic}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COMPLETE CONCEPT FLOW                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complete Conceptual Flow</h3>
+
+      <p>
+        The entire complementary-filter concept can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{True Spacecraft Attitude}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \begin{array}{cc}
+        \boxed{\text{Gyroscope}}
+        &
+        \boxed{\text{Absolute Reference Sensor}}
+        \\[6pt]
+
+        \downarrow
+        &
+        \downarrow
+        \\[6pt]
+
+        \boxed{\text{Fast-Rate Information}}
+        &
+        \boxed{\text{Absolute Reference}}
+        \\[6pt]
+
+        \downarrow
+        &
+        \downarrow
+        \\[6pt]
+
+        \boxed{\text{Propagation}}
+        &
+        \boxed{\text{Validation}}
+        \end{array}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Residual}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complementary Correction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Stable High-Rate Attitude Estimate}
+        }.
+        \]
+      </p>
+
+      <p>
+        The essential principle is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Short-Term Dynamics from Gyro}
+        +
+        \text{Long-Term Reference from Absolute Sensor}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- KEY TAKEAWAYS                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Key Takeaways</h3>
+
+      <ul>
+
+        <li>
+          Complementary filtering combines sensors with complementary error
+          characteristics.
+        </li>
+
+        <li>
+          It is not simply an arithmetic average of sensor measurements.
+        </li>
+
+        <li>
+          Gyroscopes provide excellent short-term rotational information, but
+          integrated attitude drifts because of bias and noise.
+        </li>
+
+        <li>
+          Absolute reference sensors provide long-term correction but may
+          update more slowly or suffer from noise, geometry limitations,
+          latency, and dropout.
+        </li>
+
+        <li>
+          First-order complementary filters satisfy
+          \[
+          \boxed{
+          H_{LP}(s)
+          +
+          H_{HP}(s)
+          =
+          1
+          }.
+          \]
+        </li>
+
+        <li>
+          The cutoff frequency
+          \[
+          \boxed{
+          f_c
+          =
+          \frac{1}{2\pi\tau}
+          }
+          \]
+          controls the crossover between gyro and absolute-reference influence.
+        </li>
+
+        <li>
+          A common discrete implementation is
+          \[
+          \boxed{
+          \hat{\theta}_k
+          =
+          \alpha
+          \left(
+          \hat{\theta}_{k-1}
+          +
+          \omega_{m,k}\Delta t
+          \right)
+          +
+          (1-\alpha)\theta_{a,k}
+          }.
+          \]
+        </li>
+
+        <li>
+          Quaternion or rotation-matrix implementations are preferable to
+          independent Euler-angle filtering for real spacecraft.
+        </li>
+
+        <li>
+          Gyro bias can be estimated using integral correction.
+        </li>
+
+        <li>
+          Multi-rate measurements, timestamps, latency, validity flags,
+          dropouts, and reacquisition are essential parts of a real
+          implementation.
+        </li>
+
+        <li>
+          The common terrestrial gyro-plus-accelerometer tilt filter should not
+          be copied blindly into orbital spacecraft attitude determination,
+          because an accelerometer measures specific force rather than providing
+          a conventional gravity reference in free fall.
+        </li>
+
+        <li>
+          Complementary filters are computationally efficient and intuitive but
+          do not naturally provide the full covariance framework required for
+          complex multi-sensor navigation.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NEXT SECTION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h2>Next: 4.2.4 Observer-Based Fusion</h2>
+
+      <p>
+        Complementary filtering introduces the important principle
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Use the Model / Gyro to Predict}
+        +
+        \text{Use Measurements to Correct}
+        }.
+        \]
+      </p>
+
+      <p>
+        However, the correction law has so far been designed mainly through
+        fixed gains such as
+      </p>
+
+      <p>
+        \[
+        \alpha,
+        \qquad
+        K_P,
+        \qquad
+        K_I.
+        \]
+      </p>
+
+      <p>
+        The next section formulates this idea more generally as a dynamic
+        observer:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\mathbf x}}
+        =
+        f(\hat{\mathbf x},\mathbf u)
+        +
+        \mathbf L
+        \left[
+        \mathbf z
+        -
+        h(\hat{\mathbf x})
+        \right]
+        }.
+        \]
+      </p>
+
+      <p>
+        This introduces the formal idea of feeding the measurement residual back
+        into a dynamic state estimator.
+      </p>
+
+      <a href="observer-based-fusion.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.4 Observer-Based Fusion</h3>
+
+          <p>
+            Luenberger observers, observer error dynamics, gain design,
+            nonlinear observers, spacecraft attitude observers, convergence,
+            stability, and observer-based sensor fusion.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Observer-Based Fusion &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+    </section>
+
+
+  </main>
+
+
+
+  <!-- ========================================================= -->
+  <!-- FOOTER                                                    -->
+  <!-- ========================================================= -->
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+
+</body>
+
+</html>
