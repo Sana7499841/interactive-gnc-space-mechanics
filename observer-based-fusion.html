@@ -1,0 +1,4467 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.4 Observer-Based Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+</head>
+
+
+<body>
+
+  <!-- ========================================================= -->
+  <!-- PAGE HEADER                                                -->
+  <!-- ========================================================= -->
+
+  <header class="notes-hero">
+
+    <h1>Observer-Based Fusion</h1>
+
+    <p class="notes-tagline">
+      Luenberger observers, observer error dynamics, gain selection,
+      observability, nonlinear observers, attitude observers, bias and
+      disturbance estimation, convergence, robustness, and observer-based
+      spacecraft state estimation.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN CONTENT                                               -->
+  <!-- ========================================================= -->
+
+  <main class="page-main">
+
+
+    <!-- ======================================================= -->
+    <!-- INTRODUCTION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h2>4.2.4 Observer-Based Fusion</h2>
+
+      <p>
+        An <strong>observer</strong> is a model-based state-estimation method
+        that reconstructs internal spacecraft states using two principal
+        sources of information:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{System Dynamics}
+        +
+        \text{Sensor Measurements}
+        }.
+        \]
+      </p>
+
+      <p>
+        The spacecraft dynamic model predicts how the state should evolve,
+        while sensor measurements provide information about what the spacecraft
+        is actually doing.
+      </p>
+
+      <p>
+        The observer continuously compares these two sources and uses the
+        difference to correct its estimate.
+      </p>
+
+      <p>
+        This gives the fundamental observer concept:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predict State}}
+        \rightarrow
+        \boxed{\text{Predict Measurement}}
+        \rightarrow
+        \boxed{\text{Compare with Sensor}}
+        \rightarrow
+        \boxed{\text{Correct State}}.
+        \]
+      </p>
+
+      <p>
+        Observer-based fusion forms an important conceptual bridge between
+        relatively simple complementary filters and probabilistic estimators
+        such as the Kalman filter.
+      </p>
+
+      <p>
+        A complementary filter essentially uses
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Fast Sensor Information}
+        +
+        \text{Slow Reference Information}
+        }.
+        \]
+      </p>
+
+      <p>
+        An observer generalizes this idea:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Use the Spacecraft Dynamic Model}
+        +
+        \text{Use Measurement Residuals to Correct the Estimated State}
+        }.
+        \]
+      </p>
+
+      <p>
+        Observer-based fusion can therefore be applied to
+      </p>
+
+      <ul>
+
+        <li>spacecraft attitude estimation,</li>
+
+        <li>angular-rate estimation,</li>
+
+        <li>gyro-bias estimation,</li>
+
+        <li>translational navigation,</li>
+
+        <li>relative-navigation state estimation,</li>
+
+        <li>disturbance estimation,</li>
+
+        <li>other unmeasured or partially measured GNC states.</li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- WHY OBSERVER                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Why Do We Need an Observer?</h3>
+
+      <p>
+        Consider a representative spacecraft state vector
+      </p>
+
+      <p>
+        \[
+        \mathbf{x}
+        =
+        \begin{bmatrix}
+        \mathbf r\\
+        \mathbf v\\
+        \mathbf q\\
+        \boldsymbol{\omega}\\
+        \mathbf b_g\\
+        \cdots
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The flight computer usually cannot measure every element of this state
+        directly.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <ul>
+
+        <li>
+          a gyroscope measures angular rate, not absolute attitude,
+        </li>
+
+        <li>
+          a star tracker measures attitude, but not angular acceleration or
+          disturbance torque,
+        </li>
+
+        <li>
+          GNSS provides position and velocity, but not every internal
+          navigation state,
+        </li>
+
+        <li>
+          some quantities such as gyro bias are not directly measured at all,
+        </li>
+
+        <li>
+          disturbance forces or torques may also be unknown.
+        </li>
+
+      </ul>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sensor Measurements}
+        \neq
+        \text{Complete Spacecraft State}
+        }.
+        \]
+      </p>
+
+      <p>
+        The objective is to reconstruct the state using measurements together
+        with knowledge of the spacecraft dynamics:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z
+        +
+        \text{Spacecraft Model}
+        \rightarrow
+        \hat{\mathbf x}
+        }.
+        \]
+      </p>
+
+      <p>
+        Here
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}
+        \]
+      </p>
+
+      <p>
+        is the estimated spacecraft state.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- STATE SPACE FOUNDATION                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>State-Space Foundation</h3>
+
+      <p>
+        Consider a continuous-time linear spacecraft system
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf x}
+        =
+        \mathbf A\mathbf x
+        +
+        \mathbf B\mathbf u
+        }
+        \]
+      </p>
+
+      <p>
+        with measurement equation
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y
+        =
+        \mathbf C\mathbf x
+        }.
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          \(\mathbf x\) is the true state vector,
+        </li>
+
+        <li>
+          \(\mathbf u\) is the known control input,
+        </li>
+
+        <li>
+          \(\mathbf y\) is the measured output,
+        </li>
+
+        <li>
+          \(\mathbf A\) describes the state dynamics,
+        </li>
+
+        <li>
+          \(\mathbf B\) describes how control inputs affect the state,
+        </li>
+
+        <li>
+          \(\mathbf C\) maps the state into sensor-measurement space.
+        </li>
+
+      </ul>
+
+      <p>
+        For spacecraft systems, the control input may include reaction-wheel
+        torque, control-moment-gyro torque, magnetic torque, thruster torque, or
+        commanded translational force.
+      </p>
+
+
+      <h4>Example: Only One State Is Measured</h4>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \theta\\
+        \omega
+        \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        but only attitude is measured:
+      </p>
+
+      <p>
+        \[
+        y
+        =
+        \theta.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf C
+        =
+        \begin{bmatrix}
+        1 & 0
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        Angular rate is not directly measured by this sensor.
+      </p>
+
+      <p>
+        Under suitable observability conditions, however, an observer can still
+        estimate it.
+      </p>
+
+      <p>
+        This gives an important state-estimation principle:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{A State Does Not Need to Be Directly Measured to Be Estimated}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MODEL ONLY                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Happens If We Use Only the Model?</h3>
+
+      <p>
+        Suppose we construct a copy of the spacecraft dynamics:
+      </p>
+
+      <p>
+        \[
+        \dot{\hat{\mathbf x}}
+        =
+        \mathbf A\hat{\mathbf x}
+        +
+        \mathbf B\mathbf u.
+        \]
+      </p>
+
+      <p>
+        If the initial estimate were perfect and the model exactly represented
+        the real spacecraft, then
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}(t)
+        =
+        \mathbf x(t).
+        \]
+      </p>
+
+      <p>
+        Real systems are not perfect.
+      </p>
+
+      <p>
+        Differences may arise from
+      </p>
+
+      <ul>
+
+        <li>initial-state error,</li>
+
+        <li>unmodelled disturbance torques,</li>
+
+        <li>uncertain inertia,</li>
+
+        <li>actuator errors,</li>
+
+        <li>thruster mismatch,</li>
+
+        <li>sensor biases,</li>
+
+        <li>flexible-body effects,</li>
+
+        <li>environmental disturbances,</li>
+
+        <li>numerical integration errors,</li>
+
+        <li>imperfect spacecraft models.</li>
+
+      </ul>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Model-Only Propagation}
+        \rightarrow
+        \text{Accumulating Estimation Error}
+        }.
+        \]
+      </p>
+
+      <p>
+        Sensor feedback is therefore required.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PREDICTED MEASUREMENT                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Predicted Measurement</h3>
+
+      <p>
+        The observer maintains an estimated state
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}.
+        \]
+      </p>
+
+      <p>
+        From this state, it predicts what the sensor should measure:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf y}
+        =
+        \mathbf C\hat{\mathbf x}
+        }.
+        \]
+      </p>
+
+      <p>
+        The actual sensor provides
+      </p>
+
+      <p>
+        \[
+        \mathbf y.
+        \]
+      </p>
+
+      <p>
+        Their difference is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r
+        =
+        \mathbf y-\hat{\mathbf y}
+        }
+        \]
+      </p>
+
+      <p>
+        or equivalently
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r
+        =
+        \mathbf y-\mathbf C\hat{\mathbf x}
+        }.
+        \]
+      </p>
+
+      <p>
+        This quantity is the
+        <strong>measurement residual</strong> or observer output error.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \mathbf r
+        \approx
+        0,
+        \]
+      </p>
+
+      <p>
+        the predicted measurement agrees with the sensor.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \mathbf r
+        \neq
+        0,
+        \]
+      </p>
+
+      <p>
+        the observer and the measurement disagree.
+      </p>
+
+      <p>
+        The observer uses this disagreement to correct the estimated state.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- LUENBERGER OBSERVER                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Luenberger Observer</h3>
+
+      <p>
+        For the linear system
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf x}
+        =
+        \mathbf A\mathbf x
+        +
+        \mathbf B\mathbf u
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        \mathbf y
+        =
+        \mathbf C\mathbf x,
+        \]
+      </p>
+
+      <p>
+        the classical Luenberger observer is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\mathbf x}}
+        =
+        \mathbf A\hat{\mathbf x}
+        +
+        \mathbf B\mathbf u
+        +
+        \mathbf L
+        \left(
+        \mathbf y-\mathbf C\hat{\mathbf x}
+        \right)
+        }.
+        \]
+      </p>
+
+      <p>
+        The observer contains two main components.
+      </p>
+
+
+      <h4>Model Prediction</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf A\hat{\mathbf x}
+        +
+        \mathbf B\mathbf u
+        }.
+        \]
+      </p>
+
+      <p>
+        This term predicts how the estimated spacecraft state should evolve.
+      </p>
+
+
+      <h4>Measurement Correction</h4>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf L
+        \left(
+        \mathbf y-\mathbf C\hat{\mathbf x}
+        \right)
+        }.
+        \]
+      </p>
+
+      <p>
+        This term corrects the predicted state using disagreement between the
+        measured and predicted outputs.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Observer}
+        =
+        \text{Dynamic Model}
+        +
+        \text{Measurement Feedback}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- OBSERVER GAIN                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>What Does the Observer Gain \(\mathbf L\) Do?</h3>
+
+      <p>
+        The observer gain matrix
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf L}
+        \]
+      </p>
+
+      <p>
+        determines how strongly measurement disagreement affects each estimated
+        state.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf L\text{ small}
+        \Rightarrow
+        \text{Greater Reliance on the Model}
+        }.
+        \]
+      </p>
+
+      <p>
+        Larger observer gain produces stronger and faster correction:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf L\text{ large}
+        \Rightarrow
+        \text{Faster Measurement Correction}
+        }.
+        \]
+      </p>
+
+      <p>
+        However, very large gain can also amplify sensor noise.
+      </p>
+
+      <p>
+        Observer design therefore requires a trade-off between
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Fast Error Convergence}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Noise Sensitivity}}.
+        \]
+      </p>
+
+      <p>
+        This is similar to the tuning trade-off encountered in complementary
+        filtering.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ERROR DYNAMICS                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observer Estimation Error</h3>
+
+      <p>
+        Define the estimation error:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e
+        =
+        \mathbf x-\hat{\mathbf x}
+        }.
+        \]
+      </p>
+
+      <p>
+        The true system is
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf x}
+        =
+        \mathbf A\mathbf x
+        +
+        \mathbf B\mathbf u.
+        \]
+      </p>
+
+      <p>
+        The observer is
+      </p>
+
+      <p>
+        \[
+        \dot{\hat{\mathbf x}}
+        =
+        \mathbf A\hat{\mathbf x}
+        +
+        \mathbf B\mathbf u
+        +
+        \mathbf L
+        (\mathbf y-\mathbf C\hat{\mathbf x}).
+        \]
+      </p>
+
+      <p>
+        Since
+      </p>
+
+      <p>
+        \[
+        \mathbf y
+        =
+        \mathbf C\mathbf x,
+        \]
+      </p>
+
+      <p>
+        the observer becomes
+      </p>
+
+      <p>
+        \[
+        \dot{\hat{\mathbf x}}
+        =
+        \mathbf A\hat{\mathbf x}
+        +
+        \mathbf B\mathbf u
+        +
+        \mathbf L\mathbf C
+        (\mathbf x-\hat{\mathbf x}).
+        \]
+      </p>
+
+      <p>
+        Now
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf e}
+        =
+        \dot{\mathbf x}
+        -
+        \dot{\hat{\mathbf x}}.
+        \]
+      </p>
+
+      <p>
+        Substitution gives
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf e}
+        =
+        (\mathbf A-\mathbf L\mathbf C)\mathbf e
+        }.
+        \]
+      </p>
+
+      <p>
+        This is the fundamental
+        <strong>observer error dynamics equation</strong>.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ERROR DYNAMICS IMPORTANCE                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Why Observer Error Dynamics Matter</h3>
+
+      <p>
+        We would like the state-estimation error to converge toward zero:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e(t)
+        \rightarrow
+        0
+        }
+        \]
+      </p>
+
+      <p>
+        as
+      </p>
+
+      <p>
+        \[
+        t
+        \rightarrow
+        \infty.
+        \]
+      </p>
+
+      <p>
+        From
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf e}
+        =
+        (\mathbf A-\mathbf L\mathbf C)\mathbf e,
+        \]
+      </p>
+
+      <p>
+        the convergence depends on the eigenvalues of
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf A-\mathbf L\mathbf C
+        }.
+        \]
+      </p>
+
+      <p>
+        For a continuous-time linear observer, asymptotic stability requires
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \Re(\lambda_i)<0
+        }
+        \]
+      </p>
+
+      <p>
+        for every observer pole.
+      </p>
+
+      <p>
+        Observer design therefore consists partly of choosing
+        \(\mathbf L\) so that the error dynamics are stable and sufficiently
+        fast.
+      </p>
+
+
+      <h4>Controller–Observer Duality</h4>
+
+      <p>
+        In state-feedback control,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf A-\mathbf B\mathbf K
+        }
+        \]
+      </p>
+
+      <p>
+        determines closed-loop control dynamics.
+      </p>
+
+      <p>
+        In observer design,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf A-\mathbf L\mathbf C
+        }
+        \]
+      </p>
+
+      <p>
+        determines estimation-error dynamics.
+      </p>
+
+      <p>
+        This controller–observer duality is a fundamental concept in modern
+        control theory.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- POLE PLACEMENT                                           -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observer Pole Placement</h3>
+
+      <p>
+        If the pair
+      </p>
+
+      <p>
+        \[
+        (\mathbf A,\mathbf C)
+        \]
+      </p>
+
+      <p>
+        is observable, the observer poles can generally be assigned through
+        the gain matrix \(\mathbf L\).
+      </p>
+
+      <p>
+        Suppose the desired observer poles are
+      </p>
+
+      <p>
+        \[
+        p_1,p_2,\ldots,p_n.
+        \]
+      </p>
+
+      <p>
+        The gain is selected such that
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \operatorname{eig}
+        (\mathbf A-\mathbf L\mathbf C)
+        =
+        \{p_1,p_2,\ldots,p_n\}
+        }.
+        \]
+      </p>
+
+      <p>
+        This is called <strong>observer pole placement</strong>.
+      </p>
+
+      <p>
+        The poles determine how rapidly estimation errors decay.
+      </p>
+
+      <p>
+        Faster poles may improve convergence, but overly aggressive pole
+        placement can increase
+      </p>
+
+      <ul>
+
+        <li>measurement-noise sensitivity,</li>
+
+        <li>model-error sensitivity,</li>
+
+        <li>numerical sensitivity,</li>
+
+        <li>discrete implementation difficulty.</li>
+
+      </ul>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Very Fast Observer}
+        \not\equiv
+        \text{Best Observer}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- OBSERVABILITY                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observability</h3>
+
+      <p>
+        Before designing an observer, we must determine whether the required
+        states can actually be reconstructed from the available measurements.
+      </p>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf x}
+        =
+        \mathbf A\mathbf x,
+        \qquad
+        \mathbf y
+        =
+        \mathbf C\mathbf x,
+        \]
+      </p>
+
+      <p>
+        the observability matrix is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathcal O
+        =
+        \begin{bmatrix}
+        \mathbf C\\
+        \mathbf C\mathbf A\\
+        \mathbf C\mathbf A^2\\
+        \vdots\\
+        \mathbf C\mathbf A^{n-1}
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        For an \(n\)-state system, full observability requires
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \operatorname{rank}(\mathcal O)
+        =
+        n
+        }.
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \operatorname{rank}(\mathcal O)
+        <
+        n,
+        \]
+      </p>
+
+      <p>
+        then some state directions cannot be reconstructed uniquely from the
+        available measurements.
+      </p>
+
+      <p>
+        This is especially important in spacecraft attitude determination,
+        relative navigation, and bias estimation.
+      </p>
+
+      <p>
+        For example, one reference-vector measurement generally cannot determine
+        rotation about that same vector.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Adding an Observer Cannot Create Information That the Sensors and Dynamics Do Not Contain}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ATTITUDE + RATE EXAMPLE                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Example: Estimating Attitude and Angular Rate</h3>
+
+      <p>
+        Consider a simplified single-axis rigid spacecraft:
+      </p>
+
+      <p>
+        \[
+        J\ddot{\theta}
+        =
+        u
+        \]
+      </p>
+
+      <p>
+        where \(J\) is the spacecraft moment of inertia and \(u\) is the
+        applied control torque.
+      </p>
+
+      <p>
+        Define
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \theta\\
+        \omega
+        \end{bmatrix},
+        \qquad
+        \omega
+        =
+        \dot{\theta}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \dot{\theta}
+        =
+        \omega
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \dot{\omega}
+        =
+        \frac{u}{J}.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf x}
+        =
+        \begin{bmatrix}
+        0 & 1\\
+        0 & 0
+        \end{bmatrix}
+        \mathbf x
+        +
+        \begin{bmatrix}
+        0\\
+        1/J
+        \end{bmatrix}
+        u
+        }.
+        \]
+      </p>
+
+      <p>
+        Suppose only attitude is measured:
+      </p>
+
+      <p>
+        \[
+        y
+        =
+        \theta.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \mathbf C
+        =
+        \begin{bmatrix}
+        1&0
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \mathbf L
+        =
+        \begin{bmatrix}
+        l_1\\
+        l_2
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then the observer is
+      </p>
+
+      <p>
+        \[
+        \begin{bmatrix}
+        \dot{\hat{\theta}}\\
+        \dot{\hat{\omega}}
+        \end{bmatrix}
+        =
+        \begin{bmatrix}
+        0&1\\
+        0&0
+        \end{bmatrix}
+        \begin{bmatrix}
+        \hat{\theta}\\
+        \hat{\omega}
+        \end{bmatrix}
+        +
+        \begin{bmatrix}
+        0\\
+        1/J
+        \end{bmatrix}
+        u
+        +
+        \begin{bmatrix}
+        l_1\\
+        l_2
+        \end{bmatrix}
+        \left(
+        \theta_m-\hat{\theta}
+        \right).
+        \]
+      </p>
+
+      <p>
+        Expanding,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\theta}}
+        =
+        \hat{\omega}
+        +
+        l_1
+        (\theta_m-\hat{\theta})
+        }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\omega}}
+        =
+        \frac{u}{J}
+        +
+        l_2
+        (\theta_m-\hat{\theta})
+        }.
+        \]
+      </p>
+
+      <p>
+        Only attitude is measured directly, yet the same attitude residual can
+        correct both attitude and angular-rate estimates.
+      </p>
+
+      <p>
+        The dynamic model allows the observer to reconstruct the unmeasured
+        angular-rate state.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MULTISENSOR FUSION                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observer-Based Sensor Fusion</h3>
+
+      <p>
+        An observer can fuse information from several sensors.
+      </p>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        \mathbf z
+        =
+        \begin{bmatrix}
+        \mathbf z_1\\
+        \mathbf z_2\\
+        \mathbf z_3
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Each sensor may be described by
+      </p>
+
+      <p>
+        \[
+        \mathbf z_i
+        =
+        h_i(\mathbf x)
+        +
+        \mathbf v_i.
+        \]
+      </p>
+
+      <p>
+        The observer predicts
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf z}_i
+        =
+        h_i(\hat{\mathbf x}).
+        \]
+      </p>
+
+      <p>
+        The residual for each sensor is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r_i
+        =
+        \mathbf z_i
+        -
+        \hat{\mathbf z}_i
+        }.
+        \]
+      </p>
+
+      <p>
+        A general observer correction can therefore be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\mathbf x}}
+        =
+        f(\hat{\mathbf x},\mathbf u)
+        +
+        \sum_i
+        \mathbf L_i\mathbf r_i
+        }.
+        \]
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Spacecraft Dynamics}}
+        \rightarrow
+        \boxed{\text{State Prediction}}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor 1}}
+        \rightarrow
+        \boxed{\mathbf r_1},
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor 2}}
+        \rightarrow
+        \boxed{\mathbf r_2},
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor 3}}
+        \rightarrow
+        \boxed{\mathbf r_3}.
+        \]
+      </p>
+
+      <p>
+        The residuals are used to correct the common state estimate.
+      </p>
+
+      <p>
+        Thus the measurements are fused through the spacecraft state and model,
+        rather than simply averaged with one another.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NONLINEAR OBSERVER                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Nonlinear Observer</h3>
+
+      <p>
+        Real spacecraft dynamics and measurement relationships are often
+        nonlinear.
+      </p>
+
+      <p>
+        The spacecraft dynamics may be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf x}
+        =
+        f(\mathbf x,\mathbf u)
+        }
+        \]
+      </p>
+
+      <p>
+        and the measurement model as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z
+        =
+        h(\mathbf x)
+        }.
+        \]
+      </p>
+
+      <p>
+        A general nonlinear observer can be expressed conceptually as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\mathbf x}}
+        =
+        f(\hat{\mathbf x},\mathbf u)
+        +
+        \mathbf L
+        \left[
+        \mathbf z
+        -
+        h(\hat{\mathbf x})
+        \right]
+        }.
+        \]
+      </p>
+
+      <p>
+        The quantity
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z-h(\hat{\mathbf x})
+        }
+        \]
+      </p>
+
+      <p>
+        is the nonlinear measurement residual.
+      </p>
+
+      <p>
+        Unlike the linear Luenberger observer, nonlinear observer stability
+        cannot generally be determined only by selecting eigenvalues of a
+        constant matrix.
+      </p>
+
+      <p>
+        Nonlinear observer design may involve
+      </p>
+
+      <ul>
+
+        <li>Lyapunov stability analysis,</li>
+
+        <li>local linearization,</li>
+
+        <li>geometric error definitions,</li>
+
+        <li>nonlinear correction laws,</li>
+
+        <li>invariant errors,</li>
+
+        <li>adaptive gains.</li>
+
+      </ul>
+
+      <p>
+        This is especially important for attitude because spacecraft attitude
+        evolves on
+      </p>
+
+      <p>
+        \[
+        \boxed{SO(3)}
+        \]
+      </p>
+
+      <p>
+        rather than ordinary Euclidean space.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ATTITUDE OBSERVER                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Spacecraft Attitude Observer</h3>
+
+      <p>
+        Consider attitude represented by quaternion
+      </p>
+
+      <p>
+        \[
+        \mathbf q
+        \]
+      </p>
+
+      <p>
+        and body angular rate
+      </p>
+
+      <p>
+        \[
+        \boldsymbol{\omega}.
+        \]
+      </p>
+
+      <p>
+        A gyroscope measures
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \boldsymbol{\omega}_m
+        =
+        \boldsymbol{\omega}
+        +
+        \mathbf b_g
+        +
+        \mathbf n_g
+        }.
+        \]
+      </p>
+
+      <p>
+        The observer maintains
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q},
+        \qquad
+        \hat{\mathbf b}_g.
+        \]
+      </p>
+
+      <p>
+        A bias-corrected angular rate is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\boldsymbol{\omega}}
+        =
+        \boldsymbol{\omega}_m
+        -
+        \hat{\mathbf b}_g
+        }.
+        \]
+      </p>
+
+      <p>
+        Quaternion propagation is then performed using
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\mathbf q}}
+        =
+        \frac12
+        \Omega(\hat{\boldsymbol{\omega}})
+        \hat{\mathbf q}
+        }.
+        \]
+      </p>
+
+      <p>
+        Suppose an absolute attitude sensor supplies
+      </p>
+
+      <p>
+        \[
+        \mathbf q_m.
+        \]
+      </p>
+
+      <p>
+        An attitude-error quaternion can be formed:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \delta\mathbf q
+        =
+        \mathbf q_m
+        \otimes
+        \hat{\mathbf q}^{-1}
+        }.
+        \]
+      </p>
+
+      <p>
+        The exact multiplication order depends on the selected quaternion
+        convention.
+      </p>
+
+      <p>
+        For small attitude error,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q
+        \approx
+        \begin{bmatrix}
+        1\\
+        \frac12
+        \delta\boldsymbol{\theta}
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The small rotation vector
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol{\theta}
+        \]
+      </p>
+
+      <p>
+        provides a useful correction signal.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro}}
+        \rightarrow
+        \boxed{\text{Quaternion Propagation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker}}
+        \rightarrow
+        \boxed{\text{Attitude Residual}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Residual}}
+        \rightarrow
+        \boxed{\text{Observer Correction}}
+        \]
+      </p>
+
+      <p>
+        producing
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf q},
+        \hat{\mathbf b}_g
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- VECTOR OBSERVER                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Vector-Based Attitude Observer</h3>
+
+      <p>
+        A spacecraft may not always receive a complete measured attitude
+        quaternion.
+      </p>
+
+      <p>
+        Instead, it may receive physical reference vectors such as
+      </p>
+
+      <p>
+        \[
+        \mathbf s_m^B
+        \]
+      </p>
+
+      <p>
+        from a Sun sensor and
+      </p>
+
+      <p>
+        \[
+        \mathbf B_m^B
+        \]
+      </p>
+
+      <p>
+        from a magnetometer.
+      </p>
+
+      <p>
+        Using the estimated attitude, the expected body-frame vectors are
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf s}^B
+        =
+        \mathbf C_I^B(\hat{\mathbf q})
+        \mathbf s^I
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf B}^B
+        =
+        \mathbf C_I^B(\hat{\mathbf q})
+        \mathbf B^I.
+        \]
+      </p>
+
+      <p>
+        A geometric residual can be formed using cross products:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e_s
+        =
+        \hat{\mathbf s}^B
+        \times
+        \mathbf s_m^B
+        }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e_B
+        =
+        \hat{\mathbf B}^B
+        \times
+        \mathbf B_m^B
+        }.
+        \]
+      </p>
+
+      <p>
+        A combined attitude correction may be
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e_R
+        =
+        w_s\mathbf e_s
+        +
+        w_B\mathbf e_B
+        }.
+        \]
+      </p>
+
+      <p>
+        The weights \(w_s\) and \(w_B\) determine the relative influence of
+        the two reference measurements.
+      </p>
+
+      <p>
+        This provides a geometric observer-based form of attitude fusion.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- BIAS ESTIMATION                                          -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Gyroscope Bias Estimation</h3>
+
+      <p>
+        A useful observer can estimate gyroscope bias together with attitude.
+      </p>
+
+      <p>
+        Instead of estimating only
+      </p>
+
+      <p>
+        \[
+        \mathbf q,
+        \]
+      </p>
+
+      <p>
+        the observer state includes
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}
+        =
+        \begin{bmatrix}
+        \hat{\mathbf q}\\
+        \hat{\mathbf b}_g
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        Suppose the attitude residual is
+      </p>
+
+      <p>
+        \[
+        \mathbf e_R.
+        \]
+      </p>
+
+      <p>
+        A simplified observer may use
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \boldsymbol{\omega}_c
+        =
+        \boldsymbol{\omega}_m
+        -
+        \hat{\mathbf b}_g
+        +
+        K_P\mathbf e_R
+        }
+        \]
+      </p>
+
+      <p>
+        for attitude propagation and
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\mathbf b}}_g
+        =
+        -K_I\mathbf e_R
+        }
+        \]
+      </p>
+
+      <p>
+        for bias adaptation.
+      </p>
+
+      <p>
+        The proportional term produces faster attitude correction, while the
+        integral term slowly adjusts the bias estimate.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Attitude Residual}}
+        \rightarrow
+        \begin{cases}
+        \text{Attitude Correction}\\
+        \text{Gyro-Bias Correction}
+        \end{cases}
+        \]
+      </p>
+
+      <p>
+        This shows why PI-type complementary filters naturally lead into
+        observer-based estimation.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- RELATION TO COMPLEMENTARY FILTER                         -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Relationship to Complementary Filters</h3>
+
+      <p>
+        The previous section introduced the complementary-filter structure
+      </p>
+
+      <p>
+        \[
+        \hat{\theta}_k
+        =
+        \hat{\theta}_k^-
+        +
+        K_c
+        \left(
+        \theta_{abs,k}
+        -
+        \hat{\theta}_k^-
+        \right).
+        \]
+      </p>
+
+      <p>
+        This already contains
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Prediction}}
+        +
+        \boxed{\text{Measurement Residual}}
+        +
+        \boxed{\text{Correction}}.
+        \]
+      </p>
+
+      <p>
+        The observer formalizes and generalizes this structure.
+      </p>
+
+      <p>
+        Complementary filtering is usually interpreted primarily through
+        complementary frequency characteristics.
+      </p>
+
+      <p>
+        Observer-based fusion is interpreted primarily through
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Dynamic Model}
+        +
+        \text{Output-Error Feedback}
+        }.
+        \]
+      </p>
+
+      <p>
+        A useful conceptual progression is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Complementary Filter}}
+        \rightarrow
+        \boxed{\text{Observer}}
+        \rightarrow
+        \boxed{\text{Probabilistic State Estimator}}.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- OBSERVER VS KALMAN GAIN                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observer Gain vs Kalman Gain</h3>
+
+      <p>
+        A deterministic observer uses a designed gain
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf L}.
+        \]
+      </p>
+
+      <p>
+        The designer selects this gain based on desired convergence,
+        robustness, bandwidth, and noise sensitivity.
+      </p>
+
+      <p>
+        A Kalman filter instead computes its correction gain from predicted
+        uncertainty and measurement uncertainty.
+      </p>
+
+      <p>
+        For the linear Kalman filter,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf K_k
+        =
+        \mathbf P_k^-
+        \mathbf H_k^T
+        \left(
+        \mathbf H_k
+        \mathbf P_k^-
+        \mathbf H_k^T
+        +
+        \mathbf R_k
+        \right)^{-1}
+        }.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Observer Gain}
+        =
+        \text{Designed from Desired Error Dynamics}
+        }
+        \]
+      </p>
+
+      <p>
+        whereas
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Kalman Gain}
+        =
+        \text{Computed from Model and Measurement Uncertainty}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NOISE                                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Noise in Observer-Based Fusion</h3>
+
+      <p>
+        Real spacecraft measurements contain noise:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y
+        =
+        \mathbf C\mathbf x
+        +
+        \mathbf v
+        }.
+        \]
+      </p>
+
+      <p>
+        Real spacecraft dynamics also contain disturbances and modelling
+        uncertainty:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf x}
+        =
+        \mathbf A\mathbf x
+        +
+        \mathbf B\mathbf u
+        +
+        \mathbf w
+        }.
+        \]
+      </p>
+
+      <p>
+        The observer remains
+      </p>
+
+      <p>
+        \[
+        \dot{\hat{\mathbf x}}
+        =
+        \mathbf A\hat{\mathbf x}
+        +
+        \mathbf B\mathbf u
+        +
+        \mathbf L
+        (\mathbf y-\mathbf C\hat{\mathbf x}).
+        \]
+      </p>
+
+      <p>
+        The resulting error dynamics become
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf e}
+        =
+        (\mathbf A-\mathbf L\mathbf C)\mathbf e
+        +
+        \mathbf w
+        -
+        \mathbf L\mathbf v
+        }.
+        \]
+      </p>
+
+      <p>
+        This equation reveals an important design trade-off.
+      </p>
+
+      <p>
+        Increasing \(\mathbf L\) can accelerate convergence.
+      </p>
+
+      <p>
+        But measurement noise enters through
+      </p>
+
+      <p>
+        \[
+        -\mathbf L\mathbf v.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Higher Observer Gain}
+        \rightarrow
+        \text{Faster Correction}
+        +
+        \text{Greater Measurement-Noise Sensitivity}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ROBUSTNESS                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Model Uncertainty and Robustness</h3>
+
+      <p>
+        The observer uses a mathematical model of the spacecraft.
+      </p>
+
+      <p>
+        Suppose the real system is
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf x}
+        =
+        (\mathbf A+\Delta\mathbf A)\mathbf x
+        +
+        (\mathbf B+\Delta\mathbf B)\mathbf u
+        +
+        \mathbf d
+        \]
+      </p>
+
+      <p>
+        while the observer uses nominal matrices
+      </p>
+
+      <p>
+        \[
+        \mathbf A,\mathbf B.
+        \]
+      </p>
+
+      <p>
+        Model mismatch then contributes to estimation error.
+      </p>
+
+      <p>
+        Spacecraft examples include
+      </p>
+
+      <ul>
+
+        <li>inertia uncertainty,</li>
+
+        <li>centre-of-mass uncertainty,</li>
+
+        <li>actuator scale-factor error,</li>
+
+        <li>thruster misalignment,</li>
+
+        <li>reaction-wheel torque uncertainty,</li>
+
+        <li>aerodynamic torque,</li>
+
+        <li>solar-radiation-pressure torque,</li>
+
+        <li>gravity-gradient torque,</li>
+
+        <li>flexible-appendage dynamics,</li>
+
+        <li>propellant motion.</li>
+
+      </ul>
+
+      <p>
+        A useful observer should therefore be not only stable for the nominal
+        mathematical model, but sufficiently robust to expected spacecraft
+        uncertainty.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DISTURBANCE OBSERVER                                     -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Disturbance Observers</h3>
+
+      <p>
+        Observer concepts can be extended to estimate unknown disturbances.
+      </p>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf x}
+        =
+        \mathbf A\mathbf x
+        +
+        \mathbf B\mathbf u
+        +
+        \mathbf E\mathbf d
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \mathbf d
+        \]
+      </p>
+
+      <p>
+        is an unknown disturbance.
+      </p>
+
+      <p>
+        The state can be augmented:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_a
+        =
+        \begin{bmatrix}
+        \mathbf x\\
+        \mathbf d
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        If the disturbance varies slowly, one possible model is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\mathbf d}
+        \approx
+        0
+        }.
+        \]
+      </p>
+
+      <p>
+        The observer can then attempt to estimate
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf d}.
+        \]
+      </p>
+
+      <p>
+        This can be useful for slowly varying disturbance forces or torques.
+      </p>
+
+      <p>
+        However, the augmented system must remain observable.
+      </p>
+
+      <p>
+        Adding an additional state does not automatically make the corresponding
+        physical quantity estimable.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DISCRETE OBSERVER                                        -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Discrete-Time Observer</h3>
+
+      <p>
+        Flight software normally operates digitally.
+      </p>
+
+      <p>
+        A discrete-time spacecraft model can be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{k+1}
+        =
+        \mathbf F\mathbf x_k
+        +
+        \mathbf G\mathbf u_k
+        }
+        \]
+      </p>
+
+      <p>
+        with measurement equation
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf y_k
+        =
+        \mathbf H\mathbf x_k
+        }.
+        \]
+      </p>
+
+      <p>
+        One observer form is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_{k+1}
+        =
+        \mathbf F\hat{\mathbf x}_k
+        +
+        \mathbf G\mathbf u_k
+        +
+        \mathbf L
+        \left(
+        \mathbf y_k
+        -
+        \mathbf H\hat{\mathbf x}_k
+        \right)
+        }.
+        \]
+      </p>
+
+      <p>
+        The error dynamics are
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf e_{k+1}
+        =
+        (\mathbf F-\mathbf L\mathbf H)\mathbf e_k
+        }.
+        \]
+      </p>
+
+      <p>
+        For discrete-time stability,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \left|
+        \lambda_i
+        (\mathbf F-\mathbf L\mathbf H)
+        \right|
+        <
+        1
+        }
+      </p>
+
+      <p>
+        for all observer poles.
+      </p>
+
+      <p>
+        This differs from the continuous-time requirement, where the poles must
+        lie in the left half of the complex plane.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MULTIRATE                                                -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Multi-Rate Observer-Based Fusion</h3>
+
+      <p>
+        Spacecraft sensors normally operate at different update rates.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        f_{gyro}
+        >
+        f_{star}.
+        \]
+      </p>
+
+      <p>
+        GNSS, camera, and LiDAR may also operate at different rates.
+      </p>
+
+      <p>
+        The observer can propagate at the high-rate navigation cycle:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf x}_{k+1}^{-}
+        =
+        f(
+        \hat{\mathbf x}_k^+,
+        \mathbf u_k
+        )
+        }.
+        \]
+      </p>
+
+      <p>
+        Corrections are then applied only when new sensor measurements become
+        available.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Every Navigation Step}}
+        \rightarrow
+        \boxed{\text{Prediction}}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{New Valid Measurement}}
+        \rightarrow
+        \boxed{\text{Correction}}.
+        \]
+      </p>
+
+      <p>
+        This is a much more realistic flight architecture than assuming all
+        sensors are synchronized.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DROPOUT                                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Sensor Dropout</h3>
+
+      <p>
+        Suppose a star tracker or relative-navigation sensor becomes
+        temporarily unavailable.
+      </p>
+
+      <p>
+        The observer can continue using model propagation:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \dot{\hat{\mathbf x}}
+        =
+        f(\hat{\mathbf x},\mathbf u)
+        }.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sensor Dropout}
+        \rightarrow
+        \text{Model-Based Propagation}
+        }.
+        \]
+      </p>
+
+      <p>
+        The state estimate remains available, but estimation error may grow.
+      </p>
+
+      <p>
+        When the sensor becomes valid again, the residual can once again be
+        used for correction.
+      </p>
+
+      <p>
+        Reacquisition logic should avoid introducing excessive transients when
+        the residual has become large during the outage.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- VALIDATION                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Measurement Validation</h3>
+
+      <p>
+        Sensor measurements should generally be validated before they are used
+        to correct the observer.
+      </p>
+
+      <p>
+        A useful processing chain is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Measurement}}
+        \rightarrow
+        \boxed{\text{Validity Check}}
+        \rightarrow
+        \boxed{\text{Residual}}
+        \rightarrow
+        \boxed{\text{Observer Correction}}.
+        \]
+      </p>
+
+      <p>
+        Possible checks include
+      </p>
+
+      <ul>
+
+        <li>sensor status flag,</li>
+
+        <li>field-of-view validity,</li>
+
+        <li>saturation check,</li>
+
+        <li>stale timestamp detection,</li>
+
+        <li>large residual detection,</li>
+
+        <li>impossible measurement geometry,</li>
+
+        <li>sensor-health status.</li>
+
+      </ul>
+
+      <p>
+        If the measurement is invalid,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Reject Correction}}
+        \]
+      </p>
+
+      <p>
+        and continue prediction.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- LATENCY                                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Latency and Time Synchronization</h3>
+
+      <p>
+        Suppose a measurement received at time
+      </p>
+
+      <p>
+        \[
+        t_k
+        \]
+      </p>
+
+      <p>
+        actually represents the spacecraft state at
+      </p>
+
+      <p>
+        \[
+        t_k-\tau.
+        \]
+      </p>
+
+      <p>
+        If this delayed measurement is compared directly with the current state
+        estimate
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}(t_k),
+        \]
+      </p>
+
+      <p>
+        the residual includes an artificial timing error.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Incorrect Time Alignment}
+        \rightarrow
+        \text{Incorrect Measurement Residual}
+        \rightarrow
+        \text{Incorrect State Correction}
+        }.
+        \]
+      </p>
+
+      <p>
+        This can become significant during spacecraft slews and close-range
+        rendezvous operations.
+      </p>
+
+      <p>
+        Timestamp accuracy and synchronization are therefore part of the
+        estimator design.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- TRANSLATIONAL OBSERVER                                   -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observer-Based Fusion for Translational Navigation</h3>
+
+      <p>
+        Observer-based fusion is not limited to attitude estimation.
+      </p>
+
+      <p>
+        Consider translational state
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        =
+        \begin{bmatrix}
+        \mathbf r\\
+        \mathbf v
+        \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The dynamics contain
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf r}
+        =
+        \mathbf v
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf v}
+        =
+        \mathbf a
+        (\mathbf r,\mathbf v,\mathbf u).
+        \]
+      </p>
+
+      <p>
+        Suppose GNSS provides position:
+      </p>
+
+      <p>
+        \[
+        \mathbf z_r
+        =
+        \mathbf r
+        +
+        \mathbf v_r.
+        \]
+      </p>
+
+      <p>
+        The predicted position measurement is
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf z}_r
+        =
+        \hat{\mathbf r}.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r_r
+        =
+        \mathbf z_r
+        -
+        \hat{\mathbf r}
+        }.
+        \]
+      </p>
+
+      <p>
+        This residual may directly correct position and, through system
+        dynamics, may also correct velocity and other observable states.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Measurement of One Quantity}
+        \rightarrow
+        \text{Correction of Multiple Observable States}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- RPO OBSERVER                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observer-Based Fusion for RPO</h3>
+
+      <p>
+        For rendezvous and proximity operations, consider the relative state
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf x_{rel}
+        =
+        \begin{bmatrix}
+        \mathbf r_{rel}\\
+        \mathbf v_{rel}
+        \end{bmatrix}
+        }.
+        \]
+      </p>
+
+      <p>
+        Relative dynamics may be represented using CW/Hill equations,
+        linearized relative dynamics, or a nonlinear orbital model.
+      </p>
+
+      <p>
+        Different sensors contribute different measurements.
+      </p>
+
+      <p>
+        GNSS may provide relative position or relative velocity at longer range.
+      </p>
+
+      <p>
+        A camera may provide
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Bearing / Line of Sight / Relative Pose}
+        }.
+        \]
+      </p>
+
+      <p>
+        LiDAR may provide
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Range / Relative Geometry / Pose Information}
+        }.
+        \]
+      </p>
+
+      <p>
+        The observer compares each measurement with the corresponding predicted
+        measurement from the relative state.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Relative Dynamics}}
+        \rightarrow
+        \boxed{\hat{\mathbf x}_{rel}^{-}}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS / Camera / LiDAR}}
+        \rightarrow
+        \boxed{\text{Measurement Residuals}}.
+        \]
+      </p>
+
+      <p>
+        The observer then produces
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf r}_{rel},
+        \hat{\mathbf v}_{rel},
+        \ldots
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- MODE DEPENDENT OBSERVER                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Mode-Dependent Observer Fusion</h3>
+
+      <p>
+        Sensor availability and measurement quality can change significantly
+        throughout an RPO mission.
+      </p>
+
+      <p>
+        A representative sequence is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Far Range}}
+        \rightarrow
+        \boxed{\text{Mid Range}}
+        \rightarrow
+        \boxed{\text{Final Approach}}
+        \rightarrow
+        \boxed{\text{Capture}}.
+        \]
+      </p>
+
+      <p>
+        At far range,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS-Dominated Navigation}}
+        \]
+      </p>
+
+      <p>
+        may be appropriate.
+      </p>
+
+      <p>
+        At closer range,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS + Vision}}
+        \]
+      </p>
+
+      <p>
+        may be used.
+      </p>
+
+      <p>
+        During final approach,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Vision + LiDAR / Relative Navigation}}
+        \]
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        A flight observer must therefore support changing measurement sets and
+        sensor validity.
+      </p>
+
+      <p>
+        Observer-based fusion in practice therefore includes
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sensor Selection}
+        +
+        \text{Measurement Validation}
+        +
+        \text{Mode Logic}
+        +
+        \text{Estimator Correction}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- CONVERGENCE                                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Convergence</h3>
+
+      <p>
+        An observer is useful only if its estimate converges sufficiently
+        quickly and reliably.
+      </p>
+
+      <p>
+        Ideally,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \|
+        \mathbf x
+        -
+        \hat{\mathbf x}
+        \|
+        \rightarrow
+        0
+        }.
+        \]
+      </p>
+
+      <p>
+        Convergence depends on
+      </p>
+
+      <ul>
+
+        <li>initial estimation error,</li>
+
+        <li>observer gain,</li>
+
+        <li>sensor geometry,</li>
+
+        <li>observability,</li>
+
+        <li>model accuracy,</li>
+
+        <li>measurement noise,</li>
+
+        <li>sensor update rate,</li>
+
+        <li>spacecraft manoeuvre profile,</li>
+
+        <li>sensor dropout.</li>
+
+      </ul>
+
+      <p>
+        A theoretically stable observer can still be unsuitable if convergence
+        is too slow for the mission.
+      </p>
+
+      <p>
+        For example, a convergence time of tens of seconds may be acceptable
+        during coarse acquisition but unacceptable during a short final
+        approach or capture phase.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ROBUSTNESS CONCEPT                                       -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Convergence vs Robustness</h3>
+
+      <p>
+        These two concepts should be distinguished.
+      </p>
+
+      <p>
+        <strong>Convergence</strong> asks:
+      </p>
+
+      <p>
+        <em>
+          Does the estimation error approach zero under the assumed model?
+        </em>
+      </p>
+
+      <p>
+        <strong>Robustness</strong> asks:
+      </p>
+
+      <p>
+        <em>
+          Does the estimator still behave acceptably when the real spacecraft
+          differs from that model?
+        </em>
+      </p>
+
+      <p>
+        A robust observer should tolerate reasonable levels of
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Sensor Noise}
+        +
+        \text{Model Error}
+        +
+        \text{Disturbances}
+        +
+        \text{Parameter Uncertainty}
+        +
+        \text{Timing Error}
+        }.
+        \]
+      </p>
+
+      <p>
+        A mathematically stable observer is therefore not automatically a
+        flight-robust observer.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- DIRECT VS STATE CENTRIC                                  -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observer-Based Fusion vs Direct Sensor Fusion</h3>
+
+      <p>
+        A direct fusion system might combine related sensor outputs immediately:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf z_1
+        +
+        \mathbf z_2
+        \rightarrow
+        \text{Combined Measurement}
+        }.
+        \]
+      </p>
+
+      <p>
+        Observer-based fusion asks a different set of questions:
+      </p>
+
+      <ol>
+
+        <li>
+          What spacecraft state produced these measurements?
+        </li>
+
+        <li>
+          What should each sensor measure according to the current estimated
+          state?
+        </li>
+
+        <li>
+          How does each measurement disagree with the prediction?
+        </li>
+
+        <li>
+          Which state components should that disagreement correct?
+        </li>
+
+      </ol>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Observer-Based Fusion}
+        =
+        \text{State-Centric Fusion}
+        }
+        \]
+      </p>
+
+      <p>
+        rather than simple measurement averaging.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- SIMULINK                                                 -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Simulink Implementation Concept</h3>
+
+      <p>
+        A basic linear observer can be implemented in Simulink using the
+        observer equation
+      </p>
+
+      <p>
+        \[
+        \dot{\hat{\mathbf x}}
+        =
+        \mathbf A\hat{\mathbf x}
+        +
+        \mathbf B\mathbf u
+        +
+        \mathbf L\mathbf r
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \mathbf r
+        =
+        \mathbf y
+        -
+        \hat{\mathbf y}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf y}
+        =
+        \mathbf C\hat{\mathbf x}.
+        \]
+      </p>
+
+      <p>
+        A conceptual implementation is
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf u}
+        \rightarrow
+        \boxed{\mathbf B}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}}
+        \rightarrow
+        \boxed{\mathbf A}.
+        \]
+      </p>
+
+      <p>
+        The predicted measurement is formed:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \hat{\mathbf y}
+        =
+        \mathbf C\hat{\mathbf x}
+        }.
+        \]
+      </p>
+
+      <p>
+        The measurement residual is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r
+        =
+        \mathbf y
+        -
+        \hat{\mathbf y}
+        }.
+        \]
+      </p>
+
+      <p>
+        This passes through
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf L}
+        \]
+      </p>
+
+      <p>
+        and the resulting correction is summed with the model dynamics before
+        integration.
+      </p>
+
+      <p>
+        Therefore the signal flow is
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf u}
+        \rightarrow
+        \boxed{\text{Observer Dynamics}}
+        \rightarrow
+        \boxed{\hat{\mathbf x}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}}
+        \rightarrow
+        \boxed{\text{Measurement Model}}
+        \rightarrow
+        \boxed{\hat{\mathbf y}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf y-\hat{\mathbf y}}
+        \rightarrow
+        \boxed{\mathbf L}
+        \rightarrow
+        \boxed{\text{Observer Dynamics}}.
+        \]
+      </p>
+
+      <p>
+        For nonlinear spacecraft systems, the matrix blocks are replaced with
+        nonlinear dynamic and measurement functions.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- VERIFICATION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Verification of an Observer</h3>
+
+      <p>
+        Observer verification should test much more than a single nominal
+        simulation.
+      </p>
+
+
+      <h4>Initial-State Error Test</h4>
+
+      <p>
+        Start with
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}_0
+        \neq
+        \mathbf x_0
+        \]
+      </p>
+
+      <p>
+        and verify convergence.
+      </p>
+
+
+      <h4>Measurement-Noise Test</h4>
+
+      <p>
+        Increase sensor noise and determine how observer gain changes the
+        estimated state.
+      </p>
+
+
+      <h4>Model-Uncertainty Test</h4>
+
+      <p>
+        Vary quantities such as
+      </p>
+
+      <ul>
+
+        <li>spacecraft inertia,</li>
+
+        <li>actuator effectiveness,</li>
+
+        <li>disturbance models,</li>
+
+        <li>thruster force or torque effectiveness.</li>
+
+      </ul>
+
+
+      <h4>Bias Test</h4>
+
+      <p>
+        Inject sensor bias and determine whether the observer rejects it or
+        whether a bias state must be added.
+      </p>
+
+
+      <h4>Sensor-Dropout Test</h4>
+
+      <p>
+        Remove one measurement source temporarily and evaluate drift and
+        recovery.
+      </p>
+
+
+      <h4>Outlier Test</h4>
+
+      <p>
+        Inject an invalid measurement and verify that measurement-validation
+        logic prevents corruption of the estimated state.
+      </p>
+
+
+      <h4>Latency Test</h4>
+
+      <p>
+        Introduce realistic sensor delay and verify correct time alignment.
+      </p>
+
+
+      <h4>Manoeuvre Test</h4>
+
+      <p>
+        Test representative
+      </p>
+
+      <ul>
+
+        <li>attitude slews,</li>
+
+        <li>pointing manoeuvres,</li>
+
+        <li>translational manoeuvres,</li>
+
+        <li>rendezvous approaches,</li>
+
+        <li>capture operations.</li>
+
+      </ul>
+
+
+      <h4>Monte Carlo Test</h4>
+
+      <p>
+        Randomize sensor errors, initial states, disturbances, parameters, and
+        timing uncertainties over many runs.
+      </p>
+
+      <p>
+        The goal is not merely to show
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Observer Runs}}
+        \]
+      </p>
+
+      <p>
+        but rather
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Observer Converges Reliably Under Expected Mission Conditions}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- PERFORMANCE METRICS                                      -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Observer Performance Metrics</h3>
+
+      <p>
+        For state-estimation error
+      </p>
+
+      <p>
+        \[
+        \mathbf e_k
+        =
+        \mathbf x_k
+        -
+        \hat{\mathbf x}_k,
+        \]
+      </p>
+
+      <p>
+        a general RMS measure is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        RMSE
+        =
+        \sqrt{
+        \frac{1}{N}
+        \sum_{k=1}^{N}
+        \|
+        \mathbf e_k
+        \|^2
+        }
+        }.
+        \]
+      </p>
+
+      <p>
+        Other useful performance metrics include
+      </p>
+
+      <ul>
+
+        <li>maximum estimation error,</li>
+
+        <li>steady-state error,</li>
+
+        <li>convergence time,</li>
+
+        <li>settling time,</li>
+
+        <li>measurement-residual magnitude,</li>
+
+        <li>noise amplification,</li>
+
+        <li>drift during sensor dropout,</li>
+
+        <li>reacquisition transient,</li>
+
+        <li>bias-estimation accuracy.</li>
+
+      </ul>
+
+      <p>
+        For attitude estimation, a physically meaningful attitude-error angle
+        should generally be obtained from the attitude-error quaternion rather
+        than comparing quaternion elements individually.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- ADVANTAGES                                               -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Advantages of Observer-Based Fusion</h3>
+
+      <p>
+        Observer-based estimation provides several important advantages.
+      </p>
+
+      <p>
+        It explicitly combines
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Physics Model}
+        +
+        \text{Sensor Measurements}
+        }.
+        \]
+      </p>
+
+      <p>
+        It can estimate states that are not measured directly.
+      </p>
+
+      <p>
+        It allows convergence dynamics to be designed explicitly.
+      </p>
+
+      <p>
+        It can often be computationally simpler than a full covariance-based
+        estimator.
+      </p>
+
+      <p>
+        It naturally supports measurement residuals and model-based
+        consistency checking.
+      </p>
+
+      <p>
+        It can also be extended to estimate
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Biases}
+        +
+        \text{Disturbances}
+        +
+        \text{Unmeasured Dynamic States}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- LIMITATIONS                                              -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Limitations of Observer-Based Fusion</h3>
+
+      <p>
+        Classical deterministic observers also have important limitations.
+      </p>
+
+      <p>
+        A standard Luenberger observer does not automatically provide a state
+        uncertainty covariance
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf P}.
+        \]
+      </p>
+
+      <p>
+        Its gain
+      </p>
+
+      <p>
+        \[
+        \mathbf L
+        \]
+      </p>
+
+      <p>
+        does not automatically adapt when measurement quality changes.
+      </p>
+
+      <p>
+        Stochastic process uncertainty and measurement uncertainty are handled
+        less systematically than in Kalman filtering.
+      </p>
+
+      <p>
+        Complex nonlinear navigation problems can also make deterministic
+        observer design difficult.
+      </p>
+
+      <p>
+        This becomes particularly important when the navigation system must
+        answer not only
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{What Is My Estimated State?}
+        }
+        \]
+      </p>
+
+      <p>
+        but also
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{How Certain Am I About That Estimate?}
+        }.
+        \]
+      </p>
+
+      <p>
+        That question leads naturally toward probabilistic state estimation.
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- COMPLETE ARCHITECTURE                                    -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Complete Observer-Based Spacecraft Fusion Architecture</h3>
+
+      <p>
+        A complete conceptual observer architecture can now be assembled.
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Spacecraft Dynamics}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{State Prediction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}^{-}}.
+        \]
+      </p>
+
+      <p>
+        From the predicted state,
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}^{-}}
+        \rightarrow
+        \boxed{\text{Sensor Measurement Models}}
+        \rightarrow
+        \boxed{\hat{\mathbf z}}.
+        \]
+      </p>
+
+      <p>
+        The real sensors provide
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf z}.
+        \]
+      </p>
+
+      <p>
+        The residual is then
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \mathbf r
+        =
+        \mathbf z
+        -
+        \hat{\mathbf z}
+        }.
+        \]
+      </p>
+
+      <p>
+        This passes through
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Validation}}
+        \rightarrow
+        \boxed{\text{Observer Gain}}
+        \rightarrow
+        \boxed{\text{State Correction}}.
+        \]
+      </p>
+
+      <p>
+        The corrected state is
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}^{+}}.
+        \]
+      </p>
+
+      <p>
+        Therefore, the overall architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Dynamics}
+        \rightarrow
+        \text{Prediction}
+        \rightarrow
+        \text{Predicted Measurements}
+        \rightarrow
+        \text{Residuals}
+        \rightarrow
+        \text{Correction}
+        \rightarrow
+        \text{Estimated State}
+        }.
+        \]
+      </p>
+
+      <p>
+        A practical flight implementation additionally requires
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Timing}
+        +
+        \text{Validation}
+        +
+        \text{Dropout Handling}
+        +
+        \text{Mode Logic}
+        }.
+        \]
+      </p>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- KEY TAKEAWAYS                                            -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h3>Key Takeaways</h3>
+
+      <ul>
+
+        <li>
+          An observer reconstructs spacecraft states using a dynamic model and
+          sensor measurements.
+        </li>
+
+        <li>
+          The classical linear observer is
+          \[
+          \boxed{
+          \dot{\hat{\mathbf x}}
+          =
+          \mathbf A\hat{\mathbf x}
+          +
+          \mathbf B\mathbf u
+          +
+          \mathbf L
+          (\mathbf y-\mathbf C\hat{\mathbf x})
+          }.
+          \]
+        </li>
+
+        <li>
+          The measurement residual is
+          \[
+          \boxed{
+          \mathbf y-\mathbf C\hat{\mathbf x}
+          }.
+          \]
+        </li>
+
+        <li>
+          Observer error dynamics are
+          \[
+          \boxed{
+          \dot{\mathbf e}
+          =
+          (\mathbf A-\mathbf L\mathbf C)\mathbf e
+          }.
+          \]
+        </li>
+
+        <li>
+          The observer gain \(\mathbf L\) determines convergence speed and
+          measurement sensitivity.
+        </li>
+
+        <li>
+          States do not need to be directly measured, but they must be
+          observable.
+        </li>
+
+        <li>
+          Observer-based fusion can estimate attitude, angular rate, gyro bias,
+          translational states, relative-navigation states, and disturbances.
+        </li>
+
+        <li>
+          Nonlinear spacecraft systems require nonlinear or geometric observer
+          formulations.
+        </li>
+
+        <li>
+          Multi-rate sensors, latency, dropout, measurement validation, and
+          mission-phase changes must be included in realistic implementation.
+        </li>
+
+        <li>
+          A classical observer does not naturally provide the full covariance
+          framework used by Kalman filtering.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+
+    <!-- ======================================================= -->
+    <!-- NEXT SECTION                                             -->
+    <!-- ======================================================= -->
+
+    <section class="notes-section-card">
+
+      <h2>Next: 4.2.5 Bayesian Estimation Fundamentals</h2>
+
+      <p>
+        Observer-based fusion has established the structure
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        \text{Model Prediction}
+        +
+        \text{Measurement Information}
+        \rightarrow
+        \text{State Estimate}
+        }.
+        \]
+      </p>
+
+      <p>
+        But an important question remains:
+      </p>
+
+      <p>
+        <strong>
+          How should uncertainty in the spacecraft state and measurements be
+          represented mathematically?
+        </strong>
+      </p>
+
+      <p>
+        Instead of treating the state only as one deterministic estimate
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x},
+        \]
+      </p>
+
+      <p>
+        Bayesian estimation treats the unknown state probabilistically:
+      </p>
+
+      <p>
+        \[
+        \boxed{
+        p(\mathbf x|\mathbf z)
+        }.
+        \]
+      </p>
+
+      <p>
+        The fundamental Bayesian update is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Prior}}
+        +
+        \boxed{\text{Measurement Likelihood}}
+        \rightarrow
+        \boxed{\text{Posterior}}.
+        \]
+      </p>
+
+      <p>
+        This probabilistic framework becomes the foundation of the Kalman
+        Filter, EKF, ESKF, MEKF, UKF, and Particle Filter developed in later
+        sections.
+      </p>
+
+      <a href="bayesian-estimation.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.5 Bayesian Estimation Fundamentals</h3>
+
+          <p>
+            Probability distributions, prior and posterior belief, likelihood,
+            Bayes' theorem, Gaussian uncertainty, recursive Bayesian estimation,
+            and the probabilistic foundation of Kalman filtering.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Bayesian Estimation Fundamentals &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+    </section>
+
+
+  </main>
+
+
+
+  <!-- ========================================================= -->
+  <!-- FOOTER                                                    -->
+  <!-- ========================================================= -->
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, and spacecraft navigation.
+    </p>
+
+  </footer>
+
+
+</body>
+
+</html>
