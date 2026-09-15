@@ -593,7 +593,7 @@ if (!blockIntegration) {
   <h2>Compare PD, PID, and PID with Anti-Windup</h2>
 
   <p>
-    Adjust the spacecraft inertia, controller gains, disturbance torque, and actuator torque limit.
+    Adjust the spacecraft inertia, target attitude (entered in degrees), controller gains, disturbance torque, and actuator torque limit.
     The plots update automatically. Compare the selected controller with the other two architectures using
     exactly the same physical conditions.
   </p>
@@ -610,16 +610,16 @@ if (!blockIntegration) {
     <div class="control-grid">
       <div class="control-item">
         <label>Moment of inertia, J (kg·m²)</label>
-        <input type="range" id="jSlider" min="0.2" max="10" step="0.1" value="1"
+        <input type="range" id="jSlider" min="0.2" max="20" step="0.1" value="10"
         oninput="syncValue('jVal', this.value); runSimulation();">
-        <span class="value-readout" id="jVal">1</span>
+        <span class="value-readout" id="jVal">10</span>
       </div>
 
       <div class="control-item">
-        <label>Target attitude, θ<sub>target</sub> (rad)</label>
-        <input type="range" id="targetSlider" min="-2" max="2" step="0.05" value="1"
+        <label>Target attitude, θ<sub>target</sub> (deg)</label>
+        <input type="range" id="targetSlider" min="-30" max="30" step="1" value="10"
         oninput="syncValue('targetVal', this.value); runSimulation();">
-        <span class="value-readout" id="targetVal">1</span>
+        <span class="value-readout" id="targetVal">10°</span>
       </div>
 
       <div class="control-item">
@@ -638,30 +638,30 @@ if (!blockIntegration) {
 
       <div class="control-item">
         <label>Kd</label>
-        <input type="range" id="kdSlider" min="0" max="8" step="0.5" value="2"
+        <input type="range" id="kdSlider" min="0" max="8" step="0.5" value="4"
         oninput="syncValue('kdVal', this.value); runSimulation();">
-        <span class="value-readout" id="kdVal">2</span>
+        <span class="value-readout" id="kdVal">4</span>
       </div>
 
       <div class="control-item">
         <label>Disturbance torque, τd (N·m)</label>
-        <input type="range" id="distSlider" min="-0.8" max="0.8" step="0.05" value="0.25"
+        <input type="range" id="distSlider" min="-0.8" max="0.8" step="0.01" value="0.10"
         oninput="syncValue('distVal', this.value); runSimulation();">
-        <span class="value-readout" id="distVal">0.25</span>
+        <span class="value-readout" id="distVal">0.10</span>
       </div>
 
       <div class="control-item">
         <label>Torque limit, τmax (N·m)</label>
-        <input type="range" id="tauSlider" min="0.3" max="4" step="0.1" value="1.2"
+        <input type="range" id="tauSlider" min="0.1" max="4" step="0.1" value="0.3"
         oninput="syncValue('tauVal', this.value); runSimulation();">
-        <span class="value-readout" id="tauVal">1.2</span>
+        <span class="value-readout" id="tauVal">0.3</span>
       </div>
 
       <div class="control-item">
         <label>Simulation duration (s)</label>
-        <input type="range" id="timeSlider" min="10" max="60" step="5" value="30"
+        <input type="range" id="timeSlider" min="10" max="60" step="5" value="50"
         oninput="syncValue('timeVal', this.value); runSimulation();">
-        <span class="value-readout" id="timeVal">30</span>
+        <span class="value-readout" id="timeVal">50</span>
       </div>
     </div>
 
@@ -691,6 +691,8 @@ if (!blockIntegration) {
 
   <div id="comparisonPlot" class="plot-box tall"></div>
   <div id="comparisonErrorPlot" class="plot-box tall"></div>
+  <div id="comparisonTorquePlot" class="plot-box tall"></div>
+  <div id="comparisonIntegralPlot" class="plot-box tall"></div>
 
   <h3>Controller Comparison Metrics</h3>
   <div class="table-wrap">
@@ -801,7 +803,7 @@ if (!blockIntegration) {
 
 <script>
 function syncValue(id, value) {
-  document.getElementById(id).textContent = value;
+  document.getElementById(id).textContent = (id === "targetVal") ? value + "°" : value;
 }
 
 function saturate(value, limit) {
@@ -988,7 +990,7 @@ function runSimulation() {
 
   const p = {
     J: parseFloat(document.getElementById("jSlider").value),
-    thetaTarget: parseFloat(document.getElementById("targetSlider").value),
+    thetaTarget: parseFloat(document.getElementById("targetSlider").value) * Math.PI / 180,
     kp: parseFloat(document.getElementById("kpSlider").value),
     ki: parseFloat(document.getElementById("kiSlider").value),
     kd: parseFloat(document.getElementById("kdSlider").value),
@@ -1004,7 +1006,7 @@ function runSimulation() {
   [
     "attitudePlot","errorPlot","pidTermsPlot","torquePlot",
     "saturationPlot","integralPlot","phasePlot",
-    "comparisonPlot","comparisonErrorPlot"
+    "comparisonPlot","comparisonErrorPlot","comparisonTorquePlot","comparisonIntegralPlot"
   ].forEach(id => document.getElementById(id).style.display = "block");
 
   Plotly.newPlot("attitudePlot", [
@@ -1101,6 +1103,20 @@ function runComparison(p) {
     { x: pid.t, y: pid.errorHistory, mode: "lines", name: "PID without anti-windup" },
     { x: antiwindup.t, y: antiwindup.errorHistory, mode: "lines", name: "PID with anti-windup" }
   ], commonPlotLayout("Controller Comparison: Pointing Error", "e (rad)"), { responsive: true });
+
+  Plotly.newPlot("comparisonTorquePlot", [
+    { x: pd.t, y: pd.torqueCommand, mode: "lines", name: "PD τcmd" },
+    { x: pid.t, y: pid.torqueCommand, mode: "lines", name: "PID τcmd" },
+    { x: antiwindup.t, y: antiwindup.torqueCommand, mode: "lines", name: "PID + anti-windup τcmd" },
+    { x: [0, p.tFinal], y: [p.tauMax, p.tauMax], mode: "lines", name: "+τmax", line: { dash: "dot" } },
+    { x: [0, p.tFinal], y: [-p.tauMax, -p.tauMax], mode: "lines", name: "-τmax", line: { dash: "dot" } }
+  ], commonPlotLayout("Controller Comparison: Commanded Torque", "τcmd (N·m)"), { responsive: true });
+
+  Plotly.newPlot("comparisonIntegralPlot", [
+    { x: pd.t, y: pd.integralHistory, mode: "lines", name: "PD" },
+    { x: pid.t, y: pid.integralHistory, mode: "lines", name: "PID without anti-windup" },
+    { x: antiwindup.t, y: antiwindup.integralHistory, mode: "lines", name: "PID with anti-windup" }
+  ], commonPlotLayout("Controller Comparison: Integral State", "I = ∫e dt"), { responsive: true });
 
   const rows = [
     { name: "PD", metrics: calculateMetrics(pd, p.thetaTarget, p.tauMax) },
