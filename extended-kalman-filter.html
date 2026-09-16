@@ -2,48 +2,40 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>4.2.6 Kalman Filter Fundamentals | Interactive GNC & Space Mechanics</title>
+  <title>4.2.7 Extended Kalman Filter (EKF) | Interactive GNC &amp; Space Mechanics</title>
 
-  <link rel="stylesheet" href="styles.css">
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
   <link rel="icon" type="image/png" href="favicon1.png">
 
   <!-- MathJax -->
-  <script>
-    window.MathJax = {
-      tex: {
-        inlineMath: [['\\(', '\\)']],
-        displayMath: [['\\[', '\\]']]
-      },
-      svg: {
-        fontCache: 'global'
-      }
-    };
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
   </script>
 
-  <script defer
-    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js">
-  </script>
 </head>
 
 
 <body>
 
   <!-- ========================================================= -->
-  <!-- PAGE HEADER -->
+  <!-- PAGE HEADER                                                -->
   <!-- ========================================================= -->
 
   <header class="notes-hero">
 
-    <h1>4.2.6 Kalman Filter Fundamentals</h1>
+    <h1>Extended Kalman Filter (EKF)</h1>
 
     <p class="notes-tagline">
-      Linear state-space models, state prediction, covariance propagation,
-      innovation, innovation covariance, Kalman gain, measurement update,
-      posterior covariance, uncertainty modelling, consistency testing,
-      multi-sensor fusion, and spacecraft navigation applications.
+      Nonlinear dynamics, nonlinear measurement models, first-order
+      linearisation, Jacobians, state and covariance propagation, innovation,
+      Kalman correction, spacecraft navigation applications, consistency,
+      limitations, and practical EKF implementation.
     </p>
 
     <nav class="pill-nav">
@@ -58,122 +50,28 @@
   </header>
 
 
+
   <!-- ========================================================= -->
-  <!-- MAIN CONTENT -->
+  <!-- MAIN CONTENT                                               -->
   <!-- ========================================================= -->
 
   <main class="page-main">
 
-
-    <!-- ======================================================= -->
-    <!-- INTRODUCTION -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>Kalman Filter Fundamentals</h2>
+      <h2>4.2.7 Extended Kalman Filter (EKF)</h2>
 
-      <p>
-        The <strong>Kalman Filter (KF)</strong> is one of the most important
-        recursive state-estimation algorithms used in spacecraft Guidance,
-        Navigation and Control.
+<p>
+        The <strong>Extended Kalman Filter (EKF)</strong> extends the Kalman Filter framework to systems whose dynamics and/or measurements are <strong>nonlinear</strong>.
       </p>
 
       <p>
-        It combines two imperfect sources of information:
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Mathematical Model of the Spacecraft}}
-        +
-        \boxed{\text{Noisy Sensor Measurements}}
-        \]
-      </p>
-
-      <p>
-        to estimate the spacecraft state.
-      </p>
-
-      <p>
-        The Bayesian-estimation framework developed previously introduced the
-        general probabilistic principle
+        The classical Kalman Filter developed in Section 4.2.6 assumes
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{Prior}
-        +
-        \text{Measurement Information}
-        \rightarrow
-        \text{Posterior}
-        }.
-        \]
-      </p>
-
-      <p>
-        The Kalman Filter turns this principle into an efficient recursive
-        algorithm for linear stochastic systems.
-      </p>
-
-      <p>
-        At every estimation cycle, two fundamental operations are performed:
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Prediction}}
-        \]
-      </p>
-
-      <p>
-        followed by
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Measurement Update}}.
-        \]
-      </p>
-
-      <p>
-        Conceptually,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Previous Estimate}
-        \rightarrow
-        \text{Predict}
-        \rightarrow
-        \text{Compare with Measurement}
-        \rightarrow
-        \text{Correct}
-        \rightarrow
-        \text{New Estimate}
-        }.
-        \]
-      </p>
-
-      <p>
-        An important feature of Kalman filtering is that the filter does not
-        estimate only the spacecraft state.
-      </p>
-
-      <p>
-        It simultaneously estimates
-        <strong>how uncertain that state estimate is</strong>.
-      </p>
-
-      <p>
-        Its two fundamental outputs are therefore
-      </p>
-
-      <p>
-        \[
-        \boxed{\hat{\mathbf x}_k}
+        \mathbf x_k = \mathbf F_{k-1}\mathbf x_{k-1} + \mathbf B_{k-1}\mathbf u_{k-1} + \mathbf w_{k-1}
         \]
       </p>
 
@@ -183,105 +81,182 @@
 
       <p>
         \[
-        \boxed{\mathbf P_k}.
+        \mathbf z_k = \mathbf H_k\mathbf x_k + \mathbf v_k.
         \]
       </p>
 
       <p>
-        Here,
-        \(\hat{\mathbf x}_k\) is the estimated state and
-        \(\mathbf P_k\) is the state-estimation-error covariance.
+        These equations assume that both the state evolution and measurement relationship can be represented using linear matrix operations.
       </p>
 
       <p>
-        This distinction is particularly important during operations such as
-        rendezvous, proximity operations and docking.
+        Many real spacecraft systems cannot be represented this way.
       </p>
 
       <p>
-        Knowing that the estimated relative position is 10 cm is not enough.
-        The GNC system also needs to know whether the associated uncertainty is
-        approximately 1 mm, 1 cm, or 1 m.
+        For example, orbital motion is governed by nonlinear gravitational dynamics,
+      </p>
+
+      <p>
+        \[
+        \ddot{\mathbf r} = -\frac{\mu}{\|\mathbf r\|^3}\mathbf r,
+        \]
+      </p>
+
+      <p>
+        a LiDAR range measurement depends nonlinearly on relative position,
+      </p>
+
+      <p>
+        \[
+        \rho = \sqrt{x^2+y^2+z^2},
+        \]
+      </p>
+
+      <p>
+        a camera may measure bearing angles such as
+      </p>
+
+      <p>
+        \[
+        \alpha = \tan^{-1}\left(\frac{y}{x}\right),
+        \]
+      </p>
+
+      <p>
+        and spacecraft attitude evolves through nonlinear quaternion kinematics.
+      </p>
+
+      <p>
+        Therefore, spacecraft navigation frequently requires models of the form
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k = f(\mathbf x_{k-1},\mathbf u_{k-1}) + \mathbf w_{k-1} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h(\mathbf x_k) + \mathbf v_k }.
+        \]
+      </p>
+
+      <p>
+        The EKF retains the fundamental Kalman-filter philosophy,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Prediction} \rightarrow \text{Measurement Comparison} \rightarrow \text{Uncertainty-Weighted Correction} }
+        \]
+      </p>
+
+      <p>
+        but handles nonlinear functions by <strong>linearising them locally around the current state estimate</strong>.
+      </p>
+
+      <p>
+        This is the central idea of the Extended Kalman Filter.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 1 WHY KF -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>1. Why the Kalman Filter Is Needed</h2>
+<h3>4.2.7.1 Why the Extended Kalman Filter Is Needed</h3>
 
       <p>
-        A spacecraft navigation system generally has two imperfect sources of
-        information.
-      </p>
-
-      <h3>Spacecraft Dynamics Model</h3>
-
-      <p>
-        If the present state is known, equations of motion can predict the
-        spacecraft state at the next time.
+        The classical KF works naturally when the state and measurement models are linear.
       </p>
 
       <p>
-        For example,
+        But consider a spacecraft orbiting Earth.
+      </p>
+
+      <p>
+        Its acceleration is approximately
       </p>
 
       <p>
         \[
-        \mathbf x_{k+1}
-        =
-        f(\mathbf x_k,\mathbf u_k).
+        \mathbf a = -\frac{\mu}{r^3}\mathbf r.
         \]
       </p>
 
       <p>
-        However, the mathematical model is never completely perfect.
+        Because
       </p>
 
       <p>
-        Sources of model uncertainty may include:
-      </p>
-
-      <ul>
-        <li>uncertain disturbance forces,</li>
-        <li>uncertain disturbance torques,</li>
-        <li>imperfect gravity models,</li>
-        <li>aerodynamic uncertainty,</li>
-        <li>solar-radiation-pressure uncertainty,</li>
-        <li>actuator uncertainty,</li>
-        <li>thruster-magnitude error,</li>
-        <li>thruster misalignment,</li>
-        <li>unmodelled structural dynamics,</li>
-        <li>sensor-bias evolution,</li>
-        <li>numerical approximation.</li>
-      </ul>
-
-      <h3>Sensor Measurements</h3>
-
-      <p>
-        Sensors observe the real physical spacecraft but their measurements are
-        also imperfect.
+        \[
+        r=\sqrt{x^2+y^2+z^2},
+        \]
       </p>
 
       <p>
-        Sensor measurements may contain:
+        the acceleration is a nonlinear function of position.
       </p>
 
-      <ul>
-        <li>random noise,</li>
-        <li>bias,</li>
-        <li>quantization,</li>
-        <li>latency,</li>
-        <li>scale-factor error,</li>
-        <li>alignment error,</li>
-        <li>environmental disturbances,</li>
-        <li>occasional outliers.</li>
-      </ul>
+      <p>
+        Similarly, during rendezvous and proximity operations, a camera may not directly provide Cartesian relative position
+      </p>
+
+      <p>
+        \[
+        [x,y,z]^T.
+        \]
+      </p>
+
+      <p>
+        Instead, it may measure quantities such as azimuth and elevation:
+      </p>
+
+      <p>
+        \[
+        \alpha = \tan^{-1}\left(\frac{y}{x}\right)
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \beta = \tan^{-1} \left( \frac{z}{\sqrt{x^2+y^2}} \right).
+        \]
+      </p>
+
+      <p>
+        A LiDAR may measure
+      </p>
+
+      <p>
+        \[
+        \rho = \sqrt{x^2+y^2+z^2}.
+        \]
+      </p>
+
+      <p>
+        These relationships cannot generally be written as
+      </p>
+
+      <p>
+        \[
+        z=Hx
+        \]
+      </p>
+
+      <p>
+        using a constant linear measurement matrix.
+      </p>
 
       <p>
         Therefore,
@@ -289,11 +264,76 @@
 
       <p>
         \[
-        \boxed{
-        \text{Dynamics Model}
-        =
-        \text{Continuous but Imperfect Prediction}
-        }
+        \boxed{ \text{Real Spacecraft Navigation} \rightarrow \text{Nonlinear Dynamics and Measurements} }
+        \]
+      </p>
+
+      <p>
+        which motivates
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Extended Kalman Filter}}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.2 From KF to EKF</h3>
+
+      <p>
+        The difference between the KF and EKF can be seen immediately from their models.
+      </p>
+
+      <h4>4.2.7.2.1 Linear Kalman Filter</h4>
+
+      <p>
+        \[
+        \mathbf x_k = F_{k-1}\mathbf x_{k-1} + B_{k-1}u_{k-1} + w_{k-1}
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf z_k = H_k\mathbf x_k + v_k.
+        \]
+      </p>
+
+      <h4>4.2.7.2.2 Extended Kalman Filter</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k = f(\mathbf x_{k-1},u_{k-1}) + w_{k-1} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h(\mathbf x_k) + v_k }.
+        \]
+      </p>
+
+      <p>
+        The important difference is that
+      </p>
+
+      <p>
+        \[
+        F x
+        \]
+      </p>
+
+      <p>
+        is replaced by the nonlinear function
+      </p>
+
+      <p>
+        \[
+        f(x,u),
         \]
       </p>
 
@@ -303,101 +343,476 @@
 
       <p>
         \[
-        \boxed{
-        \text{Sensor}
-        =
-        \text{Physical Observation but Noisy Measurement}
-        }.
+        Hx
         \]
       </p>
 
       <p>
-        The Kalman Filter combines the strengths of both sources.
+        is replaced by
+      </p>
+
+      <p>
+        \[
+        h(x).
+        \]
+      </p>
+
+      <p>
+        However, covariance cannot simply be propagated through arbitrary nonlinear functions using the standard KF matrix equations.
+      </p>
+
+      <p>
+        The EKF therefore introduces <strong>local linearisation</strong>.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 2 FUNDAMENTAL IDEA -->
-    <!-- ======================================================= -->
+    <section class="notes-section-card">
+
+<h3>4.2.7.3 Central Idea of the EKF</h3>
+
+      <p>
+        The EKF does not make the physical system linear.
+      </p>
+
+      <p>
+        Instead, it approximates the nonlinear system as linear <strong>in a small neighbourhood around the current estimated state</strong>.
+      </p>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        y=f(x).
+        \]
+      </p>
+
+      <p>
+        Around some operating point <code>x_0</code>,
+      </p>
+
+      <p>
+        \[
+        f(x)
+        \]
+      </p>
+
+      <p>
+        can be approximated using a first-order Taylor expansion:
+      </p>
+
+      <p>
+        \[
+        f(x) \approx f(x_0) + \left. \frac{\partial f}{\partial x} \right|_{x_0} (x-x_0).
+        \]
+      </p>
+
+      <p>
+        The derivative tells us how a small change in the state produces a change in the nonlinear function.
+      </p>
+
+      <p>
+        For multidimensional spacecraft states, these derivatives form a matrix called the <strong>Jacobian</strong>.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Model} \xrightarrow{\text{Local Linearisation}} \text{Jacobian-Based Local Model} }
+        \]
+      </p>
+
+      <p>
+        and this local model is used to propagate uncertainty.
+      </p>
+
+    </section>
+
 
     <section class="notes-section-card">
 
-      <h2>2. Fundamental Idea of Kalman Filtering</h2>
+<h3>4.2.7.4 Nonlinear Process Model</h3>
 
       <p>
-        Suppose the dynamic model predicts
+        The discrete nonlinear state model can be written as
       </p>
 
       <p>
         \[
-        x = 100~\text{m}
+        \boxed{ \mathbf x_k = f( \mathbf x_{k-1}, \mathbf u_{k-1} ) + \mathbf w_{k-1} }
         \]
       </p>
 
       <p>
-        while a sensor reports
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>\mathbf x_k</code> = spacecraft state,
+        </li>
+
+        <li>
+          <code>\mathbf u_k</code> = known control input,
+        </li>
+
+        <li>
+          <code>f(\cdot)</code> = nonlinear state-transition function,
+        </li>
+
+        <li>
+          <code>\mathbf w_k</code> = process uncertainty.
+        </li>
+
+      </ul>
+
+      <p>
+        The process noise is typically modelled as
       </p>
 
       <p>
         \[
-        z = 103~\text{m}.
+        \mathbf w_k \sim \mathcal N(0,Q_k).
         \]
       </p>
 
       <p>
-        Which value should the navigation system use?
-      </p>
-
-      <p>
-        The answer depends on uncertainty.
-      </p>
-
-      <p>
-        If the prediction is highly reliable and the sensor is noisy, the
-        corrected estimate should remain closer to 100 m.
-      </p>
-
-      <p>
-        If the model prediction is uncertain while the sensor is highly
-        accurate, the corrected estimate should move closer to 103 m.
-      </p>
-
-      <p>
-        Therefore,
+        The state can contain quantities such as
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{Correction Strength}
-        =
-        f(
-        \text{Prediction Uncertainty},
-        \text{Measurement Uncertainty}
-        )
-        }.
+        \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \boldsymbol\omega\\ \mathbf b_g\\ \mathbf b_a\\ \cdots \end{bmatrix}.
         \]
       </p>
 
       <p>
-        The Kalman Filter calculates this weighting mathematically through the
-        <strong>Kalman gain</strong>.
+        Depending on the application, an EKF may estimate orbit states, relative-navigation states, sensor biases, clock states, calibration parameters, or other uncertain quantities.
       </p>
 
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.5 Continuous-Time Nonlinear Dynamics</h3>
+
       <p>
-        Kalman filtering is therefore not simple averaging:
+        Many spacecraft models are naturally written in continuous time:
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{Kalman Filtering}
-        \neq
-        \frac{\text{Prediction}+\text{Measurement}}{2}
-        }.
+        \boxed{ \dot{\mathbf x} = f( \mathbf x, \mathbf u, t ) + G\mathbf w }.
         \]
+      </p>
+
+      <p>
+        For example, an orbital navigation state may be
+      </p>
+
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf r} = \mathbf v
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf v} = -\frac{\mu}{r^3}\mathbf r + \mathbf a_{pert} + \mathbf a_{control}.
+        \]
+      </p>
+
+      <p>
+        Here, <code>\mathbf a_{pert}</code> may include effects such as atmospheric drag, <code>J_2</code>, solar radiation pressure, third-body gravity, or other perturbations.
+      </p>
+
+      <p>
+        The EKF propagates the <strong>nonlinear nominal state</strong>, rather than replacing these dynamics with a globally linear model.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.6 Nonlinear Measurement Model</h3>
+
+      <p>
+        The measurement model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h( \mathbf x_k ) + \mathbf v_k }
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        \mathbf v_k \sim \mathcal N(0,R_k).
+        \]
+      </p>
+
+      <p>
+        The function <code>h(\cdot)</code> converts the spacecraft state into the quantity that a particular sensor should observe.
+      </p>
+
+      <p>
+        This is especially important in spacecraft navigation because the estimator state and sensor output may represent very different physical quantities.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \mathbf x = [x,y,z,v_x,v_y,v_z]^T
+        \]
+      </p>
+
+      <p>
+        may be the relative Cartesian state, while a camera measures only
+      </p>
+
+      <p>
+        \[
+        z= [\alpha,\beta]^T.
+        \]
+      </p>
+
+      <p>
+        The measurement function therefore performs the nonlinear mapping
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Cartesian Relative State} \xrightarrow{h(x)} \text{Camera Angles} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.7 Why the EKF Needs Jacobians</h3>
+
+      <p>
+        In the ordinary KF, covariance propagation uses
+      </p>
+
+      <p>
+        \[
+        P_k^- = F P_{k-1}^+F^T+Q.
+        \]
+      </p>
+
+      <p>
+        For a nonlinear model,
+      </p>
+
+      <p>
+        \[
+        x_k=f(x_{k-1}),
+        \]
+      </p>
+
+      <p>
+        there may be no constant matrix <code>F</code>.
+      </p>
+
+      <p>
+        The EKF therefore computes a local sensitivity matrix
+      </p>
+
+      <p>
+        \[
+        \boxed{ F_k = \left. \frac{\partial f}{\partial x} \right|_{\hat x} }.
+        \]
+      </p>
+
+      <p>
+        Similarly, for the nonlinear measurement function
+      </p>
+
+      <p>
+        \[
+        z=h(x),
+        \]
+      </p>
+
+      <p>
+        the EKF computes
+      </p>
+
+      <p>
+        \[
+        \boxed{ H_k = \left. \frac{\partial h}{\partial x} \right|_{\hat x} }.
+        \]
+      </p>
+
+      <p>
+        These are the <strong>process Jacobian</strong> and <strong>measurement Jacobian</strong>.
+      </p>
+
+      <p>
+        They are among the most important quantities in EKF implementation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.8 What Is a Jacobian Matrix?</h3>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        f(x) = \begin{bmatrix} f_1(x_1,x_2,\ldots,x_n)\\ f_2(x_1,x_2,\ldots,x_n)\\ \vdots\\ f_m(x_1,x_2,\ldots,x_n) \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then its Jacobian is
+      </p>
+
+      <p>
+        \[
+        \boxed{ J_f = \frac{\partial f}{\partial x} = \begin{bmatrix} \frac{\partial f_1}{\partial x_1} & \frac{\partial f_1}{\partial x_2} & \cdots & \frac{\partial f_1}{\partial x_n} \\ \frac{\partial f_2}{\partial x_1} & \frac{\partial f_2}{\partial x_2} & \cdots & \frac{\partial f_2}{\partial x_n} \\ \vdots&\vdots&\ddots&\vdots\\ \frac{\partial f_m}{\partial x_1} & \frac{\partial f_m}{\partial x_2} & \cdots & \frac{\partial f_m}{\partial x_n} \end{bmatrix} }.
+        \]
+      </p>
+
+      <p>
+        Each element answers:
+      </p>
+
+      <blockquote>
+        If this particular state variable changes slightly, how much does this particular process or measurement output change?
+      </blockquote>
+
+      <p>
+        Therefore the Jacobian is fundamentally a <strong>local sensitivity matrix</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.9 First-Order Linearisation</h3>
+
+      <p>
+        Suppose the true state is
+      </p>
+
+      <p>
+        \[
+        x=\hat x+\delta x.
+        \]
+      </p>
+
+      <p>
+        Using Taylor expansion,
+      </p>
+
+      <p>
+        \[
+        f(\hat x+\delta x) = f(\hat x) + F\delta x + \text{higher-order terms}.
+        \]
+      </p>
+
+      <p>
+        The EKF neglects the higher-order terms:
+      </p>
+
+      <p>
+        \[
+        \boxed{ f(\hat x+\delta x) \approx f(\hat x)+F\delta x }.
+        \]
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        h(\hat x+\delta x) \approx h(\hat x)+H\delta x.
+        \]
+      </p>
+
+      <p>
+        This approximation is why the EKF is called <strong>extended</strong> rather than simply nonlinear Kalman filtering.
+      </p>
+
+      <p>
+        The Kalman equations are applied to the locally linearized error behaviour.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.10 State Prediction in the EKF</h3>
+
+      <p>
+        The EKF propagates the state through the actual nonlinear process function:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^- = f( \hat{\mathbf x}_{k-1}^+, \mathbf u_{k-1} ) }.
+        \]
+      </p>
+
+      <p>
+        This distinction is fundamental.
+      </p>
+
+      <p>
+        The EKF does <strong>not</strong> normally calculate
+      </p>
+
+      <p>
+        \[
+        \hat x_k^-=F\hat x_{k-1}^+
+        \]
+      </p>
+
+      <p>
+        as the primary nonlinear state propagation.
       </p>
 
       <p>
@@ -406,57 +821,917 @@
 
       <p>
         \[
-        \boxed{
-        \text{Kalman Filtering}
-        =
-        \text{Uncertainty-Weighted State Estimation}
-        }.
+        \boxed{ \text{State} \rightarrow \text{Propagated Through }f(\cdot) }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Covariance} \rightarrow \text{Propagated Using the Jacobian} }.
+        \]
+      </p>
+
+      <p>
+        This is one of the most important EKF concepts.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.11 Process Jacobian</h3>
+
+      <p>
+        For the discrete nonlinear model
+      </p>
+
+      <p>
+        \[
+        x_k=f(x_{k-1},u_{k-1}),
+        \]
+      </p>
+
+      <p>
+        the state-transition Jacobian is
+      </p>
+
+      <p>
+        \[
+        \boxed{ F_{k-1} = \left. \frac{\partial f}{\partial x} \right|_ {\hat x_{k-1}^{+},u_{k-1}} }.
+        \]
+      </p>
+
+      <p>
+        It describes how small errors in the previous state propagate into errors at the next step.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \delta x_{k-1} = x_{k-1}-\hat x_{k-1},
+        \]
+      </p>
+
+      <p>
+        then locally,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta x_k \approx F_{k-1}\delta x_{k-1} }.
+        \]
+      </p>
+
+      <p>
+        Thus, <code>F</code> is not merely a mathematical requirement—it represents the <strong>local error dynamics</strong> of the nonlinear system.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.12 Covariance Prediction</h3>
+
+      <p>
+        Once the Jacobian has been evaluated, the covariance is propagated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_k^- = F_{k-1} P_{k-1}^+ F_{k-1}^T + Q_{k-1} }.
+        \]
+      </p>
+
+      <p>
+        This looks identical to the KF covariance equation.
+      </p>
+
+      <p>
+        The important difference is that
+      </p>
+
+      <p>
+        \[
+        F_{k-1}
+        \]
+      </p>
+
+      <p>
+        is now a Jacobian evaluated around the current estimated trajectory.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ F_k=F(\hat x_k) }
+        \]
+      </p>
+
+      <p>
+        and can change continuously as the spacecraft moves.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.13 Continuous-Time Covariance Propagation</h3>
+
+      <p>
+        For a continuous nonlinear system,
+      </p>
+
+      <p>
+        \[
+        \dot x=f(x,u)+Gw,
+        \]
+      </p>
+
+      <p>
+        define
+      </p>
+
+      <p>
+        \[
+        \boxed{ A = \left. \frac{\partial f}{\partial x} \right|_{\hat x} }.
+        \]
+      </p>
+
+      <p>
+        The covariance may then satisfy
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot P = AP + PA^T + GQ_cG^T }.
+        \]
+      </p>
+
+      <p>
+        This is the continuous-time covariance propagation equation.
+      </p>
+
+      <p>
+        For a digital estimator, this model must be discretized to obtain an appropriate state-transition matrix and discrete process covariance.
+      </p>
+
+      <p>
+        A simple approximation is
+      </p>
+
+      <p>
+        \[
+        \Phi \approx I+A\Delta t,
+        \]
+      </p>
+
+      <p>
+        but more accurate methods may use matrix exponentials:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Phi = e^{A\Delta t} }.
         \]
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 3 STATE VECTOR -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>3. The State Vector</h2>
+<h3>4.2.7.14 Predicted Measurement</h3>
 
       <p>
-        Before constructing the filter, the quantities to be estimated must be
-        defined.
+        After propagating the state, the EKF predicts what the sensor should observe.
       </p>
 
       <p>
-        For a simple one-dimensional translational problem,
+        Unlike the linear KF,
       </p>
 
       <p>
         \[
-        \mathbf x
-        =
-        \begin{bmatrix}
-        x\\
-        v
-        \end{bmatrix}.
+        \hat z=H\hat x^-,
         \]
       </p>
 
       <p>
-        For three-dimensional spacecraft navigation,
+        the EKF uses the full nonlinear measurement model:
       </p>
 
       <p>
         \[
-        \mathbf x
-        =
-        \begin{bmatrix}
-        \mathbf r\\
-        \mathbf v
-        \end{bmatrix}.
+        \boxed{ \hat z_k = h( \hat x_k^- ) }.
+        \]
+      </p>
+
+      <p>
+        For example, if LiDAR measures range,
+      </p>
+
+      <p>
+        \[
+        \hat\rho = \sqrt{ \hat x^2+ \hat y^2+ \hat z^2 }.
+        \]
+      </p>
+
+      <p>
+        For a camera bearing measurement,
+      </p>
+
+      <p>
+        \[
+        \hat\alpha = \tan^{-1} \left( \frac{\hat y}{\hat x} \right).
+        \]
+      </p>
+
+      <p>
+        Thus the predicted measurement is generated in the <strong>actual sensor measurement space</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.15 Measurement Jacobian</h3>
+
+      <p>
+        The measurement Jacobian is
+      </p>
+
+      <p>
+        \[
+        \boxed{ H_k = \left. \frac{\partial h}{\partial x} \right|_{\hat x_k^-} }.
+        \]
+      </p>
+
+      <p>
+        It describes how small changes in the estimated state affect the predicted sensor measurement.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        z=h(x),
+        \]
+      </p>
+
+      <p>
+        then locally,
+      </p>
+
+      <p>
+        \[
+        \delta z \approx H\delta x.
+        \]
+      </p>
+
+      <p>
+        The measurement Jacobian therefore determines how information from a particular sensor can correct different estimator states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.16 Example — LiDAR Range Jacobian</h3>
+
+      <p>
+        Suppose the relative position is
+      </p>
+
+      <p>
+        \[
+        \mathbf r= \begin{bmatrix} x\\y\\z \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        and LiDAR measures
+      </p>
+
+      <p>
+        \[
+        \rho = \sqrt{x^2+y^2+z^2}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        h(x,y,z)=\sqrt{x^2+y^2+z^2}.
+        \]
+      </p>
+
+      <p>
+        The Jacobian is
+      </p>
+
+      <p>
+        \[
+        H = \begin{bmatrix} \frac{\partial\rho}{\partial x} & \frac{\partial\rho}{\partial y} & \frac{\partial\rho}{\partial z} \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ H = \begin{bmatrix} \frac{x}{\rho} & \frac{y}{\rho} & \frac{z}{\rho} \end{bmatrix} }.
+        \]
+      </p>
+
+      <p>
+        This reveals something physically important:
+      </p>
+
+      <p>
+        A single range measurement constrains the spacecraft state primarily along the <strong>line of sight</strong>.
+      </p>
+
+      <p>
+        It does not independently determine all three Cartesian components.
+      </p>
+
+      <p>
+        Thus the Jacobian also helps expose <strong>measurement geometry and observability</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.17 Example — Camera Bearing Jacobian</h3>
+
+      <p>
+        Consider
+      </p>
+
+      <p>
+        \[
+        \alpha = \tan^{-1}\left(\frac{y}{x}\right).
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \frac{\partial\alpha}{\partial x} = -\frac{y}{x^2+y^2}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \frac{\partial\alpha}{\partial y} = \frac{x}{x^2+y^2}.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ H_\alpha = \begin{bmatrix} -\frac{y}{x^2+y^2} & \frac{x}{x^2+y^2} & 0 \end{bmatrix} }.
+        \]
+      </p>
+
+      <p>
+        Again, the measurement sensitivity changes with spacecraft geometry.
+      </p>
+
+      <p>
+        This means
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Geometry} \rightarrow H \rightarrow \text{Information Content} \rightarrow \text{Estimation Performance} }.
+        \]
+      </p>
+
+      <p>
+        This relationship is extremely important for RPO navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.18 Innovation in the EKF</h3>
+
+      <p>
+        The innovation remains
+      </p>
+
+      <p>
+        \[
+        \boxed{ y_k = z_k-\hat z_k }
+        \]
+      </p>
+
+      <p>
+        but the predicted measurement is nonlinear:
+      </p>
+
+      <p>
+        \[
+        \boxed{ y_k = z_k - h(\hat x_k^-) }.
+        \]
+      </p>
+
+      <p>
+        The innovation therefore represents the difference between
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Actual Sensor Output}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Output Predicted from the Current State Estimate}}.
+        \]
+      </p>
+
+      <p>
+        This is one reason correct sensor modelling is essential.
+      </p>
+
+      <p>
+        If <code>h(x)</code> is incorrect, the residual can appear abnormal even when the actual sensor is functioning correctly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.19 Innovation Covariance</h3>
+
+      <p>
+        The EKF innovation covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ S_k = H_kP_k^-H_k^T + R_k }.
+        \]
+      </p>
+
+      <p>
+        Although this equation looks identical to the linear KF equation, <code>H_k</code> is now evaluated from the nonlinear measurement model at the current predicted state.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ S_k = \text{Locally Projected State Uncertainty} + \text{Sensor Uncertainty} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.20 Kalman Gain</h3>
+
+      <p>
+        The EKF gain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ K_k = P_k^-H_k^TS_k^{-1} }.
+        \]
+      </p>
+
+      <p>
+        The same uncertainty-weighting principle from the KF remains.
+      </p>
+
+      <p>
+        If the measurement is accurate relative to the predicted uncertainty, it receives stronger influence.
+      </p>
+
+      <p>
+        If the measurement is uncertain, it receives less influence.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{EKF} = \text{Nonlinear Prediction} + \text{Locally Linearized Uncertainty Weighting} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.21 State Measurement Update</h3>
+
+      <p>
+        The corrected estimate is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x_k^+ = \hat x_k^- + K_ky_k }.
+        \]
+      </p>
+
+      <p>
+        Substituting the nonlinear innovation,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x_k^+ = \hat x_k^- + K_k \left[ z_k-h(\hat x_k^-) \right] }.
+        \]
+      </p>
+
+      <p>
+        Therefore the correction still has the familiar Kalman structure:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior} = \text{Prior} + \text{Gain} \times \text{Innovation} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.22 Posterior Covariance Update</h3>
+
+      <p>
+        A common covariance update is
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_k^+ = (I-K_kH_k)P_k^- }.
+        \]
+      </p>
+
+      <p>
+        For improved numerical robustness, the Joseph form may be used:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_k^+ = (I-KH)P^-(I-KH)^T + KRK^T }.
+        \]
+      </p>
+
+      <p>
+        As in the linear KF, a valid informative measurement generally reduces uncertainty in the observable directions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.23 Complete EKF Algorithm</h3>
+
+      <p>
+        The complete EKF cycle can now be written clearly.
+      </p>
+
+      <h4>4.2.7.23.1 Step 1 — Nonlinear State Prediction</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_k^- = f( \hat x_{k-1}^+, u_{k-1} ) }
+        \]
+      </p>
+
+      <h4>4.2.7.23.2 Step 2 — Evaluate Process Jacobian</h4>
+
+      <p>
+        \[
+        \boxed{ F_{k-1} = \left. \frac{\partial f}{\partial x} \right|_{\hat x_{k-1}^+} }
+        \]
+      </p>
+
+      <h4>4.2.7.23.3 Step 3 — Covariance Prediction</h4>
+
+      <p>
+        \[
+        \boxed{ P_k^- = F_{k-1}P_{k-1}^+F_{k-1}^T + Q_{k-1} }
+        \]
+      </p>
+
+      <h4>4.2.7.23.4 Step 4 — Predict Sensor Measurement</h4>
+
+      <p>
+        \[
+        \boxed{ \hat z_k = h(\hat x_k^-) }
+        \]
+      </p>
+
+      <h4>4.2.7.23.5 Step 5 — Evaluate Measurement Jacobian</h4>
+
+      <p>
+        \[
+        \boxed{ H_k = \left. \frac{\partial h}{\partial x} \right|_{\hat x_k^-} }
+        \]
+      </p>
+
+      <h4>4.2.7.23.6 Step 6 — Innovation</h4>
+
+      <p>
+        \[
+        \boxed{ y_k = z_k-h(\hat x_k^-) }
+        \]
+      </p>
+
+      <h4>4.2.7.23.7 Step 7 — Innovation Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ S_k = H_kP_k^-H_k^T+R_k }
+        \]
+      </p>
+
+      <h4>4.2.7.23.8 Step 8 — Kalman Gain</h4>
+
+      <p>
+        \[
+        \boxed{ K_k = P_k^-H_k^TS_k^{-1} }
+        \]
+      </p>
+
+      <h4>4.2.7.23.9 Step 9 — State Update</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_k^+ = \hat x_k^-+K_ky_k }
+        \]
+      </p>
+
+      <h4>4.2.7.23.10 Step 10 — Covariance Update</h4>
+
+      <p>
+        \[
+        \boxed{ P_k^+ = (I-K_kH_k)P_k^- }.
+        \]
+      </p>
+
+      <p>
+        This gives the fundamental EKF loop:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Predict} \rightarrow \text{Linearize} \rightarrow \text{Predict Measurement} \rightarrow \text{Linearize Measurement} \rightarrow \text{Innovation} \rightarrow \text{Correct} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.24 EKF vs KF — The Most Important Difference</h3>
+
+      <p>
+        This deserves a dedicated comparison on the page.
+      </p>
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>OperationKalman FilterExtended Kalman Filter</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>Process model</td>
+              <td><code>Fx+Bu</code></td>
+              <td><code>f(x,u)</code></td>
+            </tr>
+
+            <tr>
+              <td>Measurement model</td>
+              <td><code>Hx</code></td>
+              <td><code>h(x)</code></td>
+            </tr>
+
+            <tr>
+              <td>State propagation</td>
+              <td>Linear</td>
+              <td>Nonlinear</td>
+            </tr>
+
+            <tr>
+              <td>Measurement prediction</td>
+              <td>Linear</td>
+              <td>Nonlinear</td>
+            </tr>
+
+            <tr>
+              <td>Covariance propagation</td>
+              <td><code>FPF^T+Q</code></td>
+              <td>Jacobian-based</td>
+            </tr>
+
+            <tr>
+              <td>Measurement sensitivity</td>
+              <td><code>H</code></td>
+              <td>Measurement Jacobian</td>
+            </tr>
+
+            <tr>
+              <td>Linearisation</td>
+              <td>Not required</td>
+              <td>Required</td>
+            </tr>
+
+            <tr>
+              <td>Main approximation</td>
+              <td>Linear-Gaussian model</td>
+              <td>First-order local approximation</td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+      <p>
+        The critical concept is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{EKF propagates the state nonlinearly but propagates uncertainty through a local linear approximation.} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.25 EKF and Spacecraft Orbital Navigation</h3>
+
+      <p>
+        Consider
+      </p>
+
+      <p>
+        \[
+        x= \begin{bmatrix} r\\ v \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The nonlinear orbital dynamics may be
+      </p>
+
+      <p>
+        \[
+        \dot r=v
+        \]
+      </p>
+
+      <p>
+        \[
+        \dot v = -\frac{\mu}{r^3}r + a_{pert}.
+        \]
+      </p>
+
+      <p>
+        The EKF propagates the spacecraft trajectory using these nonlinear equations.
+      </p>
+
+      <p>
+        GNSS or ground-tracking measurements then update the state.
+      </p>
+
+      <p>
+        A representative flow is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nonlinear Orbit Propagation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predicted Position and Velocity}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{GNSS / Tracking Measurements}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{EKF Correction}}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.26 EKF for Relative Navigation and RPO</h3>
+
+      <p>
+        The EKF is particularly important for spacecraft rendezvous and proximity operations.
+      </p>
+
+      <p>
+        A basic relative state may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{rel} = \begin{bmatrix} r_{rel}\\ v_{rel} \end{bmatrix} }.
         \]
       </p>
 
@@ -466,1101 +1741,128 @@
 
       <p>
         \[
-        \boxed{
-        \mathbf x
-        =
-        \begin{bmatrix}
-        \mathbf r\\
-        \mathbf v\\
-        \boldsymbol\theta\\
-        \boldsymbol\omega\\
-        \mathbf b_g\\
-        \mathbf b_a
-        \end{bmatrix}
-        }.
+        x= \begin{bmatrix} r_{rel}\\ v_{rel}\\ \theta_{rel}\\ \omega_{rel}\\ b_g\\ b_a \end{bmatrix}.
         \]
       </p>
 
       <p>
-        Possible estimated quantities include:
+        Sensors may include:
       </p>
 
       <ul>
-        <li>position,</li>
-        <li>velocity,</li>
-        <li>attitude,</li>
-        <li>angular rate,</li>
-        <li>gyroscope bias,</li>
-        <li>accelerometer bias,</li>
-        <li>GNSS clock bias,</li>
-        <li>GNSS clock drift,</li>
-        <li>sensor alignment errors,</li>
-        <li>disturbance parameters,</li>
-        <li>relative position,</li>
-        <li>relative velocity,</li>
-        <li>relative attitude.</li>
+
+        <li>
+          relative GNSS,
+        </li>
+
+        <li>
+          camera,
+        </li>
+
+        <li>
+          LiDAR,
+        </li>
+
+        <li>
+          range sensors,
+        </li>
+
+        <li>
+          bearing sensors,
+        </li>
+
+        <li>
+          IMU,
+        </li>
+
+        <li>
+          star tracker.
+        </li>
+
       </ul>
 
       <p>
-        A critical principle is
+        The estimator may therefore perform
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{A State Does Not Need to Be Directly Measured to Be Estimated}
-        }.
+        \boxed{\text{Relative Dynamics Prediction}}
         \]
       </p>
 
       <p>
-        However, the state must be sufficiently observable through the dynamics
-        and available measurements.
+        followed by asynchronous updates from different relative-navigation sensors.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 4 PROCESS MODEL -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>4. Linear Discrete-Time State-Space Model</h2>
+<h3>4.2.7.27 EKF for Camera-Based Relative Navigation</h3>
 
       <p>
-        The classical discrete Kalman Filter assumes a linear process model:
+        Suppose a camera measures azimuth and elevation:
       </p>
 
       <p>
         \[
-        \boxed{
-        \mathbf x_k
-        =
-        \mathbf F_{k-1}\mathbf x_{k-1}
-        +
-        \mathbf B_{k-1}\mathbf u_{k-1}
-        +
-        \mathbf w_{k-1}
-        }.
+        z= \begin{bmatrix} \alpha\\ \beta \end{bmatrix}.
         \]
       </p>
 
       <p>
-        where:
-      </p>
-
-      <ul>
-        <li>\(\mathbf x_k\) is the state at time \(k\),</li>
-        <li>\(\mathbf F_{k-1}\) is the state-transition matrix,</li>
-        <li>\(\mathbf u_{k-1}\) is the known control input,</li>
-        <li>\(\mathbf B_{k-1}\) maps the control input into the state,</li>
-        <li>\(\mathbf w_{k-1}\) represents process uncertainty.</li>
-      </ul>
-
-      <p>
-        Process noise is commonly represented as
+        The state may contain
       </p>
 
       <p>
         \[
-        \boxed{
-        \mathbf w_{k-1}
-        \sim
-        \mathcal N(
-        \mathbf 0,
-        \mathbf Q_{k-1}
-        )
-        }.
+        x= [x,y,z,v_x,v_y,v_z]^T.
         \]
       </p>
 
       <p>
-        The matrix \(\mathbf Q\) is the
-        <strong>process-noise covariance</strong>.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 5 F MATRIX -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>5. Physical Meaning of the State-Transition Matrix \(F\)</h2>
-
-      <p>
-        The matrix
+        The camera measurement function becomes
       </p>
 
       <p>
         \[
-        \mathbf F
+        h(x) = \begin{bmatrix} \tan^{-1}(y/x)\\ \tan^{-1} \left( z/\sqrt{x^2+y^2} \right) \end{bmatrix}.
         \]
       </p>
 
       <p>
-        describes how the state evolves from one discrete time step to the
-        next.
+        The EKF:
       </p>
 
-      <p>
-        Consider a constant-velocity model:
-      </p>
-
-      <p>
-        \[
-        x_{k+1}
-        =
-        x_k+v_k\Delta t
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        v_{k+1}
-        =
-        v_k.
-        \]
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \begin{bmatrix}
-        x_{k+1}\\
-        v_{k+1}
-        \end{bmatrix}
-        =
-        \begin{bmatrix}
-        1 & \Delta t\\
-        0 & 1
-        \end{bmatrix}
-        \begin{bmatrix}
-        x_k\\
-        v_k
-        \end{bmatrix}.
-        \]
-      </p>
-
-      <p>
-        Hence
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf F
-        =
-        \begin{bmatrix}
-        1 & \Delta t\\
-        0 & 1
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        The term \(\Delta t\) couples velocity into future position.
-      </p>
-
-      <p>
-        This means velocity uncertainty can also influence future position
-        uncertainty.
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Dynamics Propagate Both the State and Relationships Between State Errors}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 6 B MATRIX -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>6. Control-Input Matrix \(B\)</h2>
-
-      <p>
-        Known control inputs can be incorporated using
-      </p>
-
-      <p>
-        \[
-        \mathbf B\mathbf u.
-        \]
-      </p>
-
-      <p>
-        For constant acceleration \(a\),
-      </p>
-
-      <p>
-        \[
-        x_{k+1}
-        =
-        x_k
-        +
-        v_k\Delta t
-        +
-        \frac12a_k\Delta t^2
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        v_{k+1}
-        =
-        v_k+a_k\Delta t.
-        \]
-      </p>
-
-      <p>
-        If
-      </p>
-
-      <p>
-        \[
-        u_k=a_k,
-        \]
-      </p>
-
-      <p>
-        then
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf B
-        =
-        \begin{bmatrix}
-        \frac12\Delta t^2\\
-        \Delta t
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        Spacecraft control inputs may represent:
-      </p>
-
-      <ul>
-        <li>known commanded acceleration,</li>
-        <li>thruster force,</li>
-        <li>reaction-wheel torque,</li>
-        <li>known control torque,</li>
-        <li>processed inertial measurements.</li>
-      </ul>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 7 MEASUREMENT MODEL -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>7. Measurement Model</h2>
-
-      <p>
-        The linear sensor model is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf z_k
-        =
-        \mathbf H_k\mathbf x_k
-        +
-        \mathbf v_k
-        }.
-        \]
-      </p>
-
-      <p>
-        where:
-      </p>
-
-      <ul>
-        <li>\(\mathbf z_k\) is the sensor measurement vector,</li>
-        <li>\(\mathbf H_k\) is the measurement matrix,</li>
-        <li>\(\mathbf v_k\) is measurement noise.</li>
-      </ul>
-
-      <p>
-        The measurement noise is commonly represented as
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf v_k
-        \sim
-        \mathcal N(
-        \mathbf 0,
-        \mathbf R_k
-        )
-        }.
-        \]
-      </p>
-
-      <p>
-        The matrix
-      </p>
-
-      <p>
-        \[
-        \boxed{\mathbf R_k}
-        \]
-      </p>
-
-      <p>
-        is the measurement-noise covariance.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 8 H -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>8. Physical Meaning of the Measurement Matrix \(H\)</h2>
-
-      <p>
-        The matrix
-      </p>
-
-      <p>
-        \[
-        \mathbf H
-        \]
-      </p>
-
-      <p>
-        maps the navigation state into the quantity observed by a sensor.
-      </p>
-
-      <p>
-        Suppose
-      </p>
-
-      <p>
-        \[
-        \mathbf x=
-        \begin{bmatrix}
-        x\\
-        v
-        \end{bmatrix}.
-        \]
-      </p>
-
-      <h3>Position Measurement Only</h3>
-
-      <p>
-        If the sensor measures position,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf H
-        =
-        \begin{bmatrix}
-        1&0
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <h3>Velocity Measurement Only</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf H
-        =
-        \begin{bmatrix}
-        0&1
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <h3>Position and Velocity</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf H
-        =
-        \begin{bmatrix}
-        1&0\\
-        0&1
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        Therefore, \(H\) tells the estimator:
-      </p>
-
-      <blockquote>
-        Which combination of the state variables should this sensor observe?
-      </blockquote>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 9 PRIOR POSTERIOR -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>9. Prior and Posterior State Estimates</h2>
-
-      <p>
-        The Kalman Filter maintains two estimates at each measurement epoch.
-      </p>
-
-      <h3>Prior Estimate</h3>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf x}_k^{-}
-        }
-        \]
-      </p>
-
-      <p>
-        represents knowledge before processing the current measurement.
-      </p>
-
-      <h3>Posterior Estimate</h3>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf x}_k^{+}
-        }
-        \]
-      </p>
-
-      <p>
-        represents knowledge after the measurement update.
-      </p>
-
-      <p>
-        Similarly,
-      </p>
-
-      <p>
-        \[
-        \boxed{\mathbf P_k^{-}}
-        \]
-      </p>
-
-      <p>
-        is the predicted covariance and
-      </p>
-
-      <p>
-        \[
-        \boxed{\mathbf P_k^{+}}
-        \]
-      </p>
-
-      <p>
-        is the posterior covariance.
-      </p>
-
-      <p>
-        The complete cycle is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        (
-        \hat{\mathbf x}_{k-1}^{+},
-        \mathbf P_{k-1}^{+}
-        )
-        }
-        \]
-      </p>
-
-      <p>\[
-        \downarrow
-        \]</p>
-
-      <p><strong>Prediction</strong></p>
-
-      <p>\[
-        \downarrow
-        \]</p>
-
-      <p>
-        \[
-        \boxed{
-        (
-        \hat{\mathbf x}_k^{-},
-        \mathbf P_k^{-}
-        )
-        }
-        \]
-      </p>
-
-      <p>\[
-        \downarrow
-        \]</p>
-
-      <p><strong>Measurement Update</strong></p>
-
-      <p>\[
-        \downarrow
-        \]</p>
-
-      <p>
-        \[
-        \boxed{
-        (
-        \hat{\mathbf x}_k^{+},
-        \mathbf P_k^{+}
-        )
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 10 STATE PREDICTION -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>10. Step 1 — State Prediction</h2>
-
-      <p>
-        The predicted state is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf x}_k^{-}
-        =
-        \mathbf F_{k-1}\hat{\mathbf x}_{k-1}^{+}
-        +
-        \mathbf B_{k-1}\mathbf u_{k-1}
-        }.
-        \]
-      </p>
-
-      <p>
-        This equation asks:
-      </p>
-
-      <blockquote>
-        Based on the previous best estimate and the spacecraft dynamic model,
-        where should the spacecraft state be now?
-      </blockquote>
-
-      <p>
-        No new measurement has yet been processed.
-      </p>
-
-      <p>
-        This prediction may propagate:
-      </p>
-
-      <ul>
-        <li>orbit position and velocity,</li>
-        <li>relative RPO state,</li>
-        <li>inertial-navigation states,</li>
-        <li>attitude error states,</li>
-        <li>sensor biases.</li>
-      </ul>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 11 COVARIANCE PREDICTION -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>11. Step 2 — Covariance Prediction</h2>
-
-      <p>
-        State prediction must be accompanied by uncertainty prediction:
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf P_k^{-}
-        =
-        \mathbf F_{k-1}
-        \mathbf P_{k-1}^{+}
-        \mathbf F_{k-1}^{T}
-        +
-        \mathbf Q_{k-1}
-        }.
-        \]
-      </p>
-
-      <p>
-        The term
-      </p>
-
-      <p>
-        \[
-        \mathbf F
-        \mathbf P^{+}
-        \mathbf F^T
-        \]
-      </p>
-
-      <p>
-        propagates existing uncertainty through the dynamics.
-      </p>
-
-      <p>
-        The term
-      </p>
-
-      <p>
-        \[
-        \mathbf Q
-        \]
-      </p>
-
-      <p>
-        adds new uncertainty caused by imperfect process modelling.
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Predicted Uncertainty}
-        =
-        \text{Propagated Previous Uncertainty}
-        +
-        \text{New Model Uncertainty}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 12 COVARIANCE GROWTH -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>12. Why Covariance Can Grow During Propagation</h2>
-
-      <p>
-        During a sensor outage, the estimator can continue propagating the
-        spacecraft state.
-      </p>
-
-      <p>
-        However, uncertain disturbances and model imperfections continue to
-        accumulate.
-      </p>
-
-      <p>
-        Thus the state estimate still exists, but confidence in that estimate
-        generally decreases.
-      </p>
-
-      <p>
-        Mathematically,
-      </p>
-
-      <p>
-        \[
-        \mathbf P^{-}
-        \]
-      </p>
-
-      <p>
-        normally grows.
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{No Measurement}
-        \not\Rightarrow
-        \text{No Estimate}
-        }
-        \]
-      </p>
-
-      <p>
-        but normally
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{No Measurement}
-        \Rightarrow
-        \text{Increasing Uncertainty}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 13 Q -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>13. Understanding Process Noise \(Q\)</h2>
-
-      <p>
-        The matrix
-      </p>
-
-      <p>
-        \[
-        \boxed{\mathbf Q}
-        \]
-      </p>
-
-      <p>
-        describes uncertainty in state evolution.
-      </p>
-
-      <p>
-        It can represent:
-      </p>
-
-      <ul>
-        <li>unmodelled acceleration,</li>
-        <li>disturbance-force uncertainty,</li>
-        <li>disturbance-torque uncertainty,</li>
-        <li>atmospheric-drag uncertainty,</li>
-        <li>solar-radiation-pressure uncertainty,</li>
-        <li>thruster-force uncertainty,</li>
-        <li>actuator errors,</li>
-        <li>sensor-bias random walks,</li>
-        <li>model truncation,</li>
-        <li>neglected dynamics.</li>
-      </ul>
-
-      <p>
-        A very small \(Q\) tells the filter:
-      </p>
-
-      <blockquote>
-        Trust the model strongly.
-      </blockquote>
+      <ol>
 
-      <p>
-        A larger \(Q\) says:
-      </p>
-
-      <blockquote>
-        The model prediction may be inaccurate.
-      </blockquote>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 14 Q PHYSICAL MODEL -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>14. \(Q\) Is Not Simply a Tuning Knob</h2>
-
-      <p>
-        Although \(Q\) is often adjusted during filter tuning, it should ideally
-        be derived from a physical stochastic model.
-      </p>
-
-      <p>
-        For example, if acceleration uncertainty is represented as continuous
-        white acceleration noise with spectral density \(q_a\), the
-        constant-velocity model can lead to
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf Q
-        =
-        q_a
-        \begin{bmatrix}
-        \frac{\Delta t^3}{3}
-        &
-        \frac{\Delta t^2}{2}
-        \\[6pt]
-        \frac{\Delta t^2}{2}
-        &
-        \Delta t
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        Different process-noise models can produce different discrete \(Q\)
-        matrices.
-      </p>
-
-      <p>
-        Therefore a good workflow is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Physical Disturbance Model}
-        \rightarrow
-        \text{Continuous Stochastic Model}
-        \rightarrow
-        \text{Discretization}
-        \rightarrow
-        Q_d
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 15 MEASUREMENT PREDICTION -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>15. Measurement Prediction</h2>
-
-      <p>
-        Once the state has been predicted, the filter calculates the
-        measurement expected from that predicted state.
-      </p>
-
-      <p>
-        For the linear case,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf z}_k
-        =
-        \mathbf H_k
-        \hat{\mathbf x}_k^{-}
-        }.
-        \]
-      </p>
-
-      <p>
-        This answers:
-      </p>
-
-      <blockquote>
-        If the predicted spacecraft state were correct, what should the sensor
-        measure?
-      </blockquote>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 16 INNOVATION -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>16. Innovation or Measurement Residual</h2>
+        <li>
+          propagates relative position and velocity,
+        </li>
 
-      <p>
-        The difference between the actual measurement and predicted
-        measurement is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf y_k
-        =
-        \mathbf z_k
-        -
-        \mathbf H_k
-        \hat{\mathbf x}_k^{-}
-        }.
-        \]
-      </p>
-
-      <p>
-        The vector \(\mathbf y_k\) is called the:
-      </p>
-
-      <ul>
-        <li>innovation,</li>
-        <li>measurement residual,</li>
-        <li>pre-fit residual.</li>
-      </ul>
-
-      <p>
-        Conceptually,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Innovation}
-        =
-        \text{Actual Measurement}
-        -
-        \text{Expected Measurement}
-        }.
-        \]
-      </p>
-
-      <p>
-        If
-      </p>
-
-      <p>
-        \[
-        \mathbf y_k\approx0,
-        \]
-      </p>
-
-      <p>
-        the sensor agrees with the prediction.
-      </p>
-
-      <p>
-        A large innovation means that prediction and measurement disagree.
-      </p>
-
-      <p>
-        However, a large raw residual is not enough to conclude that a sensor
-        is faulty.
-      </p>
-
-      <p>
-        Its importance depends on the expected residual uncertainty.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 17 S -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>17. Innovation Covariance</h2>
-
-      <p>
-        The innovation covariance is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf S_k
-        =
-        \mathbf H_k
-        \mathbf P_k^{-}
-        \mathbf H_k^T
-        +
-        \mathbf R_k
-        }.
-        \]
-      </p>
-
-      <p>
-        It combines:
-      </p>
+        <li>
+          predicts the camera angles,
+        </li>
 
-      <p>
-        \[
-        \mathbf H\mathbf P^{-}\mathbf H^T
-        \]
-      </p>
+        <li>
+          compares predicted angles with observed angles,
+        </li>
 
-      <p>
-        which represents predicted-measurement uncertainty due to state
-        uncertainty,
-      </p>
+        <li>
+          computes the angular innovation,
+        </li>
 
-      <p>
-        and
-      </p>
+        <li>
+          uses the Jacobian to determine state sensitivity,
+        </li>
 
-      <p>
-        \[
-        \mathbf R
-        \]
-      </p>
+        <li>
+          corrects the Cartesian relative state.
+        </li>
 
-      <p>
-        which represents sensor uncertainty.
-      </p>
+      </ol>
 
       <p>
         Thus,
@@ -1568,1892 +1870,75 @@
 
       <p>
         \[
-        \boxed{
-        \text{Innovation Uncertainty}
-        =
-        \text{Projected State Uncertainty}
-        +
-        \text{Sensor Uncertainty}
-        }.
+        \boxed{ \text{Angular Measurements} \rightarrow \text{EKF} \rightarrow \text{Cartesian Relative-State Estimate} }.
         \]
+      </p>
+
+      <p>
+        This is a powerful example of estimating states that are not directly measured.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 18 WHY S MATTERS -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>18. Why Innovation Covariance Matters</h2>
+<h3>4.2.7.28 EKF for LiDAR-Based RPO</h3>
 
       <p>
-        Suppose
+        A LiDAR can provide measurements such as:
       </p>
 
       <p>
         \[
-        y=1~\text{m}.
+        \rho = \sqrt{x^2+y^2+z^2}.
         \]
       </p>
 
       <p>
-        If
-      </p>
-
-      <p>
-        \[
-        \sigma_y=0.01~\text{m},
-        \]
-      </p>
-
-      <p>
-        the innovation is extremely unusual.
-      </p>
-
-      <p>
-        But if
-      </p>
-
-      <p>
-        \[
-        \sigma_y=10~\text{m},
-        \]
-      </p>
-
-      <p>
-        the same 1 m residual is relatively insignificant.
-      </p>
-
-      <p>
-        Therefore residual magnitude should always be interpreted together with
-        its covariance.
-      </p>
-
-      <p>
-        A normalized quantity is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \epsilon_k
-        =
-        \mathbf y_k^T
-        \mathbf S_k^{-1}
-        \mathbf y_k
-        }.
-        \]
-      </p>
-
-      <p>
-        This forms the basis of NIS and Mahalanobis-distance gating.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 19 KALMAN GAIN -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>19. Kalman Gain</h2>
-
-      <p>
-        The Kalman gain is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf K_k
-        =
-        \mathbf P_k^{-}
-        \mathbf H_k^T
-        \mathbf S_k^{-1}
-        }.
-        \]
-      </p>
-
-      <p>
-        Equivalently,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf K_k
-        =
-        \mathbf P_k^{-}
-        \mathbf H_k^T
-        \left(
-        \mathbf H_k
-        \mathbf P_k^{-}
-        \mathbf H_k^T
-        +
-        \mathbf R_k
-        \right)^{-1}
-        }.
-        \]
-      </p>
-
-      <p>
-        The Kalman gain determines how strongly the innovation modifies the
-        predicted state.
-      </p>
-
-      <p>
-        Conceptually,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Kalman Gain}
-        =
-        \text{Optimal Measurement Correction Weight}
-        }
-        \]
-      </p>
-
-      <p>
-        under the classical Kalman assumptions.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 20 K INTERPRETATION -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>20. Physical Interpretation of the Kalman Gain</h2>
-
-      <p>
-        Consider a scalar state measured directly:
-      </p>
-
-      <p>
-        \[
-        H=1.
-        \]
-      </p>
-
-      <p>
-        Then
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        K
-        =
-        \frac{P^-}{P^-+R}
-        }.
-        \]
-      </p>
-
-      <h3>Prediction Much More Uncertain Than the Sensor</h3>
-
-      <p>
-        If
-      </p>
-
-      <p>
-        \[
-        P^-\gg R,
-        \]
-      </p>
-
-      <p>
-        then
-      </p>
-
-      <p>
-        \[
-        K\rightarrow1.
-        \]
-      </p>
-
-      <p>
-        The filter responds strongly to the measurement.
-      </p>
-
-      <h3>Sensor Much More Uncertain Than the Prediction</h3>
-
-      <p>
-        If
-      </p>
-
-      <p>
-        \[
-        R\gg P^-,
-        \]
-      </p>
-
-      <p>
-        then
-      </p>
-
-      <p>
-        \[
-        K\rightarrow0.
-        \]
-      </p>
-
-      <p>
-        The filter relies mainly on prediction.
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        P^- \uparrow
-        \Rightarrow
-        \text{Measurement Influence} \uparrow
-        }
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        R \uparrow
-        \Rightarrow
-        \text{Measurement Influence} \downarrow
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 21 NOT FIXED -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>21. Kalman Gain Is Not a Fixed Gain</h2>
-
-      <p>
-        Unlike a conventional fixed-gain observer,
-      </p>
-
-      <p>
-        \[
-        \boxed{\mathbf K_k}
-        \]
-      </p>
-
-      <p>
-        generally varies with time.
-      </p>
-
-      <p>
-        As the covariance changes,
-      </p>
-
-      <p>
-        \[
-        \mathbf P_k
-        \]
-      </p>
-
-      <p>
-        changes the gain.
-      </p>
-
-      <p>
-        If sensor uncertainty changes and \(R_k\) is modified, the gain also
-        changes.
-      </p>
-
-      <p>
-        Therefore the Kalman Filter continuously adjusts measurement influence
-        according to the uncertainty model.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 22 STATE UPDATE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>22. State Measurement Update</h2>
-
-      <p>
-        The corrected state is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf x}_k^{+}
-        =
-        \hat{\mathbf x}_k^{-}
-        +
-        \mathbf K_k\mathbf y_k
-        }.
-        \]
-      </p>
-
-      <p>
-        Substituting the innovation,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf x}_k^{+}
-        =
-        \hat{\mathbf x}_k^{-}
-        +
-        \mathbf K_k
-        \left(
-        \mathbf z_k
-        -
-        \mathbf H_k\hat{\mathbf x}_k^{-}
-        \right)
-        }.
-        \]
-      </p>
-
-      <p>
-        Thus,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Corrected Estimate}
-        =
-        \text{Predicted Estimate}
-        +
-        \text{Weighted Measurement Disagreement}
-        }.
-        \]
-      </p>
-
-      <p>
-        The innovation tells us
-        <strong>what correction is required</strong>.
-      </p>
-
-      <p>
-        The Kalman gain tells us
-        <strong>how much correction should be applied</strong>.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 23 POSTERIOR COV -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>23. Posterior Covariance Update</h2>
-
-      <p>
-        After incorporating a measurement, the state covariance must also be
-        updated.
-      </p>
-
-      <p>
-        A common expression is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf P_k^{+}
-        =
-        (
-        \mathbf I-\mathbf K_k\mathbf H_k
-        )
-        \mathbf P_k^{-}
-        }.
-        \]
-      </p>
-
-      <p>
-        An informative valid measurement usually reduces state uncertainty:
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf P_k^{+}
-        \preceq
-        \mathbf P_k^{-}
-        }.
-        \]
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Valid Informative Measurement}
-        \rightarrow
-        \text{Reduced Uncertainty}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 24 JOSEPH -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>24. Joseph-Form Covariance Update</h2>
-
-      <p>
-        A numerically robust covariance update is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf P_k^{+}
-        =
-        (
-        \mathbf I-\mathbf K_k\mathbf H_k
-        )
-        \mathbf P_k^{-}
-        (
-        \mathbf I-\mathbf K_k\mathbf H_k
-        )^T
-        +
-        \mathbf K_k
-        \mathbf R_k
-        \mathbf K_k^T
-        }.
-        \]
-      </p>
-
-      <p>
-        This is known as the <strong>Joseph form</strong>.
-      </p>
-
-      <p>
-        In exact arithmetic it is equivalent to the simplified covariance
-        update when \(K\) is the Kalman gain.
-      </p>
-
-      <p>
-        In finite-precision implementation it can help preserve:
+        Depending on the sensor, it may additionally provide:
       </p>
 
       <ul>
-        <li>covariance symmetry,</li>
-        <li>positive-semidefinite behaviour,</li>
-        <li>numerical robustness.</li>
-      </ul>
 
-    </section>
+        <li>
+          line-of-sight direction,
+        </li>
 
+        <li>
+          point-cloud information,
+        </li>
 
-    <!-- ======================================================= -->
-    <!-- 25 COMPLETE CYCLE -->
-    <!-- ======================================================= -->
+        <li>
+          relative pose,
+        </li>
 
-    <section class="notes-section-card">
+        <li>
+          target geometry,
+        </li>
 
-      <h2>25. Complete Kalman Filter Cycle</h2>
+        <li>
+          closing range.
+        </li>
 
-      <h3>Prediction — State</h3>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf x}_k^{-}
-        =
-        \mathbf F_{k-1}
-        \hat{\mathbf x}_{k-1}^{+}
-        +
-        \mathbf B_{k-1}
-        \mathbf u_{k-1}
-        }
-        \]
-      </p>
-
-      <h3>Prediction — Covariance</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf P_k^{-}
-        =
-        \mathbf F_{k-1}
-        \mathbf P_{k-1}^{+}
-        \mathbf F_{k-1}^{T}
-        +
-        \mathbf Q_{k-1}
-        }
-        \]
-      </p>
-
-      <h3>Predicted Measurement</h3>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf z}_k
-        =
-        \mathbf H_k
-        \hat{\mathbf x}_k^{-}
-        }
-        \]
-      </p>
-
-      <h3>Innovation</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf y_k
-        =
-        \mathbf z_k
-        -
-        \hat{\mathbf z}_k
-        }
-        \]
-      </p>
-
-      <h3>Innovation Covariance</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf S_k
-        =
-        \mathbf H_k
-        \mathbf P_k^{-}
-        \mathbf H_k^T
-        +
-        \mathbf R_k
-        }
-        \]
-      </p>
-
-      <h3>Kalman Gain</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf K_k
-        =
-        \mathbf P_k^{-}
-        \mathbf H_k^T
-        \mathbf S_k^{-1}
-        }
-        \]
-      </p>
-
-      <h3>State Update</h3>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf x}_k^{+}
-        =
-        \hat{\mathbf x}_k^{-}
-        +
-        \mathbf K_k\mathbf y_k
-        }
-        \]
-      </p>
-
-      <h3>Covariance Update</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf P_k^{+}
-        =
-        (
-        \mathbf I-\mathbf K_k\mathbf H_k
-        )
-        \mathbf P_k^{-}
-        }
-        \]
-      </p>
-
-      <p>
-        The posterior then becomes the starting condition for the next
-        prediction.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 26 FLOW -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>26. Complete Information Flow</h2>
-
-      <p>
-        The state-estimation path is
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Previous Posterior State}}
-        \rightarrow
-        \boxed{\text{Dynamics Model}}
-        \rightarrow
-        \boxed{\text{Predicted State}}.
-        \]
-      </p>
-
-      <p>
-        In parallel, uncertainty evolves as
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Previous Covariance}}
-        \rightarrow
-        \boxed{\text{Dynamics + Process Noise}}
-        \rightarrow
-        \boxed{\text{Predicted Covariance}}.
-        \]
-      </p>
-
-      <p>
-        Then
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Sensor Measurement}}
-        -
-        \boxed{\text{Predicted Measurement}}
-        \rightarrow
-        \boxed{\text{Innovation}}.
-        \]
-      </p>
-
-      <p>
-        The predicted covariance and measurement covariance determine
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Innovation Covariance}}
-        \]
-      </p>
-
-      <p>
-        which contributes to
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Kalman Gain}}.
-        \]
-      </p>
-
-      <p>
-        Finally,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Prediction}
-        +
-        \text{Kalman Gain}
-        \times
-        \text{Innovation}
-        }
-        \]
-      </p>
-
-      <p>
-        gives the corrected state estimate.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 27 MATRIX MEANINGS -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>27. What \(P\), \(Q\), \(R\), \(S\), and \(K\) Mean</h2>
-
-      <h3>\(P\): State-Estimation Error Covariance</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf P
-        =
-        E
-        \left[
-        (
-        \mathbf x-\hat{\mathbf x}
-        )
-        (
-        \mathbf x-\hat{\mathbf x}
-        )^T
-        \right]
-        }.
-        \]
-      </p>
-
-      <p>
-        It represents uncertainty in the estimated state.
-      </p>
-
-      <h3>\(Q\): Process-Noise Covariance</h3>
-
-      <p>
-        \[
-        \boxed{\mathbf Q}
-        \]
-      </p>
-
-      <p>
-        describes uncertainty introduced during state propagation.
-      </p>
-
-      <h3>\(R\): Measurement-Noise Covariance</h3>
-
-      <p>
-        \[
-        \boxed{\mathbf R}
-        \]
-      </p>
-
-      <p>
-        describes sensor uncertainty.
-      </p>
-
-      <h3>\(S\): Innovation Covariance</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf S
-        =
-        \mathbf H\mathbf P^-\mathbf H^T+\mathbf R
-        }.
-        \]
-      </p>
-
-      <h3>\(K\): Kalman Gain</h3>
-
-      <p>
-        \[
-        \boxed{\mathbf K}
-        \]
-      </p>
-
-      <p>
-        determines the strength of measurement correction.
-      </p>
-
-      <p>
-        A useful conceptual chain is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        P,Q,R
-        \rightarrow
-        S
-        \rightarrow
-        K
-        \rightarrow
-        \text{State Correction}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 28 DIMENSIONS -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>28. Dimensions of the Main Matrices</h2>
-
-      <p>
-        Suppose
-      </p>
-
-      <p>
-        \[
-        \mathbf x\in\mathbb R^n,
-        \qquad
-        \mathbf z\in\mathbb R^m,
-        \qquad
-        \mathbf u\in\mathbb R^p.
-        \]
-      </p>
-
-      <p>
-        Then:
-      </p>
-
-      <p>
-        \[
-        \mathbf F\in\mathbb R^{n\times n},
-        \]
-      </p>
-
-      <p>
-        \[
-        \mathbf B\in\mathbb R^{n\times p},
-        \]
-      </p>
-
-      <p>
-        \[
-        \mathbf H\in\mathbb R^{m\times n},
-        \]
-      </p>
-
-      <p>
-        \[
-        \mathbf P,\mathbf Q\in\mathbb R^{n\times n},
-        \]
-      </p>
-
-      <p>
-        \[
-        \mathbf R,\mathbf S\in\mathbb R^{m\times m},
-        \]
-      </p>
-
-      <p>
-        \[
-        \mathbf K\in\mathbb R^{n\times m}.
-        \]
-      </p>
-
-      <p>
-        Matrix-dimension checking is one of the simplest and most useful
-        debugging tools for a Kalman Filter implementation.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 29 EXAMPLE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>29. Simple Position–Velocity Example</h2>
-
-      <p>
-        Consider
-      </p>
-
-      <p>
-        \[
-        \mathbf x
-        =
-        \begin{bmatrix}
-        x\\
-        v
-        \end{bmatrix}.
-        \]
-      </p>
-
-      <p>
-        For constant velocity,
-      </p>
-
-      <p>
-        \[
-        \mathbf F
-        =
-        \begin{bmatrix}
-        1&\Delta t\\
-        0&1
-        \end{bmatrix}.
-        \]
-      </p>
-
-      <p>
-        Suppose only position is measured:
-      </p>
-
-      <p>
-        \[
-        z=x+v_m.
-        \]
-      </p>
-
-      <p>
-        Then
-      </p>
-
-      <p>
-        \[
-        \mathbf H=
-        \begin{bmatrix}
-        1&0
-        \end{bmatrix}.
-        \]
-      </p>
-
-      <p>
-        The filter estimates both position and velocity even though velocity is
-        not measured directly.
-      </p>
-
-      <p>
-        The position measurement can correct velocity because position and
-        velocity errors become statistically coupled through the dynamics.
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{A Measurement Can Correct States That It Does Not Directly Measure}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 30 CROSS COV -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>30. Cross-Covariance and Indirect State Correction</h2>
-
-      <p>
-        Suppose
-      </p>
-
-      <p>
-        \[
-        \mathbf P^-
-        =
-        \begin{bmatrix}
-        P_{xx}&P_{xv}\\
-        P_{vx}&P_{vv}
-        \end{bmatrix}
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        H=
-        \begin{bmatrix}
-        1&0
-        \end{bmatrix}.
-        \]
-      </p>
-
-      <p>
-        Then
-      </p>
-
-      <p>
-        \[
-        K
-        =
-        \frac{1}{P_{xx}+R}
-        \begin{bmatrix}
-        P_{xx}\\
-        P_{vx}
-        \end{bmatrix}.
-        \]
-      </p>
-
-      <p>
-        The velocity correction depends on
-      </p>
-
-      <p>
-        \[
-        \frac{P_{vx}}{P_{xx}+R}.
-        \]
-      </p>
-
-      <p>
-        Thus the position measurement can modify the velocity estimate through
-        position–velocity cross-covariance.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 31 BAYES -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>31. Kalman Filter as a Bayesian Estimator</h2>
-
-      <p>
-        Before the measurement,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        p(
-        \mathbf x_k
-        |
-        \mathbf z_{1:k-1}
-        )
-        =
-        \mathcal N(
-        \hat{\mathbf x}_k^-,
-        \mathbf P_k^-
-        )
-        }.
-        \]
-      </p>
-
-      <p>
-        The measurement likelihood is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        p(
-        \mathbf z_k
-        |
-        \mathbf x_k
-        )
-        =
-        \mathcal N(
-        \mathbf H_k\mathbf x_k,
-        \mathbf R_k
-        )
-        }.
-        \]
-      </p>
-
-      <p>
-        After measurement,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        p(
-        \mathbf x_k
-        |
-        \mathbf z_{1:k}
-        )
-        =
-        \mathcal N(
-        \hat{\mathbf x}_k^+,
-        \mathbf P_k^+
-        )
-        }.
-        \]
-      </p>
-
-      <p>
-        Thus a linear-Gaussian Bayesian posterior can be represented completely
-        using
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Mean}+\text{Covariance}}.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 32 OPTIMAL -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>32. In What Sense Is the Kalman Filter Optimal?</h2>
-
-      <p>
-        The classical Kalman Filter is optimal only under specific modelling
-        assumptions.
-      </p>
-
-      <p>
-        Under a correctly specified linear stochastic model with appropriate
-        assumptions, the KF provides a minimum mean-square-error estimate.
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{The Kalman Filter Is Optimal Under Its Assumed Linear Stochastic Model}
-        }.
-        \]
-      </p>
-
-      <p>
-        It is not correct to say that the Kalman Filter is always optimal under
-        every real-world condition.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 33 ASSUMPTIONS -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>33. Core Assumptions of the Classical Kalman Filter</h2>
-
-      <p>
-        The standard formulation assumes
-      </p>
-
-      <p>
-        \[
-        \mathbf x_k
-        =
-        \mathbf F\mathbf x_{k-1}
-        +
-        \mathbf B\mathbf u
-        +
-        \mathbf w
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \mathbf z_k
-        =
-        \mathbf H\mathbf x_k
-        +
-        \mathbf v.
-        \]
-      </p>
-
-      <p>
-        Typical assumptions include
-      </p>
-
-      <p>
-        \[
-        E[\mathbf w_k]=0,
-        \qquad
-        E[\mathbf v_k]=0,
-        \]
-      </p>
-
-      <p>
-        with known covariance matrices \(Q\) and \(R\).
-      </p>
-
-      <p>
-        The basic formulation usually assumes process noise and measurement
-        noise are mutually uncorrelated.
-      </p>
-
-      <p>
-        Gaussian assumptions are especially important when the KF is
-        interpreted as representing the complete posterior distribution.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 34 NONLINEAR -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>34. What Happens When the System Is Nonlinear?</h2>
-
-      <p>
-        Real spacecraft systems are often nonlinear.
-      </p>
-
-      <p>
-        Orbital dynamics may be
-      </p>
-
-      <p>
-        \[
-        \dot{\mathbf x}
-        =
-        f(\mathbf x,\mathbf u).
-        \]
-      </p>
-
-      <p>
-        A camera bearing measurement may be
-      </p>
-
-      <p>
-        \[
-        \alpha
-        =
-        \tan^{-1}
-        \left(
-        \frac{y}{x}
-        \right).
-        \]
-      </p>
-
-      <p>
-        LiDAR range may be
-      </p>
-
-      <p>
-        \[
-        \rho
-        =
-        \sqrt{x^2+y^2+z^2}.
-        \]
-      </p>
-
-      <p>
-        Quaternion attitude kinematics are also nonlinear.
-      </p>
-
-      <p>
-        This motivates nonlinear Kalman-filter variants such as
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{EKF}},
-        \qquad
-        \boxed{\text{ESKF}},
-        \qquad
-        \boxed{\text{MEKF}},
-        \qquad
-        \boxed{\text{UKF}}.
-        \]
-      </p>
-
-      <p>
-        Their implementations differ, but the fundamental
-        prediction–innovation–correction architecture remains.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 35 INIT -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>35. Filter Initialization</h2>
-
-      <p>
-        The filter requires an initial state estimate
-      </p>
-
-      <p>
-        \[
-        \boxed{\hat{\mathbf x}_0^+}
-        \]
-      </p>
-
-      <p>
-        and an initial covariance
-      </p>
-
-      <p>
-        \[
-        \boxed{\mathbf P_0^+}.
-        \]
-      </p>
-
-      <p>
-        Initial state information may come from:
-      </p>
-
-      <ul>
-        <li>GNSS,</li>
-        <li>ground-based orbit determination,</li>
-        <li>star tracker,</li>
-        <li>coarse Sun sensors,</li>
-        <li>a previous navigation solution,</li>
-        <li>target ephemeris,</li>
-        <li>relative-navigation initialization.</li>
       </ul>
 
       <p>
-        If \(P_0\) is unrealistically small, the filter may be overconfident and
-        resist valid measurements.
+        A range measurement alone does not provide complete Cartesian relative position.
       </p>
 
       <p>
-        If \(P_0\) is very large, the filter may respond aggressively to initial
-        measurements.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 36 CONVERGENCE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>36. Filter Convergence</h2>
-
-      <p>
-        The filter may require time to converge after initialization.
-      </p>
-
-      <p>
-        During convergence:
-      </p>
-
-      <ul>
-        <li>state errors should decrease,</li>
-        <li>covariance should become realistic,</li>
-        <li>innovations should become statistically reasonable,</li>
-        <li>Kalman gains may change significantly.</li>
-      </ul>
-
-      <p>
-        Convergence depends on:
-      </p>
-
-      <ul>
-        <li>observability,</li>
-        <li>measurement availability,</li>
-        <li>initial-state error,</li>
-        <li>initial covariance,</li>
-        <li>\(Q\),</li>
-        <li>\(R\),</li>
-        <li>sensor geometry,</li>
-        <li>dynamic excitation.</li>
-      </ul>
-
-      <p>
-        Running a filter longer cannot make fundamentally unobservable states
-        observable.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 37 OBSERVABILITY -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>37. Observability and the Kalman Filter</h2>
-
-      <p>
-        For
+        But when combined with spacecraft dynamics and other measurements,
       </p>
 
       <p>
         \[
-        x_{k+1}=Fx_k
+        \boxed{ \text{LiDAR} + \text{Camera} + \text{Relative Dynamics} \rightarrow \text{Relative State Estimate} }.
         \]
       </p>
 
       <p>
-        and
-      </p>
-
-      <p>
-        \[
-        z_k=Hx_k,
-        \]
-      </p>
-
-      <p>
-        the observability matrix is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathcal O
-        =
-        \begin{bmatrix}
-        H\\
-        HF\\
-        HF^2\\
-        \vdots\\
-        HF^{n-1}
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        Full observability requires
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \operatorname{rank}(\mathcal O)=n
-        }.
-        \]
-      </p>
-
-      <p>
-        Therefore,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Kalman Filter}
-        +
-        \text{Measurements}
-        \not\Rightarrow
-        \text{All States Are Automatically Estimable}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 38 INNOVATION HEALTH -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>38. Innovation as a Filter-Health Indicator</h2>
-
-      <p>
-        For a correctly modelled and statistically consistent filter, the
-        innovation should behave approximately according to its predicted
-        statistics.
-      </p>
-
-      <p>
-        Innovation behaviour can help identify:
-      </p>
-
-      <ul>
-        <li>incorrect \(Q\),</li>
-        <li>incorrect \(R\),</li>
-        <li>sensor bias,</li>
-        <li>model errors,</li>
-        <li>timing problems,</li>
-        <li>sensor faults,</li>
-        <li>outliers,</li>
-        <li>incorrect measurement models.</li>
-      </ul>
-
-      <p>
-        A persistent non-zero residual mean can indicate systematic error.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 39 NIS -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>39. Normalized Innovation Squared — NIS</h2>
-
-      <p>
-        A common consistency statistic is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \operatorname{NIS}_k
-        =
-        \mathbf y_k^T
-        \mathbf S_k^{-1}
-        \mathbf y_k
-        }.
-        \]
-      </p>
-
-      <p>
-        Under the standard assumptions, NIS may be compared with chi-square
-        bounds based on measurement dimension.
-      </p>
-
-      <p>
-        NIS can be used for:
-      </p>
-
-      <ul>
-        <li>measurement validation,</li>
-        <li>innovation gating,</li>
-        <li>consistency analysis,</li>
-        <li>Monte Carlo verification.</li>
-      </ul>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 40 NEES -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>40. Normalized Estimation Error Squared — NEES</h2>
-
-      <p>
-        If truth is available,
-      </p>
-
-      <p>
-        \[
-        \mathbf e_k
-        =
-        \mathbf x_k-\hat{\mathbf x}_k.
-        \]
-      </p>
-
-      <p>
-        Then
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \operatorname{NEES}_k
-        =
-        \mathbf e_k^T
-        \mathbf P_k^{-1}
-        \mathbf e_k
-        }.
-        \]
-      </p>
-
-      <p>
-        NEES evaluates whether actual estimation error is consistent with the
-        covariance predicted by the filter.
-      </p>
-
-      <p>
-        It is especially useful for:
-      </p>
-
-      <ul>
-        <li>simulation,</li>
-        <li>Monte Carlo analysis,</li>
-        <li>SIL testing,</li>
-        <li>HIL testing,</li>
-        <li>validation.</li>
-      </ul>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 41 ACCURACY CONSISTENCY -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>41. Filter Accuracy vs Filter Consistency</h2>
-
-      <p>
-        Two questions should always be considered separately:
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Is the state estimate accurate?}}
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Is the stated uncertainty credible?}}
-        \]
-      </p>
-
-      <p>
-        Useful validation metrics include:
-      </p>
-
-      <ul>
-        <li>RMSE,</li>
-        <li>mean estimation error,</li>
-        <li>standard deviation,</li>
-        <li>covariance envelopes,</li>
-        <li>innovation statistics,</li>
-        <li>NIS,</li>
-        <li>NEES,</li>
-        <li>convergence time,</li>
-        <li>maximum error.</li>
-      </ul>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 42-45 Q/R TUNING -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>42. Effect of Choosing \(R\) Too Small</h2>
-
-      <p>
-        If the assumed measurement covariance is smaller than the true sensor
-        uncertainty,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        R_{\text{assumed}}
-        <
-        R_{\text{actual}}
-        \Rightarrow
-        \text{Overtrust Measurements}
-        }.
-        \]
-      </p>
-
-      <p>
-        Possible consequences include:
-      </p>
-
-      <ul>
-        <li>excessive measurement weighting,</li>
-        <li>noisy state estimates,</li>
-        <li>covariance becoming too small,</li>
-        <li>filter overconfidence,</li>
-        <li>higher sensitivity to outliers.</li>
-      </ul>
-
-    </section>
-
-
-    <section class="notes-section-card">
-
-      <h2>43. Effect of Choosing \(R\) Too Large</h2>
-
-      <p>
-        If \(R\) is too large, the filter under-trusts the sensor.
-      </p>
-
-      <p>
-        Consequences may include:
-      </p>
-
-      <ul>
-        <li>weak measurement corrections,</li>
-        <li>excessive reliance on prediction,</li>
-        <li>slow correction of model drift,</li>
-        <li>slower convergence.</li>
-      </ul>
-
-    </section>
-
-
-    <section class="notes-section-card">
-
-      <h2>44. Effect of Choosing \(Q\) Too Small</h2>
-
-      <p>
-        If \(Q\) is too small, the filter assumes that the dynamics model is
-        more accurate than it actually is.
-      </p>
-
-      <p>
-        Possible consequences include:
-      </p>
-
-      <ul>
-        <li>poor response to real disturbances,</li>
-        <li>slow adaptation,</li>
-        <li>overconfidence,</li>
-        <li>underestimated covariance,</li>
-        <li>poor innovation statistics.</li>
-      </ul>
-
-    </section>
-
-
-    <section class="notes-section-card">
-
-      <h2>45. Effect of Choosing \(Q\) Too Large</h2>
-
-      <p>
-        If \(Q\) is excessively large, predicted covariance grows rapidly.
-      </p>
-
-      <p>
-        The filter then relies more strongly on measurements.
-      </p>
-
-      <p>
-        Possible consequences include:
-      </p>
-
-      <ul>
-        <li>noisier state estimates,</li>
-        <li>higher sensor-noise sensitivity,</li>
-        <li>unnecessary measurement-driven corrections.</li>
-      </ul>
-
-      <p>
-        \(Q\) and \(R\) should therefore be based on physical modelling and
-        verified empirically.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 46 CORRELATION -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>46. Correlated Measurement Noise</h2>
-
-      <p>
-        Measurement covariance does not have to be diagonal.
-      </p>
-
-      <p>
-        For example,
-      </p>
-
-      <p>
-        \[
-        \mathbf R
-        =
-        \begin{bmatrix}
-        \sigma_x^2&R_{xy}\\
-        R_{yx}&\sigma_y^2
-        \end{bmatrix}.
-        \]
-      </p>
-
-      <p>
-        Non-zero off-diagonal terms represent correlation between measurement
-        errors.
-      </p>
-
-      <p>
-        Ignoring significant correlations can cause the filter to count
-        information incorrectly and become overconfident.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 47-49 MULTI RATE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>47. Sequential Multi-Sensor Updates</h2>
-
-      <p>
-        Measurements from GNSS, cameras, LiDAR, star trackers and other sensors
-        need not arrive simultaneously.
-      </p>
-
-      <p>
-        The filter may execute:
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Prediction}}
-        \rightarrow
-        \boxed{\text{GNSS Update}}
-        \rightarrow
-        \boxed{\text{Prediction}}
-        \rightarrow
-        \boxed{\text{Camera Update}}
-        \rightarrow
-        \boxed{\text{LiDAR Update}}.
-        \]
-      </p>
-
-      <p>
-        This naturally supports asynchronous spacecraft sensors.
+        The EKF provides one framework for this fusion.
       </p>
 
     </section>
@@ -3461,33 +1946,32 @@
 
     <section class="notes-section-card">
 
-      <h2>48. Multi-Rate Sensor Fusion</h2>
+<h3>4.2.7.29 EKF for GNSS Navigation</h3>
 
       <p>
-        Typical spacecraft sensor rates may differ significantly.
+        GNSS may provide position and velocity measurements.
       </p>
 
-      <ul>
-        <li>Gyroscope — high rate,</li>
-        <li>IMU — high rate,</li>
-        <li>Star tracker — lower rate,</li>
-        <li>GNSS — moderate rate,</li>
-        <li>Camera — mission-dependent,</li>
-        <li>LiDAR — mission-dependent.</li>
-      </ul>
-
       <p>
-        A common architecture is
+        A state could include
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{High-Rate Prediction}
-        +
-        \text{Asynchronous Measurement Updates}
-        }.
+        x= \begin{bmatrix} r\\ v\\ b_c\\ \dot b_c \end{bmatrix}
         \]
+      </p>
+
+      <p>
+        where <code>b_c</code> and <code>\dot b_c</code> represent receiver clock bias and drift.
+      </p>
+
+      <p>
+        Depending on whether processed navigation solutions or raw pseudorange/Doppler measurements are used, the measurement model may be linear or nonlinear.
+      </p>
+
+      <p>
+        With raw GNSS observables, satellite geometry naturally produces nonlinear measurement equations, making EKF-based estimation especially useful.
       </p>
 
     </section>
@@ -3495,472 +1979,34 @@
 
     <section class="notes-section-card">
 
-      <h2>49. Sensor Dropout</h2>
+<h3>4.2.7.30 EKF for IMU/GNSS Fusion</h3>
 
       <p>
-        If a sensor measurement is unavailable, its update is skipped.
-      </p>
-
-      <p>
-        The filter continues propagation:
+        An inertial-navigation EKF may estimate
       </p>
 
       <p>
         \[
-        \boxed{
-        \hat x^+
-        \rightarrow
-        \text{Prediction}
-        \rightarrow
-        \hat x^-
-        }.
+        x= \begin{bmatrix} r\\ v\\ \theta\\ b_g\\ b_a \end{bmatrix}.
         \]
       </p>
 
       <p>
-        State uncertainty generally grows because process noise continues to
-        accumulate.
+        The IMU provides high-rate measurements for propagation.
       </p>
 
       <p>
-        Once the sensor becomes valid again, measurement updates resume.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 50 GATING -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>50. Measurement Gating</h2>
-
-      <p>
-        Not every received measurement should automatically be accepted.
-      </p>
-
-      <p>
-        For example, an RPO camera may incorrectly associate a visual feature.
-      </p>
-
-      <p>
-        A common validation chain is
+        But inertial errors accumulate because of
       </p>
 
       <p>
         \[
-        \boxed{\text{Measurement}}
-        \rightarrow
-        \boxed{\text{Innovation}}
-        \rightarrow
-        \boxed{\text{Statistical Gating}}
-        \rightarrow
-        \boxed{\text{Accept / Reject / Down-Weight}}
-        \rightarrow
-        \boxed{\text{Kalman Update}}.
+        \boxed{ \text{Gyro Bias} + \text{Accelerometer Bias} + \text{Noise} + \text{Scale Factor} + \text{Misalignment} }.
         \]
       </p>
 
       <p>
-        NIS and Mahalanobis-distance tests can be used for this purpose.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 51 TIMING -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>51. Time Synchronization and Latency</h2>
-
-      <p>
-        A measurement must be associated with the correct state epoch.
-      </p>
-
-      <p>
-        Real spacecraft sensors may contain:
-      </p>
-
-      <ul>
-        <li>different timestamps,</li>
-        <li>processing delays,</li>
-        <li>communication latency,</li>
-        <li>buffering delays,</li>
-        <li>asynchronous clocks.</li>
-      </ul>
-
-      <p>
-        If a measurement generated at
-      </p>
-
-      <p>
-        \[
-        t-\tau
-        \]
-      </p>
-
-      <p>
-        is incorrectly interpreted as belonging to \(t\), the innovation can
-        contain timing error.
-      </p>
-
-      <p>
-        Therefore a practical measurement requires
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Measurement Value}
-        +
-        \text{Measurement Covariance}
-        +
-        \text{Correct Timestamp}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 52 NUMERICAL -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>52. Numerical Implementation Considerations</h2>
-
-      <p>
-        Practical implementation requires attention to:
-      </p>
-
-      <ul>
-        <li>covariance symmetry,</li>
-        <li>positive-semidefinite covariance,</li>
-        <li>matrix conditioning,</li>
-        <li>floating-point precision,</li>
-        <li>discretization accuracy,</li>
-        <li>update timing,</li>
-        <li>matrix dimensions,</li>
-        <li>sensor units,</li>
-        <li>coordinate frames.</li>
-      </ul>
-
-      <p>
-        Although the theoretical formula contains
-      </p>
-
-      <p>
-        \[
-        S^{-1},
-        \]
-      </p>
-
-      <p>
-        software implementations should generally solve the associated linear
-        system rather than explicitly forming a matrix inverse.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 53 SYMMETRY -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>53. Covariance Symmetry</h2>
-
-      <p>
-        The covariance theoretically satisfies
-      </p>
-
-      <p>
-        \[
-        \boxed{P=P^T}.
-        \]
-      </p>
-
-      <p>
-        Finite-precision computations can introduce small asymmetries.
-      </p>
-
-      <p>
-        A common safeguard is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        P
-        \leftarrow
-        \frac12(P+P^T)
-        }.
-        \]
-      </p>
-
-      <p>
-        However, repeated covariance asymmetry may indicate a deeper
-        implementation problem and should be investigated.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 54 PSD -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>54. Positive-Semidefinite Covariance</h2>
-
-      <p>
-        A valid covariance matrix must satisfy
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf a^T
-        P
-        \mathbf a
-        \ge0
-        }
-        \]
-      </p>
-
-      <p>
-        for any vector \(\mathbf a\).
-      </p>
-
-      <p>
-        Negative covariance eigenvalues caused by numerical errors are
-        physically invalid.
-      </p>
-
-      <p>
-        This motivates robust covariance-update methods and, in demanding
-        applications, square-root filtering.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 55 FRAMES -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>55. Kalman Filter and Coordinate Frames</h2>
-
-      <p>
-        Every state and measurement must have an explicit coordinate frame.
-      </p>
-
-      <p>
-        Examples include:
-      </p>
-
-      <ul>
-        <li>inertial frame,</li>
-        <li>ECEF frame,</li>
-        <li>LVLH/Hill frame,</li>
-        <li>spacecraft body frame,</li>
-        <li>sensor frame,</li>
-        <li>target frame.</li>
-      </ul>
-
-      <p>
-        Suppose a sensor reports
-      </p>
-
-      <p>
-        \[
-        \mathbf r^S
-        \]
-      </p>
-
-      <p>
-        in the sensor frame while the estimator state uses
-      </p>
-
-      <p>
-        \[
-        \mathbf r^H
-        \]
-      </p>
-
-      <p>
-        in a Hill frame.
-      </p>
-
-      <p>
-        The appropriate transformation must be included in the measurement
-        model.
-      </p>
-
-      <p>
-        Incorrect frame handling can cause estimator failure even when all
-        Kalman equations are mathematically correct.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 56 ORBIT -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>56. Kalman Filtering for Spacecraft Orbit Navigation</h2>
-
-      <p>
-        A basic orbital state is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf x
-        =
-        \begin{bmatrix}
-        \mathbf r\\
-        \mathbf v
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        Measurements may come from:
-      </p>
-
-      <ul>
-        <li>GNSS,</li>
-        <li>ground tracking,</li>
-        <li>range,</li>
-        <li>range rate,</li>
-        <li>inter-satellite links.</li>
-      </ul>
-
-      <p>
-        For highly nonlinear orbital dynamics or nonlinear measurements, an EKF
-        or another nonlinear estimator is usually required.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 57 ATTITUDE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>57. Kalman Filtering for Attitude Determination</h2>
-
-      <p>
-        Attitude estimation can combine:
-      </p>
-
-      <ul>
-        <li>gyroscope,</li>
-        <li>star tracker,</li>
-        <li>Sun sensor,</li>
-        <li>magnetometer.</li>
-      </ul>
-
-      <p>
-        Conceptually,
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Gyroscope}}
-        \rightarrow
-        \boxed{\text{High-Rate Attitude Propagation}}
-        \]
-      </p>
-
-      <p>
-        while
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Star Tracker / Sun Sensor / Magnetometer}
-        }
-        \rightarrow
-        \boxed{\text{Measurement Update}}.
-        \]
-      </p>
-
-      <p>
-        Because quaternion kinematics and reference-vector measurements are
-        nonlinear, spacecraft attitude determination commonly uses the MEKF or
-        related nonlinear formulations.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 58 IMU GNSS -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>58. Kalman Filtering for IMU/GNSS Navigation</h2>
-
-      <p>
-        A representative navigation state is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf x
-        =
-        \begin{bmatrix}
-        \mathbf r\\
-        \mathbf v\\
-        \boldsymbol\theta\\
-        \mathbf b_g\\
-        \mathbf b_a
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        The IMU provides high-rate propagation.
-      </p>
-
-      <p>
-        Its errors accumulate because of:
-      </p>
-
-      <ul>
-        <li>white noise,</li>
-        <li>gyro bias,</li>
-        <li>accelerometer bias,</li>
-        <li>scale factor,</li>
-        <li>alignment errors.</li>
-      </ul>
-
-      <p>
-        GNSS supplies long-term position and velocity information.
+        GNSS periodically constrains position and velocity.
       </p>
 
       <p>
@@ -3969,385 +2015,7 @@
 
       <p>
         \[
-        \boxed{\text{IMU}}
-        \rightarrow
-        \boxed{\text{High-Rate Propagation}}
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{GNSS}}
-        \rightarrow
-        \boxed{\text{Position/Velocity Correction}}.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 59 RPO -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>59. Kalman Filtering for Rendezvous and Proximity Operations</h2>
-
-      <p>
-        A basic relative-navigation state is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf x_{rel}
-        =
-        \begin{bmatrix}
-        \mathbf r_{rel}\\
-        \mathbf v_{rel}
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        A more complete state may additionally include:
-      </p>
-
-      <ul>
-        <li>relative attitude,</li>
-        <li>relative angular rates,</li>
-        <li>sensor biases,</li>
-        <li>sensor calibration parameters.</li>
-      </ul>
-
-      <p>
-        Dynamic models may include:
-      </p>
-
-      <ul>
-        <li>Hill/Clohessy-Wiltshire equations,</li>
-        <li>Tschauner-Hempel dynamics,</li>
-        <li>nonlinear relative orbital dynamics,</li>
-        <li>numerical orbital propagation.</li>
-      </ul>
-
-      <p>
-        Relative measurements may come from:
-      </p>
-
-      <ul>
-        <li>relative GNSS,</li>
-        <li>camera,</li>
-        <li>LiDAR,</li>
-        <li>range sensors,</li>
-        <li>bearing sensors.</li>
-      </ul>
-
-      <p>
-        Thus,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Relative Dynamics Prediction}
-        +
-        \text{Relative Sensor Updates}
-        \rightarrow
-        \hat{\mathbf x}_{rel}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 60 RPO MEASUREMENTS -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>60. RPO Measurement Examples</h2>
-
-      <h3>Relative GNSS</h3>
-
-      <p>
-        \[
-        \boxed{
-        \mathbf z_{GNSS}
-        =
-        \begin{bmatrix}
-        \mathbf r_{rel}\\
-        \mathbf v_{rel}
-        \end{bmatrix}
-        +
-        \text{noise}
-        }.
-        \]
-      </p>
-
-      <h3>Camera Bearing</h3>
-
-      <p>
-        \[
-        \boxed{
-        \alpha
-        =
-        \tan^{-1}
-        \left(
-        \frac{y}{x}
-        \right)
-        }
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \beta
-        =
-        \tan^{-1}
-        \left(
-        \frac{z}
-        {\sqrt{x^2+y^2}}
-        \right)
-        }.
-        \]
-      </p>
-
-      <h3>LiDAR Range</h3>
-
-      <p>
-        \[
-        \boxed{
-        \rho
-        =
-        \sqrt{x^2+y^2+z^2}
-        }.
-        \]
-      </p>
-
-      <p>
-        These measurement models are nonlinear, which motivates EKF or UKF
-        methods.
-      </p>
-
-      <p>
-        However, the fundamental estimator structure remains
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Predict}
-        \rightarrow
-        \text{Predict Measurement}
-        \rightarrow
-        \text{Innovation}
-        \rightarrow
-        \text{Gain}
-        \rightarrow
-        \text{Correct}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 61 SENSOR HANDOVER -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>61. Sensor Handover During RPO</h2>
-
-      <p>
-        Different sensors may dominate at different relative ranges.
-      </p>
-
-      <p>
-        A representative architecture is
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Far Range: Relative GNSS}}
-        \]
-      </p>
-
-      <p>\[
-        \downarrow
-        \]</p>
-
-      <p>
-        \[
-        \boxed{\text{Mid Range: GNSS + Camera}}
-        \]
-      </p>
-
-      <p>\[
-        \downarrow
-        \]</p>
-
-      <p>
-        \[
-        \boxed{\text{Close Range: Camera + LiDAR}}
-        \]
-      </p>
-
-      <p>\[
-        \downarrow
-        \]</p>
-
-      <p>
-        \[
-        \boxed{\text{Capture: Precision Relative Pose}}.
-        \]
-      </p>
-
-      <p>
-        The estimator should maintain continuity throughout these transitions.
-      </p>
-
-      <p>
-        This requires proper handling of:
-      </p>
-
-      <ul>
-        <li>sensor availability,</li>
-        <li>measurement covariance,</li>
-        <li>observability,</li>
-        <li>initialization,</li>
-        <li>mode-dependent measurement models,</li>
-        <li>outlier rejection.</li>
-      </ul>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 62 CAPTURE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>62. State Estimate vs Capture Decision</h2>
-
-      <p>
-        Suppose capture requires
-      </p>
-
-      <p>
-        \[
-        \|\mathbf r_{rel}\|
-        <
-        r_{capture}
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \|\mathbf v_{rel}\|
-        <
-        v_{capture}.
-        \]
-      </p>
-
-      <p>
-        Checking only
-      </p>
-
-      <p>
-        \[
-        \hat{\mathbf r}_{rel}
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \hat{\mathbf v}_{rel}
-        \]
-      </p>
-
-      <p>
-        may not be sufficient.
-      </p>
-
-      <p>
-        The associated covariance should also be considered.
-      </p>
-
-      <p>
-        Therefore mission logic can use both
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Estimated Relative State}}
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Navigation Confidence}}.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 63 CF VS KF -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>63. Kalman Filter vs Complementary Filter</h2>
-
-      <p>
-        A complementary filter uses designed frequency weighting or fixed gains.
-      </p>
-
-      <p>
-        A Kalman Filter uses propagated uncertainty.
-      </p>
-
-      <p>
-        Conceptually,
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Complementary Filter}
-        \rightarrow
-        \text{Frequency / Designed Weighting}
-        }
+        \boxed{\text{IMU}} \rightarrow \boxed{\text{High-Rate Nonlinear Propagation}}
         \]
       </p>
 
@@ -4357,692 +2025,134 @@
 
       <p>
         \[
-        \boxed{
-        \text{Kalman Filter}
-        \rightarrow
-        \text{Model- and Covariance-Based Weighting}
-        }.
+        \boxed{\text{GNSS}} \rightarrow \boxed{\text{Long-Term Correction}}.
         \]
+      </p>
+
+      <p>
+        This is one of the classic EKF applications.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 64 OBSERVER VS KF -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>64. Kalman Filter vs Luenberger Observer</h2>
+<h3>4.2.7.31 EKF and Spacecraft Attitude Estimation</h3>
 
       <p>
-        A Luenberger observer may be written as
+        Attitude dynamics are nonlinear.
+      </p>
+
+      <p>
+        Quaternion kinematics can be written as
       </p>
 
       <p>
         \[
-        \hat x_{k+1}
-        =
-        F\hat x_k
-        +
-        L(z_k-H\hat x_k).
+        \boxed{ \dot q = \frac12\Omega(\omega)q }.
         \]
       </p>
 
       <p>
-        Its structure resembles the Kalman Filter.
-      </p>
-
-      <p>
-        The fundamental difference is how the correction gain is obtained.
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Observer Gain}
-        \rightarrow
-        \text{Designed from Error Dynamics}
-        }
-        \]
-      </p>
-
-      <p>
-        while
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Kalman Gain}
-        \rightarrow
-        \text{Derived from Uncertainty}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 65 STEADY -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>65. Steady-State Kalman Filter</h2>
-
-      <p>
-        For a time-invariant system under suitable conditions,
-      </p>
-
-      <p>
-        \[
-        P_k
-        \rightarrow
-        P_\infty.
-        \]
-      </p>
-
-      <p>
-        Consequently,
-      </p>
-
-      <p>
-        \[
-        K_k
-        \rightarrow
-        K_\infty.
-        \]
-      </p>
-
-      <p>
-        The filter can then behave similarly to a fixed-gain observer.
-      </p>
-
-      <p>
-        This creates an important link between deterministic observer design and
-        stochastic estimation.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 66 RICCATI -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>66. The Riccati Equation</h2>
-
-      <p>
-        Kalman covariance recursion is closely related to the Riccati equation.
-      </p>
-
-      <p>
-        The covariance evolves according to a balance between:
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Dynamic Propagation}},
-        \]
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Process Uncertainty}},
-        \]
-      </p>
-
-      <p>
-        and
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Measurement Information}}.
-        \]
-      </p>
-
-      <p>
-        The Riccati equation also appears in optimal-control theory,
-        particularly LQR.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 67 LQR -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>67. Duality with LQR</h2>
-
-      <p>
-        There is a mathematical duality between Kalman filtering and the Linear
-        Quadratic Regulator.
+        Measurements may come from:
       </p>
 
       <ul>
+
         <li>
-          LQR determines how control inputs should be selected to regulate a
-          dynamic state.
+          star trackers,
         </li>
 
         <li>
-          Kalman filtering determines how measurements should be used to
-          reconstruct an uncertain state.
+          Sun sensors,
         </li>
+
+        <li>
+          magnetometers,
+        </li>
+
+        <li>
+          gyroscopes.
+        </li>
+
       </ul>
 
       <p>
-        Together,
+        A straightforward EKF can theoretically include quaternion components directly.
+      </p>
+
+      <p>
+        However, quaternion states have the constraint
       </p>
 
       <p>
         \[
-        \boxed{\text{Kalman Filter}}
-        +
-        \boxed{\text{LQR Controller}}
+        \boxed{ \|q\|=1 }.
         \]
       </p>
 
       <p>
-        form the classical LQG estimator-controller framework under appropriate
-        assumptions.
+        This creates practical issues if quaternion components are treated as ordinary unconstrained Euclidean states.
+      </p>
+
+      <p>
+        For spacecraft attitude estimation, this motivates specialized formulations such as the
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Multiplicative Extended Kalman Filter — MEKF}}.
+        \]
+      </p>
+
+      <p>
+        This should be introduced here but developed fully in the dedicated MEKF section.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 68 BIAS -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>68. Kalman Filter Does Not Remove Sensor Bias Automatically</h2>
+<h3>4.2.7.32 EKF for Sensor Bias Estimation</h3>
 
       <p>
-        A common misconception is that a Kalman Filter automatically removes
-        sensor bias.
+        The EKF can estimate sensor biases if they are included in the state and sufficiently observable.
       </p>
 
       <p>
-        Bias must generally be represented in the model and be observable.
-      </p>
-
-      <p>
-        For example, gyro bias can be included as
+        For example,
       </p>
 
       <p>
         \[
-        \boxed{
-        \mathbf x
-        =
-        \begin{bmatrix}
-        \cdots\\
-        \mathbf b_g
-        \end{bmatrix}
-        }.
+        x= \begin{bmatrix} \cdots\\ b_g\\ b_a \end{bmatrix}.
         \]
       </p>
 
       <p>
-        A simple bias evolution model is
+        A bias can be modelled as constant:
       </p>
 
       <p>
         \[
-        \boxed{
-        \mathbf b_{g,k+1}
-        =
-        \mathbf b_{g,k}
-        +
-        \mathbf w_{b,k}
-        }.
+        \dot b=0
         \]
       </p>
 
       <p>
-        Thus,
+        or as a random walk:
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{Unknown Error}
-        +
-        \text{No State/Error Model}
-        \not\Rightarrow
-        \text{Automatic Kalman Correction}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 69 WRONG MODEL -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>69. Kalman Filter Does Not Fix a Wrong Model</h2>
-
-      <p>
-        A sophisticated estimator cannot compensate indefinitely for incorrect
-        physics or incorrect implementation.
-      </p>
-
-      <p>
-        Serious problems can arise from:
-      </p>
-
-      <ul>
-        <li>incorrect frame transformations,</li>
-        <li>wrong signs,</li>
-        <li>incorrect units,</li>
-        <li>incorrect timestamps,</li>
-        <li>wrong measurement functions,</li>
-        <li>missing sensor biases,</li>
-        <li>incorrect process models,</li>
-        <li>incorrect noise models.</li>
-      </ul>
-
-      <p>
-        Therefore estimator development must begin with
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Physics}
-        +
-        \text{Frames}
-        +
-        \text{Units}
-        +
-        \text{Timing}
-        +
-        \text{Sensor Models}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 70 DIVERGENCE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>70. Filter Divergence</h2>
-
-      <p>
-        Filter divergence occurs when the estimated state increasingly departs
-        from truth or when the covariance no longer represents actual error.
-      </p>
-
-      <p>
-        Possible causes include:
-      </p>
-
-      <ul>
-        <li>incorrect \(Q\),</li>
-        <li>incorrect \(R\),</li>
-        <li>poor initialization,</li>
-        <li>strong nonlinearities,</li>
-        <li>unmodelled bias,</li>
-        <li>incorrect measurement association,</li>
-        <li>numerical instability,</li>
-        <li>timing error,</li>
-        <li>sensor fault,</li>
-        <li>poor observability.</li>
-      </ul>
-
-      <p>
-        Innovation monitoring and covariance monitoring are therefore essential
-        for estimator health assessment.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 71 VERIFICATION -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>71. Kalman Filter Verification</h2>
-
-      <p>
-        A Kalman Filter should not be validated using only one nominal
-        simulation.
-      </p>
-
-      <p>
-        A verification campaign should include:
-      </p>
-
-      <ul>
-        <li>nominal runs,</li>
-        <li>measurement-noise variation,</li>
-        <li>process-model uncertainty,</li>
-        <li>initial-state error,</li>
-        <li>initial-covariance error,</li>
-        <li>sensor bias,</li>
-        <li>sensor dropout,</li>
-        <li>outliers,</li>
-        <li>timing errors,</li>
-        <li>sensor misalignment,</li>
-        <li>actuator uncertainty where relevant,</li>
-        <li>different trajectories and sensor geometries.</li>
-      </ul>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 72 MONTE CARLO -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>72. Monte Carlo Validation</h2>
-
-      <p>
-        Across many Monte Carlo runs, compare
-      </p>
-
-      <p>
-        \[
-        \hat{\mathbf x}(t)
+        \boxed{ \dot b=w_b }.
         \]
       </p>
 
       <p>
-        with simulation truth
-      </p>
-
-      <p>
-        \[
-        \mathbf x(t).
-        \]
-      </p>
-
-      <p>
-        Evaluate, where applicable:
-      </p>
-
-      <ul>
-        <li>position error,</li>
-        <li>velocity error,</li>
-        <li>attitude error,</li>
-        <li>bias error,</li>
-        <li>NIS,</li>
-        <li>NEES.</li>
-      </ul>
-
-      <p>
-        The purpose is not merely to obtain a smooth trajectory.
-      </p>
-
-      <p>
-        The objective is to demonstrate robust estimator behaviour over the
-        expected uncertainty envelope.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 73 SIMULINK -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>73. Kalman Filter Implementation in Simulink</h2>
-
-      <p>
-        A conceptual implementation is:
-      </p>
-
-      <pre>
-Previous State Estimate
-        │
-        ▼
-State Prediction ───────────────┐
-        │                       │
-        ▼                       │
-Predicted State                 │
-                                │
-Previous Covariance             │
-        │                       │
-        ▼                       │
-Covariance Prediction           │
-        │                       │
-        ▼                       │
-Predicted Covariance            │
-                                │
-Sensor Measurement ─────────────┤
-                                ▼
-                     Measurement Prediction
-                                │
-                                ▼
-                            Innovation
-                                │
-                                ▼
-                     Innovation Covariance
-                                │
-                                ▼
-                           Kalman Gain
-                                │
-                   ┌────────────┴────────────┐
-                   ▼                         ▼
-              State Update             Covariance Update
-                   │                         │
-                   └────────────┬────────────┘
-                                ▼
-                       Posterior Estimate
-                                │
-                                └──► Next Time Step
-      </pre>
-
-      <p>
-        The Simulink architecture should keep separate:
-      </p>
-
-      <ul>
-        <li>truth dynamics,</li>
-        <li>sensor models,</li>
-        <li>estimator,</li>
-        <li>guidance and control.</li>
-      </ul>
-
-      <p>
-        A critical simulation principle is
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \text{Estimator Must Receive Sensor Measurements, Not Simulation Truth}
-        }.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 74 SOFTWARE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>74. Recommended Software Architecture</h2>
-
-      <p>
-        A practical estimator implementation can be divided into:
-      </p>
-
-      <ul>
-        <li>Propagation,</li>
-        <li>Measurement Preprocessing,</li>
-        <li>Measurement Prediction,</li>
-        <li>Innovation Calculation,</li>
-        <li>Validation / Gating,</li>
-        <li>Measurement Update,</li>
-        <li>Covariance Management,</li>
-        <li>Health Monitoring.</li>
-      </ul>
-
-      <p>
-        A modular estimator is easier to test, verify and debug than a single
-        monolithic implementation.
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 75 PIPELINE -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>75. Practical Navigation Pipeline</h2>
-
-      <p>
-        A practical spacecraft navigation chain is more extensive than the
-        textbook equations:
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{Sensor Acquisition}}
-        \]
-      </p>
-
-      <p>\[\downarrow\]</p>
-
-      <p>
-        \[
-        \boxed{\text{Timestamping and Synchronization}}
-        \]
-      </p>
-
-      <p>\[\downarrow\]</p>
-
-      <p>
-        \[
-        \boxed{\text{Calibration / Frame Conversion}}
-        \]
-      </p>
-
-      <p>\[\downarrow\]</p>
-
-      <p>
-        \[
-        \boxed{\text{Measurement Validation}}
-        \]
-      </p>
-
-      <p>\[\downarrow\]</p>
-
-      <p>
-        \[
-        \boxed{\text{State and Covariance Prediction}}
-        \]
-      </p>
-
-      <p>\[\downarrow\]</p>
-
-      <p>
-        \[
-        \boxed{\text{Innovation and Gating}}
-        \]
-      </p>
-
-      <p>\[\downarrow\]</p>
-
-      <p>
-        \[
-        \boxed{\text{Kalman Measurement Update}}
-        \]
-      </p>
-
-      <p>\[\downarrow\]</p>
-
-      <p>
-        \[
-        \boxed{\hat x,\;P}
-        \]
-      </p>
-
-      <p>\[\downarrow\]</p>
-
-      <p>
-        \[
-        \boxed{\text{Guidance and Control}}.
-        \]
-      </p>
-
-    </section>
-
-
-    <!-- ======================================================= -->
-    <!-- 76 OUTPUT TO GNC -->
-    <!-- ======================================================= -->
-
-    <section class="notes-section-card">
-
-      <h2>76. What the Guidance and Control System Receives</h2>
-
-      <p>
-        Navigation should provide a coherent state estimate such as
-      </p>
-
-      <p>
-        \[
-        \boxed{
-        \hat{\mathbf x}
-        =
-        \begin{bmatrix}
-        \hat{\mathbf r}\\
-        \hat{\mathbf v}\\
-        \hat{\mathbf q}\\
-        \hat{\boldsymbol\omega}\\
-        \cdots
-        \end{bmatrix}
-        }.
-        \]
-      </p>
-
-      <p>
-        It should also maintain
-      </p>
-
-      <p>
-        \[
-        \boxed{\mathbf P}.
-        \]
-      </p>
-
-      <p>
-        Guidance then determines desired motion, and control compares that
-        desired motion against the estimated spacecraft state.
+        The corresponding process-noise covariance describes expected bias evolution.
       </p>
 
       <p>
@@ -5051,168 +2161,130 @@ Sensor Measurement ─────────────┤
 
       <p>
         \[
-        \boxed{
-        \text{Sensors}
-        \rightarrow
-        \text{Kalman Filter}
-        \rightarrow
-        \hat x,P
-        \rightarrow
-        \text{Guidance}
-        \rightarrow
-        \text{Control}
-        \rightarrow
-        \text{Actuators}
-        }.
+        \boxed{ \text{Sensor Bias} + \text{Bias Dynamic Model} + \text{Independent Measurement Information} \rightarrow \text{Bias Estimation} }.
         \]
+      </p>
+
+      <p>
+        Simply placing a bias in the state does not guarantee that it will be observable.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 77 KEY EQUATIONS -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>77. Key Equations at a Glance</h2>
+<h3>4.2.7.33 Multi-Rate and Asynchronous EKF</h3>
 
-      <h3>1. State Prediction</h3>
+      <p>
+        Real spacecraft sensors do not operate at identical rates.
+      </p>
+
+      <p>
+        For example:
+      </p>
 
       <p>
         \[
-        \boxed{
-        \hat x_k^-
-        =
-        F_{k-1}\hat x_{k-1}^+
-        +
-        B_{k-1}u_{k-1}
-        }
+        \text{IMU}:100~\text{Hz}
         \]
       </p>
 
-      <h3>2. Covariance Prediction</h3>
-
       <p>
         \[
-        \boxed{
-        P_k^-
-        =
-        F_{k-1}
-        P_{k-1}^+
-        F_{k-1}^T
-        +
-        Q_{k-1}
-        }
+        \text{GNSS}:10~\text{Hz}
         \]
       </p>
 
-      <h3>3. Innovation</h3>
-
       <p>
         \[
-        \boxed{
-        y_k
-        =
-        z_k-H_k\hat x_k^-
-        }
+        \text{Camera}:5~\text{Hz}
         \]
       </p>
 
-      <h3>4. Innovation Covariance</h3>
-
       <p>
         \[
-        \boxed{
-        S_k
-        =
-        H_kP_k^-H_k^T+R_k
-        }
+        \text{Star Tracker}:1~\text{Hz}.
         \]
       </p>
 
-      <h3>5. Kalman Gain</h3>
+      <p>
+        The EKF may therefore propagate continuously or at a high rate while measurement updates occur whenever measurements arrive.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
 
       <p>
         \[
-        \boxed{
-        K_k
-        =
-        P_k^-H_k^TS_k^{-1}
-        }
+        \boxed{\text{Propagate}} \rightarrow \boxed{\text{IMU}} \rightarrow \boxed{\text{Propagate}} \rightarrow \boxed{\text{GNSS Update}} \rightarrow \boxed{\text{Propagate}} \rightarrow \boxed{\text{Camera Update}}.
         \]
       </p>
 
-      <h3>6. State Update</h3>
-
       <p>
-        \[
-        \boxed{
-        \hat x_k^+
-        =
-        \hat x_k^-+K_ky_k
-        }
-        \]
-      </p>
-
-      <h3>7. Covariance Update</h3>
-
-      <p>
-        \[
-        \boxed{
-        P_k^+
-        =
-        (I-K_kH_k)P_k^-
-        }.
-        \]
+        This is particularly relevant to RPO sensor fusion.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 78 CONCEPT -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>78. The Entire Kalman Filter in One Conceptual Equation</h2>
+<h3>4.2.7.34 Time Synchronization and Delayed Measurements</h3>
 
       <p>
-        The central idea can be remembered as
+        Because the EKF evaluates
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{New Estimate}
-        =
-        \text{Model Prediction}
-        +
-        \text{Uncertainty-Weighted Measurement Correction}
-        }.
+        h(\hat x_k^-)
         \]
       </p>
 
       <p>
-        However, the filter actually maintains two coupled recursive processes:
+        at a particular epoch, a measurement must correspond to that same epoch.
       </p>
 
       <p>
-        \[
-        \boxed{\text{State Evolution}}
-        \]
+        A delayed camera frame or GNSS solution can otherwise create a false innovation.
       </p>
 
       <p>
-        and
+        Therefore practical EKF implementations must account for:
       </p>
 
+      <ul>
+
+        <li>
+          timestamps,
+        </li>
+
+        <li>
+          sensor latency,
+        </li>
+
+        <li>
+          communication delays,
+        </li>
+
+        <li>
+          clock synchronization,
+        </li>
+
+        <li>
+          buffered measurements,
+        </li>
+
+        <li>
+          out-of-sequence measurements.
+        </li>
+
+      </ul>
+
       <p>
-        \[
-        \boxed{\text{Uncertainty Evolution}}.
-        \]
+        A correct measurement associated with the wrong time can behave like an incorrect measurement.
       </p>
 
       <p>
@@ -5221,128 +2293,24 @@ Sensor Measurement ─────────────┤
 
       <p>
         \[
-        \boxed{
-        \text{Kalman Filter}
-        =
-        \text{State Estimation}
-        +
-        \text{Uncertainty Estimation}
-        }.
+        \boxed{ \text{Correct Value} + \text{Wrong Timestamp} = \text{Incorrect Estimator Information} }.
         \]
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 79 TAKEAWAYS -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>79. Key Takeaways</h2>
-
-      <ul>
-
-        <li>
-          The Kalman Filter is a recursive model-based sensor-fusion algorithm
-          for linear stochastic systems.
-        </li>
-
-        <li>
-          It combines dynamic prediction and sensor measurements according to
-          their uncertainties.
-        </li>
-
-        <li>
-          Its central quantities are
-          \[
-          \boxed{
-          \hat x,\;P,\;Q,\;R,\;y,\;S,\;K
-          }.
-          \]
-        </li>
-
-        <li>
-          \(Q\) describes process-model uncertainty.
-        </li>
-
-        <li>
-          \(R\) describes measurement uncertainty.
-        </li>
-
-        <li>
-          The innovation
-          \[
-          y=z-H\hat x^-
-          \]
-          represents disagreement between prediction and observation.
-        </li>
-
-        <li>
-          The innovation covariance
-          \[
-          S=HP^-H^T+R
-          \]
-          determines how significant that disagreement is.
-        </li>
-
-        <li>
-          The Kalman gain
-          \[
-          K=P^-H^TS^{-1}
-          \]
-          determines how strongly the measurement corrects the state.
-        </li>
-
-        <li>
-          Valid measurements generally reduce uncertainty.
-        </li>
-
-        <li>
-          Prediction without measurement generally increases uncertainty.
-        </li>
-
-        <li>
-          A measurement may improve states that it does not directly measure
-          because of state coupling and covariance.
-        </li>
-
-        <li>
-          Initial state and covariance must be realistic.
-        </li>
-
-        <li>
-          Correct frames, units, timestamps, process models, sensor models,
-          \(Q\), and \(R\) are essential.
-        </li>
-
-        <li>
-          Innovation statistics, NIS, NEES, Monte Carlo analysis and covariance
-          consistency should be used during validation.
-        </li>
-
-      </ul>
+<h3>4.2.7.35 Innovation Gating in an EKF</h3>
 
       <p>
-        Most importantly,
+        As in the KF,
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{A Kalman Filter Is Not Merely a Noise-Smoothing Algorithm}
-        }.
-        \]
-      </p>
-
-      <p>
-        It is a recursive probabilistic state estimator that continually asks:
-      </p>
-
-      <p>
-        \[
-        \boxed{\text{What Is the Spacecraft State?}}
+        y_k=z_k-h(\hat x_k^-)
         \]
       </p>
 
@@ -5352,46 +2320,92 @@ Sensor Measurement ─────────────┤
 
       <p>
         \[
-        \boxed{\text{How Certain Are We About That State?}}
+        S_k=H_kP_k^-H_k^T+R_k.
         \]
+      </p>
+
+      <p>
+        A normalized innovation statistic can be calculated:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \epsilon_k = y_k^TS_k^{-1}y_k }.
+        \]
+      </p>
+
+      <p>
+        This can be used to determine whether a measurement is statistically compatible with the current estimate.
+      </p>
+
+      <p>
+        A practical navigation chain may therefore be
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement}} \rightarrow \boxed{\text{Nonlinear Prediction}} \rightarrow \boxed{\text{Innovation}} \rightarrow \boxed{\text{NIS/Gating}} \rightarrow \boxed{\text{Accept/Reject}} \rightarrow \boxed{\text{EKF Update}}.
+        \]
+      </p>
+
+      <p>
+        This is especially important for camera feature mismatches and LiDAR outliers during RPO.
       </p>
 
     </section>
 
 
-    <!-- ======================================================= -->
-    <!-- 80 NEXT EKF -->
-    <!-- ======================================================= -->
-
     <section class="notes-section-card">
 
-      <h2>80. From the Kalman Filter to Nonlinear Spacecraft Estimation</h2>
+<h3>4.2.7.36 Observability in the EKF</h3>
 
       <p>
-        The classical Kalman Filter established the architecture
+        For nonlinear systems, observability is more complicated than the simple linear observability matrix introduced for the KF.
+      </p>
+
+      <p>
+        However, the same physical principle remains:
       </p>
 
       <p>
         \[
-        \boxed{
-        \text{Prediction}
-        \rightarrow
-        \text{Innovation}
-        \rightarrow
-        \text{Kalman Gain}
-        \rightarrow
-        \text{Correction}
-        }.
+        \boxed{ \text{A State Can Be Estimated Only If Available Measurements and Dynamics Contain Information About It} }.
         \]
       </p>
 
       <p>
-        However, many important spacecraft models are nonlinear:
+        For example, a single bearing measurement may not immediately determine range.
+      </p>
+
+      <p>
+        But spacecraft motion changes the observation geometry.
+      </p>
+
+      <p>
+        Over time,
       </p>
 
       <p>
         \[
-        \dot x=f(x,u)
+        \boxed{ \text{Dynamics} + \text{Changing Geometry} + \text{Repeated Bearings} }
+        \]
+      </p>
+
+      <p>
+        may make range observable.
+      </p>
+
+      <p>
+        Therefore spacecraft manoeuvres can sometimes improve navigation observability.
+      </p>
+
+      <p>
+        This is an important connection between
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Guidance}}
         \]
       </p>
 
@@ -5401,69 +2415,1761 @@ Sensor Measurement ─────────────┤
 
       <p>
         \[
-        z=h(x)+v.
+        \boxed{\text{Navigation}}.
         \]
       </p>
 
-      <p>
-        Examples include:
-      </p>
+    </section>
 
-      <ul>
-        <li>nonlinear orbital dynamics,</li>
-        <li>quaternion attitude kinematics,</li>
-        <li>star-vector measurements,</li>
-        <li>camera bearing measurements,</li>
-        <li>LiDAR range measurements,</li>
-        <li>relative-pose measurements,</li>
-        <li>nonlinear IMU navigation.</li>
-      </ul>
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.37 Why EKF Performance Depends on the Operating Point</h3>
 
       <p>
-        The next question is therefore:
-      </p>
-
-      <blockquote>
-        How can the Kalman-filter framework be retained when
-        \(f(\cdot)\) and \(h(\cdot)\) are nonlinear?
-      </blockquote>
-
-      <p>
-        The first major approach is to linearize the nonlinear process and
-        measurement models around the current state estimate.
+        The Jacobians are evaluated around the current estimate.
       </p>
 
       <p>
-        This leads to:
+        Therefore,
       </p>
 
       <p>
         \[
-        \boxed{\textbf{4.2.7 Extended Kalman Filter — EKF}}
+        F_k = F(\hat x_k)
         \]
       </p>
 
       <p>
-        where the nonlinear functions are propagated directly while Jacobians
-        are used to approximate the local state and measurement sensitivity.
+        and
       </p>
 
-      <a href="extended-kalman-filter.html"
+      <p>
+        \[
+        H_k = H(\hat x_k).
+        \]
+      </p>
+
+      <p>
+        If the estimated state is close to truth, the local linear approximation may be accurate.
+      </p>
+
+      <p>
+        If the estimate is far from truth, the Jacobian may describe the wrong local behaviour.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Poor Initial Estimate} \rightarrow \text{Poor Linearisation} \rightarrow \text{Poor Correction} \rightarrow \text{Possible Divergence} }.
+        \]
+      </p>
+
+      <p>
+        This is one of the central limitations of the EKF.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.38 First-Order Approximation Error</h3>
+
+      <p>
+        Taylor expansion is actually
+      </p>
+
+      <p>
+        \[
+        f(x) = f(\hat x) + F\delta x + \frac12 \delta x^T \nabla^2f \delta x +\cdots
+        \]
+      </p>
+
+      <p>
+        but the EKF retains only
+      </p>
+
+      <p>
+        \[
+        f(x) \approx f(\hat x)+F\delta x.
+        \]
+      </p>
+
+      <p>
+        Therefore the EKF neglects second-order and higher-order nonlinear effects.
+      </p>
+
+      <p>
+        When uncertainty is small and nonlinearities are mild, this may be an excellent approximation.
+      </p>
+
+      <p>
+        When uncertainty is large or the system is strongly nonlinear,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Higher-Order Terms} \not\approx0 }
+        \]
+      </p>
+
+      <p>
+        and EKF accuracy can deteriorate.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.39 EKF Is Not an Exact Nonlinear Bayesian Filter</h3>
+
+      <p>
+        This distinction should be explicit.
+      </p>
+
+      <p>
+        The EKF is often described as a nonlinear Kalman Filter, but it does <strong>not</strong> calculate the exact nonlinear Bayesian posterior.
+      </p>
+
+      <p>
+        After a nonlinear transformation, a Gaussian random variable generally does not remain exactly Gaussian.
+      </p>
+
+      <p>
+        The EKF approximates the state distribution using
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Estimated Mean} + \text{Covariance} }
+        \]
+      </p>
+
+      <p>
+        and locally linearizes the nonlinear functions.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{EKF} = \text{Approximate Nonlinear Bayesian Estimator} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.40 Important EKF Limitations</h3>
+
+      <p>
+        The main limitations should have their own section.
+      </p>
+
+      <h4>4.2.7.40.1 First-order linearisation</h4>
+
+      <p>
+        The EKF neglects higher-order nonlinear effects.
+      </p>
+
+      <h4>4.2.7.40.2 Jacobian dependence</h4>
+
+      <p>
+        Incorrect Jacobians can cause serious estimator errors.
+      </p>
+
+      <h4>4.2.7.40.3 Sensitivity to initialization</h4>
+
+      <p>
+        A poor initial estimate may produce poor local linearisation.
+      </p>
+
+      <h4>4.2.7.40.4 Possible divergence</h4>
+
+      <p>
+        Strong nonlinearities, incorrect models or poor uncertainty tuning can lead to divergence.
+      </p>
+
+      <h4>4.2.7.40.5 Gaussian approximation</h4>
+
+      <p>
+        Non-Gaussian or multimodal state distributions are poorly represented by a single mean and covariance.
+      </p>
+
+      <h4>4.2.7.40.6 Numerical issues</h4>
+
+      <p>
+        Poor conditioning, covariance loss of symmetry, or incorrect discretization can degrade performance.
+      </p>
+
+      <h4>4.2.7.40.7 Coordinate singularities</h4>
+
+      <p>
+        Certain parameterizations such as Euler angles can introduce singularities.
+      </p>
+
+      <h4>4.2.7.40.8 State constraints</h4>
+
+      <p>
+        Quaternion normalization and other physical constraints require careful handling.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.41 Common EKF Implementation Errors</h3>
+
+      <p>
+        This section is particularly useful for your interactive GNC website because it connects theory with engineering practice.
+      </p>
+
+      <p>
+        Common errors include:
+      </p>
+
+      <ul>
+
+        <li>
+          evaluating <code>F</code> at the wrong state,
+        </li>
+
+        <li>
+          evaluating <code>H</code> at the wrong state,
+        </li>
+
+        <li>
+          using <code>H\hat x</code> instead of <code>h(\hat x)</code>,
+        </li>
+
+        <li>
+          incorrect Jacobian signs,
+        </li>
+
+        <li>
+          wrong coordinate frames,
+        </li>
+
+        <li>
+          inconsistent units,
+        </li>
+
+        <li>
+          incorrect angle wrapping,
+        </li>
+
+        <li>
+          wrong timestamps,
+        </li>
+
+        <li>
+          incorrect <code>Q</code> discretization,
+        </li>
+
+        <li>
+          incorrect sensor covariance <code>R</code>,
+        </li>
+
+        <li>
+          forgetting bias states,
+        </li>
+
+        <li>
+          incorrect quaternion handling,
+        </li>
+
+        <li>
+          directly inverting poorly conditioned matrices,
+        </li>
+
+        <li>
+          updating with invalid sensor measurements.
+        </li>
+
+      </ul>
+
+      <p>
+        A mathematically correct EKF equation cannot compensate for an incorrect physical model.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.42 Angle Innovation Must Be Handled Carefully</h3>
+
+      <p>
+        Suppose the predicted bearing is
+      </p>
+
+      <p>
+        \[
+        179^\circ
+        \]
+      </p>
+
+      <p>
+        while the measured bearing is
+      </p>
+
+      <p>
+        \[
+        -179^\circ.
+        \]
+      </p>
+
+      <p>
+        Naively,
+      </p>
+
+      <p>
+        \[
+        y=-179^\circ-179^\circ=-358^\circ.
+        \]
+      </p>
+
+      <p>
+        But physically, the difference is only
+      </p>
+
+      <p>
+        \[
+        2^\circ.
+        \]
+      </p>
+
+      <p>
+        Therefore angular innovations must be wrapped to the appropriate interval, such as
+      </p>
+
+      <p>
+        \[
+        [-\pi,\pi).
+        \]
+      </p>
+
+      <p>
+        This is extremely important for:
+      </p>
+
+      <ul>
+
+        <li>
+          camera azimuth,
+        </li>
+
+        <li>
+          heading,
+        </li>
+
+        <li>
+          Euler-angle measurements,
+        </li>
+
+        <li>
+          bearing sensors.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.43 Process Noise in an EKF</h3>
+
+      <p>
+        As in the KF,
+      </p>
+
+      <p>
+        \[
+        Q
+        \]
+      </p>
+
+      <p>
+        represents uncertainty in the process model.
+      </p>
+
+      <p>
+        But in a nonlinear spacecraft estimator, constructing <code>Q</code> may require careful physical modelling.
+      </p>
+
+      <p>
+        Possible sources include:
+      </p>
+
+      <ul>
+
+        <li>
+          unknown translational acceleration,
+        </li>
+
+        <li>
+          disturbance torques,
+        </li>
+
+        <li>
+          thruster magnitude uncertainty,
+        </li>
+
+        <li>
+          thruster misalignment,
+        </li>
+
+        <li>
+          aerodynamic uncertainty,
+        </li>
+
+        <li>
+          solar radiation pressure,
+        </li>
+
+        <li>
+          gyro bias random walk,
+        </li>
+
+        <li>
+          accelerometer bias random walk.
+        </li>
+
+      </ul>
+
+      <p>
+        A preferred workflow is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Physical Uncertainty} \rightarrow \text{Continuous Noise Model} \rightarrow \text{Noise Mapping} \rightarrow \text{Discrete }Q }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.44 Measurement Noise in an EKF</h3>
+
+      <p>
+        The measurement covariance
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        should represent uncertainty in the sensor measurement space.
+      </p>
+
+      <p>
+        For example, if a camera provides
+      </p>
+
+      <p>
+        \[
+        z= [\alpha,\beta]^T,
+        \]
+      </p>
+
+      <p>
+        then <code>R</code> should describe uncertainty in angular measurements.
+      </p>
+
+      <p>
+        If LiDAR measures range,
+      </p>
+
+      <p>
+        \[
+        R_\rho=\sigma_\rho^2.
+        \]
+      </p>
+
+      <p>
+        If a relative-pose sensor provides position and attitude, <code>R</code> should represent the corresponding position and orientation uncertainty and any relevant correlations.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ R \text{ belongs to measurement space, not automatically to state space.} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.45 EKF Consistency Testing</h3>
+
+      <p>
+        The same statistical tools introduced for the KF remain important.
+      </p>
+
+      <h4>4.2.7.45.1 Innovation</h4>
+
+      <p>
+        \[
+        y_k=z_k-h(\hat x_k^-).
+        \]
+      </p>
+
+      <h4>4.2.7.45.2 NIS</h4>
+
+      <p>
+        \[
+        \boxed{ NIS = y_k^TS_k^{-1}y_k }.
+        \]
+      </p>
+
+      <h4>4.2.7.45.3 State error when truth is available</h4>
+
+      <p>
+        \[
+        e_k=x_k-\hat x_k.
+        \]
+      </p>
+
+      <h4>4.2.7.45.4 NEES</h4>
+
+      <p>
+        \[
+        \boxed{ NEES = e_k^TP_k^{-1}e_k }.
+        \]
+      </p>
+
+      <p>
+        For spacecraft simulation and Monte Carlo verification, these quantities help determine whether the EKF covariance realistically represents actual estimation errors.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.46 Monte Carlo Verification of an EKF</h3>
+
+      <p>
+        Because EKF behaviour depends on nonlinear dynamics, initial conditions, sensor geometry and noise, Monte Carlo testing is particularly important.
+      </p>
+
+      <p>
+        Randomize quantities such as:
+      </p>
+
+      <ul>
+
+        <li>
+          initial position error,
+        </li>
+
+        <li>
+          initial velocity error,
+        </li>
+
+        <li>
+          initial attitude error,
+        </li>
+
+        <li>
+          sensor noise,
+        </li>
+
+        <li>
+          sensor bias,
+        </li>
+
+        <li>
+          sensor alignment,
+        </li>
+
+        <li>
+          process disturbances,
+        </li>
+
+        <li>
+          measurement dropout,
+        </li>
+
+        <li>
+          measurement latency,
+        </li>
+
+        <li>
+          actuator errors,
+        </li>
+
+        <li>
+          target-state uncertainty.
+        </li>
+
+      </ul>
+
+      <p>
+        Evaluate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{RMSE} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{NIS} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{NEES} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Convergence Time} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Divergence Rate} }.
+        \]
+      </p>
+
+      <p>
+        For RPO, also evaluate estimator performance across different approach phases and sensor handovers.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.47 EKF Architecture for Spacecraft RPO</h3>
+
+      <p>
+        A practical architecture may look like:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Relative Orbital Dynamics}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nonlinear State Propagation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat x^-,P^-}
+        \]
+      </p>
+
+      <p>
+        while sensors provide:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Relative GNSS}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Camera}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{LiDAR}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Time Synchronization}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Models }h_i(x)}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Jacobians }H_i}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation + Gating}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{EKF Measurement Updates}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat x^+,P^+}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Guidance + Control}}.
+        \]
+      </p>
+
+      <p>
+        This is the practical connection between sensor modelling, fusion, navigation and closed-loop GNC.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.48 Sensor Handover During RPO</h3>
+
+      <p>
+        A rendezvous mission may use different sensors as range decreases:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Far Range}} \rightarrow \boxed{\text{Relative GNSS}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Mid Range}} \rightarrow \boxed{\text{GNSS + Camera}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Close Range}} \rightarrow \boxed{\text{Camera + LiDAR}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Capture}} \rightarrow \boxed{\text{Precision Relative Pose}}.
+        \]
+      </p>
+
+      <p>
+        The EKF must handle changing measurement functions,
+      </p>
+
+      <p>
+        \[
+        h_{GNSS}(x), \quad h_{camera}(x), \quad h_{LiDAR}(x),
+        \]
+      </p>
+
+      <p>
+        with corresponding Jacobians
+      </p>
+
+      <p>
+        \[
+        H_{GNSS}, \quad H_{camera}, \quad H_{LiDAR}.
+        \]
+      </p>
+
+      <p>
+        Therefore sensor handover is not simply switching sensor values. It is a change in the <strong>information entering the navigation estimator</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.49 EKF in Simulink</h3>
+
+      <p>
+        For the website, I would explicitly show the implementation architecture:
+      </p>
+
+      <pre><code>
+Previous Posterior State
+          │
+          ▼
+Nonlinear Dynamics f(x,u)
+          │
+          ▼
+Predicted State x⁻
+          │
+          ├──────────────► Evaluate Process Jacobian F
+          │                         │
+          │                         ▼
+Previous P ───────────────► Covariance Prediction
+                                    │
+                                    ▼
+                                   P⁻
+
+Sensor Measurement z
+          │
+          ▼
+Predicted Measurement h(x⁻)
+          │
+          ▼
+Innovation y = z - h(x⁻)
+          │
+          ├──────────────► Evaluate Measurement Jacobian H
+          │
+          ▼
+Innovation Covariance S
+          │
+          ▼
+Kalman Gain K
+          │
+          ├────────────────────┐
+          ▼                    ▼
+    State Update        Covariance Update
+          │                    │
+          └─────────┬──────────┘
+                    ▼
+                 x⁺ , P⁺
+                    │
+                    ▼
+              Next Time Step
+      </code></pre>
+
+      <p>
+        And the estimator must receive
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Measurements}}
+        \]
+      </p>
+
+      <p>
+        not
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Simulation Truth}}.
+        \]
+      </p>
+
+      <p>
+        Truth should remain outside the estimator and be used only for performance evaluation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.50 Recommended EKF Software Blocks</h3>
+
+      <p>
+        For a clean implementation, separate:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nonlinear State Propagation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Process Jacobian}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Covariance Propagation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Preprocessing}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nonlinear Measurement Model}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Jacobian}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gating}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Kalman Gain}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{State Update}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Covariance Update}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Estimator Health Monitoring}}.
+        \]
+      </p>
+
+      <p>
+        This modular structure is easier to test than a single large EKF block.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.51 EKF Verification Hierarchy</h3>
+
+      <p>
+        A good implementation should be verified progressively.
+      </p>
+
+      <p>
+        Start with:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Known Linear Problem}}
+        \]
+      </p>
+
+      <p>
+        where the EKF should reproduce KF behaviour.
+      </p>
+
+      <p>
+        Then test:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Simple Nonlinear Dynamics}}
+        \]
+      </p>
+
+      <p>
+        then:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nonlinear Measurement}}
+        \]
+      </p>
+
+      <p>
+        then:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Multiple Sensors}}
+        \]
+      </p>
+
+      <p>
+        then:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Dropout + Outliers}}
+        \]
+      </p>
+
+      <p>
+        then:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Monte Carlo}}
+        \]
+      </p>
+
+      <p>
+        then:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{SIL}} \rightarrow \boxed{\text{HIL}}.
+        \]
+      </p>
+
+      <p>
+        This makes debugging much easier.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.52 When the EKF Works Well</h3>
+
+      <p>
+        The EKF is particularly effective when:
+      </p>
+
+      <ul>
+
+        <li>
+          the system is reasonably smooth,
+        </li>
+
+        <li>
+          nonlinearities are moderate,
+        </li>
+
+        <li>
+          the initial estimate is sufficiently close to truth,
+        </li>
+
+        <li>
+          uncertainty remains reasonably localized,
+        </li>
+
+        <li>
+          Jacobians are accurate,
+        </li>
+
+        <li>
+          process and sensor models are realistic,
+        </li>
+
+        <li>
+          measurement geometry provides adequate observability.
+        </li>
+
+      </ul>
+
+      <p>
+        In these conditions, the EKF can provide excellent estimation performance with relatively modest computational cost.
+      </p>
+
+      <p>
+        This is one reason it remains widely used in aerospace navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.53 When the EKF Can Struggle</h3>
+
+      <p>
+        The EKF may perform poorly when:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Strong Nonlinearity}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Large Initial Error}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Poor Observability}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Highly Non-Gaussian Uncertainty}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Multimodal State Distribution}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Incorrect Jacobians}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Incorrect }Q/R}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Association Errors}}.
+        \]
+      </p>
+
+      <p>
+        These limitations motivate other nonlinear estimation approaches.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.54 EKF vs UKF — Conceptual Preview</h3>
+
+      <p>
+        The EKF handles nonlinear transformations by linearizing:
+      </p>
+
+      <p>
+        \[
+        \boxed{ f(x) \xrightarrow{\text{Jacobian}} \text{Local Linear Approximation} }.
+        \]
+      </p>
+
+      <p>
+        The Unscented Kalman Filter takes a different approach.
+      </p>
+
+      <p>
+        Instead of calculating Jacobians, it selects representative sigma points and propagates them through the nonlinear function:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{State Distribution} \rightarrow \text{Sigma Points} \rightarrow f(\cdot) \rightarrow \text{Reconstructed Mean and Covariance} }.
+        \]
+      </p>
+
+      <p>
+        This avoids explicit first-order Jacobian linearisation.
+      </p>
+
+      <p>
+        The UKF will be developed later in the chapter.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.55 EKF vs ESKF — Conceptual Preview</h3>
+
+      <p>
+        In a standard EKF, the full state may be estimated directly.
+      </p>
+
+      <p>
+        An <strong>Error-State Kalman Filter (ESKF)</strong> instead maintains a nonlinear nominal state and estimates a small error state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{true} = x_{nominal} \oplus \delta x }.
+        \]
+      </p>
+
+      <p>
+        The filter estimates
+      </p>
+
+      <p>
+        \[
+        \delta x
+        \]
+      </p>
+
+      <p>
+        rather than continuously treating the entire physical state as a small Euclidean correction.
+      </p>
+
+      <p>
+        This is especially useful for inertial navigation and attitude states.
+      </p>
+
+      <p>
+        The ESKF will therefore be treated separately in <strong>4.2.8</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.56 EKF vs MEKF — Conceptual Preview</h3>
+
+      <p>
+        For quaternion attitude estimation, directly adding a Kalman correction to a quaternion is inconvenient because
+      </p>
+
+      <p>
+        \[
+        \|q\|=1.
+        \]
+      </p>
+
+      <p>
+        The MEKF represents the attitude estimate using a nominal quaternion while the filter estimates a small three-dimensional attitude error.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{true} = \delta q \otimes \hat q }.
+        \]
+      </p>
+
+      <p>
+        This preserves the quaternion structure more naturally.
+      </p>
+
+      <p>
+        Therefore the MEKF is particularly important for spacecraft attitude determination.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.57 Key Equations at a Glance</h3>
+
+      <h4>4.2.7.57.1 Nonlinear Process Model</h4>
+
+      <p>
+        \[
+        \boxed{ x_k=f(x_{k-1},u_{k-1})+w_{k-1} }
+        \]
+      </p>
+
+      <h4>4.2.7.57.2 Nonlinear Measurement Model</h4>
+
+      <p>
+        \[
+        \boxed{ z_k=h(x_k)+v_k }
+        \]
+      </p>
+
+      <h4>4.2.7.57.3 State Prediction</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_k^- = f(\hat x_{k-1}^+,u_{k-1}) }
+        \]
+      </p>
+
+      <h4>4.2.7.57.4 Process Jacobian</h4>
+
+      <p>
+        \[
+        \boxed{ F_{k-1} = \left. \frac{\partial f}{\partial x} \right|_{\hat x_{k-1}^+} }
+        \]
+      </p>
+
+      <h4>4.2.7.57.5 Covariance Prediction</h4>
+
+      <p>
+        \[
+        \boxed{ P_k^- = F_{k-1}P_{k-1}^+F_{k-1}^T+Q_{k-1} }
+        \]
+      </p>
+
+      <h4>4.2.7.57.6 Predicted Measurement</h4>
+
+      <p>
+        \[
+        \boxed{ \hat z_k=h(\hat x_k^-) }
+        \]
+      </p>
+
+      <h4>4.2.7.57.7 Measurement Jacobian</h4>
+
+      <p>
+        \[
+        \boxed{ H_k = \left. \frac{\partial h}{\partial x} \right|_{\hat x_k^-} }
+        \]
+      </p>
+
+      <h4>4.2.7.57.8 Innovation</h4>
+
+      <p>
+        \[
+        \boxed{ y_k=z_k-h(\hat x_k^-) }
+        \]
+      </p>
+
+      <h4>4.2.7.57.9 Innovation Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ S_k=H_kP_k^-H_k^T+R_k }
+        \]
+      </p>
+
+      <h4>4.2.7.57.10 Kalman Gain</h4>
+
+      <p>
+        \[
+        \boxed{ K_k=P_k^-H_k^TS_k^{-1} }
+        \]
+      </p>
+
+      <h4>4.2.7.57.11 State Update</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_k^+ = \hat x_k^-+K_ky_k }
+        \]
+      </p>
+
+      <h4>4.2.7.57.12 Covariance Update</h4>
+
+      <p>
+        \[
+        \boxed{ P_k^+ = (I-K_kH_k)P_k^- }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.58 The EKF in One Diagram</h3>
+
+      <p>
+        The conceptual structure should be emphasized visually:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Previous State Estimate}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nonlinear Dynamics }f(x,u)}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predicted State }\hat x^-}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nonlinear Sensor Prediction }h(\hat x^-)}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation }z-h(\hat x^-)}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Jacobian-Based Uncertainty Weighting}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Corrected State }\hat x^+}
+        \]
+      </p>
+
+      <p>
+        while in parallel,
+      </p>
+
+      <p>
+        \[
+        \boxed{P^+} \rightarrow \boxed{F} \rightarrow \boxed{P^-} \rightarrow \boxed{H,R} \rightarrow \boxed{K} \rightarrow \boxed{P^+}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.59 Key Takeaways</h3>
+
+      <p>
+        The reader should leave this page understanding these points:
+      </p>
+
+      <ul>
+
+        <li>
+          The EKF extends Kalman filtering to <strong>nonlinear state and measurement models</strong>.
+        </li>
+
+        <li>
+          The spacecraft state is propagated using the nonlinear dynamics <code>f(x,u)</code>.
+        </li>
+
+        <li>
+          The predicted measurement is calculated using the nonlinear sensor model <code>h(x)</code>.
+        </li>
+
+        <li>
+          Jacobians describe the local sensitivity of the nonlinear process and measurement models.
+        </li>
+
+        <li>
+          <code>F</code> is used primarily for <strong>error/covariance propagation</strong>, not as a replacement for nonlinear state propagation.
+        </li>
+
+        <li>
+          <code>H</code> maps local state errors into local measurement errors.
+        </li>
+
+        <li>
+          The EKF uses a <strong>first-order Taylor approximation</strong>.
+        </li>
+
+        <li>
+          Its performance therefore depends on how accurately the local linearization represents the actual nonlinear system.
+        </li>
+
+        <li>
+          Poor initialization can produce poor Jacobians and potentially cause divergence.
+        </li>
+
+        <li>
+          <code>Q</code>, <code>R</code>, timing, coordinate frames, sensor biases and measurement models remain critical.
+        </li>
+
+        <li>
+          Camera, LiDAR, GNSS, IMU, star tracker and other spacecraft sensors can be incorporated through appropriate measurement functions.
+        </li>
+
+        <li>
+          EKFs naturally support asynchronous multi-sensor updates.
+        </li>
+
+        <li>
+          Innovation gating, NIS, NEES and Monte Carlo testing remain essential for validation.
+        </li>
+
+        <li>
+          The EKF is particularly useful for <strong>orbit determination, IMU/GNSS fusion, spacecraft attitude estimation, and relative navigation during RPO</strong>.
+        </li>
+
+        <li>
+          For quaternion attitude estimation, the MEKF is often preferable to a straightforward full-state EKF.
+        </li>
+
+        <li>
+          For inertial navigation, error-state formulations such as the ESKF provide important practical advantages.
+        </li>
+
+        <li>
+          For strongly nonlinear systems, the UKF or other nonlinear Bayesian estimators may be considered.
+        </li>
+
+      </ul>
+
+      <p>
+        The most important concept is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{EKF} = \text{Nonlinear State and Measurement Models} + \text{Local Jacobian Linearisation} + \text{Kalman Uncertainty Update} }
+        \]
+      </p>
+
+      <p>
+        or, even more physically,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate the spacecraft nonlinearly} \quad \text{but propagate uncertainty locally linearly.} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.7.60 Transition to 4.2.8 Error-State Kalman Filter</h3>
+
+      <p>
+        The EKF provides a practical solution for nonlinear spacecraft estimation, but one difficulty remains.
+      </p>
+
+      <p>
+        Some spacecraft states—particularly attitude, position, velocity and inertial sensor biases—are often more naturally represented using a <strong>nonlinear nominal state plus a small estimation error</strong>.
+      </p>
+
+      <p>
+        Instead of estimating the entire physical state correction directly,
+      </p>
+
+      <p>
+        \[
+        x
+        \]
+      </p>
+
+      <p>
+        we can write
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{true} = x_{nominal} \oplus \delta x }
+        \]
+      </p>
+
+      <p>
+        and let the Kalman Filter estimate only
+      </p>
+
+      <p>
+        \[
+        \boxed{\delta x}.
+        \]
+      </p>
+
+      <p>
+        After each measurement update, the estimated error is injected into the nominal state and the error state is reset.
+      </p>
+
+      <p>
+        This leads to the next topic:
+      </p>
+
+      <p>
+        \[
+        \boxed{\textbf{4.2.8 Error-State Kalman Filter (ESKF)}}
+        \]
+      </p>
+
+      <p>
+        where we develop <strong>nominal-state propagation, error-state dynamics, error injection, covariance reset, IMU propagation, gyro and accelerometer bias estimation, and spacecraft inertial-navigation applications</strong>.
+      </p>
+
+    </section>
+
+
+
+    <section class="notes-section-card">
+
+      <h2>Next: 4.2.8 Error-State Kalman Filter (ESKF)</h2>
+
+      <p>
+        The Extended Kalman Filter handles nonlinear dynamics and nonlinear
+        measurements through local Jacobian linearisation. The next section
+        develops the error-state formulation, where a nonlinear nominal state is
+        propagated while the filter estimates only a small local error state.
+      </p>
+
+      <a href="error-state-kalman-filter.html"
          class="sensor-link-card">
 
         <div class="sensor-link-content">
 
-          <h3>4.2.7 Extended Kalman Filter (EKF)</h3>
+          <h3>4.2.8 Error-State Kalman Filter (ESKF)</h3>
 
           <p>
-            Nonlinear process and measurement models, Jacobian matrices,
-            nonlinear state propagation, covariance linearization, innovation,
-            EKF measurement update, limitations of first-order linearization,
-            and spacecraft navigation applications.
+            Nominal-state propagation, error-state dynamics, error injection,
+            covariance reset, IMU propagation, gyro and accelerometer bias
+            estimation, and spacecraft inertial-navigation applications.
           </p>
 
           <p class="sensor-link-arrow">
-            Continue to Extended Kalman Filter &rarr;
+            Continue to Error-State Kalman Filter &rarr;
           </p>
 
         </div>
@@ -5476,8 +4182,9 @@ Sensor Measurement ─────────────┤
   </main>
 
 
+
   <!-- ========================================================= -->
-  <!-- FOOTER -->
+  <!-- FOOTER                                                     -->
   <!-- ========================================================= -->
 
   <footer class="site-footer">
@@ -5486,10 +4193,11 @@ Sensor Measurement ─────────────┤
       © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
       Educational resource for spacecraft dynamics, orbital mechanics,
       guidance–navigation–control systems, sensor modelling, state estimation,
-      Kalman filtering, and spacecraft sensor fusion.
+      and spacecraft sensor fusion.
     </p>
 
   </footer>
+
 
 </body>
 
