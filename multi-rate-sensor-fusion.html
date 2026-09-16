@@ -1,0 +1,5651 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.2.13 Multi-Rate and Asynchronous Sensor Fusion | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    .concept-note {
+      margin: 1.5rem 0 0;
+      padding: 1.1rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+    }
+    .concept-note h4 { margin-top: 0; margin-bottom: 0.45rem; }
+    .concept-note p { margin-bottom: 0; }
+  </style>
+
+</head>
+
+<body>
+
+  <header class="notes-hero">
+    <h1>Multi-Rate and Asynchronous Sensor Fusion</h1>
+    <p class="notes-tagline">
+      High-rate inertial propagation, lower-rate absolute updates,
+      asynchronous sensor events, independent clocks, variable propagation
+      intervals, measurement queues, sensor dropout and reacquisition,
+      sensor handover, multi-rate RPO navigation, timing diagnostics,
+      verification, and real-time implementation.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.13 Multi-Rate and Asynchronous Sensor Fusion</h2>
+
+<p>
+        Real spacecraft navigation systems almost never receive all sensor measurements at the same rate, at the same time, or from the same clock.
+      </p>
+
+      <p>
+        An IMU may generate measurements at
+      </p>
+
+      <p>
+        \[
+        \boxed{ 100\text{–}1000~\mathrm{Hz} }
+        \]
+      </p>
+
+      <p>
+        while GNSS may update at only
+      </p>
+
+      <p>
+        \[
+        \boxed{ 1\text{–}20~\mathrm{Hz}. }
+        \]
+      </p>
+
+      <p>
+        A star tracker may provide attitude at
+      </p>
+
+      <p>
+        \[
+        \boxed{ 1\text{–}20~\mathrm{Hz}, }
+        \]
+      </p>
+
+      <p>
+        while a camera or LiDAR may produce measurements irregularly depending on
+      </p>
+
+      <ul>
+        <li>image exposure,</li>
+        <li>image-processing time,</li>
+        <li>target visibility,</li>
+        <li>feature detection,</li>
+        <li>communication delay,</li>
+        <li>processor scheduling.</li>
+      </ul>
+
+      <p>
+        Therefore, a practical navigation system cannot assume
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{All Sensors Update Simultaneously}. }
+        \]
+      </p>
+
+      <p>
+        Instead, it must support
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Continuous or High-Rate State Propagation} + \text{Asynchronous Measurement Corrections}. }
+        \]
+      </p>
+
+      <p>
+        This is the central idea of <strong>multi-rate and asynchronous sensor fusion</strong>.
+      </p>
+
+      <p>
+        A typical spacecraft estimator may operate conceptually as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-Rate IMU / Gyro Propagation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Update Whenever Available} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star-Tracker Update Whenever Available} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera / LiDAR Update Whenever Available}. }
+        \]
+      </p>
+
+      <p>
+        The estimator therefore evolves according to the <strong>time of each measurement</strong>, rather than according to one artificial common sensor sampling rate.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.1 Why Multi-Rate Sensor Fusion Is Necessary</h3>
+
+      <p>
+        Different spacecraft sensors are designed for different physical purposes.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <h4>Gyroscope</h4>
+
+      <p>
+        Provides high-rate angular-rate information:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m }
+        \]
+      </p>
+
+      <p>
+        but suffers from
+      </p>
+
+      <ul>
+        <li>bias,</li>
+        <li>drift,</li>
+        <li>noise.</li>
+      </ul>
+
+      <h4>Accelerometer</h4>
+
+      <p>
+        Provides high-rate specific force:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf f_m }
+        \]
+      </p>
+
+      <p>
+        but also suffers from
+      </p>
+
+      <ul>
+        <li>bias,</li>
+        <li>scale-factor error,</li>
+        <li>noise,</li>
+        <li>misalignment.</li>
+      </ul>
+
+      <h4>GNSS</h4>
+
+      <p>
+        Provides relatively low-rate absolute position and velocity:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r, \mathbf v }
+        \]
+      </p>
+
+      <p>
+        but often with much lower frequency than IMU data.
+      </p>
+
+      <h4>Star Tracker</h4>
+
+      <p>
+        Provides precise absolute attitude:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q }
+        \]
+      </p>
+
+      <p>
+        but typically at a lower rate than gyroscopes.
+      </p>
+
+      <h4>Camera</h4>
+
+      <p>
+        May provide
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Bearing} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative Pose} }
+        \]
+      </p>
+
+      <p>
+        only when image processing is complete.
+      </p>
+
+      <h4>LiDAR</h4>
+
+      <p>
+        May provide
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Range / Bearing / Pose} }
+        \]
+      </p>
+
+      <p>
+        at another independent rate.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ f_{\text{gyro}} \neq f_{\text{GNSS}} \neq f_{\text{camera}} \neq f_{\text{LiDAR}}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.2 Typical Spacecraft Sensor Rates</h3>
+
+      <p>
+        A representative sensor-rate hierarchy may look like
+      </p>
+
+      <p>
+        \[
+        \boxed{ f_{\text{IMU}} > f_{\text{gyro}} > f_{\text{GNSS}} > f_{\text{camera}} > f_{\text{star tracker}} }
+        \]
+      </p>
+
+      <p>
+        although actual values depend on the mission.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Sensor</th>
+            <th>Representative Rate</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>IMU / Gyro</td>
+              <td>100–1000 Hz</td>
+            </tr>
+            <tr>
+              <td>Accelerometer</td>
+              <td>100–1000 Hz</td>
+            </tr>
+            <tr>
+              <td>Magnetometer</td>
+              <td>10–100 Hz</td>
+            </tr>
+            <tr>
+              <td>GNSS</td>
+              <td>1–20 Hz</td>
+            </tr>
+            <tr>
+              <td>Star Tracker</td>
+              <td>1–20 Hz</td>
+            </tr>
+            <tr>
+              <td>Camera</td>
+              <td>1–30 Hz</td>
+            </tr>
+            <tr>
+              <td>LiDAR</td>
+              <td>1–20 Hz</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        These are only illustrative values.
+      </p>
+
+      <p>
+        The important concept is that the rates are <strong>different</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.3 High-Rate Propagation and Low-Rate Correction</h3>
+
+      <p>
+        The most common navigation architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-Rate Sensor} \rightarrow \text{State Propagation} }
+        \]
+      </p>
+
+      <p>
+        combined with
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Low-Rate Absolute Sensor} \rightarrow \text{State Correction}. }
+        \]
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} \rightarrow \text{Attitude Propagation} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker} \rightarrow \text{Attitude Correction}. }
+        \]
+      </p>
+
+      <p>
+        Similarly:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \text{Position / Velocity Propagation} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS} \rightarrow \text{Position / Velocity Correction}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.4 Why High-Rate Sensors Are Useful</h3>
+
+      <p>
+        High-rate inertial sensors capture fast spacecraft motion.
+      </p>
+
+      <p>
+        For example, a gyroscope may detect a rapid slew long before a low-rate star tracker provides its next attitude measurement.
+      </p>
+
+      <p>
+        Therefore inertial propagation provides
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High Temporal Resolution}. }
+        \]
+      </p>
+
+      <p>
+        But because inertial sensors integrate noise and bias, their error accumulates.
+      </p>
+
+      <p>
+        Thus high-rate propagation alone is not sufficient.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.5 Why Low-Rate Absolute Sensors Are Useful</h3>
+
+      <p>
+        Absolute sensors provide information that limits accumulated inertial drift.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Bias} \rightarrow \text{Attitude Drift} }
+        \]
+      </p>
+
+      <p>
+        but a star tracker periodically provides an absolute attitude reference.
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Accelerometer Bias} \rightarrow \text{Velocity / Position Drift} }
+        \]
+      </p>
+
+      <p>
+        while GNSS periodically corrects those errors.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-Rate Relative Information} + \text{Low-Rate Absolute Information} = \text{Robust Navigation}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.6 Synchronous Fusion vs Asynchronous Fusion</h3>
+
+      <p>
+        In a synchronous system, all measurements are assumed to arrive at the same discrete time:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_k. }
+        \]
+      </p>
+
+      <p>
+        One might construct a combined measurement vector
+      </p>
+
+      <p>
+        \[
+        \mathbf z_k = \begin{bmatrix} \mathbf z_{GNSS}\\ \mathbf z_{camera}\\ \mathbf z_{LiDAR} \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        But this is often unrealistic.
+      </p>
+
+      <p>
+        In an asynchronous system, measurements arrive at
+      </p>
+
+      <p>
+        \[
+        t_{GNSS}, \qquad t_{camera}, \qquad t_{LiDAR}
+        \]
+      </p>
+
+      <p>
+        independently.
+      </p>
+
+      <p>
+        The estimator should therefore process each measurement at its own valid timestamp.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.7 Event-Driven Measurement Updates</h3>
+
+      <p>
+        A practical architecture is <strong>event driven</strong>.
+      </p>
+
+      <p>
+        State propagation runs continuously or at a fixed high rate.
+      </p>
+
+      <p>
+        Whenever a measurement arrives:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Event} \rightarrow \text{Perform Measurement Update}. }
+        \]
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{No New Measurement} \rightarrow \text{Prediction Only} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Available} \rightarrow \text{Prediction + Correction}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.8 Generic Multi-Rate Filter Structure</h3>
+
+      <p>
+        The estimator may maintain
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}(t)
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf P(t).
+        \]
+      </p>
+
+      <p>
+        At every propagation interval:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k+1}^{-} = f( \hat{\mathbf x}_k^{+}, \mathbf u_k ) }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_{k+1}^{-} = \mathbf\Phi_k \mathbf P_k^{+} \mathbf\Phi_k^T + \mathbf Q_k. }
+        \]
+      </p>
+
+      <p>
+        If no measurement exists:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k+1}^{+} = \hat{\mathbf x}_{k+1}^{-}. }
+        \]
+      </p>
+
+      <p>
+        If a measurement exists, perform the appropriate update.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.9 Variable Propagation Interval</h3>
+
+      <p>
+        In asynchronous processing, the time step is not always constant.
+      </p>
+
+      <p>
+        Instead,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_k = t_k-t_{k-1}. }
+        \]
+      </p>
+
+      <p>
+        The propagation equations must use the <strong>actual elapsed time</strong>.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf\Phi = \mathbf\Phi(\Delta t_k) }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf Q_d = \mathbf Q_d(\Delta t_k). }
+        \]
+      </p>
+
+      <p>
+        Using a fixed <code>\Delta t</code> when actual timing varies introduces state and covariance errors.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why the actual time step matters</h4>
+        <p>Asynchronous sensors break the assumption of one fixed sample period. If state transition and process-noise matrices are computed using the wrong time step, both the predicted state and predicted covariance become inconsistent with the real vehicle motion.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.10 Process-Noise Scaling with Time</h3>
+
+      <p>
+        For simple models, discrete process noise may scale approximately as
+      </p>
+
+      <p>
+        \[
+        \boxed{ Q_d \propto \Delta t. }
+        \]
+      </p>
+
+      <p>
+        For integrated states, higher-order terms may appear:
+      </p>
+
+      <p>
+        \[
+        \Delta t^2, \qquad \Delta t^3, \qquad \Delta t^4.
+        \]
+      </p>
+
+      <p>
+        Therefore asynchronous estimators must recompute or appropriately scale
+      </p>
+
+      <p>
+        \[
+        Q_d
+        \]
+      </p>
+
+      <p>
+        whenever
+      </p>
+
+      <p>
+        \[
+        \Delta t
+        \]
+      </p>
+
+      <p>
+        changes.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.11 Multi-Rate Gyro and Star-Tracker Fusion</h3>
+
+      <p>
+        Consider
+      </p>
+
+      <p>
+        \[
+        f_g = 100~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        f_{ST} = 5~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        The gyro propagation occurs every
+      </p>
+
+      <p>
+        \[
+        \boxed{ 0.01~\mathrm{s}. }
+        \]
+      </p>
+
+      <p>
+        The star tracker updates every
+      </p>
+
+      <p>
+        \[
+        \boxed{ 0.2~\mathrm{s}. }
+        \]
+      </p>
+
+      <p>
+        Thus approximately 20 gyro propagation steps occur between star-tracker updates.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ G\,G\,G\,G\,G\,G\,G\,G\,G\,G }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ G\,G\,G\,G\,G\,G\,G\,G\,G\,G }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ ST~Update. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.12 Multi-Rate IMU and GNSS Fusion</h3>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        f_{\text{IMU}} = 200~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        f_{\text{GNSS}} = 10~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        Then IMU propagation occurs every
+      </p>
+
+      <p>
+        \[
+        5~\mathrm{ms}
+        \]
+      </p>
+
+      <p>
+        while GNSS correction occurs every
+      </p>
+
+      <p>
+        \[
+        100~\mathrm{ms}.
+        \]
+      </p>
+
+      <p>
+        There are approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ 20 }
+        \]
+      </p>
+
+      <p>
+        IMU updates between GNSS measurements.
+      </p>
+
+      <p>
+        This is a classic strapdown-navigation architecture.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.13 Propagation State</h3>
+
+      <p>
+        For inertial navigation, the nominal state may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \mathbf b_g\\ \mathbf b_a \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        High-rate IMU data propagates
+      </p>
+
+      <p>
+        \[
+        \mathbf r, \mathbf v, \mathbf q.
+        \]
+      </p>
+
+      <p>
+        Lower-rate measurements correct the accumulated navigation errors and biases.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.14 Attitude Propagation with Gyro</h3>
+
+      <p>
+        The bias-corrected angular rate is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m - \hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <p>
+        Then the quaternion is propagated using
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\hat{\mathbf q}} = \frac12 \Omega( \hat{\boldsymbol\omega} ) \hat{\mathbf q}. }
+        \]
+      </p>
+
+      <p>
+        This propagation occurs at the gyroscope rate.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.15 Translational Propagation with Accelerometer</h3>
+
+      <p>
+        A simplified inertial navigation relation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf v} = \mathbf C_{IB}( \mathbf f_m-\hat{\mathbf b}_a ) + \mathbf g. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf r} = \mathbf v. }
+        \]
+      </p>
+
+      <p>
+        These equations can be integrated at the accelerometer update rate.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.16 Measurement Update Does Not Need to Match Propagation Rate</h3>
+
+      <p>
+        Suppose the filter propagates at
+      </p>
+
+      <p>
+        \[
+        200~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        GNSS may update at
+      </p>
+
+      <p>
+        \[
+        10~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        Camera may update at
+      </p>
+
+      <p>
+        \[
+        7.3~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        and LiDAR at
+      </p>
+
+      <p>
+        \[
+        12~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        There is no requirement that these rates be integer multiples of each other.
+      </p>
+
+      <p>
+        The filter should use timestamps, not assumed integer scheduling relationships.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.17 Independent Sensor Clocks</h3>
+
+      <p>
+        Each sensor may maintain its own internal clock.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{IMU}} \neq t_{\text{camera}} \neq t_{\text{LiDAR}} \neq t_{\text{computer}}. }
+        \]
+      </p>
+
+      <p>
+        Differences can arise from
+      </p>
+
+      <ul>
+        <li>clock offset,</li>
+        <li>clock drift,</li>
+        <li>oscillator error,</li>
+        <li>transport delay,</li>
+        <li>software buffering.</li>
+      </ul>
+
+      <p>
+        These timing differences must eventually be reconciled.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.18 Measurement Timestamp</h3>
+
+      <p>
+        Every sensor measurement should ideally include
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{measurement}}. }
+        \]
+      </p>
+
+      <p>
+        This is the time at which the physical phenomenon was measured.
+      </p>
+
+      <p>
+        It is not necessarily equal to
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{arrival}}. }
+        \]
+      </p>
+
+      <p>
+        The distinction is fundamental.
+      </p>
+
+      <div class="concept-note">
+        <h4>Measurement time is the physically meaningful time</h4>
+        <p>The estimator should associate a measurement with the instant at which the physical quantity was sensed, not simply when the packet reached the processor. This distinction becomes critical for cameras, LiDAR, distributed computers, and any sensor with non-negligible processing latency.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.19 Measurement Time vs Arrival Time</h3>
+
+      <p>
+        Suppose a camera captures an image at
+      </p>
+
+      <p>
+        \[
+        t=10.000~\mathrm{s}.
+        \]
+      </p>
+
+      <p>
+        Image processing takes
+      </p>
+
+      <p>
+        \[
+        80~\mathrm{ms}.
+        \]
+      </p>
+
+      <p>
+        The pose estimate may therefore reach the estimator at
+      </p>
+
+      <p>
+        \[
+        t=10.080~\mathrm{s}.
+        \]
+      </p>
+
+      <p>
+        But the measurement belongs to
+      </p>
+
+      <p>
+        \[
+        \boxed{ 10.000~\mathrm{s}, }
+        \]
+      </p>
+
+      <p>
+        not
+      </p>
+
+      <p>
+        \[
+        10.080~\mathrm{s}.
+        \]
+      </p>
+
+      <p>
+        Using arrival time instead of measurement time introduces temporal inconsistency.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.20 Exposure Time</h3>
+
+      <p>
+        For cameras, even the phrase “measurement time” may require definition.
+      </p>
+
+      <p>
+        An image may have exposure interval
+      </p>
+
+      <p>
+        \[
+        [t_s,t_e].
+        \]
+      </p>
+
+      <p>
+        A common convention is to timestamp at the exposure midpoint:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m = \frac{t_s+t_e}{2}. }
+        \]
+      </p>
+
+      <p>
+        For rapidly rotating spacecraft, exposure duration itself can affect the measurement.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.21 LiDAR Timestamping</h3>
+
+      <p>
+        A LiDAR measurement may also be generated over a finite scan interval.
+      </p>
+
+      <p>
+        A complete scan may contain points corresponding to different times.
+      </p>
+
+      <p>
+        Therefore a point cloud is not always one instantaneous measurement.
+      </p>
+
+      <p>
+        This is particularly important for
+      </p>
+
+      <ul>
+        <li>scanning LiDAR,</li>
+        <li>rapidly moving spacecraft,</li>
+        <li>close-range RPO.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.22 Event-Driven Filter Timeline</h3>
+
+      <p>
+        A realistic timeline might be
+      </p>
+
+      <p>
+        \[
+        t_0: \text{IMU}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_1: \text{IMU}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_2: \text{IMU + GNSS}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_3: \text{IMU}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_4: \text{IMU + Camera}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_5: \text{IMU + LiDAR}.
+        \]
+      </p>
+
+      <p>
+        The estimator processes whichever measurements are valid at each time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.23 Sequential Measurement Updates</h3>
+
+      <p>
+        If multiple independent measurements arrive at approximately the same time, they can be processed sequentially.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Update} }
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star-Tracker Update} }
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{LiDAR Update}. }
+        \]
+      </p>
+
+      <p>
+        For a linear Gaussian filter with independent measurements, sequential updates are mathematically equivalent to a batch update under ideal assumptions.
+      </p>
+
+      <div class="concept-note">
+        <h4>Sequential update interpretation</h4>
+        <p>Sequential updates are especially convenient in asynchronous systems because each measurement can be fused immediately at its own timestamp. There is no need to wait for a complete multi-sensor packet before correcting the state.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.24 Batch Measurement Update</h3>
+
+      <p>
+        Alternatively, measurements may be stacked:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z = \begin{bmatrix} \mathbf z_1\\ \mathbf z_2\\ \mathbf z_3 \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The measurement matrix becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H = \begin{bmatrix} \mathbf H_1\\ \mathbf H_2\\ \mathbf H_3 \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        For independent noise:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf R = \operatorname{blkdiag} ( R_1,R_2,R_3 ). }
+        \]
+      </p>
+
+      <p>
+        But asynchronous measurements should not be artificially batched if their timestamps differ significantly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.25 Sequential vs Batch Fusion</h3>
+
+      <p>
+        Sequential fusion is often preferable in practical asynchronous systems because
+      </p>
+
+      <ul>
+        <li>each sensor can update independently,</li>
+        <li>different rates are easy to support,</li>
+        <li>sensor dropout is simple,</li>
+        <li>software architecture is modular.</li>
+      </ul>
+
+      <p>
+        Batch updates may be useful when measurements are truly synchronized.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.26 Sensor-Specific Measurement Models</h3>
+
+      <p>
+        Each sensor has its own measurement model.
+      </p>
+
+      <p>
+        GNSS:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_G = h_G(x)+v_G. }
+        \]
+      </p>
+
+      <p>
+        Camera:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_C = h_C(x)+v_C. }
+        \]
+      </p>
+
+      <p>
+        LiDAR:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_L = h_L(x)+v_L. }
+        \]
+      </p>
+
+      <p>
+        Star tracker:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_{ST} = h_{ST}(x)+v_{ST}. }
+        \]
+      </p>
+
+      <p>
+        The estimator selects the appropriate
+      </p>
+
+      <p>
+        \[
+        h_j, H_j,R_j
+        \]
+      </p>
+
+      <p>
+        when sensor <code>j</code> produces a measurement.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.27 Sensor-Specific Measurement Dimensions</h3>
+
+      <p>
+        GNSS may provide six values:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_x,r_y,r_z,v_x,v_y,v_z. }
+        \]
+      </p>
+
+      <p>
+        A monocular camera may provide only two image coordinates:
+      </p>
+
+      <p>
+        \[
+        \boxed{ u,v. }
+        \]
+      </p>
+
+      <p>
+        LiDAR may provide range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho. }
+        \]
+      </p>
+
+      <p>
+        Therefore the measurement dimension changes dynamically depending on which sensor updates.
+      </p>
+
+      <p>
+        The estimator must support this naturally.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.28 Event-Driven EKF Update</h3>
+
+      <p>
+        Suppose sensor <code>j</code> produces
+      </p>
+
+      <p>
+        \[
+        z_j.
+        \]
+      </p>
+
+      <p>
+        Compute
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_j = z_j - h_j( \hat x^- ). }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ S_j = H_jP^-H_j^T+R_j. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ K_j = P^-H_j^TS_j^{-1}. }
+        \]
+      </p>
+
+      <p>
+        Update:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x^+ = \hat x^- + K_jr_j. }
+        \]
+      </p>
+
+      <p>
+        Thus no common sensor rate is required.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.29 Event-Driven ESKF Update</h3>
+
+      <p>
+        For an ESKF, nominal-state propagation may occur continuously at IMU rate.
+      </p>
+
+      <p>
+        When a measurement arrives:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_j \rightarrow \delta\hat x }
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{\text{nominal}} \leftarrow x_{\text{nominal}} \oplus \delta\hat x. }
+        \]
+      </p>
+
+      <p>
+        The error state is then reset.
+      </p>
+
+      <p>
+        Again, the correction occurs only when the measurement is available.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.30 Event-Driven MEKF Update</h3>
+
+      <p>
+        For an MEKF:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} \rightarrow \text{High-Rate Quaternion Propagation} }
+        \]
+      </p>
+
+      <p>
+        while star tracker or vector sensors trigger measurement updates.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ q^- \rightarrow \delta\theta \rightarrow q^+. }
+        \]
+      </p>
+
+      <p>
+        This is inherently a multi-rate architecture.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.31 Event-Driven UKF Update</h3>
+
+      <p>
+        The UKF can also operate asynchronously.
+      </p>
+
+      <p>
+        Propagation occurs whenever required.
+      </p>
+
+      <p>
+        When sensor <code>j</code> arrives:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \chi_i^- \rightarrow h_j( \chi_i^- ) }
+        \]
+      </p>
+
+      <p>
+        and the corresponding predicted measurement distribution is calculated.
+      </p>
+
+      <p>
+        Only the active sensor model is evaluated.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.32 Event-Driven Particle Filter</h3>
+
+      <p>
+        Particle propagation can occur at the process-model rate.
+      </p>
+
+      <p>
+        When a new sensor measurement arrives:
+      </p>
+
+      <p>
+        \[
+        \boxed{ w_i \leftarrow w_i p( z_j|x_i ). }
+        \]
+      </p>
+
+      <p>
+        Thus particle filters also naturally support multi-rate measurement likelihoods.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.33 Different Update Frequencies Do Not Require Different Filters</h3>
+
+      <p>
+        A common misconception is that each sensor rate requires a separate estimator.
+      </p>
+
+      <p>
+        This is not necessary.
+      </p>
+
+      <p>
+        A single estimator may maintain one state and covariance while accepting different sensors asynchronously.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Different Sensor Rates} \neq \text{Different Navigation States}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.34 Propagation Frequency</h3>
+
+      <p>
+        The propagation rate should be high enough to represent vehicle dynamics accurately.
+      </p>
+
+      <p>
+        Potential considerations include
+      </p>
+
+      <ul>
+        <li>angular rate,</li>
+        <li>acceleration,</li>
+        <li>orbital dynamics,</li>
+        <li>control bandwidth,</li>
+        <li>sensor sampling rate.</li>
+      </ul>
+
+      <p>
+        A filter propagating too slowly may introduce discretization error.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.35 Estimator Rate vs Sensor Rate</h3>
+
+      <p>
+        The estimator itself may run at a fixed loop rate
+      </p>
+
+      <p>
+        \[
+        f_{\text{filter}}
+        \]
+      </p>
+
+      <p>
+        while sensor arrivals are asynchronous.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        f_{\text{filter}} = 200~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        At each estimator tick:
+      </p>
+
+      <ol>
+        <li>process IMU data,</li>
+        <li>propagate state,</li>
+        <li>inspect measurement queue,</li>
+        <li>process all valid measurements.</li>
+      </ol>
+
+      <p>
+        This is one practical implementation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.36 Fully Event-Driven Estimator</h3>
+
+      <p>
+        Another implementation does not use one fixed estimator loop.
+      </p>
+
+      <p>
+        Instead:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Event} \rightarrow \text{Estimator Event}. }
+        \]
+      </p>
+
+      <p>
+        Every timestamped measurement is inserted into a time-ordered event queue.
+      </p>
+
+      <p>
+        The estimator processes events chronologically.
+      </p>
+
+      <p>
+        This architecture can handle irregular sensors elegantly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.37 Sensor Buffer</h3>
+
+      <p>
+        A practical system may use separate buffers:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU Buffer} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Buffer} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera Buffer} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{LiDAR Buffer}. }
+        \]
+      </p>
+
+      <p>
+        Each stored item should ideally contain
+      </p>
+
+      <ul>
+        <li>measurement value,</li>
+        <li>timestamp,</li>
+        <li>validity flag,</li>
+        <li>sensor ID,</li>
+        <li>covariance,</li>
+        <li>sequence number.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.38 Measurement Queue</h3>
+
+      <p>
+        Measurements can be combined into a time-ordered queue:
+      </p>
+
+      <p>
+        \[
+        \boxed{ (t_1,z_1), (t_2,z_2), \dots }
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        t_1<t_2<\cdots.
+        \]
+      </p>
+
+      <p>
+        The estimator processes measurements according to timestamp rather than arrival order when possible.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.39 Data Association with Time</h3>
+
+      <p>
+        Correct timestamping is also important for data association.
+      </p>
+
+      <p>
+        A camera detection observed at
+      </p>
+
+      <p>
+        \[
+        t_1
+        \]
+      </p>
+
+      <p>
+        must be compared with the predicted target position at
+      </p>
+
+      <p>
+        \[
+        t_1,
+        \]
+      </p>
+
+      <p>
+        not at the current processor time
+      </p>
+
+      <p>
+        \[
+        t_2.
+        \]
+      </p>
+
+      <p>
+        Otherwise association gates can be wrong.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.40 Multi-Sensor Fusion Example</h3>
+
+      <p>
+        Consider an RPO estimator using:
+      </p>
+
+      <ul>
+        <li>IMU at 200 Hz,</li>
+        <li>relative GNSS at 10 Hz,</li>
+        <li>camera at 15 Hz,</li>
+        <li>LiDAR at 5 Hz,</li>
+        <li>star tracker at 5 Hz.</li>
+      </ul>
+
+      <p>
+        A possible sequence is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU Propagation} }
+        \]
+      </p>
+
+      <p>
+        repeated continuously.
+      </p>
+
+      <p>
+        Then, whenever available:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Update} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera Update} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{LiDAR Update} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star-Tracker Update}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.41 RPO Far-Range Fusion</h3>
+
+      <p>
+        At far range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative GNSS} }
+        \]
+      </p>
+
+      <p>
+        may provide the primary navigation measurement.
+      </p>
+
+      <p>
+        Camera bearing information may be intermittent.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU Propagation} + \text{GNSS Correction} + \text{Occasional Optical Update}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.42 RPO Mid-Range Fusion</h3>
+
+      <p>
+        At mid range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS} + \text{Camera} }
+        \]
+      </p>
+
+      <p>
+        may both provide useful information.
+      </p>
+
+      <p>
+        The estimator should process whichever measurement arrives first.
+      </p>
+
+      <p>
+        There is no need to delay a valid camera measurement until the next GNSS epoch.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.43 RPO Close-Range Fusion</h3>
+
+      <p>
+        At close range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} }
+        \]
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        Relative GNSS may become less important.
+      </p>
+
+      <p>
+        LiDAR and camera updates can occur independently.
+      </p>
+
+      <p>
+        Thus the filter becomes strongly event-driven.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.44 Capture-Phase Fusion</h3>
+
+      <p>
+        During capture, navigation updates may include
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{rel} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ v_{rel} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{rel} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \omega_{rel}. }
+        \]
+      </p>
+
+      <p>
+        These quantities may arrive from different sensors at different times.
+      </p>
+
+      <p>
+        The capture-readiness logic must use a state estimate propagated to a <strong>common current epoch</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.45 Common Fusion Epoch</h3>
+
+      <p>
+        Before guidance or control uses the navigation solution, all estimates should correspond to the same time:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{nav}}. }
+        \]
+      </p>
+
+      <p>
+        A camera measurement from
+      </p>
+
+      <p>
+        \[
+        t_c
+        \]
+      </p>
+
+      <p>
+        and LiDAR measurement from
+      </p>
+
+      <p>
+        \[
+        t_L
+        \]
+      </p>
+
+      <p>
+        may have been fused earlier, but the output state should be propagated to
+      </p>
+
+      <p>
+        \[
+        t_{\text{nav}}.
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why a common fusion epoch is essential</h4>
+        <p>Guidance and control need a single physically consistent state. Position, velocity, attitude, and angular rate should all correspond to the same epoch before they are used in capture logic, thruster control, or collision-avoidance decisions.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.46 Asynchronous Sensor Availability</h3>
+
+      <p>
+        Some sensors may become unavailable temporarily.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera} \rightarrow \text{Unavailable During Poor Illumination}. }
+        \]
+      </p>
+
+      <p>
+        LiDAR may remain available.
+      </p>
+
+      <p>
+        GNSS may experience blockage.
+      </p>
+
+      <p>
+        The filter should not require all sensors to be simultaneously healthy.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.47 Sensor Dropout</h3>
+
+      <p>
+        If sensor <code>j</code> becomes unavailable:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Do Not Perform Its Measurement Update}. }
+        \]
+      </p>
+
+      <p>
+        Continue using
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagation + Remaining Sensors}. }
+        \]
+      </p>
+
+      <p>
+        Covariance should naturally increase in state directions that lose observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.48 Sensor Reacquisition</h3>
+
+      <p>
+        When a sensor returns, its measurement can be processed again.
+      </p>
+
+      <p>
+        However, after a long dropout, residuals may be large.
+      </p>
+
+      <p>
+        Therefore reacquisition may require
+      </p>
+
+      <ul>
+        <li>validity checking,</li>
+        <li>larger gates,</li>
+        <li>covariance-aware acceptance,</li>
+        <li>staged reintroduction.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.49 Measurement Age</h3>
+
+      <p>
+        A useful quantity is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\text{age}} = t_{\text{current}} - t_{\text{measurement}}. }
+        \]
+      </p>
+
+      <p>
+        The estimator should know whether a measurement is
+      </p>
+
+      <ul>
+        <li>current,</li>
+        <li>slightly delayed,</li>
+        <li>excessively stale.</li>
+      </ul>
+
+      <p>
+        A stale measurement should not be treated as current.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.50 Maximum Accepted Measurement Age</h3>
+
+      <p>
+        A system may define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max}. }
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \Delta t_{\text{age}} > \Delta t_{\max},
+        \]
+      </p>
+
+      <p>
+        the measurement may be
+      </p>
+
+      <ul>
+        <li>rejected,</li>
+        <li>handled using delayed-update logic,</li>
+        <li>processed through repropagation.</li>
+      </ul>
+
+      <p>
+        The correct response depends on mission requirements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.51 Independent Sensor Processing Time</h3>
+
+      <p>
+        Measurement generation latency may differ by sensor.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{IMU}} \approx 1~\mathrm{ms} }
+        \]
+      </p>
+
+      <p>
+        while image-based pose estimation may require
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{camera}} = 50\text{–}200~\mathrm{ms}. }
+        \]
+      </p>
+
+      <p>
+        Therefore asynchronous fusion and latency management are closely related.
+      </p>
+
+      <p>
+        This leads directly to the next section on time synchronization and delayed measurements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.52 State Interpolation</h3>
+
+      <p>
+        Suppose a sensor measurement time falls between two stored navigation states:
+      </p>
+
+      <p>
+        \[
+        t_k < t_m < t_{k+1}.
+        \]
+      </p>
+
+      <p>
+        One strategy is to interpolate the state.
+      </p>
+
+      <p>
+        For linear quantities:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x(t_m) \approx (1-\alpha)x_k + \alpha x_{k+1} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \boxed{ \alpha = \frac{t_m-t_k} {t_{k+1}-t_k}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.53 Quaternion Interpolation</h3>
+
+      <p>
+        Quaternion attitude should not generally be interpolated linearly.
+      </p>
+
+      <p>
+        A better approach is spherical linear interpolation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ q(t_m) = \operatorname{SLERP} ( q_k, q_{k+1}, \alpha ). }
+        \]
+      </p>
+
+      <p>
+        This preserves unit quaternion geometry.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.54 State Propagation to Measurement Time</h3>
+
+      <p>
+        Instead of interpolation, the estimator can propagate the previous state directly to the measurement timestamp:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x(t_m) = f( x(t_k), t_m-t_k ). }
+        \]
+      </p>
+
+      <p>
+        Then perform the measurement update.
+      </p>
+
+      <p>
+        This is often preferable when a reliable process model is available.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.55 Propagate-Update-Propagate Architecture</h3>
+
+      <p>
+        A delayed but still manageable measurement can be processed as:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x(t_k) }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate to }t_m }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Update} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate to Current Time}. }
+        \]
+      </p>
+
+      <p>
+        This concept becomes central to delayed-measurement handling.
+      </p>
+
+      <div class="concept-note">
+        <h4>Delayed-measurement interpretation</h4>
+        <p>The propagate-update-propagate sequence is the conceptual bridge from ordinary asynchronous fusion to delayed-measurement processing. The state is first reconstructed at the measurement epoch, corrected there, and then repropagated to the current epoch.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.56 Multi-Rate Covariance Propagation</h3>
+
+      <p>
+        Covariance must be propagated whenever state is propagated.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P(t_m) = \Phi P(t_k) \Phi^T + Q_d. }
+        \]
+      </p>
+
+      <p>
+        A multi-rate implementation must not update only the nominal state while leaving covariance at an old timestamp.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.57 Sensor-Specific Measurement Covariance</h3>
+
+      <p>
+        Each sensor has its own covariance:
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{GNSS} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{camera} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{LiDAR} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{ST}. }
+        \]
+      </p>
+
+      <p>
+        The correct matrix must be selected dynamically during each update.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.58 Dynamic Measurement Covariance</h3>
+
+      <p>
+        Measurement uncertainty itself may vary with operating conditions.
+      </p>
+
+      <p>
+        For a camera,
+      </p>
+
+      <p>
+        \[
+        R_C
+        \]
+      </p>
+
+      <p>
+        may depend on
+      </p>
+
+      <ul>
+        <li>target range,</li>
+        <li>number of detected features,</li>
+        <li>image blur,</li>
+        <li>illumination,</li>
+        <li>pose-estimation confidence.</li>
+      </ul>
+
+      <p>
+        For GNSS,
+      </p>
+
+      <p>
+        \[
+        R_G
+        \]
+      </p>
+
+      <p>
+        may depend on satellite geometry or signal quality.
+      </p>
+
+      <p>
+        Thus asynchronous fusion may also be <strong>quality adaptive</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.59 Sensor Health Flag</h3>
+
+      <p>
+        Each measurement packet should ideally include a health or validity indication:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{valid}_j. }
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \text{valid}_j=0,
+        \]
+      </p>
+
+      <p>
+        the measurement should not be used.
+      </p>
+
+      <p>
+        Measurement arrival alone does not imply measurement validity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.60 Measurement Sequence Numbers</h3>
+
+      <p>
+        A sequence number helps detect
+      </p>
+
+      <ul>
+        <li>dropped packets,</li>
+        <li>duplicated measurements,</li>
+        <li>reordered packets.</li>
+      </ul>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_k, N_{k+1}, N_{k+3} }
+        \]
+      </p>
+
+      <p>
+        indicates a missing packet.
+      </p>
+
+      <p>
+        This information is useful in real-time distributed systems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.61 Duplicate Measurements</h3>
+
+      <p>
+        If the same measurement is accidentally processed twice, information is counted twice.
+      </p>
+
+      <p>
+        For a Kalman filter this can lead to
+      </p>
+
+      <p>
+        \[
+        \boxed{ P \text{ becoming artificially small}. }
+        \]
+      </p>
+
+      <p>
+        Therefore duplicate detection is important.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why duplicate processing is dangerous</h4>
+        <p>A repeated measurement is not new information. Processing the same packet twice artificially reduces covariance and can make the navigation solution appear more accurate than the available sensor information supports.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.62 Message Reordering</h3>
+
+      <p>
+        Communication networks may deliver packets out of order.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        t_1
+        \]
+      </p>
+
+      <p>
+        measurement may arrive after
+      </p>
+
+      <p>
+        \[
+        t_2
+        \]
+      </p>
+
+      <p>
+        measurement.
+      </p>
+
+      <p>
+        The estimator therefore needs either
+      </p>
+
+      <ul>
+        <li>ordered buffering,</li>
+        <li>out-of-sequence handling,</li>
+        <li>rejection of stale measurements.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.63 Asynchronous Sensor Fusion Is Not the Same as Delayed Fusion</h3>
+
+      <p>
+        A measurement may be asynchronous but not delayed.
+      </p>
+
+      <p>
+        Example:
+      </p>
+
+      <p>
+        camera produces measurements at irregular times, but each arrives immediately.
+      </p>
+
+      <p>
+        That is asynchronous.
+      </p>
+
+      <p>
+        A measurement becomes delayed when
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{arrival}} > t_{\text{measurement}} }
+        \]
+      </p>
+
+      <p>
+        by a non-negligible interval.
+      </p>
+
+      <p>
+        These are related but distinct problems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.64 Clock Offset</h3>
+
+      <p>
+        Suppose sensor clock time is
+      </p>
+
+      <p>
+        \[
+        t_s.
+        \]
+      </p>
+
+      <p>
+        Navigation computer time is
+      </p>
+
+      <p>
+        \[
+        t_n.
+        \]
+      </p>
+
+      <p>
+        There may be constant offset
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_o = t_s-t_n. }
+        \]
+      </p>
+
+      <p>
+        Without calibration, measurements may be systematically fused at the wrong epoch.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.65 Clock Drift</h3>
+
+      <p>
+        Sensor clocks may also drift.
+      </p>
+
+      <p>
+        A simple model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_s = a\,t_n+b. }
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <ul>
+        <li><code>b</code> is clock offset,</li>
+        <li><code>a</code> represents clock-rate error.</li>
+      </ul>
+
+      <p>
+        Long-duration missions may require continuous clock synchronization.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.66 Time Synchronization Sources</h3>
+
+      <p>
+        Possible spacecraft synchronization sources include
+      </p>
+
+      <ul>
+        <li>GNSS time,</li>
+        <li>onboard master clock,</li>
+        <li>PPS signals,</li>
+        <li>hardware trigger lines,</li>
+        <li>time-distribution buses,</li>
+        <li>PTP-like protocols,</li>
+        <li>spacecraft time correlation.</li>
+      </ul>
+
+      <p>
+        The architecture depends on mission hardware.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.67 PPS Synchronization</h3>
+
+      <p>
+        GNSS receivers may provide a pulse-per-second signal:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{PPS}. }
+        \]
+      </p>
+
+      <p>
+        This can synchronize sensor or processor clocks to a common epoch.
+      </p>
+
+      <p>
+        Accurate PPS synchronization is especially useful when multiple sensors require sub-millisecond alignment.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.68 Hardware Triggering</h3>
+
+      <p>
+        Some sensors can be triggered simultaneously using a hardware line.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Common Trigger} \rightarrow \text{Camera Exposure + LiDAR Measurement}. }
+        \]
+      </p>
+
+      <p>
+        This can greatly simplify sensor-fusion timing.
+      </p>
+
+      <p>
+        But processing latencies may still differ after acquisition.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.69 Software Synchronization</h3>
+
+      <p>
+        When hardware triggering is unavailable, timestamps must be aligned in software.
+      </p>
+
+      <p>
+        This requires
+      </p>
+
+      <ul>
+        <li>clock calibration,</li>
+        <li>latency characterization,</li>
+        <li>buffering,</li>
+        <li>interpolation,</li>
+        <li>synchronization logic.</li>
+      </ul>
+
+      <p>
+        Software-only synchronization is generally less precise than hardware synchronization.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.70 Timing Error as Navigation Error</h3>
+
+      <p>
+        Suppose relative velocity is
+      </p>
+
+      <p>
+        \[
+        v_{rel}.
+        \]
+      </p>
+
+      <p>
+        If a position measurement is applied with timestamp error
+      </p>
+
+      <p>
+        \[
+        \Delta t,
+        \]
+      </p>
+
+      <p>
+        the induced position mismatch is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta r \approx v_{rel} \Delta t. }
+        \]
+      </p>
+
+      <p>
+        Thus even small timing errors can matter when relative motion is fast.
+      </p>
+
+      <div class="concept-note">
+        <h4>RPO timing sensitivity</h4>
+        <p>The approximation shows directly why timing requirements tighten as relative speed increases. Even a small timestamp error can become a meaningful position error during fast approach or translational correction.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.71 Attitude Timing Error</h3>
+
+      <p>
+        If spacecraft angular rate is
+      </p>
+
+      <p>
+        \[
+        \omega,
+        \]
+      </p>
+
+      <p>
+        and attitude timestamp error is
+      </p>
+
+      <p>
+        \[
+        \Delta t,
+        \]
+      </p>
+
+      <p>
+        the angular error is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta\theta \approx \omega\Delta t. }
+        \]
+      </p>
+
+      <p>
+        During fast slews, millisecond timing errors can become important.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.72 Camera Timing Error During RPO</h3>
+
+      <p>
+        Suppose camera line-of-sight is measured at
+      </p>
+
+      <p>
+        \[
+        t_c
+        \]
+      </p>
+
+      <p>
+        but compared against predicted target state at
+      </p>
+
+      <p>
+        \[
+        t_c+\Delta t.
+        \]
+      </p>
+
+      <p>
+        The residual then contains both
+      </p>
+
+      <ul>
+        <li>actual navigation error,</li>
+        <li>timing-induced geometric error.</li>
+      </ul>
+
+      <p>
+        The filter may mistakenly interpret timing error as state error.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.73 Latency Can Mimic Bias</h3>
+
+      <p>
+        Persistent sensor latency can create residual patterns that resemble
+      </p>
+
+      <ul>
+        <li>position bias,</li>
+        <li>velocity bias,</li>
+        <li>attitude bias.</li>
+      </ul>
+
+      <p>
+        Therefore some apparent calibration errors may actually be timing errors.
+      </p>
+
+      <p>
+        This is why sensor timing should be verified before aggressively tuning bias states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.74 Multi-Rate Observability</h3>
+
+      <p>
+        Different sensor rates affect observability over time.
+      </p>
+
+      <p>
+        For example, high-rate gyro measurements alone do not make absolute attitude observable.
+      </p>
+
+      <p>
+        Absolute attitude information arrives only when
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker / Sun Sensor / Magnetometer} }
+        \]
+      </p>
+
+      <p>
+        updates.
+      </p>
+
+      <p>
+        Therefore uncertainty may grow between absolute updates.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.75 Covariance Sawtooth Behaviour</h3>
+
+      <p>
+        A multi-rate estimator often shows covariance that
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Grows During Prediction} }
+        \]
+      </p>
+
+      <p>
+        and then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Drops During Measurement Update}. }
+        \]
+      </p>
+
+      <p>
+        This produces a characteristic sawtooth pattern.
+      </p>
+
+      <p>
+        That behavior can be completely normal.
+      </p>
+
+      <div class="concept-note">
+        <h4>Normal covariance behavior</h4>
+        <p>The sawtooth pattern is not itself a sign of instability. It reflects uncertainty growth during open-loop prediction followed by uncertainty reduction when informative measurements arrive.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.76 Example of Covariance Evolution</h3>
+
+      <p>
+        Between GNSS updates:
+      </p>
+
+      <p>
+        \[
+        P_r \uparrow
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        P_v \uparrow.
+        \]
+      </p>
+
+      <p>
+        When GNSS arrives:
+      </p>
+
+      <p>
+        \[
+        P_r \downarrow
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        P_v \downarrow.
+        \]
+      </p>
+
+      <p>
+        The magnitude of growth depends on
+      </p>
+
+      <ul>
+        <li>process noise,</li>
+        <li>IMU quality,</li>
+        <li>time between measurements.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.77 Sensor Rate and Estimation Accuracy</h3>
+
+      <p>
+        Increasing an absolute measurement rate can improve performance because uncertainty has less time to grow between updates.
+      </p>
+
+      <p>
+        However, more frequent measurements also increase
+      </p>
+
+      <ul>
+        <li>processor load,</li>
+        <li>bus traffic,</li>
+        <li>power consumption.</li>
+      </ul>
+
+      <p>
+        Thus sensor rate is a system-level design trade.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.78 Measurement Rate vs Measurement Quality</h3>
+
+      <p>
+        A high-rate noisy sensor is not always more useful than a lower-rate accurate sensor.
+      </p>
+
+      <p>
+        The filter naturally balances this through covariance.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High Rate + Large }R }
+        \]
+      </p>
+
+      <p>
+        may contribute similar information to
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Low Rate + Small }R. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.79 Information Rate</h3>
+
+      <p>
+        A useful conceptual quantity is information gained per unit time.
+      </p>
+
+      <p>
+        If a sensor provides covariance
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        at rate
+      </p>
+
+      <p>
+        \[
+        f,
+        \]
+      </p>
+
+      <p>
+        then roughly speaking its information contribution scales with
+      </p>
+
+      <p>
+        \[
+        \boxed{ fR^{-1} }
+        \]
+      </p>
+
+      <p>
+        for simple independent measurements.
+      </p>
+
+      <p>
+        This is only a conceptual approximation but helps compare sensor architectures.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.80 High-Rate Noise Correlation</h3>
+
+      <p>
+        Successive high-rate measurements may not be statistically independent.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <ul>
+        <li>filtered IMU outputs,</li>
+        <li>correlated camera tracking errors,</li>
+        <li>colored sensor noise.</li>
+      </ul>
+
+      <p>
+        If correlations are ignored, the filter may become overconfident.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.81 Colored Noise</h3>
+
+      <p>
+        If measurement noise is temporally correlated,
+      </p>
+
+      <p>
+        \[
+        E[ v_kv_{k-1}^T ] \neq0.
+        \]
+      </p>
+
+      <p>
+        Standard Kalman assumptions are violated.
+      </p>
+
+      <p>
+        Possible approaches include
+      </p>
+
+      <ul>
+        <li>augmenting bias/noise states,</li>
+        <li>whitening filters,</li>
+        <li>more realistic stochastic models.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.82 IMU Preintegration</h3>
+
+      <p>
+        In systems where IMU runs much faster than the main estimator, many IMU samples can be summarized using <strong>preintegration</strong>.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Many IMU Samples} \rightarrow \Delta R,\Delta v,\Delta r. }
+        \]
+      </p>
+
+      <p>
+        This is especially common in factor-graph and visual-inertial navigation architectures.
+      </p>
+
+      <div class="concept-note">
+        <h4>Relation to high-rate inertial navigation</h4>
+        <p>Preintegration is useful when propagating every raw IMU sample inside a slower optimization or fusion layer would be expensive. It compresses many inertial samples into a relative motion constraint while retaining an uncertainty model.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.83 Why Preintegration Helps</h3>
+
+      <p>
+        Suppose an IMU runs at
+      </p>
+
+      <p>
+        \[
+        1000~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        but camera updates at
+      </p>
+
+      <p>
+        \[
+        10~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        There are
+      </p>
+
+      <p>
+        \[
+        100
+        \]
+      </p>
+
+      <p>
+        IMU samples between images.
+      </p>
+
+      <p>
+        Preintegration summarizes their cumulative motion while preserving appropriate uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.84 Zero-Order Hold</h3>
+
+      <p>
+        One simple multi-rate implementation holds the latest measurement constant until the next measurement.
+      </p>
+
+      <p>
+        For control signals, this may be represented as a zero-order hold.
+      </p>
+
+      <p>
+        However, for navigation measurements, the estimator should not repeatedly treat a held value as a new independent measurement.
+      </p>
+
+      <p>
+        Otherwise information is counted multiple times.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.85 Critical Warning About Reusing Old Measurements</h3>
+
+      <p>
+        Suppose GNSS updates at
+      </p>
+
+      <p>
+        \[
+        1~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        but the filter runs at
+      </p>
+
+      <p>
+        \[
+        100~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        If the same GNSS measurement is applied at every filter step, it is effectively used 100 times.
+      </p>
+
+      <p>
+        That produces severe overconfidence.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Each Measurement Must Normally Be Applied Once}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Critical implementation rule</h4>
+        <p>A low-rate sensor packet should normally trigger exactly one measurement correction. Holding the value for visualization or signal routing is different from repeatedly treating that value as statistically independent new information.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.86 Measurement “New Data” Flag</h3>
+
+      <p>
+        A practical implementation should use a flag such as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{newGNSS} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{measurementAvailable}. }
+        \]
+      </p>
+
+      <p>
+        Only when
+      </p>
+
+      <p>
+        \[
+        \text{newGNSS}=1
+        \]
+      </p>
+
+      <p>
+        should the GNSS measurement update be executed.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.87 Sample-and-Hold Display vs Estimator Update</h3>
+
+      <p>
+        It is acceptable to display the latest GNSS value continuously.
+      </p>
+
+      <p>
+        But display behavior is different from estimator behavior.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Held Measurement for Display} \neq \text{Repeated Measurement Update}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.88 Simulink Multi-Rate Implementation</h3>
+
+      <p>
+        A Simulink architecture may contain
+      </p>
+
+      <ul>
+        <li>high-rate propagation subsystem,</li>
+        <li>GNSS update subsystem,</li>
+        <li>camera update subsystem,</li>
+        <li>LiDAR update subsystem,</li>
+        <li>star-tracker update subsystem.</li>
+      </ul>
+
+      <p>
+        Each subsystem can be triggered by its own valid-data event.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.89 Simulink Rate Transitions</h3>
+
+      <p>
+        When signals cross between different sample rates, <strong>Rate Transition</strong> blocks may be required.
+      </p>
+
+      <p>
+        These help maintain deterministic data transfer between tasks.
+      </p>
+
+      <p>
+        However, the navigation meaning of the timestamp must still be preserved.
+      </p>
+
+      <p>
+        A rate-transition block alone does not solve sensor latency.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.90 Simulink Function-Call Subsystems</h3>
+
+      <p>
+        An event-driven architecture can use function-call subsystems:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Event} \rightarrow \text{GNSS Update Subsystem} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera Event} \rightarrow \text{Camera Update Subsystem}. }
+        \]
+      </p>
+
+      <p>
+        This closely matches real asynchronous measurement processing.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.91 MATLAB Implementation Pattern</h3>
+
+      <p>
+        A simplified software loop might conceptually be:
+      </p>
+
+      <ol>
+        <li>obtain next event,</li>
+        <li>read event timestamp,</li>
+        <li>propagate state to event timestamp,</li>
+        <li>identify sensor type,</li>
+        <li>build <code>h,H,R</code>,</li>
+        <li>validate measurement,</li>
+        <li>perform update,</li>
+        <li>continue.</li>
+      </ol>
+
+      <p>
+        Thus the estimator operates on a chronological stream of events.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.92 Sensor Event Structure</h3>
+
+      <p>
+        A useful software structure is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{MeasurementEvent} = \{ t, \text{sensorID}, z, R, \text{valid} \}. }
+        \]
+      </p>
+
+      <p>
+        This standardizes asynchronous sensor handling.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.93 Sensor-Specific Calibration</h3>
+
+      <p>
+        Before fusion, each sensor may require calibration for
+      </p>
+
+      <ul>
+        <li>scale factor,</li>
+        <li>bias,</li>
+        <li>misalignment,</li>
+        <li>lever arm,</li>
+        <li>boresight,</li>
+        <li>clock offset.</li>
+      </ul>
+
+      <p>
+        Multi-rate fusion does not eliminate calibration requirements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.94 Lever-Arm Correction</h3>
+
+      <p>
+        Suppose GNSS antenna and IMU are not located at the same point.
+      </p>
+
+      <p>
+        The measured position must be transformed using the lever arm.
+      </p>
+
+      <p>
+        During rotation, antenna velocity also includes rotational contribution:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf v_A = \mathbf v_{CG} + \boldsymbol\omega \times \mathbf r_{A/CG}. }
+        \]
+      </p>
+
+      <p>
+        At high rates, timing and lever-arm errors can interact.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.95 Boresight Alignment</h3>
+
+      <p>
+        Camera or LiDAR frame may not align perfectly with body frame.
+      </p>
+
+      <p>
+        A constant rotation
+      </p>
+
+      <p>
+        \[
+        \boxed{ C_{BC} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ C_{BL} }
+        \]
+      </p>
+
+      <p>
+        must be included.
+      </p>
+
+      <p>
+        Without correct boresight calibration, asynchronous optical residuals may appear biased.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.96 Multi-Rate Bias Estimation</h3>
+
+      <p>
+        Bias states may be propagated continuously:
+      </p>
+
+      <p>
+        \[
+        \dot b_g = n_{bg}.
+        \]
+      </p>
+
+      <p>
+        But they are corrected only when informative absolute measurements arrive.
+      </p>
+
+      <p>
+        Thus gyro bias uncertainty may grow between star-tracker updates and decrease afterward.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.97 Sensor Dropout and Bias Observability</h3>
+
+      <p>
+        During a long absolute-attitude sensor outage, gyro bias may become weakly observable.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{b_g} \uparrow. }
+        \]
+      </p>
+
+      <p>
+        When star-tracker measurements return, bias estimation improves again.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.98 Multi-Rate Navigation Output</h3>
+
+      <p>
+        Although measurements arrive irregularly, guidance and control often require a fixed-rate navigation output.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ f_{\text{GNC}} = 50~\mathrm{Hz}. }
+        \]
+      </p>
+
+      <p>
+        The estimator can output the latest state propagated to each control epoch.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.99 Fixed-Rate GNC Output from Asynchronous Estimator</h3>
+
+      <p>
+        At control time
+      </p>
+
+      <p>
+        \[
+        t_c,
+        \]
+      </p>
+
+      <p>
+        the navigation system provides
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x(t_c), P(t_c). }
+        \]
+      </p>
+
+      <p>
+        Measurements may have been fused at earlier irregular times.
+      </p>
+
+      <p>
+        The state is simply propagated to the control time before output.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.100 Guidance Should Use State Age</h3>
+
+      <p>
+        A useful navigation output is
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{last absolute update}}. }
+        \]
+      </p>
+
+      <p>
+        Guidance can then know how long the estimator has been operating without external correction.
+      </p>
+
+      <p>
+        This may influence
+      </p>
+
+      <ul>
+        <li>approach speed,</li>
+        <li>hold decisions,</li>
+        <li>abort logic.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Why state age belongs in the navigation output</h4>
+        <p>A numerically valid state can still be operationally stale. Exposing the age of the last absolute correction allows guidance logic to reduce approach speed, hold, or abort when navigation confidence is degrading.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.101 Navigation Health Flag</h3>
+
+      <p>
+        A navigation solution should include a health indicator based on
+      </p>
+
+      <ul>
+        <li>covariance,</li>
+        <li>sensor availability,</li>
+        <li>innovation consistency,</li>
+        <li>update age,</li>
+        <li>filter status.</li>
+      </ul>
+
+      <p>
+        Thus guidance should not receive only
+      </p>
+
+      <p>
+        \[
+        \hat x.
+        \]
+      </p>
+
+      <p>
+        It should also know whether that estimate is trustworthy.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.102 Capture Readiness and Sensor Timing</h3>
+
+      <p>
+        Suppose capture requires
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|r_{rel}\|<r_c }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|v_{rel}\|<v_c. }
+        \]
+      </p>
+
+      <p>
+        These quantities must correspond to the <strong>same timestamp</strong>.
+      </p>
+
+      <p>
+        Using position from one epoch and velocity from another can produce incorrect capture readiness.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.103 Multi-Rate Attitude and Translation Fusion</h3>
+
+      <p>
+        Attitude may update using star tracker at one rate.
+      </p>
+
+      <p>
+        Translation may update using GNSS or LiDAR at another.
+      </p>
+
+      <p>
+        But force and measurement transformations often depend on attitude.
+      </p>
+
+      <p>
+        Therefore a translational measurement at
+      </p>
+
+      <p>
+        \[
+        t_m
+        \]
+      </p>
+
+      <p>
+        must use attitude corresponding to
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.104 Frame Transformation at Measurement Time</h3>
+
+      <p>
+        Suppose camera measurement requires
+      </p>
+
+      <p>
+        \[
+        C_{HC}(t_m).
+        \]
+      </p>
+
+      <p>
+        Using
+      </p>
+
+      <p>
+        \[
+        C_{HC}(t_{\text{current}})
+        \]
+      </p>
+
+      <p>
+        instead can introduce a false residual.
+      </p>
+
+      <p>
+        Thus time consistency applies not just to state values but also to coordinate transformations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.105 Thruster Events and Navigation Timing</h3>
+
+      <p>
+        During RPO, thruster firings may occur between measurements.
+      </p>
+
+      <p>
+        The state propagation must include the maneuver at the correct time.
+      </p>
+
+      <p>
+        If a thruster event occurs at
+      </p>
+
+      <p>
+        \[
+        t_b,
+        \]
+      </p>
+
+      <p>
+        then propagation across that interval must account for the applied impulse or force.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.106 Impulsive Maneuver Example</h3>
+
+      <p>
+        For impulsive velocity change
+      </p>
+
+      <p>
+        \[
+        \Delta v,
+        \]
+      </p>
+
+      <p>
+        the state update at
+      </p>
+
+      <p>
+        \[
+        t_b
+        \]
+      </p>
+
+      <p>
+        is
+      </p>
+
+      <p>
+        \[
+        \boxed{ v(t_b^+) = v(t_b^-) + \Delta v. }
+        \]
+      </p>
+
+      <p>
+        All later sensor predictions must include this maneuver.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.107 Continuous Thruster Firing</h3>
+
+      <p>
+        For finite-duration thrust,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot v = \frac{F(t)}{m(t)} + a_{\text{external}}. }
+        \]
+      </p>
+
+      <p>
+        Propagation through the burn interval should use the actual actuation timeline.
+      </p>
+
+      <p>
+        Multi-rate sensor measurements during the burn must be compared with that propagated state.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.108 Control Command Timestamp</h3>
+
+      <p>
+        Navigation timing is also linked to control-command timing.
+      </p>
+
+      <p>
+        The filter should know when a command was actually applied, not merely when it was computed.
+      </p>
+
+      <p>
+        Possible delays include
+      </p>
+
+      <ul>
+        <li>command generation,</li>
+        <li>bus transmission,</li>
+        <li>valve actuation,</li>
+        <li>actuator dynamics.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.109 Asynchronous Actuator Information</h3>
+
+      <p>
+        Actuator telemetry may itself arrive asynchronously.
+      </p>
+
+      <p>
+        For accurate propagation, the estimator may need
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Actual Actuator State} }
+        \]
+      </p>
+
+      <p>
+        rather than only commanded actuator state.
+      </p>
+
+      <p>
+        This is especially relevant when actuation delays are significant.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.110 Multi-Rate Sensor Fusion and RPO Safety</h3>
+
+      <p>
+        During close RPO, a stale navigation estimate can be dangerous.
+      </p>
+
+      <p>
+        Therefore the system may define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\text{nav,max}}. }
+        \]
+      </p>
+
+      <p>
+        If navigation information becomes too old:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Continue Approach} \rightarrow \text{Not Allowed}. }
+        \]
+      </p>
+
+      <p>
+        The spacecraft may instead
+      </p>
+
+      <ul>
+        <li>hold,</li>
+        <li>retreat,</li>
+        <li>abort.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.111 Sensor Update Age by Mission Phase</h3>
+
+      <p>
+        Far from the target, longer update intervals may be acceptable.
+      </p>
+
+      <p>
+        Near capture, tighter timing requirements may apply.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max} = \Delta t_{\max}( \text{mission phase} ). }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.112 Multi-Rate Fusion and Observability During RPO</h3>
+
+      <p>
+        At different ranges, different sensors provide observability.
+      </p>
+
+      <p>
+        Far range:
+      </p>
+
+      <p>
+        \boxed{ \text{GNSS}
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        Mid range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS + Camera} }
+        \]
+      </p>
+
+      <p>
+        Close range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera + LiDAR}. }
+        \]
+      </p>
+
+      <p>
+        The estimator remains continuous while sensor information rates change.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.113 Sensor Handover</h3>
+
+      <p>
+        During handover from sensor A to sensor B:
+      </p>
+
+      <p>
+        \[
+        \boxed{ A \rightarrow A+B \rightarrow B. }
+        \]
+      </p>
+
+      <p>
+        An overlap period is often useful.
+      </p>
+
+      <p>
+        It allows
+      </p>
+
+      <ul>
+        <li>consistency comparison,</li>
+        <li>alignment verification,</li>
+        <li>smoother transition.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Why overlap helps during handover</h4>
+        <p>An overlap interval allows the old and new sensor paths to be compared directly before one is removed. This gives the system a chance to detect frame offsets, scale errors, timing problems, or unexpected covariance differences.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.114 Hard vs Soft Sensor Handover</h3>
+
+      <h4>Hard Handover</h4>
+
+      <p>
+        Immediately stop sensor A and start sensor B.
+      </p>
+
+      <h4>Soft Handover</h4>
+
+      <p>
+        Use both sensors during an overlap interval.
+      </p>
+
+      <p>
+        Soft handover generally provides better continuity and fault detection.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.115 Covariance During Sensor Handover</h3>
+
+      <p>
+        The filter should not manually force covariance lower simply because a new sensor becomes active.
+      </p>
+
+      <p>
+        The covariance should change according to the actual information in the measurement update.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{New Sensor} \neq \text{Automatic Confidence}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.116 Measurement Rejection in Multi-Rate Fusion</h3>
+
+      <p>
+        Every asynchronous measurement should still pass validation.
+      </p>
+
+      <p>
+        Possible checks include
+      </p>
+
+      <ul>
+        <li>range limits,</li>
+        <li>innovation magnitude,</li>
+        <li>timestamp validity,</li>
+        <li>sensor health,</li>
+        <li>frame validity.</li>
+      </ul>
+
+      <p>
+        A fast sensor should not be trusted merely because it updates frequently.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.117 Outlier Frequency Matters</h3>
+
+      <p>
+        Suppose a sensor has a low per-measurement outlier probability.
+      </p>
+
+      <p>
+        At a very high update rate, outliers may still occur frequently in time.
+      </p>
+
+      <p>
+        Therefore robust gating becomes even more important for high-rate sensors.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.118 Innovation Sequence</h3>
+
+      <p>
+        For each sensor, maintain a separate innovation history:
+      </p>
+
+      <p>
+        \[
+        r_{GNSS},
+        \]
+      </p>
+
+      <p>
+        \[
+        r_{camera},
+        \]
+      </p>
+
+      <p>
+        \[
+        r_{LiDAR}.
+        \]
+      </p>
+
+      <p>
+        This makes it easier to detect sensor-specific inconsistencies.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.119 Sensor-Specific NIS</h3>
+
+      <p>
+        For each sensor <code>j</code>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS_j = r_j^TS_j^{-1}r_j. }
+        \]
+      </p>
+
+      <p>
+        Different sensor dimensions require different chi-square thresholds.
+      </p>
+
+      <p>
+        Thus validation should be sensor specific.
+      </p>
+
+      <div class="concept-note">
+        <h4>Sensor-specific statistical gating</h4>
+        <p>NIS thresholds depend on measurement dimension. A scalar range measurement, a 2-D image feature, and a 6-D pose measurement should not use the same chi-square acceptance threshold.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.120 Multi-Rate Logging</h3>
+
+      <p>
+        A good logging system should record:
+      </p>
+
+      <ul>
+        <li>estimator time,</li>
+        <li>sensor timestamp,</li>
+        <li>arrival time,</li>
+        <li>sensor ID,</li>
+        <li>measurement,</li>
+        <li>innovation,</li>
+        <li>innovation covariance,</li>
+        <li>update accepted/rejected,</li>
+        <li>state before update,</li>
+        <li>state after update.</li>
+      </ul>
+
+      <p>
+        This is invaluable for diagnosing timing problems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.121 Timing Diagnostics</h3>
+
+      <p>
+        Useful derived quantities include
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{latency} = t_{\text{arrival}} - t_{\text{measurement}} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{update interval} = t_{k} - t_{k-1}. }
+        \]
+      </p>
+
+      <p>
+        Plotting these values often reveals synchronization issues that are invisible in ordinary state plots.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.122 Sensor Jitter</h3>
+
+      <p>
+        Even nominally periodic sensors exhibit timing jitter.
+      </p>
+
+      <p>
+        For nominal sample period
+      </p>
+
+      <p>
+        \[
+        T,
+        \]
+      </p>
+
+      <p>
+        actual period may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ T_k = T+\delta T_k. }
+        \]
+      </p>
+
+      <p>
+        A robust estimator should use actual timestamps rather than assuming perfect periodicity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.123 Dropped Sample Detection</h3>
+
+      <p>
+        If sensor timestamps normally satisfy
+      </p>
+
+      <p>
+        \[
+        t_{k+1}-t_k \approx T,
+        \]
+      </p>
+
+      <p>
+        but suddenly
+      </p>
+
+      <p>
+        \[
+        t_{k+1}-t_k \approx 2T,
+        \]
+      </p>
+
+      <p>
+        one sample may have been dropped.
+      </p>
+
+      <p>
+        The filter can continue, but covariance should propagate through the longer interval.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.124 Multi-Rate Simulation</h3>
+
+      <p>
+        Simulation should represent the actual sensor rates rather than producing all sensors every solver step.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        f_{IMU}=200~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        \[
+        f_{GNSS}=10~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        \[
+        f_{camera}=5~\mathrm{Hz}.
+        \]
+      </p>
+
+      <p>
+        Each sensor should generate measurements according to its own schedule.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.125 Sensor-Clock Simulation</h3>
+
+      <p>
+        A higher-fidelity simulation may include
+      </p>
+
+      <ul>
+        <li>clock offset,</li>
+        <li>clock drift,</li>
+        <li>jitter,</li>
+        <li>packet delay.</li>
+      </ul>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        t_{\text{sensor}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        t_{\text{truth}}
+        \]
+      </p>
+
+      <p>
+        are not assumed identical.
+      </p>
+
+      <p>
+        This is important before HIL testing.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.126 Communication-Delay Simulation</h3>
+
+      <p>
+        Measurements may be delayed by
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{comm}}. }
+        \]
+      </p>
+
+      <p>
+        For each sensor:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{arrival}} = t_{\text{measurement}} + \tau_{\text{processing}} + \tau_{\text{communication}}. }
+        \]
+      </p>
+
+      <p>
+        This provides realistic asynchronous behavior.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.127 Monte Carlo Timing Errors</h3>
+
+      <p>
+        Timing uncertainty should be included in Monte Carlo analysis.
+      </p>
+
+      <p>
+        Randomize:
+      </p>
+
+      <ul>
+        <li>clock offset,</li>
+        <li>drift,</li>
+        <li>jitter,</li>
+        <li>processing latency,</li>
+        <li>packet delay,</li>
+        <li>dropout.</li>
+      </ul>
+
+      <p>
+        Evaluate sensitivity of navigation accuracy and consistency.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.128 Verification Strategy</h3>
+
+      <p>
+        A multi-rate estimator should be verified incrementally.
+      </p>
+
+      <h4>4.2.13.128.1 Equal-Rate Test</h4>
+
+      <p>
+        Run all sensors at the same rate.
+      </p>
+
+      <p>
+        Verify baseline filter performance.
+      </p>
+
+      <h4>4.2.13.128.2 Two-Rate Test</h4>
+
+      <p>
+        Use high-rate IMU and low-rate GNSS.
+      </p>
+
+      <p>
+        Verify correct propagation between GNSS updates.
+      </p>
+
+      <h4>4.2.13.128.3 Irregular Measurement Test</h4>
+
+      <p>
+        Generate camera measurements at nonuniform intervals.
+      </p>
+
+      <p>
+        Verify each is processed at its own timestamp.
+      </p>
+
+      <h4>4.2.13.128.4 Dropout Test</h4>
+
+      <p>
+        Disable one sensor temporarily.
+      </p>
+
+      <p>
+        Verify covariance growth and continued propagation.
+      </p>
+
+      <h4>4.2.13.128.5 Reacquisition Test</h4>
+
+      <p>
+        Restore the sensor and verify stable convergence.
+      </p>
+
+      <h4>4.2.13.128.6 Duplicate-Measurement Test</h4>
+
+      <p>
+        Send the same packet twice.
+      </p>
+
+      <p>
+        Verify it is not processed twice.
+      </p>
+
+      <h4>4.2.13.128.7 Reordered-Packet Test</h4>
+
+      <p>
+        Deliver measurements out of order.
+      </p>
+
+      <p>
+        Verify buffering or delayed-update logic.
+      </p>
+
+      <h4>4.2.13.128.8 Timestamp-Jitter Test</h4>
+
+      <p>
+        Introduce timing jitter.
+      </p>
+
+      <p>
+        Verify variable-<code>\Delta t</code> propagation.
+      </p>
+
+      <h4>4.2.13.128.9 High-Dynamics Test</h4>
+
+      <p>
+        Perform fast slew or translation.
+      </p>
+
+      <p>
+        Verify timing sensitivity.
+      </p>
+
+      <h4>4.2.13.128.10 Sensor-Handover Test</h4>
+
+      <p>
+        Transition from GNSS to camera to LiDAR.
+      </p>
+
+      <p>
+        Verify estimator continuity.
+      </p>
+
+      <div class="concept-note">
+        <h4>Verification philosophy</h4>
+        <p>The tests should be added incrementally so timing failures can be isolated from state-estimation failures. Equal-rate and two-rate tests establish the baseline before introducing jitter, dropout, packet reordering, and sensor handover.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.129 Common Implementation Errors</h3>
+
+      <p>
+        Common errors include:
+      </p>
+
+      <ul>
+        <li>applying a low-rate measurement repeatedly at every high-rate filter step,</li>
+        <li>using arrival time instead of measurement time,</li>
+        <li>assuming fixed <code>\Delta t</code> despite timing jitter,</li>
+        <li>forgetting to scale <code>Q_d</code> with time,</li>
+        <li>processing measurements out of chronological order without correction,</li>
+        <li>mixing sensor clocks without synchronization,</li>
+        <li>fusing stale measurements as current,</li>
+        <li>using current attitude for an old camera measurement,</li>
+        <li>failing to propagate covariance with the state,</li>
+        <li>incorrect sensor-rate transitions,</li>
+        <li>duplicate packet processing,</li>
+        <li>ignoring packet loss,</li>
+        <li>using one <code>R</code> for sensors with different quality,</li>
+        <li>not updating health status after dropout,</li>
+        <li>inconsistent coordinate frames at different timestamps,</li>
+        <li>not logging timing information.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.130 Real-Time Software Architecture</h3>
+
+      <p>
+        A robust architecture may contain:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Drivers} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Timestamping} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Buffers} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Chronological Event Queue} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{State Propagation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor-Specific Update} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Navigation Output}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.131 Multi-Rate Fusion in One Diagram</h3>
+
+      <p>
+        The complete concept can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-Rate IMU / Gyro} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Continuous State + Covariance Propagation} }
+        \]
+      </p>
+
+      <p>
+        while independent sensors provide:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS at }t_G }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker at }t_{ST} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera at }t_C }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{LiDAR at }t_L. }
+        \]
+      </p>
+
+      <p>
+        Each measurement triggers:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate to Measurement Time} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Validate Measurement} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Perform Sensor-Specific Correction} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Continue Propagation}. }
+        \]
+      </p>
+
+      <p>
+        Thus the estimator is driven by
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Time} + \text{Measurement Events}, }
+        \]
+      </p>
+
+      <p>
+        not by the assumption that every sensor shares one sample clock.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.132 Key Equations at a Glance</h3>
+
+      <h4>Actual Propagation Interval</h4>
+
+      <p>
+        \[
+        \boxed{ \Delta t_k = t_k-t_{k-1}. }
+        \]
+      </p>
+
+      <h4>State Prediction</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_k^- = f( \hat x_{k-1}^+, u_{k-1}, \Delta t_k ). }
+        \]
+      </p>
+
+      <h4>Covariance Prediction</h4>
+
+      <p>
+        \[
+        \boxed{ P_k^- = \Phi_k P_{k-1}^+ \Phi_k^T + Q_d( \Delta t_k ). }
+        \]
+      </p>
+
+      <h4>Sensor-Specific Innovation</h4>
+
+      <p>
+        \[
+        \boxed{ r_j = z_j - h_j( \hat x^- ). }
+        \]
+      </p>
+
+      <h4>Innovation Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ S_j = H_jP^-H_j^T+R_j. }
+        \]
+      </p>
+
+      <h4>Kalman Gain</h4>
+
+      <p>
+        \[
+        \boxed{ K_j = P^-H_j^TS_j^{-1}. }
+        \]
+      </p>
+
+      <h4>Measurement Update</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x^+ = \hat x^- + K_jr_j. }
+        \]
+      </p>
+
+      <h4>Measurement Age</h4>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\text{age}} = t_{\text{current}} - t_{\text{measurement}}. }
+        \]
+      </p>
+
+      <h4>Timing-Induced Position Error Approximation</h4>
+
+      <p>
+        \[
+        \boxed{ \Delta r \approx v\Delta t. }
+        \]
+      </p>
+
+      <h4>Timing-Induced Attitude Error Approximation</h4>
+
+      <p>
+        \[
+        \boxed{ \Delta\theta \approx \omega\Delta t. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.13.133 Key Takeaways</h3>
+
+      <p>
+        The most important concepts of multi-rate and asynchronous sensor fusion are:
+      </p>
+
+      <ul>
+        <li>Real spacecraft sensors operate at <strong>different rates</strong>.</li>
+        <li>They may also use <strong>independent clocks</strong>.</li>
+        <li>High-rate IMU and gyroscope data are typically used for state propagation.</li>
+        <li>Lower-rate GNSS, star tracker, camera, and LiDAR measurements provide corrections.</li>
+        <li>The estimator should normally process measurements according to their <strong>measurement timestamps</strong>.</li>
+        <li>Measurement time and arrival time are not necessarily the same.</li>
+        <li>The propagation interval should use the actual</li>
+      </ul>
+
+      <p>
+        \[
+          \Delta t.
+        \]
+      </p>
+
+      <ul>
+        <li>Process covariance</li>
+      </ul>
+
+      <p>
+        \[
+          Q_d
+        \]
+      </p>
+
+      <p>
+        must be consistent with the actual propagation duration.
+      </p>
+
+      <ul>
+        <li>A low-rate measurement must not be repeatedly reused at every high-rate filter step.</li>
+        <li>Each independent measurement should normally be incorporated once.</li>
+        <li>Measurement updates can be event driven.</li>
+        <li>Sequential sensor updates are convenient for asynchronous systems.</li>
+        <li>Different sensors may use different</li>
+      </ul>
+
+      <p>
+        \[
+          h_j,\;H_j,\;R_j.
+        \]
+      </p>
+
+      <ul>
+        <li>Measurement dimensions may change dynamically.</li>
+        <li>Multi-rate fusion works naturally with KF, EKF, ESKF, MEKF, UKF, and Particle Filters.</li>
+        <li>Sensor dropout should result in prediction-only operation for the missing measurement source.</li>
+        <li>Covariance generally grows during propagation and drops when measurements arrive.</li>
+        <li>Sensor reacquisition should be validated before full trust is restored.</li>
+        <li>State and covariance must refer to the same timestamp.</li>
+        <li>Attitude used in camera or LiDAR transformations must correspond to the measurement epoch.</li>
+        <li>Independent sensor clocks require synchronization or time correlation.</li>
+        <li>Packet duplication, loss, and reordering must be detected.</li>
+        <li>High-rate measurements may have correlated noise and should not automatically be treated as independent.</li>
+        <li>Sensor handover is best handled with overlap when possible.</li>
+        <li>Guidance and control should receive a state propagated to a common current epoch.</li>
+        <li>Navigation outputs should include covariance, sensor health, and measurement-age information.</li>
+        <li>Timing errors can appear as navigation biases.</li>
+        <li>During RPO, timing requirements become increasingly strict near final approach and capture.</li>
+        <li>Simulation and Monte Carlo testing should reproduce real sensor rates, latency, jitter, dropout, and asynchronous events.</li>
+      </ul>
+
+      <p>
+        The central implementation principle is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate Continuously} + \text{Update Only When New Valid Measurements Arrive}. }
+        \]
+      </p>
+
+      <p>
+        The central timing principle is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fuse a Measurement With the State at the Time the Measurement Was Taken}. }
+        \]
+      </p>
+
+      <p>
+        And the central warning is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{A Measurement With the Correct Value but the Wrong Timestamp Is Still a Wrong Measurement for the Estimator}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3 class="next-title">Next: 4.2.14 Time Synchronization, Latency and Delayed Measurements</h3>
+
+      <p>
+        Multi-rate fusion establishes that sensors operate at different frequencies and measurement updates may occur asynchronously.
+      </p>
+
+      <p>
+        The next problem is more subtle.
+      </p>
+
+      <p>
+        A measurement may correspond to time
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m }
+        \]
+      </p>
+
+      <p>
+        but reach the navigation computer only at
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_a=t_m+\tau. }
+        \]
+      </p>
+
+      <p>
+        The delay
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau }
+        \]
+      </p>
+
+      <p>
+        may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau = \tau_{\text{sensor}} + \tau_{\text{processing}} + \tau_{\text{communication}} + \tau_{\text{buffering}}. }
+        \]
+      </p>
+
+      <p>
+        Therefore the next section should develop <strong>4.2.14 Time Synchronization, Latency and Delayed Measurements</strong>, including:
+      </p>
+
+      <ul>
+        <li>sensor timestamps,</li>
+        <li>measurement time versus arrival time,</li>
+        <li>clock offset,</li>
+        <li>clock drift,</li>
+        <li>PPS synchronization,</li>
+        <li>master spacecraft time,</li>
+        <li>camera exposure timing,</li>
+        <li>LiDAR scan timing,</li>
+        <li>communication latency,</li>
+        <li>processing latency,</li>
+        <li>buffering delay,</li>
+        <li>state history buffers,</li>
+        <li>propagation to measurement time,</li>
+        <li>delayed measurement correction,</li>
+        <li>repropagation,</li>
+        <li>out-of-sequence measurements,</li>
+        <li>fixed-lag smoothing,</li>
+        <li>timestamp uncertainty,</li>
+        <li>timing calibration,</li>
+        <li>timing-error observability,</li>
+        <li>latency estimation,</li>
+        <li>software and hardware synchronization,</li>
+        <li>RPO timing requirements,</li>
+        <li>Monte Carlo timing-error analysis,</li>
+        <li>and verification of delayed-measurement navigation systems.</li>
+      </ul>
+
+      <a href="time-synchronization-latency-delayed-measurements.html"
+         class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2.14 Time Synchronization, Latency and Delayed Measurements</h3>
+          <p>
+            Sensor timestamps, clock alignment, PPS synchronization,
+            measurement latency, communication delay, state propagation to
+            measurement time, delayed measurements, repropagation,
+            out-of-sequence updates, fixed-lag smoothing, and timing-error
+            verification.
+          </p>
+          <p class="sensor-link-arrow">
+            Continue to Time Synchronization, Latency and Delayed Measurements &rarr;
+          </p>
+        </div>
+      </a>
+
+
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+  </footer>
+
+</body>
+</html>
