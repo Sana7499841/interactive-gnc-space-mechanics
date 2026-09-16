@@ -1,0 +1,5200 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.9 Multiplicative Extended Kalman Filter (MEKF) | Interactive GNC &amp; Space Mechanics</title>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+</head>
+
+
+<body>
+
+  <!-- ========================================================= -->
+  <!-- PAGE HEADER                                                -->
+  <!-- ========================================================= -->
+
+  <header class="notes-hero">
+
+    <h1>Multiplicative Extended Kalman Filter (MEKF)</h1>
+
+    <p class="notes-tagline">
+      Quaternion attitude estimation, multiplicative attitude-error
+      representation, small-angle error states, gyroscope-bias estimation,
+      quaternion propagation and correction, covariance reset, absolute
+      attitude sensor fusion, observability, verification, and spacecraft
+      attitude-determination applications.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN CONTENT                                               -->
+  <!-- ========================================================= -->
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.9 Multiplicative Extended Kalman Filter (MEKF)</h2>
+
+<p>
+        The <strong>Multiplicative Extended Kalman Filter (MEKF)</strong> is one of the most important estimation methods used for <strong>spacecraft attitude determination</strong>.
+      </p>
+
+      <p>
+        It is designed specifically for systems in which attitude is represented using a quaternion.
+      </p>
+
+      <p>
+        A spacecraft may maintain an attitude quaternion
+      </p>
+
+      <p>
+        \[
+        \mathbf q
+        \]
+      </p>
+
+      <p>
+        together with gyroscope bias
+      </p>
+
+      <p>
+        \[
+        \mathbf b_g
+        \]
+      </p>
+
+      <p>
+        and possibly other calibration or sensor-error states.
+      </p>
+
+      <p>
+        The central difficulty is that a quaternion is not an ordinary four-dimensional Euclidean vector.
+      </p>
+
+      <p>
+        It must satisfy the unit-norm constraint
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|\mathbf q\| = 1 }
+        \]
+      </p>
+
+      <p>
+        and represents a point on the unit hypersphere.
+      </p>
+
+      <p>
+        Therefore, directly treating the quaternion as four independent additive Kalman-filter states is not ideal.
+      </p>
+
+      <p>
+        The MEKF solves this problem by maintaining
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal Quaternion} + \text{Small Multiplicative Attitude Error} }
+        \]
+      </p>
+
+      <p>
+        rather than estimating the quaternion correction additively.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_{\text{true}} = \delta\mathbf q \otimes \hat{\mathbf q} }
+        \]
+      </p>
+
+      <p>
+        for one common convention, where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>\hat{\mathbf q}</code> is the nominal estimated quaternion,
+        </li>
+
+        <li>
+          <code>\delta\mathbf q</code> is a small quaternion describing attitude error,
+        </li>
+
+        <li>
+          <code>\otimes</code> denotes quaternion multiplication.
+        </li>
+
+      </ul>
+
+      <p>
+        Because the attitude error is assumed small, it can be represented by a three-dimensional vector
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta }
+        \]
+      </p>
+
+      <p>
+        rather than four quaternion components.
+      </p>
+
+      <p>
+        Thus the MEKF combines
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Global Quaternion Representation} + \text{Local 3-D Linear Error State} }
+        \]
+      </p>
+
+      <p>
+        which is particularly well suited to spacecraft attitude estimation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.1 Why the MEKF Is Needed</h3>
+
+      <p>
+        Suppose spacecraft attitude is represented by
+      </p>
+
+      <p>
+        \[
+        \mathbf q = \begin{bmatrix} q_0\\ q_1\\ q_2\\ q_3 \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The quaternion must always satisfy
+      </p>
+
+      <p>
+        \[
+        q_0^2+q_1^2+q_2^2+q_3^2=1.
+        \]
+      </p>
+
+      <p>
+        A straightforward EKF might attempt an additive correction
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q^+ = \mathbf q^- + \Delta\mathbf q }.
+        \]
+      </p>
+
+      <p>
+        But after this operation,
+      </p>
+
+      <p>
+        \[
+        \|\mathbf q^+\|
+        \]
+      </p>
+
+      <p>
+        is not automatically equal to one.
+      </p>
+
+      <p>
+        The quaternion must then be renormalized.
+      </p>
+
+      <p>
+        More importantly, quaternion components are not four independent physical attitude coordinates.
+      </p>
+
+      <p>
+        They contain only three rotational degrees of freedom.
+      </p>
+
+      <p>
+        Therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Four Quaternion Components} \neq \text{Four Independent Attitude Errors}. }
+        \]
+      </p>
+
+      <p>
+        The MEKF avoids this redundancy by representing uncertainty using a three-dimensional local attitude error.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.2 Quaternion Attitude Representation</h3>
+
+      <p>
+        A unit quaternion may be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q = \begin{bmatrix} q_0\\ \mathbf q_v \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>q_0</code> is the scalar component,
+        </li>
+
+        <li>
+          <code>\mathbf q_v</code> is the three-dimensional vector component.
+        </li>
+
+      </ul>
+
+      <p>
+        For a rotation of angle
+      </p>
+
+      <p>
+        \[
+        \theta
+        \]
+      </p>
+
+      <p>
+        about unit axis
+      </p>
+
+      <p>
+        \[
+        \mathbf e,
+        \]
+      </p>
+
+      <p>
+        the quaternion can be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q = \begin{bmatrix} \cos(\theta/2)\\ \mathbf e\sin(\theta/2) \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        This immediately shows why attitude has only three independent degrees of freedom despite the four quaternion components.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.3 Quaternion Constraint</h3>
+
+      <p>
+        The quaternion must remain on
+      </p>
+
+      <p>
+        \[
+        S^3
+        \]
+      </p>
+
+      <p>
+        such that
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q^T\mathbf q=1. }
+        \]
+      </p>
+
+      <p>
+        This geometric constraint makes additive covariance representations over all four quaternion elements awkward.
+      </p>
+
+      <p>
+        The MEKF instead maintains the nominal quaternion exactly on the unit hypersphere and represents uncertainty in the local tangent space.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Quaternion} \rightarrow \text{Global Orientation} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta \rightarrow \text{Local Attitude Uncertainty}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.4 Quaternion Sign Ambiguity</h3>
+
+      <p>
+        Another important property is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q \equiv -\mathbf q. }
+        \]
+      </p>
+
+      <p>
+        Both quaternions represent the same physical orientation.
+      </p>
+
+      <p>
+        This has practical consequences when computing measurement residuals.
+      </p>
+
+      <p>
+        Suppose a star tracker provides
+      </p>
+
+      <p>
+        \[
+        \mathbf q_m.
+        \]
+      </p>
+
+      <p>
+        Before computing the residual, the estimator may need to ensure that the measured quaternion has the same sign hemisphere as the estimated quaternion.
+      </p>
+
+      <p>
+        A common check is
+      </p>
+
+      <p>
+        \[
+        \mathbf q_m^T\hat{\mathbf q}<0.
+        \]
+      </p>
+
+      <p>
+        If this occurs, use
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_m \leftarrow -\mathbf q_m. }
+        \]
+      </p>
+
+      <p>
+        Otherwise an almost perfect attitude match could appear as a very large quaternion difference.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.5 Central MEKF Idea</h3>
+
+      <p>
+        The MEKF separates attitude into
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal Quaternion} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Small Attitude Error}. }
+        \]
+      </p>
+
+      <p>
+        A common convention is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_{\text{true}} = \delta\mathbf q \otimes \hat{\mathbf q}. }
+        \]
+      </p>
+
+      <p>
+        Another convention is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_{\text{true}} = \hat{\mathbf q} \otimes \delta\mathbf q. }
+        \]
+      </p>
+
+      <p>
+        Both are valid.
+      </p>
+
+      <p>
+        However, they lead to different signs and Jacobians.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Choose Left or Right Multiplicative Error Once and Use It Consistently}. }
+        \]
+      </p>
+
+      <p>
+        This is one of the most important implementation rules in MEKF design.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.6 Small-Angle Quaternion Error</h3>
+
+      <p>
+        If the attitude error is small,
+      </p>
+
+      <p>
+        \[
+        \|\delta\boldsymbol\theta\|\ll1,
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \sin\left(\frac{\delta\theta}{2}\right) \approx \frac{\delta\theta}{2}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \cos\left(\frac{\delta\theta}{2}\right) \approx 1.
+        \]
+      </p>
+
+      <p>
+        Therefore the error quaternion can be approximated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf q \approx \begin{bmatrix} 1\\ \frac12\delta\boldsymbol\theta \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        for a scalar-first convention.
+      </p>
+
+      <p>
+        Thus only
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta = \begin{bmatrix} \delta\theta_x\\ \delta\theta_y\\ \delta\theta_z \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        must be estimated by the Kalman filter.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.7 Why Three Error States Are Better Than Four Quaternion Errors</h3>
+
+      <p>
+        The quaternion contains four numerical components but only three physical degrees of freedom.
+      </p>
+
+      <p>
+        If an EKF estimates four independent quaternion corrections, covariance may include uncertainty in a direction that does not correspond to a valid physical rotation.
+      </p>
+
+      <p>
+        The MEKF instead uses
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta\in\mathbb R^3 }
+        \]
+      </p>
+
+      <p>
+        which provides a minimal local representation.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal Quaternion} \in S^3 }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Error} \in \mathbb R^3. }
+        \]
+      </p>
+
+      <p>
+        This division is one of the strongest conceptual advantages of the MEKF.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.8 Typical MEKF State</h3>
+
+      <p>
+        A simple attitude MEKF may estimate
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = \begin{bmatrix} \delta\boldsymbol\theta\\ \delta\mathbf b_g \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        This produces a six-state Kalman filter:
+      </p>
+
+      <p>
+        \[
+        \boxed{ 3~\text{attitude-error states} + 3~\text{gyro-bias states} = 6~\text{states}. }
+        \]
+      </p>
+
+      <p>
+        The nominal quantities are
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}, \qquad \hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <p>
+        The error state contains
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta, \qquad \delta\mathbf b_g. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.9 Why Gyro Bias Is Included</h3>
+
+      <p>
+        The gyroscope measurement may be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf n_g. }
+        \]
+      </p>
+
+      <p>
+        If gyro bias is not estimated, attitude error grows approximately as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta \sim \mathbf b_g t. }
+        \]
+      </p>
+
+      <p>
+        Therefore even a small constant gyro bias produces increasing attitude drift.
+      </p>
+
+      <p>
+        The MEKF typically includes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf b_g }
+        \]
+      </p>
+
+      <p>
+        so that absolute attitude measurements from sensors such as star trackers can indirectly estimate and correct gyroscope bias.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.10 Nominal Gyro Correction</h3>
+
+      <p>
+        The estimated angular velocity used for quaternion propagation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m - \hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <p>
+        Thus the estimator removes the current bias estimate before integrating the gyro.
+      </p>
+
+      <p>
+        If the bias estimate is imperfect,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf b_g = \mathbf b_{g,\text{true}} - \hat{\mathbf b}_g
+        \]
+      </p>
+
+      <p>
+        appears in the attitude-error dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.11 Quaternion Kinematics</h3>
+
+      <p>
+        Quaternion attitude propagation obeys
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf q} = \frac12 \Omega(\boldsymbol\omega) \mathbf q. }
+        \]
+      </p>
+
+      <p>
+        The exact form of
+      </p>
+
+      <p>
+        \[
+        \Omega(\boldsymbol\omega)
+        \]
+      </p>
+
+      <p>
+        depends on quaternion convention.
+      </p>
+
+      <p>
+        For one common scalar-first convention,
+      </p>
+
+      <p>
+        \[
+        \Omega(\boldsymbol\omega) = \begin{bmatrix} 0 & -\boldsymbol\omega^T\\ \boldsymbol\omega & -[\boldsymbol\omega]_\times \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\hat{\mathbf q}} = \frac12 \Omega( \boldsymbol\omega_m-\hat{\mathbf b}_g ) \hat{\mathbf q}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.12 Discrete Quaternion Propagation</h3>
+
+      <p>
+        For sampling interval
+      </p>
+
+      <p>
+        \[
+        \Delta t,
+        \]
+      </p>
+
+      <p>
+        define incremental rotation
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta\boldsymbol\theta = \hat{\boldsymbol\omega} \Delta t. }
+        \]
+      </p>
+
+      <p>
+        An incremental quaternion may be calculated as
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q_\Delta = \begin{bmatrix} \cos(\|\Delta\boldsymbol\theta\|/2)\\ \frac{\Delta\boldsymbol\theta} {\|\Delta\boldsymbol\theta\|} \sin(\|\Delta\boldsymbol\theta\|/2) \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then propagate
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}_{k+1}^{-} = \delta\mathbf q_\Delta \otimes \hat{\mathbf q}_k^{+} }
+        \]
+      </p>
+
+      <p>
+        for one selected convention.
+      </p>
+
+      <p>
+        The quaternion should then be normalized.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.13 Quaternion Normalization</h3>
+
+      <p>
+        Numerical integration and finite precision can cause
+      </p>
+
+      <p>
+        \[
+        \|\hat{\mathbf q}\| \neq1.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q} \leftarrow \frac{ \hat{\mathbf q} }{ \|\hat{\mathbf q}\| }. }
+        \]
+      </p>
+
+      <p>
+        This is generally done after propagation and after correction.
+      </p>
+
+      <p>
+        Normalization is not a substitute for correct multiplicative error modelling, but it protects against numerical drift.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.14 Attitude-Error Dynamics</h3>
+
+      <p>
+        For a typical MEKF, the local attitude-error dynamics may be approximated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\boldsymbol\theta} = -[\hat{\boldsymbol\omega}]_\times \delta\boldsymbol\theta - \delta\mathbf b_g - \mathbf n_g }
+        \]
+      </p>
+
+      <p>
+        for one common convention.
+      </p>
+
+      <p>
+        The exact signs depend on
+      </p>
+
+      <ul>
+
+        <li>
+          left vs right multiplicative error,
+        </li>
+
+        <li>
+          passive vs active rotation convention,
+        </li>
+
+        <li>
+          body-to-inertial vs inertial-to-body quaternion,
+        </li>
+
+        <li>
+          quaternion multiplication order.
+        </li>
+
+      </ul>
+
+      <p>
+        This cannot be emphasized enough.
+      </p>
+
+      <p>
+        A formula copied from another implementation is not safe unless its conventions match your own.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.15 Gyro-Bias Dynamics</h3>
+
+      <p>
+        A simple gyro bias model is constant:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf b}_g=0. }
+        \]
+      </p>
+
+      <p>
+        A more realistic model treats bias as random walk:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf b}_g = \mathbf n_{bg}. }
+        \]
+      </p>
+
+      <p>
+        Alternatively, a first-order Gauss-Markov model can be used:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf b}_g = -\frac{1}{\tau_g} \mathbf b_g + \mathbf n_{bg}. }
+        \]
+      </p>
+
+      <p>
+        The appropriate model should reflect expected sensor behaviour.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.16 MEKF Error-State Dynamics</h3>
+
+      <p>
+        For the six-state error vector
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf x = \begin{bmatrix} \delta\boldsymbol\theta\\ \delta\mathbf b_g \end{bmatrix},
+        \]
+      </p>
+
+      <p>
+        the dynamics can be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf F \delta\mathbf x + \mathbf G\mathbf w. }
+        \]
+      </p>
+
+      <p>
+        A representative structure is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf F = \begin{bmatrix} -[\hat{\boldsymbol\omega}]_\times & -I\\ 0 & 0 \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        for a random-walk gyro-bias model and one common error convention.
+      </p>
+
+      <p>
+        Again, signs must be derived from the selected convention.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.17 Process-Noise Vector</h3>
+
+      <p>
+        A typical process-noise vector may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf w = \begin{bmatrix} \mathbf n_g\\ \mathbf n_{bg} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The continuous noise covariance might therefore be
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf Q_c = \begin{bmatrix} \mathbf Q_g & 0\\ 0 & \mathbf Q_{bg} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <ul>
+
+        <li>
+          <code>\mathbf Q_g</code>: gyro white-noise covariance,
+        </li>
+
+        <li>
+          <code>\mathbf Q_{bg}</code>: gyro-bias driving-noise covariance.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.18 Covariance Propagation</h3>
+
+      <p>
+        The continuous covariance equation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf P} = \mathbf F\mathbf P + \mathbf P\mathbf F^T + \mathbf G\mathbf Q_c\mathbf G^T. }
+        \]
+      </p>
+
+      <p>
+        After discretization,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_{k+1}^{-} = \mathbf\Phi_k \mathbf P_k^{+} \mathbf\Phi_k^T + \mathbf Q_{d,k}. }
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf\Phi = e^{\mathbf F\Delta t}. }
+        \]
+      </p>
+
+      <p>
+        For small time steps,
+      </p>
+
+      <p>
+        \[
+        \mathbf\Phi \approx I+\mathbf F\Delta t
+        \]
+      </p>
+
+      <p>
+        may be sufficient.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.19 The Nominal Quaternion and the Covariance Evolve Differently</h3>
+
+      <p>
+        This is a central MEKF concept.
+      </p>
+
+      <p>
+        The quaternion is propagated using the <strong>full nonlinear quaternion kinematics</strong>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q} \rightarrow \text{Quaternion Propagation}. }
+        \]
+      </p>
+
+      <p>
+        The covariance is propagated using the <strong>linearized local error dynamics</strong>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P \rightarrow \mathbf F \rightarrow \mathbf\Phi \rightarrow \mathbf P^-. }
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Evolves Nonlinearly} \quad \text{while} \quad \text{Attitude Error Evolves Locally Linearly}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.20 Absolute Attitude Sensors</h3>
+
+      <p>
+        A spacecraft can obtain attitude information from sensors such as
+      </p>
+
+      <ul>
+
+        <li>
+          star trackers,
+        </li>
+
+        <li>
+          Sun sensors,
+        </li>
+
+        <li>
+          Earth sensors,
+        </li>
+
+        <li>
+          horizon sensors,
+        </li>
+
+        <li>
+          magnetometers,
+        </li>
+
+        <li>
+          optical navigation systems,
+        </li>
+
+        <li>
+          relative-pose sensors.
+        </li>
+
+      </ul>
+
+      <p>
+        The MEKF uses these measurements to correct gyroscope propagation.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} \rightarrow \text{High-Rate Attitude Propagation} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Absolute Attitude Sensors} \rightarrow \text{Drift Correction}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.21 Star Tracker Measurement</h3>
+
+      <p>
+        A star tracker may provide an attitude quaternion
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_{ST}. }
+        \]
+      </p>
+
+      <p>
+        The estimated attitude is
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}^{-}.
+        \]
+      </p>
+
+      <p>
+        Instead of computing ordinary subtraction
+      </p>
+
+      <p>
+        \[
+        \mathbf q_{ST} - \hat{\mathbf q}^{-},
+        \]
+      </p>
+
+      <p>
+        construct an attitude-error quaternion.
+      </p>
+
+      <p>
+        For one convention,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf q_m = \mathbf q_{ST} \otimes (\hat{\mathbf q}^{-})^{-1}. }
+        \]
+      </p>
+
+      <p>
+        This represents the rotation required to move from the estimated attitude to the measured attitude.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.22 Quaternion Measurement Residual</h3>
+
+      <p>
+        If the mismatch is small,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q_m \approx \begin{bmatrix} 1\\ \frac12\mathbf y_\theta \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Therefore the attitude residual is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_\theta \approx 2 \delta\mathbf q_{m,v} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q_{m,v}
+        \]
+      </p>
+
+      <p>
+        is the vector part of the error quaternion.
+      </p>
+
+      <p>
+        Thus a four-component quaternion measurement becomes a three-component Kalman innovation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.23 Why Quaternion Subtraction Is Wrong</h3>
+
+      <p>
+        Two orientations are related through <strong>rotation composition</strong>, not ordinary Euclidean subtraction.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Residual} \neq \mathbf q_m-\hat{\mathbf q}. }
+        \]
+      </p>
+
+      <p>
+        Instead,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Residual} = \text{Relative Rotation Between Measured and Estimated Attitudes}. }
+        \]
+      </p>
+
+      <p>
+        This is one of the defining differences between the MEKF and a naive quaternion EKF.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.24 Measurement Jacobian for Direct Attitude Measurement</h3>
+
+      <p>
+        For a direct small-angle attitude measurement,
+      </p>
+
+      <p>
+        \[
+        \mathbf y_\theta \approx \delta\boldsymbol\theta + \mathbf v.
+        \]
+      </p>
+
+      <p>
+        For the state
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf x = \begin{bmatrix} \delta\boldsymbol\theta\\ \delta\mathbf b_g \end{bmatrix},
+        \]
+      </p>
+
+      <p>
+        the measurement matrix may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H = \begin{bmatrix} I_3 & 0 \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Thus the star tracker directly observes attitude error but not gyro bias.
+      </p>
+
+      <p>
+        Gyro bias is estimated indirectly through correlations and temporal dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.25 Sun Sensor Measurement</h3>
+
+      <p>
+        A Sun sensor may measure the Sun direction in the body frame.
+      </p>
+
+      <p>
+        Suppose the inertial Sun vector is
+      </p>
+
+      <p>
+        \[
+        \mathbf s_I.
+        \]
+      </p>
+
+      <p>
+        The predicted body-frame vector is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf s}_B = C_{BI}(\hat{\mathbf q}) \mathbf s_I. }
+        \]
+      </p>
+
+      <p>
+        The sensor provides
+      </p>
+
+      <p>
+        \[
+        \mathbf s_{B,m}.
+        \]
+      </p>
+
+      <p>
+        A residual can be formed from the difference or cross product between measured and predicted unit vectors.
+      </p>
+
+      <p>
+        For small attitude error,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf s \approx -[\hat{\mathbf s}_B]_\times \delta\boldsymbol\theta.
+        \]
+      </p>
+
+      <p>
+        Therefore a representative measurement Jacobian is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H_s = \begin{bmatrix} -[\hat{\mathbf s}_B]_\times & 0 \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The exact sign depends on convention.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.26 Magnetometer Measurement</h3>
+
+      <p>
+        A magnetometer provides body-frame magnetic field
+      </p>
+
+      <p>
+        \[
+        \mathbf B_{B,m}.
+        \]
+      </p>
+
+      <p>
+        A magnetic field model provides inertial/reference-frame field
+      </p>
+
+      <p>
+        \[
+        \mathbf B_I.
+        \]
+      </p>
+
+      <p>
+        Predicted measurement:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf B}_B = C_{BI}(\hat{\mathbf q}) \mathbf B_I. }
+        \]
+      </p>
+
+      <p>
+        The residual is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_B = \mathbf B_{B,m} - \hat{\mathbf B}_B. }
+        \]
+      </p>
+
+      <p>
+        For a small attitude error, the measurement Jacobian again contains a skew-symmetric sensitivity term.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.27 Vector Observation Model</h3>
+
+      <p>
+        Many attitude sensors can therefore be represented using
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z = C(\mathbf q)\mathbf r + \mathbf v }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>\mathbf r</code> is a known reference vector,
+        </li>
+
+        <li>
+          <code>C(\mathbf q)</code> rotates it into the sensor/body frame,
+        </li>
+
+        <li>
+          <code>\mathbf z</code> is the measured vector.
+        </li>
+
+      </ul>
+
+      <p>
+        This common structure covers
+      </p>
+
+      <ul>
+
+        <li>
+          Sun vector,
+        </li>
+
+        <li>
+          magnetic field vector,
+        </li>
+
+        <li>
+          star direction,
+        </li>
+
+        <li>
+          landmark direction.
+        </li>
+
+      </ul>
+
+      <p>
+        The MEKF then estimates attitude from vector residuals.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.28 One Vector Does Not Fully Determine Attitude</h3>
+
+      <p>
+        A single vector measurement constrains only two rotational degrees of freedom.
+      </p>
+
+      <p>
+        Rotation about the measured vector itself remains unobservable instantaneously.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{One Vector Observation} \neq \text{Full 3-D Attitude Determination}. }
+        \]
+      </p>
+
+      <p>
+        Full attitude determination generally requires
+      </p>
+
+      <ul>
+
+        <li>
+          two non-collinear vector observations,
+        </li>
+
+        <li>
+          temporal dynamics,
+        </li>
+
+        <li>
+          gyroscope propagation,
+        </li>
+
+        <li>
+          or another absolute attitude source.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.29 Two-Vector Attitude Determination</h3>
+
+      <p>
+        Suppose two reference vectors are available:
+      </p>
+
+      <p>
+        \[
+        \mathbf r_1, \qquad \mathbf r_2.
+        \]
+      </p>
+
+      <p>
+        Sensors provide corresponding body-frame vectors
+      </p>
+
+      <p>
+        \[
+        \mathbf b_1, \qquad \mathbf b_2.
+        \]
+      </p>
+
+      <p>
+        If the vectors are sufficiently non-collinear, they constrain all three attitude degrees of freedom.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sun Sensor} + \text{Magnetometer} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker} + \text{Gyro}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.30 Innovation</h3>
+
+      <p>
+        The measurement innovation remains
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y = \mathbf z - \hat{\mathbf z}. }
+        \]
+      </p>
+
+      <p>
+        The important point is that <code>\hat{\mathbf z}</code> must be calculated from the <strong>nominal quaternion</strong> using the full nonlinear measurement model.
+      </p>
+
+      <p>
+        For quaternion measurements, the innovation should be a local three-dimensional attitude difference, not component-wise quaternion subtraction.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.31 Innovation Covariance</h3>
+
+      <p>
+        The innovation covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf S = \mathbf H \mathbf P^{-} \mathbf H^T + \mathbf R. }
+        \]
+      </p>
+
+      <p>
+        It represents uncertainty in the expected measurement residual.
+      </p>
+
+      <p>
+        The matrix
+      </p>
+
+      <p>
+        \[
+        \mathbf R
+        \]
+      </p>
+
+      <p>
+        must be expressed in the same residual coordinates used by the MEKF.
+      </p>
+
+      <p>
+        For example, if the innovation is a three-dimensional small-angle vector, then <code>R</code> should describe uncertainty in those angular-error coordinates.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.32 Kalman Gain</h3>
+
+      <p>
+        The MEKF uses
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf K = \mathbf P^{-} \mathbf H^T \mathbf S^{-1}. }
+        \]
+      </p>
+
+      <p>
+        This determines how strongly the attitude and bias errors should be corrected.
+      </p>
+
+      <p>
+        The same uncertainty-weighting principle remains:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High Sensor Confidence} \rightarrow \text{Stronger Correction} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High Sensor Uncertainty} \rightarrow \text{Weaker Correction}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.33 Error-State Update</h3>
+
+      <p>
+        The error-state correction is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} = \mathbf K\mathbf y. }
+        \]
+      </p>
+
+      <p>
+        For a six-state MEKF,
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf x} = \begin{bmatrix} \delta\hat{\boldsymbol\theta}\\ \delta\hat{\mathbf b}_g \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Thus the Kalman filter estimates
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Error} + \text{Gyro-Bias Error}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.34 Multiplicative Quaternion Correction</h3>
+
+      <p>
+        Construct an error quaternion from
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\boldsymbol\theta}.
+        \]
+      </p>
+
+      <p>
+        For small angles,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf q} \approx \begin{bmatrix} 1\\ \frac12 \delta\hat{\boldsymbol\theta} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The nominal quaternion is corrected multiplicatively.
+      </p>
+
+      <p>
+        For one convention,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} = \delta\hat{\mathbf q} \otimes \hat{\mathbf q}^{-}. }
+        \]
+      </p>
+
+      <p>
+        For the opposite convention,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} = \hat{\mathbf q}^{-} \otimes \delta\hat{\mathbf q}. }
+        \]
+      </p>
+
+      <p>
+        This multiplicative correction gives the MEKF its name.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.35 Gyro-Bias Correction</h3>
+
+      <p>
+        The bias update remains additive:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf b}_g^{+} = \hat{\mathbf b}_g^{-} + \delta\hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <p>
+        After this update,
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf b}_g^{+}
+        \]
+      </p>
+
+      <p>
+        will be used in subsequent gyro compensation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m - \hat{\mathbf b}_g^{+}. }
+        \]
+      </p>
+
+      <p>
+        Thus absolute attitude measurements gradually calibrate the gyro bias.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.36 Quaternion Renormalization After Correction</h3>
+
+      <p>
+        After multiplicative correction,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} \leftarrow \frac{ \hat{\mathbf q}^{+} }{ \|\hat{\mathbf q}^{+}\| }. }
+        \]
+      </p>
+
+      <p>
+        Ideally, quaternion multiplication of unit quaternions already preserves norm.
+      </p>
+
+      <p>
+        However, numerical finite precision can create small deviations, so renormalization remains good practice.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.37 Error Reset</h3>
+
+      <p>
+        After the attitude and bias corrections are injected,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\boldsymbol\theta} \leftarrow 0 }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf b}_g \leftarrow 0. }
+        \]
+      </p>
+
+      <p>
+        The Kalman filter is then re-centered around the corrected nominal attitude and bias.
+      </p>
+
+      <p>
+        This keeps the local error state small.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.38 Covariance Reset</h3>
+
+      <p>
+        Resetting the attitude-error state changes the local tangent coordinates.
+      </p>
+
+      <p>
+        Therefore the covariance should be transformed consistently.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P \leftarrow \mathbf G_{\text{reset}} \mathbf P^{+} \mathbf G_{\text{reset}}^T. }
+        \]
+      </p>
+
+      <p>
+        For sufficiently tiny attitude corrections, some simplified implementations approximate
+      </p>
+
+      <p>
+        \[
+        \mathbf G_{\text{reset}} \approx I.
+        \]
+      </p>
+
+      <p>
+        However, a rigorous high-accuracy MEKF should account for the reset Jacobian.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.39 Posterior Covariance</h3>
+
+      <p>
+        A standard update is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = (I-KH) \mathbf P^{-}. }
+        \]
+      </p>
+
+      <p>
+        A numerically safer alternative is the Joseph form:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = (I-KH) \mathbf P^{-} (I-KH)^T + KRK^T. }
+        \]
+      </p>
+
+      <p>
+        After this, apply the error-reset transformation as required.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.40 Complete MEKF Algorithm</h3>
+
+      <p>
+        The MEKF cycle can now be summarized.
+      </p>
+
+      <h4>4.2.9.40.1 Read Gyro Measurement</h4>
+
+      <p>
+        \[
+        \boldsymbol\omega_m.
+        \]
+      </p>
+
+      <h4>4.2.9.40.2 Remove Estimated Gyro Bias</h4>
+
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m - \hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.3 Propagate Nominal Quaternion</h4>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}_{k+1}^{-} = \delta\mathbf q_\Delta \otimes \hat{\mathbf q}_k^{+}. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.4 Propagate Bias Nominal State</h4>
+
+      <p>
+        For random-walk bias,
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf b}_{g,k+1}^{-} \approx \hat{\mathbf b}_{g,k}^{+}.
+        \]
+      </p>
+
+      <h4>4.2.9.40.5 Compute Error Dynamics</h4>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf x} = F\delta\mathbf x+Gw. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.6 Propagate Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ P^{-} = \Phi P^{+}\Phi^T+Q_d. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.7 Receive Attitude Measurement</h4>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \mathbf q_{ST}
+        \]
+      </p>
+
+      <p>
+        or vector observations.
+      </p>
+
+      <h4>4.2.9.40.8 Predict Measurement</h4>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z} = h( \hat{\mathbf q}^{-} ). }
+        \]
+      </p>
+
+      <h4>4.2.9.40.9 Form Attitude Residual</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf y = \text{Measured Attitude} \ominus \text{Predicted Attitude}. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.10 Compute Measurement Jacobian</h4>
+
+      <p>
+        \[
+        \boxed{ H = \frac{\partial h} {\partial\delta\mathbf x}. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.11 Innovation Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ S = HP^-H^T+R. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.12 Kalman Gain</h4>
+
+      <p>
+        \[
+        \boxed{ K = P^-H^TS^{-1}. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.13 Estimate Error State</h4>
+
+      <p>
+        \[
+        \boxed{ \delta\hat x = Ky. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.14 Inject Quaternion Correction</h4>
+
+      <p>
+        \[
+        \boxed{ \hat q^+ = \delta\hat q \otimes \hat q^-. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.15 Correct Gyro Bias</h4>
+
+      <p>
+        \[
+        \boxed{ \hat b_g^+ = \hat b_g^- + \delta\hat b_g. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.16 Normalize Quaternion</h4>
+
+      <p>
+        \[
+        \boxed{ \hat q^+ \leftarrow \frac{\hat q^+}{\|\hat q^+\|}. }
+        \]
+      </p>
+
+      <h4>4.2.9.40.17 Update Covariance</h4>
+
+      <p>
+        Use normal or Joseph covariance update.
+      </p>
+
+      <h4>4.2.9.40.18 Reset Error Coordinates</h4>
+
+      <p>
+        \[
+        \boxed{ \delta\hat x \leftarrow 0. }
+        \]
+      </p>
+
+      <p>
+        Then continue propagation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.41 MEKF Conceptual Flow</h3>
+
+      <p>
+        The complete architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro Measurement}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Subtract Estimated Gyro Bias}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Propagate Nominal Quaternion}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat q^-}
+        \]
+      </p>
+
+      <p>
+        while in parallel,
+      </p>
+
+      <p>
+        \[
+        \boxed{P^+} \rightarrow \boxed{F,Q} \rightarrow \boxed{P^-}.
+        \]
+      </p>
+
+      <p>
+        Then:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker / Sun Sensor / Magnetometer}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predict Sensor Measurement}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Attitude Innovation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Kalman Error-State Update}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\boldsymbol\theta}, \delta\hat{\mathbf b}_g }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Multiplicative Quaternion Correction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro-Bias Correction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Reset Error State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Continue Gyro Propagation}}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.42 Why the Error State Stays Small</h3>
+
+      <p>
+        Each absolute-attitude measurement produces
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\boldsymbol\theta}.
+        \]
+      </p>
+
+      <p>
+        The correction is immediately injected into
+      </p>
+
+      <p>
+        \[
+        \hat q.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\boldsymbol\theta}
+        \]
+      </p>
+
+      <p>
+        is reset to zero.
+      </p>
+
+      <p>
+        Therefore the error state repeatedly stays near the identity rotation.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Small Multiplicative Error} \rightarrow \text{Reliable First-Order Linearisation}. }
+        \]
+      </p>
+
+      <p>
+        This is one of the key strengths of the MEKF.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.43 MEKF and the ESKF</h3>
+
+      <p>
+        The MEKF is closely related to the ESKF developed in Section 4.2.8.
+      </p>
+
+      <p>
+        The ESKF used
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{\text{true}} = x_{\text{nominal}} \oplus \delta x. }
+        \]
+      </p>
+
+      <p>
+        For attitude,
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{\text{true}} = \delta q \otimes \hat q. }
+        \]
+      </p>
+
+      <p>
+        Thus the MEKF can be understood as a specialized error-state filter focused on rotational geometry.
+      </p>
+
+      <p>
+        A broad navigation ESKF might estimate
+      </p>
+
+      <p>
+        \[
+        \delta r, \delta v, \delta\theta, \delta b_g, \delta b_a, \ldots
+        \]
+      </p>
+
+      <p>
+        whereas a basic MEKF may contain only
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\theta, \delta b_g. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.44 MEKF vs Direct Quaternion EKF</h3>
+
+      <p>
+        A direct quaternion EKF may use the quaternion components directly in the state covariance.
+      </p>
+
+      <p>
+        The MEKF instead separates
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal Quaternion} }
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{3-D Attitude Error}. }
+        \]
+      </p>
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Direct Quaternion EKF</th>
+              <th>MEKF</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>Attitude nominal state</td>
+              <td>Quaternion</td>
+              <td>Quaternion</td>
+            </tr>
+
+            <tr>
+              <td>Kalman attitude-error dimension</td>
+              <td>Often 4</td>
+              <td>3</td>
+            </tr>
+
+            <tr>
+              <td>Quaternion correction</td>
+              <td>Additive</td>
+              <td>Multiplicative</td>
+            </tr>
+
+            <tr>
+              <td>Unit-norm handling</td>
+              <td>Requires explicit care</td>
+              <td>Naturally respected by multiplicative update</td>
+            </tr>
+
+            <tr>
+              <td>Error coordinates</td>
+              <td>Redundant quaternion space</td>
+              <td>Minimal local rotation</td>
+            </tr>
+
+            <tr>
+              <td>Spacecraft attitude use</td>
+              <td>Possible</td>
+              <td>Usually preferred</td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.45 Left-Multiplicative vs Right-Multiplicative Error</h3>
+
+      <p>
+        Two common definitions are
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{\text{true}} = \delta q\otimes\hat q }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{\text{true}} = \hat q\otimes\delta q. }
+        \]
+      </p>
+
+      <p>
+        They correspond to expressing the attitude error in different frames.
+      </p>
+
+      <p>
+        One may represent an inertial-frame error while the other represents a body-frame error, depending on the precise convention.
+      </p>
+
+      <p>
+        This changes
+      </p>
+
+      <ul>
+
+        <li>
+          error dynamics,
+        </li>
+
+        <li>
+          signs,
+        </li>
+
+        <li>
+          measurement Jacobians,
+        </li>
+
+        <li>
+          reset equations,
+        </li>
+
+        <li>
+          injection order.
+        </li>
+
+      </ul>
+
+      <p>
+        Therefore every MEKF document and software implementation should explicitly state its convention.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.46 Active vs Passive Rotation Convention</h3>
+
+      <p>
+        Another source of confusion is whether
+      </p>
+
+      <p>
+        \[
+        C_{BI}
+        \]
+      </p>
+
+      <p>
+        maps inertial vectors into body coordinates or vice versa.
+      </p>
+
+      <p>
+        Some texts use quaternions to rotate vectors actively.
+      </p>
+
+      <p>
+        Others use them as passive frame transformations.
+      </p>
+
+      <p>
+        This affects
+      </p>
+
+      <p>
+        \[
+        C(q),
+        \]
+      </p>
+
+      <p>
+        quaternion multiplication order, and measurement equations.
+      </p>
+
+      <p>
+        A practical rule is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Define Every Frame Transformation Explicitly Before Deriving the MEKF}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.47 Scalar-First vs Scalar-Last Quaternions</h3>
+
+      <p>
+        Quaternions may be stored as
+      </p>
+
+      <p>
+        \[
+        \boxed{ [q_0,q_1,q_2,q_3]^T }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ [q_1,q_2,q_3,q_0]^T. }
+        \]
+      </p>
+
+      <p>
+        These conventions produce different matrix formulas.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Quaternion Ordering Is Part of the Algorithm Definition}. }
+        \]
+      </p>
+
+      <p>
+        Mixing scalar-first and scalar-last routines is a common cause of estimator failure.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.48 Frame Consistency</h3>
+
+      <p>
+        Suppose gyro output is in the body frame.
+      </p>
+
+      <p>
+        The star-tracker quaternion may represent
+      </p>
+
+      <p>
+        \[
+        I\rightarrow B
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        B\rightarrow I.
+        \]
+      </p>
+
+      <p>
+        The Sun-vector model may be given in inertial coordinates.
+      </p>
+
+      <p>
+        Magnetometer output is typically body-frame.
+      </p>
+
+      <p>
+        All of these must be transformed consistently.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Correct Mathematics} + \text{Wrong Frames} = \text{Wrong Estimator}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.49 Star Tracker + Gyro Fusion</h3>
+
+      <p>
+        This is a canonical spacecraft MEKF application.
+      </p>
+
+      <p>
+        The gyro provides high-rate angular motion:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} \rightarrow \text{Fast Attitude Propagation}. }
+        \]
+      </p>
+
+      <p>
+        The star tracker provides accurate but slower absolute attitude:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker} \rightarrow \text{Absolute Attitude Correction}. }
+        \]
+      </p>
+
+      <p>
+        Together,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} + \text{Star Tracker} \rightarrow \text{High-Rate Drift-Corrected Attitude Estimate}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.50 Gyro + Sun Sensor + Magnetometer</h3>
+
+      <p>
+        When a star tracker is unavailable, a spacecraft may fuse
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyroscope} + \text{Sun Sensor} + \text{Magnetometer}. }
+        \]
+      </p>
+
+      <p>
+        The gyro provides propagation.
+      </p>
+
+      <p>
+        Sun and magnetic-field vectors provide absolute reference information.
+      </p>
+
+      <p>
+        The quality depends on geometry.
+      </p>
+
+      <p>
+        If the Sun vector and magnetic-field vector become nearly aligned,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Observability Degrades}. }
+        \]
+      </p>
+
+      <p>
+        Thus sensor geometry changes estimator performance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.51 Eclipse Operation</h3>
+
+      <p>
+        During eclipse, the Sun sensor may become unavailable.
+      </p>
+
+      <p>
+        The MEKF can continue propagation using the gyro:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro-Only Propagation}. }
+        \]
+      </p>
+
+      <p>
+        However,
+      </p>
+
+      <p>
+        \[
+        P
+        \]
+      </p>
+
+      <p>
+        should grow because attitude and bias uncertainty accumulate.
+      </p>
+
+      <p>
+        When Sun measurements return,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Reacquisition} \rightarrow \text{Attitude Correction}. }
+        \]
+      </p>
+
+      <p>
+        The estimator should not maintain artificially constant confidence during eclipse.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.52 Star Tracker Dropout</h3>
+
+      <p>
+        A star tracker may lose lock because of
+      </p>
+
+      <ul>
+
+        <li>
+          Sun exclusion,
+        </li>
+
+        <li>
+          Earth/Moon interference,
+        </li>
+
+        <li>
+          excessive angular rate,
+        </li>
+
+        <li>
+          bright-object contamination,
+        </li>
+
+        <li>
+          image-processing failure,
+        </li>
+
+        <li>
+          poor star visibility.
+        </li>
+
+      </ul>
+
+      <p>
+        During dropout,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Propagation Continues} }
+        \]
+      </p>
+
+      <p>
+        while covariance grows.
+      </p>
+
+      <p>
+        When measurements return, residual gating should prevent a faulty reacquisition from corrupting the attitude solution.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.53 Sensor Handover</h3>
+
+      <p>
+        A spacecraft might use different attitude sensors in different phases.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        ### Safe Mode
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sun Sensor + Magnetometer} }
+        \]
+      </p>
+
+      <p>
+        ### Nominal Fine Pointing
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker + Gyro} }
+        \]
+      </p>
+
+      <p>
+        ### RPO
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker + Relative Pose Sensors + Gyro}. }
+        \]
+      </p>
+
+      <p>
+        The MEKF state can remain continuous while the active measurement model changes.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.54 Relative Attitude During RPO</h3>
+
+      <p>
+        During rendezvous, relative attitude may be required in addition to inertial attitude.
+      </p>
+
+      <p>
+        A camera or pose-estimation system may provide
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{\text{rel},m}. }
+        \]
+      </p>
+
+      <p>
+        The estimator predicts
+      </p>
+
+      <p>
+        \[
+        \hat q_{\text{rel}}
+        \]
+      </p>
+
+      <p>
+        from target and chaser attitudes.
+      </p>
+
+      <p>
+        A relative attitude residual can then be formed multiplicatively.
+      </p>
+
+      <p>
+        This is useful for
+      </p>
+
+      <ul>
+
+        <li>
+          docking,
+        </li>
+
+        <li>
+          robotic capture,
+        </li>
+
+        <li>
+          target alignment,
+        </li>
+
+        <li>
+          inspection,
+        </li>
+
+        <li>
+          cooperative rendezvous.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.55 Gyro-Bias Observability</h3>
+
+      <p>
+        Including
+      </p>
+
+      <p>
+        \[
+        \delta b_g
+        \]
+      </p>
+
+      <p>
+        in the state does not automatically make it observable.
+      </p>
+
+      <p>
+        Bias becomes observable through its effect on attitude over time.
+      </p>
+
+      <p>
+        If the spacecraft receives accurate absolute attitude measurements, accumulated gyro-bias-induced attitude drift produces residuals that allow the filter to identify bias.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta b_g \rightarrow \delta\theta \rightarrow \text{Attitude Measurement Residual}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.56 Attitude Observability</h3>
+
+      <p>
+        Attitude observability depends on available reference information.
+      </p>
+
+      <p>
+        A star tracker typically provides strong three-axis attitude information.
+      </p>
+
+      <p>
+        A single Sun vector cannot instantaneously observe rotation about the Sun vector.
+      </p>
+
+      <p>
+        A single magnetometer measurement has a similar limitation.
+      </p>
+
+      <p>
+        Two non-collinear vectors improve observability.
+      </p>
+
+      <p>
+        Dynamics over time can also improve observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.57 Measurement Timing</h3>
+
+      <p>
+        Attitude changes rapidly during slews.
+      </p>
+
+      <p>
+        If a star-tracker measurement corresponds to
+      </p>
+
+      <p>
+        \[
+        t-\tau
+        \]
+      </p>
+
+      <p>
+        but is compared with
+      </p>
+
+      <p>
+        \[
+        \hat q(t),
+        \]
+      </p>
+
+      <p>
+        a false residual occurs.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Accurate Attitude Measurement} + \text{Wrong Time} = \text{Incorrect Attitude Innovation}. }
+        \]
+      </p>
+
+      <p>
+        Practical MEKF systems require accurate timestamps and latency handling.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.58 Multi-Rate Sensors</h3>
+
+      <p>
+        A typical spacecraft may have
+      </p>
+
+      <p>
+        \[
+        f_{\text{gyro}} \gg f_{\text{star tracker}}
+        \]
+      </p>
+
+      <p>
+        and perhaps
+      </p>
+
+      <p>
+        \[
+        f_{\text{magnetometer}} \neq f_{\text{Sun sensor}}.
+        \]
+      </p>
+
+      <p>
+        The MEKF naturally supports this:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-Rate Gyro Propagation} + \text{Asynchronous Absolute-Attitude Updates}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.59 Innovation Gating</h3>
+
+      <p>
+        For residual
+      </p>
+
+      <p>
+        \[
+        y
+        \]
+      </p>
+
+      <p>
+        and covariance
+      </p>
+
+      <p>
+        \[
+        S,
+        \]
+      </p>
+
+      <p>
+        calculate
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS = y^TS^{-1}y. }
+        \]
+      </p>
+
+      <p>
+        Large values may indicate
+      </p>
+
+      <ul>
+
+        <li>
+          star-tracker outlier,
+        </li>
+
+        <li>
+          wrong vector association,
+        </li>
+
+        <li>
+          faulty sensor,
+        </li>
+
+        <li>
+          timing mismatch,
+        </li>
+
+        <li>
+          poor state estimate,
+        </li>
+
+        <li>
+          model inconsistency.
+        </li>
+
+      </ul>
+
+      <p>
+        The measurement can then be rejected or downweighted.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.60 Process Noise <code>Q</code></h3>
+
+      <p>
+        The process covariance must represent uncertainty in attitude propagation and gyro bias.
+      </p>
+
+      <p>
+        Typical contributors include
+      </p>
+
+      <ul>
+
+        <li>
+          gyro angle random walk,
+        </li>
+
+        <li>
+          rate noise,
+        </li>
+
+        <li>
+          gyro-bias instability,
+        </li>
+
+        <li>
+          bias random walk,
+        </li>
+
+        <li>
+          scale-factor effects not explicitly estimated,
+        </li>
+
+        <li>
+          axis misalignment,
+        </li>
+
+        <li>
+          unmodeled angular dynamics.
+        </li>
+
+      </ul>
+
+      <p>
+        A physical workflow is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Error Model} \rightarrow Q_c \rightarrow G \rightarrow Q_d. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.61 Measurement Noise <code>R</code></h3>
+
+      <p>
+        The measurement covariance depends on the sensor and residual definition.
+      </p>
+
+      <p>
+        For a star tracker, <code>R</code> may describe small-angle attitude uncertainty.
+      </p>
+
+      <p>
+        For Sun sensors or magnetometers, <code>R</code> may describe vector measurement noise.
+      </p>
+
+      <p>
+        For vision-based relative attitude,
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        may include pose-estimation uncertainty.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ R \text{ Must Represent Uncertainty in the Actual MEKF Measurement Residual}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.62 Initial Quaternion</h3>
+
+      <p>
+        The initial nominal quaternion should be reasonably close to truth.
+      </p>
+
+      <p>
+        If attitude uncertainty is extremely large, the small-angle approximation may be invalid.
+      </p>
+
+      <p>
+        Thus the MEKF performs best when
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|\delta\theta\| \text{ remains reasonably small}. }
+        \]
+      </p>
+
+      <p>
+        Initial attitude may come from
+      </p>
+
+      <ul>
+
+        <li>
+          coarse Sun sensors,
+        </li>
+
+        <li>
+          magnetometer-based attitude,
+        </li>
+
+        <li>
+          TRIAD,
+        </li>
+
+        <li>
+          QUEST,
+        </li>
+
+        <li>
+          star tracker,
+        </li>
+
+        <li>
+          known launch attitude,
+        </li>
+
+        <li>
+          previous navigation solution.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.63 Initial Covariance</h3>
+
+      <p>
+        The initial covariance should realistically describe uncertainty in
+      </p>
+
+      <p>
+        \[
+        \delta\theta
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \delta b_g.
+        \]
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        P_0 = \begin{bmatrix} P_{\theta\theta} & P_{\theta b}\\ P_{b\theta} & P_{bb} \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        If attitude uncertainty is underestimated, the filter may trust its initial orientation too strongly.
+      </p>
+
+      <p>
+        If gyro-bias uncertainty is underestimated, bias convergence can be unnecessarily slow.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.64 Large Initial Attitude Error</h3>
+
+      <p>
+        The standard MEKF relies on a local small-angle attitude-error representation.
+      </p>
+
+      <p>
+        If the initial error is very large,
+      </p>
+
+      <p>
+        \[
+        \|\delta\theta\| \not\ll1,
+        \]
+      </p>
+
+      <p>
+        the approximation
+      </p>
+
+      <p>
+        \[
+        \delta q \approx \begin{bmatrix} 1\\ \frac12\delta\theta \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        is poor.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Very Large Initial Attitude Error} \rightarrow \text{Potential MEKF Convergence Problems}. }
+        \]
+      </p>
+
+      <p>
+        A coarse attitude-acquisition stage may be required before enabling the fine MEKF.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.65 MEKF During Spacecraft Slews</h3>
+
+      <p>
+        During a fast slew,
+      </p>
+
+      <p>
+        \[
+        \|\omega\|
+        \]
+      </p>
+
+      <p>
+        may become large.
+      </p>
+
+      <p>
+        The quaternion propagation remains valid, but
+      </p>
+
+      <ul>
+
+        <li>
+          integration accuracy,
+        </li>
+
+        <li>
+          gyro saturation,
+        </li>
+
+        <li>
+          star-tracker availability,
+        </li>
+
+        <li>
+          measurement latency,
+        </li>
+
+        <li>
+          discretization,
+        </li>
+
+        <li>
+          covariance propagation
+        </li>
+
+      </ul>
+
+      <p>
+        become more important.
+      </p>
+
+      <p>
+        A sufficiently high propagation rate should be used.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.66 Numerical Integration</h3>
+
+      <p>
+        A simple Euler step
+      </p>
+
+      <p>
+        \[
+        q_{k+1} = q_k+ \dot q_k\Delta t
+        \]
+      </p>
+
+      <p>
+        can work for sufficiently small time steps but may produce norm drift.
+      </p>
+
+      <p>
+        More accurate approaches include
+      </p>
+
+      <ul>
+
+        <li>
+          exponential quaternion update,
+        </li>
+
+        <li>
+          Runge-Kutta integration,
+        </li>
+
+        <li>
+          exact constant-rate quaternion increment.
+        </li>
+
+      </ul>
+
+      <p>
+        The propagation method should be consistent with required attitude accuracy.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.67 Common MEKF Implementation Errors</h3>
+
+      <p>
+        Typical mistakes include:
+      </p>
+
+      <ul>
+
+        <li>
+          quaternion multiplication in the wrong order,
+        </li>
+
+        <li>
+          using a left-error Jacobian with a right-error injection,
+        </li>
+
+        <li>
+          wrong quaternion scalar location,
+        </li>
+
+        <li>
+          mixing active and passive rotations,
+        </li>
+
+        <li>
+          wrong body/inertial frame convention,
+        </li>
+
+        <li>
+          failing to align quaternion signs before residual calculation,
+        </li>
+
+        <li>
+          subtracting quaternions directly,
+        </li>
+
+        <li>
+          forgetting quaternion normalization,
+        </li>
+
+        <li>
+          incorrect skew-matrix sign,
+        </li>
+
+        <li>
+          incorrect gyro-bias sign,
+        </li>
+
+        <li>
+          evaluating residuals in inconsistent frames,
+        </li>
+
+        <li>
+          using degrees internally in equations expecting radians,
+        </li>
+
+        <li>
+          incorrect <code>Q</code> discretization,
+        </li>
+
+        <li>
+          incorrect star-tracker <code>R</code>,
+        </li>
+
+        <li>
+          ignoring sensor latency,
+        </li>
+
+        <li>
+          using invalid measurements,
+        </li>
+
+        <li>
+          failing to reset the error state,
+        </li>
+
+        <li>
+          neglecting covariance reset.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.68 Simulation Truth Must Remain Separate</h3>
+
+      <p>
+        When implementing an MEKF in simulation, truth may contain
+      </p>
+
+      <p>
+        \[
+        q_{\text{true}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        b_{g,\text{true}}.
+        \]
+      </p>
+
+      <p>
+        These quantities must not be used by the estimator except to generate simulated sensor outputs.
+      </p>
+
+      <p>
+        The estimator should receive
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Measurements} + \text{Star Tracker / Vector Measurements} }
+        \]
+      </p>
+
+      <p>
+        not
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{True Attitude}. }
+        \]
+      </p>
+
+      <p>
+        Truth should be used only for performance evaluation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.69 Simulink Architecture</h3>
+
+      <p>
+        A clean MEKF Simulink implementation can contain separate blocks for:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyro Preprocessing}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Bias Compensation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Quaternion Propagation}}
+        \]
+      </p>
+
+      <p>
+        while in parallel:
+      </p>
+
+      <p>
+        \[
+        \boxed{F,G,Q} \rightarrow \boxed{\text{Covariance Propagation}}.
+        \]
+      </p>
+
+      <p>
+        Then:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Absolute Attitude Sensor}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Prediction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Attitude Residual}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gating}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{H,S,K}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat\theta, \delta\hat b_g }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Quaternion Injection + Bias Correction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Error Reset}}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.70 Verification Strategy</h3>
+
+      <p>
+        A good MEKF should be verified progressively.
+      </p>
+
+      <h4>4.2.9.70.1 Perfect-Sensor Test</h4>
+
+      <p>
+        Set gyro and attitude-sensor noise to zero.
+      </p>
+
+      <p>
+        Verify
+      </p>
+
+      <p>
+        \[
+        \hat q \rightarrow q_{\text{true}}.
+        \]
+      </p>
+
+      <h4>4.2.9.70.2 Initial Attitude Error Test</h4>
+
+      <p>
+        Apply known initial orientation error.
+      </p>
+
+      <p>
+        Verify convergence.
+      </p>
+
+      <h4>4.2.9.70.3 Gyro Bias Test</h4>
+
+      <p>
+        Inject known gyro bias.
+      </p>
+
+      <p>
+        Verify
+      </p>
+
+      <p>
+        \[
+        \hat b_g \rightarrow b_{g,\text{true}}.
+        \]
+      </p>
+
+      <h4>4.2.9.70.4 Gyro Noise Test</h4>
+
+      <p>
+        Add realistic gyro noise and verify covariance behaviour.
+      </p>
+
+      <h4>4.2.9.70.5 Star Tracker Noise Test</h4>
+
+      <p>
+        Add realistic attitude measurement uncertainty.
+      </p>
+
+      <h4>4.2.9.70.6 Star Tracker Dropout Test</h4>
+
+      <p>
+        Disable star tracker.
+      </p>
+
+      <p>
+        Verify gyro propagation and covariance growth.
+      </p>
+
+      <h4>4.2.9.70.7 Reacquisition Test</h4>
+
+      <p>
+        Restore star tracker and verify smooth convergence.
+      </p>
+
+      <h4>4.2.9.70.8 Quaternion Sign Test</h4>
+
+      <p>
+        Flip measured quaternion sign:
+      </p>
+
+      <p>
+        \[
+        q_m \rightarrow -q_m.
+        \]
+      </p>
+
+      <p>
+        Verify physical residual remains unchanged.
+      </p>
+
+      <h4>4.2.9.70.9 Fast Slew Test</h4>
+
+      <p>
+        Test high angular rates.
+      </p>
+
+      <h4>4.2.9.70.10 Outlier Test</h4>
+
+      <p>
+        Inject faulty attitude measurements and verify gating.
+      </p>
+
+      <h4>4.2.9.70.11 Timestamp Test</h4>
+
+      <p>
+        Introduce measurement latency.
+      </p>
+
+      <h4>4.2.9.70.12 Convention Test</h4>
+
+      <p>
+        Verify quaternion multiplication and frame conventions using known rotations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.71 NIS Testing</h3>
+
+      <p>
+        For innovation
+      </p>
+
+      <p>
+        \[
+        y_k
+        \]
+      </p>
+
+      <p>
+        and covariance
+      </p>
+
+      <p>
+        \[
+        S_k,
+        \]
+      </p>
+
+      <p>
+        calculate
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS_k = y_k^TS_k^{-1}y_k. }
+        \]
+      </p>
+
+      <p>
+        NIS helps assess whether the measurement residual is consistent with the uncertainty predicted by the filter.
+      </p>
+
+      <p>
+        It is useful for
+      </p>
+
+      <ul>
+
+        <li>
+          tuning,
+        </li>
+
+        <li>
+          gating,
+        </li>
+
+        <li>
+          fault detection,
+        </li>
+
+        <li>
+          statistical consistency testing.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.72 NEES Testing</h3>
+
+      <p>
+        When simulation truth is available, calculate a compatible local attitude error
+      </p>
+
+      <p>
+        \[
+        \delta\theta_{\text{true-est}}
+        \]
+      </p>
+
+      <p>
+        and bias error
+      </p>
+
+      <p>
+        \[
+        \delta b_g.
+        \]
+      </p>
+
+      <p>
+        Form
+      </p>
+
+      <p>
+        \[
+        \delta x.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ NEES = \delta x^TP^{-1}\delta x. }
+        \]
+      </p>
+
+      <p>
+        This assesses whether the estimator covariance accurately represents the actual estimation errors.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.73 Monte Carlo Validation</h3>
+
+      <p>
+        Randomize
+      </p>
+
+      <ul>
+
+        <li>
+          initial attitude error,
+        </li>
+
+        <li>
+          angular rate,
+        </li>
+
+        <li>
+          gyro noise,
+        </li>
+
+        <li>
+          gyro bias,
+        </li>
+
+        <li>
+          bias drift,
+        </li>
+
+        <li>
+          star-tracker noise,
+        </li>
+
+        <li>
+          Sun-sensor noise,
+        </li>
+
+        <li>
+          magnetometer noise,
+        </li>
+
+        <li>
+          alignment errors,
+        </li>
+
+        <li>
+          sensor dropout,
+        </li>
+
+        <li>
+          latency,
+        </li>
+
+        <li>
+          sensor outliers,
+        </li>
+
+        <li>
+          spacecraft slew profiles.
+        </li>
+
+      </ul>
+
+      <p>
+        Evaluate
+      </p>
+
+      <p>
+        \[
+        \boxed{Attitude~RMSE}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{Bias~RMSE}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{NIS}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{NEES}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{Convergence~Time}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{Maximum~Attitude~Error}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{Divergence~Rate}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.74 MEKF for Fine Pointing</h3>
+
+      <p>
+        For fine-pointing spacecraft,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker} + \text{Precision Gyro} + \text{MEKF} }
+        \]
+      </p>
+
+      <p>
+        can provide high-quality attitude knowledge.
+      </p>
+
+      <p>
+        The control system then uses
+      </p>
+
+      <p>
+        \[
+        \hat q
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \hat\omega
+        \]
+      </p>
+
+      <p>
+        to drive reaction wheels or other actuators.
+      </p>
+
+      <p>
+        The complete chain becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensors} \rightarrow \text{MEKF} \rightarrow \text{Attitude Estimate} \rightarrow \text{Attitude Controller} \rightarrow \text{Reaction Wheels}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.75 MEKF During RPO</h3>
+
+      <p>
+        During RPO, attitude knowledge is essential because translation commands and sensor line-of-sight vectors depend on spacecraft orientation.
+      </p>
+
+      <p>
+        An MEKF may fuse
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} + \text{Star Tracker} + \text{Relative Pose Attitude} }
+        \]
+      </p>
+
+      <p>
+        to estimate chaser orientation.
+      </p>
+
+      <p>
+        This affects
+      </p>
+
+      <ul>
+
+        <li>
+          thrust direction,
+        </li>
+
+        <li>
+          camera pointing,
+        </li>
+
+        <li>
+          LiDAR pointing,
+        </li>
+
+        <li>
+          docking alignment,
+        </li>
+
+        <li>
+          robotic capture,
+        </li>
+
+        <li>
+          relative-frame transformations.
+        </li>
+
+      </ul>
+
+      <p>
+        Thus attitude estimation is tightly connected to translational RPO navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.76 Relative Attitude and Docking</h3>
+
+      <p>
+        At docking or capture, relative attitude may need to satisfy
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|\delta\boldsymbol\theta_{rel}\| < \theta_{\text{capture}}. }
+        \]
+      </p>
+
+      <p>
+        Relative angular rate may also need to satisfy
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|\boldsymbol\omega_{rel}\| < \omega_{\text{capture}}. }
+        \]
+      </p>
+
+      <p>
+        The navigation system therefore needs not only relative position and velocity but also precise relative attitude.
+      </p>
+
+      <p>
+        The MEKF philosophy can be extended to such relative-attitude estimation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.77 Attitude Uncertainty and Capture Readiness</h3>
+
+      <p>
+        The navigation output should not contain only
+      </p>
+
+      <p>
+        \[
+        \hat q.
+        \]
+      </p>
+
+      <p>
+        It should also provide attitude uncertainty through
+      </p>
+
+      <p>
+        \[
+        P_{\theta\theta}.
+        \]
+      </p>
+
+      <p>
+        Therefore capture logic can consider not just
+      </p>
+
+      <p>
+        \[
+        \|\hat{\delta\theta}_{rel}\|
+        \]
+      </p>
+
+      <p>
+        but also confidence in that estimate.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Capture Readiness} = \text{Relative Attitude Estimate} + \text{Attitude Confidence}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.78 Relationship to Attitude Controller</h3>
+
+      <p>
+        Suppose the controller uses attitude error
+      </p>
+
+      <p>
+        \[
+        q_e
+        \]
+      </p>
+
+      <p>
+        between reference attitude and estimated attitude.
+      </p>
+
+      <p>
+        Then any navigation error propagates directly into control commands.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{MEKF Error} \rightarrow \text{Control Error} \rightarrow \text{Actuator Command Error}. }
+        \]
+      </p>
+
+      <p>
+        This is why estimator accuracy, latency, and noise should be evaluated together with closed-loop control performance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.79 Key Equations at a Glance</h3>
+
+      <p>
+        ### Multiplicative Attitude Definition
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{\text{true}} = \delta q\otimes\hat q }
+        \]
+      </p>
+
+      <p>
+        ### Small-Angle Error Quaternion
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta q \approx \begin{bmatrix} 1\\ \frac12\delta\theta \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        ### Gyro Correction
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat\omega = \omega_m-\hat b_g }
+        \]
+      </p>
+
+      <p>
+        ### Quaternion Propagation
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\hat q} = \frac12 \Omega(\hat\omega)\hat q }
+        \]
+      </p>
+
+      <p>
+        ### Error State
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta x = \begin{bmatrix} \delta\theta\\ \delta b_g \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        ### Error Dynamics
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot x = F\delta x+Gw }
+        \]
+      </p>
+
+      <p>
+        ### Covariance Prediction
+      </p>
+
+      <p>
+        \[
+        \boxed{ P^- = \Phi P^+\Phi^T+Q_d }
+        \]
+      </p>
+
+      <p>
+        ### Innovation
+      </p>
+
+      <p>
+        \[
+        \boxed{ y=z-h(\hat q^-) }
+        \]
+      </p>
+
+      <p>
+        ### Innovation Covariance
+      </p>
+
+      <p>
+        \[
+        \boxed{ S=HP^-H^T+R }
+        \]
+      </p>
+
+      <p>
+        ### Kalman Gain
+      </p>
+
+      <p>
+        \[
+        \boxed{ K=P^-H^TS^{-1} }
+        \]
+      </p>
+
+      <p>
+        ### Error Estimate
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat x=Ky }
+        \]
+      </p>
+
+      <p>
+        ### Multiplicative Correction
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat q^+ = \delta\hat q\otimes\hat q^- }
+        \]
+      </p>
+
+      <p>
+        ### Bias Correction
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat b_g^+ = \hat b_g^-+\delta\hat b_g }
+        \]
+      </p>
+
+      <p>
+        ### Error Reset
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat x\leftarrow0 }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.80 MEKF in One Diagram</h3>
+
+      <p>
+        The complete idea can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Gyroscope}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Bias Compensation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Quaternion Propagation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat q^-}
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ P^+ \rightarrow F,Q \rightarrow P^-. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Star Tracker / Sun Sensor / Magnetometer}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Attitude Residual}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Estimate Small Attitude + Bias Error}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Multiplicatively Correct Quaternion}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Correct Gyro Bias}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Reset Error State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Continue Propagation}}.
+        \]
+      </p>
+
+      <p>
+        The MEKF philosophy is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate Quaternion Globally} + \text{Estimate Attitude Error Locally} + \text{Correct Multiplicatively}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.9.81 Key Takeaways</h3>
+
+      <p>
+        The Multiplicative Extended Kalman Filter should be understood through these points:
+      </p>
+
+      <ul>
+
+        <li>
+          The MEKF is designed primarily for <strong>quaternion-based spacecraft attitude estimation</strong>.
+        </li>
+
+        <li>
+          A quaternion has four components but only three rotational degrees of freedom.
+        </li>
+
+        <li>
+          The quaternion must satisfy
+        </li>
+
+      </ul>
+
+      <p>
+        \[
+          \|\mathbf q\|=1.
+        \]
+      </p>
+
+      <ul>
+
+        <li>
+          A direct additive quaternion correction is therefore not the most natural formulation.
+        </li>
+
+        <li>
+          The MEKF maintains a full nominal quaternion but estimates only a <strong>three-dimensional small attitude error</strong>.
+        </li>
+
+        <li>
+          True and nominal attitude are related multiplicatively:
+        </li>
+
+      </ul>
+
+      <p>
+        \[
+          q_{\text{true}} = \delta q\otimes\hat q.
+        \]
+      </p>
+
+      <ul>
+
+        <li>
+          A common MEKF error state contains
+        </li>
+
+      </ul>
+
+      <p>
+        \[
+          \delta\theta,\qquad\delta b_g.
+        \]
+      </p>
+
+      <ul>
+
+        <li>
+          Gyro measurements provide high-rate attitude propagation.
+        </li>
+
+        <li>
+          Gyro bias causes attitude drift and should often be estimated.
+        </li>
+
+        <li>
+          Star trackers provide accurate absolute attitude corrections.
+        </li>
+
+        <li>
+          Sun sensors and magnetometers provide reference-vector measurements.
+        </li>
+
+        <li>
+          Vector-observation Jacobians map attitude error into sensor residuals.
+        </li>
+
+        <li>
+          Quaternion measurement residuals must be obtained through <strong>relative rotation</strong>, not quaternion subtraction.
+        </li>
+
+        <li>
+          Quaternion sign ambiguity must be handled.
+        </li>
+
+        <li>
+          Quaternion order and frame convention must remain consistent.
+        </li>
+
+        <li>
+          Left- and right-multiplicative error definitions must not be mixed.
+        </li>
+
+        <li>
+          The covariance represents uncertainty in the <strong>local attitude-error state</strong>, not in four unconstrained quaternion coordinates.
+        </li>
+
+        <li>
+          After every update, the attitude correction is injected multiplicatively.
+        </li>
+
+        <li>
+          Gyro bias is corrected additively.
+        </li>
+
+        <li>
+          The local error state is then reset.
+        </li>
+
+        <li>
+          Covariance reset may require a reset Jacobian.
+        </li>
+
+        <li>
+          <code>Q</code> should reflect gyro noise and bias dynamics.
+        </li>
+
+        <li>
+          <code>R</code> should represent uncertainty in the actual measurement residual.
+        </li>
+
+        <li>
+          Multi-rate attitude sensors are naturally supported.
+        </li>
+
+        <li>
+          Sensor dropout should increase attitude uncertainty.
+        </li>
+
+        <li>
+          Measurement timing is critical during spacecraft slews.
+        </li>
+
+        <li>
+          NIS and NEES are useful consistency tests.
+        </li>
+
+        <li>
+          Monte Carlo analysis should include bias, noise, misalignment, dropout, timing, and initial-attitude uncertainty.
+        </li>
+
+        <li>
+          The MEKF is particularly well suited to <strong>fine pointing, star-tracker/gyro fusion, attitude determination, RPO, docking, and robotic capture applications</strong>.
+        </li>
+
+      </ul>
+
+      <p>
+        The most important concept is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{MEKF} = \text{Nominal Quaternion} + \text{Small 3-D Attitude Error} + \text{Multiplicative Correction}. }
+        \]
+      </p>
+
+      <p>
+        Or physically:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Do not add a Kalman correction directly to the quaternion; estimate the small rotation by which the quaternion is wrong and compose that rotation with the nominal attitude.} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3 class="next-title">Next: 4.2.10 Unscented Kalman Filter (UKF)</h3>
+
+      <p>
+        The EKF, ESKF, and MEKF all rely fundamentally on <strong>local linearisation</strong>.
+      </p>
+
+      <p>
+        For example, the MEKF uses a locally linear attitude-error model
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot x = F\delta x+Gw. }
+        \]
+      </p>
+
+      <p>
+        This works extremely well when the uncertainty remains sufficiently local.
+      </p>
+
+      <p>
+        But for systems with stronger nonlinearities, another approach is possible.
+      </p>
+
+      <p>
+        Instead of evaluating Jacobians, choose a carefully constructed set of representative points around the current mean:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sigma Points}. }
+        \]
+      </p>
+
+      <p>
+        Propagate those points through the actual nonlinear function:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \chi_i \rightarrow f(\chi_i) }
+        \]
+      </p>
+
+      <p>
+        and reconstruct the transformed mean and covariance.
+      </p>
+
+      <p>
+        This leads to <strong>4.2.10 Unscented Kalman Filter (UKF)</strong>, where the focus should shift to <strong>sigma-point generation, the unscented transform, nonlinear state propagation, predicted mean and covariance, nonlinear measurement updates,</strong> <strong><code>\alpha,\beta,\kappa</code></strong> <strong>tuning parameters, covariance weights, spacecraft nonlinear-navigation applications, and comparison with the EKF</strong>.
+      </p>
+
+      <a href="unscented-kalman-filter.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.10 Unscented Kalman Filter (UKF)</h3>
+
+          <p>
+            Sigma-point generation, the unscented transform, nonlinear state
+            propagation, predicted mean and covariance, nonlinear measurement
+            updates, tuning parameters, covariance weights, spacecraft
+            nonlinear-navigation applications, and comparison with the EKF.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Unscented Kalman Filter &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+
+    </section>
+
+  </main>
+
+
+
+  <!-- ========================================================= -->
+  <!-- FOOTER                                                     -->
+  <!-- ========================================================= -->
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+
+</body>
+
+</html>
