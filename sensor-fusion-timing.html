@@ -1,0 +1,6683 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.14 Time Synchronization, Latency and Delayed Measurements | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+
+  <style>
+    .concept-note {
+      margin: 1.5rem 0 0;
+      padding: 1.1rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+    }
+    .concept-note h4 { margin-top: 0; margin-bottom: 0.45rem; }
+    .concept-note p { margin-bottom: 0; }
+  </style>
+
+
+</head>
+
+<body>
+
+  <header class="notes-hero">
+
+    <h1>Time Synchronization, Latency and Delayed Measurements</h1>
+
+    <p class="notes-tagline">
+      Sensor timestamps, master spacecraft time, clock offset and drift,
+      PPS and hardware synchronization, camera and LiDAR timing,
+      measurement latency, delayed and out-of-sequence measurements,
+      rewind–update–replay processing, timing uncertainty, timing calibration,
+      RPO timing requirements, and verification.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.14 Time Synchronization, Latency and Delayed Measurements</h2>
+
+<p>
+        Accurate spacecraft navigation does not depend only on <strong>what a sensor measures</strong>.
+      </p>
+
+      <p>
+        It also depends on <strong>when that measurement was physically valid</strong>.
+      </p>
+
+      <p>
+        A measurement may be numerically accurate, correctly calibrated, and expressed in the correct coordinate frame, but if it is fused at the wrong time, the estimator can still generate a significant state error.
+      </p>
+
+      <p>
+        This becomes especially important in spacecraft systems because several independent timing effects may exist simultaneously:
+      </p>
+
+      <ul>
+        <li>different sensor clocks,</li>
+        <li>clock offsets,</li>
+        <li>clock drift,</li>
+        <li>image-exposure delays,</li>
+        <li>LiDAR scan duration,</li>
+        <li>sensor-processing latency,</li>
+        <li>communication latency,</li>
+        <li>packet buffering,</li>
+        <li>onboard scheduling,</li>
+        <li>delayed measurements,</li>
+        <li>out-of-sequence measurements.</li>
+      </ul>
+
+      <p>
+        The basic timing problem can be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{arrival}} = t_{\text{measurement}} + \tau }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau = \tau_{\text{sensor}} + \tau_{\text{processing}} + \tau_{\text{communication}} + \tau_{\text{buffering}}. }
+        \]
+      </p>
+
+      <p>
+        The navigation estimator must therefore distinguish between
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{When the Physical Quantity Was Observed} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{When the Measurement Became Available to the Filter}. }
+        \]
+      </p>
+
+      <p>
+        The central timing principle is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{A Measurement Must Be Fused With the State at the Epoch to Which That Measurement Belongs}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.1 Why Timing Matters in Sensor Fusion</h3>
+
+      <p>
+        Consider a spacecraft moving with velocity
+      </p>
+
+      <p>
+        \[
+        \mathbf v.
+        \]
+      </p>
+
+      <p>
+        Suppose a position measurement is delayed by
+      </p>
+
+      <p>
+        \[
+        \Delta t.
+        \]
+      </p>
+
+      <p>
+        During that delay, the spacecraft moves approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta \mathbf r \approx \mathbf v\Delta t. }
+        \]
+      </p>
+
+      <p>
+        If the delayed measurement is incorrectly compared with the current position estimate, the filter sees an artificial residual.
+      </p>
+
+      <p>
+        Similarly, if the spacecraft rotates with angular velocity
+      </p>
+
+      <p>
+        \[
+        \boldsymbol\omega,
+        \]
+      </p>
+
+      <p>
+        a timing error produces approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta\boldsymbol\theta \approx \boldsymbol\omega\Delta t. }
+        \]
+      </p>
+
+      <p>
+        Therefore timing error becomes state error.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.2 Measurement Time and Arrival Time</h3>
+
+      <p>
+        A measurement has at least two important times.
+      </p>
+
+      <h4>Measurement Time</h4>
+
+      <p>
+        \[
+        \boxed{ t_m }
+        \]
+      </p>
+
+      <p>
+        This is when the physical quantity was actually observed.
+      </p>
+
+      <h4>Arrival Time</h4>
+
+      <p>
+        \[
+        \boxed{ t_a }
+        \]
+      </p>
+
+      <p>
+        This is when the measurement becomes available to the estimator.
+      </p>
+
+      <p>
+        Generally,
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_a \ge t_m. }
+        \]
+      </p>
+
+      <p>
+        The difference is the latency:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau = t_a-t_m. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why the distinction matters</h4>
+        <p>Arrival time tells the software when a packet became available; measurement time tells the estimator which physical state the data actually constrains. Treating these as interchangeable creates temporal inconsistency.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.3 Example: Camera Measurement Delay</h3>
+
+      <p>
+        Suppose an image is captured at
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m=10.000~\mathrm{s}. }
+        \]
+      </p>
+
+      <p>
+        Feature extraction and pose estimation take
+      </p>
+
+      <p>
+        \[
+        80~\mathrm{ms}.
+        \]
+      </p>
+
+      <p>
+        The navigation computer receives the pose at
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_a=10.080~\mathrm{s}. }
+        \]
+      </p>
+
+      <p>
+        The estimated pose measurement still belongs to
+      </p>
+
+      <p>
+        \[
+        10.000~\mathrm{s},
+        \]
+      </p>
+
+      <p>
+        not
+      </p>
+
+      <p>
+        \[
+        10.080~\mathrm{s}.
+        \]
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Processing Completion Time} \neq \text{Physical Measurement Time}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.4 Sensor Timestamp</h3>
+
+      <p>
+        Every sensor measurement should ideally contain a timestamp:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{sensor}}. }
+        \]
+      </p>
+
+      <p>
+        The timestamp should identify when the physical measurement was valid.
+      </p>
+
+      <p>
+        For simple sensors, this may approximately equal the sampling instant.
+      </p>
+
+      <p>
+        For complex sensors such as cameras and scanning LiDAR, defining the correct timestamp may require more care.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.5 Timestamp Source</h3>
+
+      <p>
+        A timestamp may be generated by
+      </p>
+
+      <ul>
+        <li>the sensor itself,</li>
+        <li>the sensor interface electronics,</li>
+        <li>an onboard computer,</li>
+        <li>a hardware timing unit,</li>
+        <li>a synchronized spacecraft clock.</li>
+      </ul>
+
+      <p>
+        The closer timestamp generation occurs to the physical measurement event, the more reliable the timestamp usually is.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.6 Software Timestamping</h3>
+
+      <p>
+        Suppose the onboard software timestamps a measurement only after receiving a packet.
+      </p>
+
+      <p>
+        Then the timestamp includes unknown communication and processing delay.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{software}} = t_m + \tau_{\text{unknown}}. }
+        \]
+      </p>
+
+      <p>
+        Software timestamping may be adequate for slow systems but can be problematic during high-dynamics RPO.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.7 Hardware Timestamping</h3>
+
+      <p>
+        Hardware timestamping assigns time as close as possible to the physical acquisition event.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <ul>
+        <li>camera exposure trigger,</li>
+        <li>IMU sample interrupt,</li>
+        <li>GNSS measurement epoch,</li>
+        <li>LiDAR trigger pulse.</li>
+      </ul>
+
+      <p>
+        This reduces timing uncertainty significantly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.8 Master Spacecraft Time</h3>
+
+      <p>
+        A spacecraft may define one common onboard time base:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{SC}}. }
+        \]
+      </p>
+
+      <p>
+        All sensor timestamps should ideally be correlated to this master time.
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{GNSS}}, t_{\text{IMU}}, t_{\text{camera}}, t_{\text{LiDAR}} \rightarrow t_{\text{SC}}. }
+        \]
+      </p>
+
+      <p>
+        This greatly simplifies fusion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.9 Clock Offset</h3>
+
+      <p>
+        Suppose a sensor clock is
+      </p>
+
+      <p>
+        \[
+        t_s
+        \]
+      </p>
+
+      <p>
+        and spacecraft master time is
+      </p>
+
+      <p>
+        \[
+        t_{\text{SC}}.
+        \]
+      </p>
+
+      <p>
+        A constant offset may exist:
+      </p>
+
+      <p>
+        \[
+        \boxed{ b_t = t_s-t_{\text{SC}}. }
+        \]
+      </p>
+
+      <p>
+        Then the corrected time is
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{SC}} = t_s-b_t. }
+        \]
+      </p>
+
+      <p>
+        If the offset is not corrected, all measurements from that sensor are shifted in time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.10 Clock Drift</h3>
+
+      <p>
+        Clock offset may not remain constant.
+      </p>
+
+      <p>
+        A sensor oscillator may run slightly faster or slower.
+      </p>
+
+      <p>
+        A simple clock model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_s = (1+\epsilon)t_{\text{SC}} + b. }
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <ul>
+        <li><code>b</code> is clock offset,</li>
+        <li><code>\epsilon</code> is fractional clock-rate error.</li>
+      </ul>
+
+      <p>
+        Over time, even a small
+      </p>
+
+      <p>
+        \[
+        \epsilon
+        \]
+      </p>
+
+      <p>
+        can produce significant timing error.
+      </p>
+
+      <div class="concept-note">
+        <h4>Clock-model interpretation</h4>
+        <p>The affine clock model separates a fixed time bias from a clock-rate error. In practice, the offset can often be calibrated quickly, while drift must be monitored over time because it accumulates.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.11 Clock-Skew Interpretation</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \epsilon>0,
+        \]
+      </p>
+
+      <p>
+        the sensor clock runs faster than spacecraft time.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \epsilon<0,
+        \]
+      </p>
+
+      <p>
+        it runs slower.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Clock Offset} \rightarrow \text{Constant Timing Error} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Clock Drift} \rightarrow \text{Timing Error That Grows With Time}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.12 Example of Clock Drift</h3>
+
+      <p>
+        Suppose clock-rate error is
+      </p>
+
+      <p>
+        \[
+        10~\mathrm{ppm}.
+        \]
+      </p>
+
+      <p>
+        This corresponds to
+      </p>
+
+      <p>
+        \[
+        10\times10^{-6}.
+        \]
+      </p>
+
+      <p>
+        After
+      </p>
+
+      <p>
+        \[
+        1000~\mathrm{s},
+        \]
+      </p>
+
+      <p>
+        the accumulated error is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ 10^{-5} \times 1000 = 0.01~\mathrm{s}. }
+        \]
+      </p>
+
+      <p>
+        Thus a 10 ppm oscillator can accumulate
+      </p>
+
+      <p>
+        \[
+        10~\mathrm{ms}
+        \]
+      </p>
+
+      <p>
+        of error in roughly 1000 seconds.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.13 Timing Error During Fast Motion</h3>
+
+      <p>
+        Suppose relative velocity is
+      </p>
+
+      <p>
+        \[
+        v_{rel}=0.5~\mathrm{m/s}
+        \]
+      </p>
+
+      <p>
+        and timing error is
+      </p>
+
+      <p>
+        \[
+        \Delta t=50~\mathrm{ms}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \Delta r \approx v_{rel}\Delta t
+        \]
+      </p>
+
+      <p>
+        gives
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta r \approx 0.025~\mathrm{m}. }
+        \]
+      </p>
+
+      <p>
+        That is
+      </p>
+
+      <p>
+        \[
+        2.5~\mathrm{cm}.
+        \]
+      </p>
+
+      <p>
+        For close-proximity navigation, this may be significant.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.14 Timing Error During Fast Attitude Motion</h3>
+
+      <p>
+        Suppose spacecraft angular rate is
+      </p>
+
+      <p>
+        \[
+        5^\circ/\mathrm{s}
+        \]
+      </p>
+
+      <p>
+        and timestamp error is
+      </p>
+
+      <p>
+        \[
+        100~\mathrm{ms}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \Delta\theta \approx \omega\Delta t
+        \]
+      </p>
+
+      <p>
+        gives
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta\theta \approx 0.5^\circ. }
+        \]
+      </p>
+
+      <p>
+        For precise attitude or docking operations, this may be unacceptable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.15 Pulse-Per-Second Synchronization</h3>
+
+      <p>
+        GNSS receivers often provide
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{PPS} }
+        \]
+      </p>
+
+      <p>
+        or <strong>Pulse Per Second</strong>.
+      </p>
+
+      <p>
+        PPS provides a precise timing pulse aligned with GNSS time.
+      </p>
+
+      <p>
+        This can be used to synchronize
+      </p>
+
+      <ul>
+        <li>onboard computers,</li>
+        <li>sensor acquisition cards,</li>
+        <li>cameras,</li>
+        <li>LiDAR,</li>
+        <li>timing electronics.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.16 PPS and Measurement Timing</h3>
+
+      <p>
+        PPS does not itself contain the complete timestamp.
+      </p>
+
+      <p>
+        It identifies precise second boundaries.
+      </p>
+
+      <p>
+        A corresponding time message provides the actual time label.
+      </p>
+
+      <p>
+        Together:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{PPS} + \text{Time Message} \rightarrow \text{Accurate Epoch Reference}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.17 Hardware Trigger Synchronization</h3>
+
+      <p>
+        A common hardware trigger can synchronize sensor acquisition.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Trigger} \rightarrow \text{Camera Exposure} }
+        \]
+      </p>
+
+      <p>
+        and simultaneously
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Trigger} \rightarrow \text{LiDAR Acquisition}. }
+        \]
+      </p>
+
+      <p>
+        This aligns the physical sensing events even if processing completes at different times.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.18 Hardware Synchronization vs Software Synchronization</h3>
+
+      <p>
+        Hardware synchronization controls acquisition timing directly.
+      </p>
+
+      <p>
+        Software synchronization corrects timestamps after acquisition.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Hardware Synchronization} \rightarrow \text{Reduce Timing Error at the Source} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Software Synchronization} \rightarrow \text{Estimate and Compensate Timing Error}. }
+        \]
+      </p>
+
+      <p>
+        Hardware synchronization is generally preferable when available.
+      </p>
+
+      <div class="concept-note">
+        <h4>Engineering preference</h4>
+        <p>Hardware synchronization is generally preferred because it reduces timing uncertainty before estimation. Software synchronization remains important for converting residual offsets, variable latencies, or independent sensor clocks into one common mission time.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.19 Camera Exposure Timing</h3>
+
+      <p>
+        A camera image is not necessarily instantaneous.
+      </p>
+
+      <p>
+        Suppose exposure begins at
+      </p>
+
+      <p>
+        \[
+        t_s
+        \]
+      </p>
+
+      <p>
+        and ends at
+      </p>
+
+      <p>
+        \[
+        t_e.
+        \]
+      </p>
+
+      <p>
+        A common effective timestamp is
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_c = \frac{t_s+t_e}{2}. }
+        \]
+      </p>
+
+      <p>
+        This approximates the image as representing the scene at exposure midpoint.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.20 Long Camera Exposure</h3>
+
+      <p>
+        If exposure duration is
+      </p>
+
+      <p>
+        \[
+        T_e=t_e-t_s,
+        \]
+      </p>
+
+      <p>
+        and the spacecraft rotates significantly during
+      </p>
+
+      <p>
+        \[
+        T_e,
+        \]
+      </p>
+
+      <p>
+        the image may contain motion blur.
+      </p>
+
+      <p>
+        Thus timing uncertainty is not just a timestamp problem.
+      </p>
+
+      <p>
+        It can alter the measurement itself.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.21 Rolling-Shutter Cameras</h3>
+
+      <p>
+        A rolling-shutter camera exposes different image rows at different times.
+      </p>
+
+      <p>
+        Therefore one image may correspond to many timestamps.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{row}} = t_0 + k\Delta t_{\text{row}}. }
+        \]
+      </p>
+
+      <p>
+        For rapidly moving spacecraft, rolling shutter can create geometric distortion.
+      </p>
+
+      <p>
+        A single image timestamp may be insufficient.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.22 Global-Shutter Cameras</h3>
+
+      <p>
+        A global-shutter camera exposes all pixels approximately simultaneously.
+      </p>
+
+      <p>
+        Therefore the image is much easier to associate with one timestamp.
+      </p>
+
+      <p>
+        For high-dynamics RPO, global-shutter cameras are often attractive for this reason.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.23 LiDAR Timing</h3>
+
+      <p>
+        LiDAR timing depends on measurement type.
+      </p>
+
+      <p>
+        A flash LiDAR may capture an entire scene nearly simultaneously.
+      </p>
+
+      <p>
+        A scanning LiDAR may generate individual points sequentially.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{One LiDAR Scan} \neq \text{One Physical Time} }
+        \]
+      </p>
+
+      <p>
+        for many scanning systems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.24 LiDAR Scan Deskewing</h3>
+
+      <p>
+        Suppose a LiDAR scan spans
+      </p>
+
+      <p>
+        \[
+        [t_s,t_e].
+        \]
+      </p>
+
+      <p>
+        If the spacecraft moves during this interval, the point cloud becomes distorted.
+      </p>
+
+      <p>
+        Deskewing transforms each point according to the estimated spacecraft state at its individual timestamp.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf p_i(t_i) \rightarrow \mathbf p_i(t_{\text{reference}}). }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why LiDAR deskewing matters</h4>
+        <p>If the spacecraft translates or rotates significantly during a scan, treating the whole point cloud as simultaneous distorts geometry. Deskewing maps each point to a common reference epoch before pose or range estimation.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.25 IMU Timestamping</h3>
+
+      <p>
+        IMU measurements typically have short processing delay but high update rate.
+      </p>
+
+      <p>
+        Because IMU samples may arrive at
+      </p>
+
+      <p>
+        \[
+        100\text{–}1000~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        or higher, even small timestamp inconsistencies can accumulate in integration.
+      </p>
+
+      <p>
+        Each inertial sample should therefore use its actual
+      </p>
+
+      <p>
+        \[
+        \Delta t.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.26 GNSS Timing</h3>
+
+      <p>
+        GNSS provides precise time and navigation measurements at known epochs.
+      </p>
+
+      <p>
+        However, the navigation message may arrive after the physical measurement epoch.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Measurement Epoch} \neq \text{Packet Reception Time}. }
+        \]
+      </p>
+
+      <p>
+        The filter should use the GNSS measurement epoch.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.27 Sensor Processing Latency</h3>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \tau_p
+        \]
+      </p>
+
+      <p>
+        represent processing latency.
+      </p>
+
+      <p>
+        For simple sensors,
+      </p>
+
+      <p>
+        \[
+        \tau_p
+        \]
+      </p>
+
+      <p>
+        may be negligible.
+      </p>
+
+      <p>
+        For camera-based pose estimation,
+      </p>
+
+      <p>
+        \[
+        \tau_p
+        \]
+      </p>
+
+      <p>
+        may be tens or hundreds of milliseconds.
+      </p>
+
+      <p>
+        The latency may also vary depending on
+      </p>
+
+      <ul>
+        <li>number of detected features,</li>
+        <li>processor load,</li>
+        <li>image complexity,</li>
+        <li>algorithm convergence.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.28 Communication Latency</h3>
+
+      <p>
+        Measurements may be transmitted over
+      </p>
+
+      <ul>
+        <li>CAN,</li>
+        <li>SpaceWire,</li>
+        <li>Ethernet,</li>
+        <li>serial buses,</li>
+        <li>wireless links,</li>
+        <li>inter-spacecraft communication links.</li>
+      </ul>
+
+      <p>
+        Communication introduces
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{comm}}. }
+        \]
+      </p>
+
+      <p>
+        For distributed spacecraft, communication latency can be especially significant.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.29 Buffering Latency</h3>
+
+      <p>
+        Measurements may wait in a queue before processing.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{buffer}} = t_{\text{dequeue}} - t_{\text{enqueue}}. }
+        \]
+      </p>
+
+      <p>
+        Under heavy processor load, this latency may become variable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.30 Scheduling Latency</h3>
+
+      <p>
+        Real-time software may process navigation tasks according to a schedule.
+      </p>
+
+      <p>
+        A sensor event may occur at one time but the estimator may not execute until its scheduled task slot.
+      </p>
+
+      <p>
+        This creates
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{sched}}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.31 Total Latency</h3>
+
+      <p>
+        A more complete latency model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{total}} = \tau_{\text{sensor}} + \tau_{\text{processing}} + \tau_{\text{communication}} + \tau_{\text{buffer}} + \tau_{\text{scheduler}}. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_a = t_m + \tau_{\text{total}}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.32 Constant Latency</h3>
+
+      <p>
+        If latency is approximately constant,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau=\tau_0, }
+        \]
+      </p>
+
+      <p>
+        it may be calibrated and removed:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m = t_a-\tau_0. }
+        \]
+      </p>
+
+      <p>
+        Constant latency is easier to manage than variable latency.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.33 Variable Latency</h3>
+
+      <p>
+        If latency changes from sample to sample:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_k = \tau_0 + \delta\tau_k. }
+        \]
+      </p>
+
+      <p>
+        Then compensation requires either
+      </p>
+
+      <ul>
+        <li>accurate timestamps,</li>
+        <li>explicit delay measurements,</li>
+        <li>delay estimation,</li>
+        <li>conservative uncertainty modelling.</li>
+      </ul>
+
+      <p>
+        Variable delay is more difficult than constant delay.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.34 Latency Jitter</h3>
+
+      <p>
+        Latency jitter describes variations in delay.
+      </p>
+
+      <p>
+        Define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\tau_k = \tau_k-\bar\tau. }
+        \]
+      </p>
+
+      <p>
+        Large jitter can make measurement arrival order unpredictable.
+      </p>
+
+      <p>
+        It can also produce out-of-sequence measurements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.35 Delayed Measurement</h3>
+
+      <p>
+        A measurement is delayed when it arrives after the estimator has already propagated beyond its measurement epoch.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m < t_{\text{filter}}. }
+        \]
+      </p>
+
+      <p>
+        Example:
+      </p>
+
+      <p>
+        \[
+        t_m=5.0~\mathrm{s}
+        \]
+      </p>
+
+      <p>
+        while current navigation time is
+      </p>
+
+      <p>
+        \[
+        t_{\text{filter}}=5.1~\mathrm{s}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.36 Why Directly Applying a Delayed Measurement Is Wrong</h3>
+
+      <p>
+        Suppose the estimator is currently at
+      </p>
+
+      <p>
+        \[
+        t_c.
+        \]
+      </p>
+
+      <p>
+        A delayed measurement belongs to
+      </p>
+
+      <p>
+        \[
+        t_m<t_c.
+        \]
+      </p>
+
+      <p>
+        If we calculate
+      </p>
+
+      <p>
+        \[
+        r = z(t_m) - h( \hat x(t_c) ),
+        \]
+      </p>
+
+      <p>
+        we compare states from different times.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Old Measurement} - \text{Current Prediction} = \text{Artificial Residual}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Estimator interpretation</h4>
+        <p>A delayed measurement is not necessarily bad data. The error arises when the measurement is compared with the wrong predicted state. If the state can be reconstructed at the measurement epoch, the delayed observation can still be valuable.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.37 Correct Delayed-Measurement Principle</h3>
+
+      <p>
+        The proper conceptual procedure is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Recover State at }t_m }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Apply Measurement at }t_m }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Repropagate to Current Time}. }
+        \]
+      </p>
+
+      <p>
+        This preserves temporal consistency.
+      </p>
+
+      <div class="concept-note">
+        <h4>Core delayed-update logic</h4>
+        <p>This three-step sequence is the foundation of rewind-and-replay implementations. The measurement first corrects the correct historical state, then its effect is propagated forward to the present.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.38 State History Buffer</h3>
+
+      <p>
+        To process delayed measurements, the estimator may store past states:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x(t_k), P(t_k). }
+        \]
+      </p>
+
+      <p>
+        A history buffer may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \{ t_i, \hat x_i, P_i \}. }
+        \]
+      </p>
+
+      <p>
+        For inertial navigation, it may also store IMU or control inputs needed for repropagation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.39 Required History Length</h3>
+
+      <p>
+        If maximum expected delay is
+      </p>
+
+      <p>
+        \[
+        \tau_{\max},
+        \]
+      </p>
+
+      <p>
+        the state-history buffer should cover at least
+      </p>
+
+      <p>
+        \[
+        \boxed{ T_{\text{history}} \ge \tau_{\max}. }
+        \]
+      </p>
+
+      <p>
+        Additional margin is usually desirable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.40 History Buffer Memory Cost</h3>
+
+      <p>
+        Suppose state dimension is
+      </p>
+
+      <p>
+        \[
+        n.
+        \]
+      </p>
+
+      <p>
+        Storing covariance requires approximately
+      </p>
+
+      <p>
+        \[
+        n^2
+        \]
+      </p>
+
+      <p>
+        elements per history entry.
+      </p>
+
+      <p>
+        Therefore long history buffers can consume substantial memory.
+      </p>
+
+      <p>
+        For high-dimensional filters, storage strategy matters.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.41 Store State and Inputs</h3>
+
+      <p>
+        To repropagate correctly, the estimator may need
+      </p>
+
+      <ul>
+        <li>previous state,</li>
+        <li>covariance,</li>
+        <li>IMU samples,</li>
+        <li>control inputs,</li>
+        <li>process-noise parameters,</li>
+        <li>actuator events.</li>
+      </ul>
+
+      <p>
+        Thus history is not just
+      </p>
+
+      <p>
+        \[
+        x(t).
+        \]
+      </p>
+
+      <p>
+        It may require the full sequence of inputs between the delayed measurement and the current time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.42 Propagation to Measurement Time</h3>
+
+      <p>
+        Suppose stored state exists at
+      </p>
+
+      <p>
+        \[
+        t_k
+        \]
+      </p>
+
+      <p>
+        and delayed measurement belongs to
+      </p>
+
+      <p>
+        \[
+        t_m
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        t_k<t_m.
+        \]
+      </p>
+
+      <p>
+        Propagate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x(t_m)^- = f( \hat x(t_k)^+, t_m-t_k ). }
+        \]
+      </p>
+
+      <p>
+        Likewise,
+      </p>
+
+      <p>
+        \[
+        \boxed{ P(t_m)^- = \Phi P(t_k)^+ \Phi^T + Q_d. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.43 Delayed Measurement Correction</h3>
+
+      <p>
+        At
+      </p>
+
+      <p>
+        \[
+        t_m,
+        \]
+      </p>
+
+      <p>
+        compute innovation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_m = z_m - h( \hat x(t_m)^- ). }
+        \]
+      </p>
+
+      <p>
+        Then perform the ordinary measurement update.
+      </p>
+
+      <p>
+        For an EKF:
+      </p>
+
+      <p>
+        \[
+        \boxed{ K_m = P_m^-H_m^T \left( H_mP_m^-H_m^T+R_m \right)^{-1}. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x_m^+ = \hat x_m^- + K_mr_m. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.44 Covariance Correction at Measurement Time</h3>
+
+      <p>
+        The covariance is corrected at the same measurement epoch.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_m^+ = (I-K_mH_m) P_m^-. }
+        \]
+      </p>
+
+      <p>
+        or using Joseph form:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_m^+ = (I-K_mH_m) P_m^- (I-K_mH_m)^T + K_mR_mK_m^T. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.45 Repropagation to Current Time</h3>
+
+      <p>
+        After correcting the state at
+      </p>
+
+      <p>
+        \[
+        t_m,
+        \]
+      </p>
+
+      <p>
+        the estimator must replay all subsequent inputs.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x(t_c) = \Phi_{m\rightarrow c} \hat x(t_m)^+ }
+        \]
+      </p>
+
+      <p>
+        conceptually.
+      </p>
+
+      <p>
+        For nonlinear systems, repropagation uses the full nonlinear dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.46 Repropagation Sequence</h3>
+
+      <p>
+        Suppose stored sequence is
+      </p>
+
+      <p>
+        \[
+        t_m<t_1<t_2<t_c.
+        \]
+      </p>
+
+      <p>
+        Then:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x(t_m)^+ }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Apply Input }u_1 }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ x(t_1) }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Apply Input }u_2 }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ x(t_2) }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ x(t_c). }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.47 Why Repropagation Is Necessary</h3>
+
+      <p>
+        The delayed measurement changes the historical state.
+      </p>
+
+      <p>
+        Therefore every later predicted state derived from the old historical state is no longer correct.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Past Correction} \rightarrow \text{Changes All Future Predictions}. }
+        \]
+      </p>
+
+      <p>
+        That is why repropagation is required.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.48 Repropagating Covariance</h3>
+
+      <p>
+        The same logic applies to uncertainty.
+      </p>
+
+      <p>
+        After correcting
+      </p>
+
+      <p>
+        \[
+        P(t_m),
+        \]
+      </p>
+
+      <p>
+        all later covariance values must be recomputed using
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{k+1} = \Phi_kP_k\Phi_k^T+Q_k. }
+        \]
+      </p>
+
+      <p>
+        Using the old current covariance after a delayed state correction would be inconsistent.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.49 Replaying Later Measurements</h3>
+
+      <p>
+        Suppose another measurement had already been processed at
+      </p>
+
+      <p>
+        \[
+        t_2>t_m.
+        \]
+      </p>
+
+      <p>
+        If the filter rewinds to
+      </p>
+
+      <p>
+        \[
+        t_m,
+        \]
+      </p>
+
+      <p>
+        then the later measurement may need to be replayed as well.
+      </p>
+
+      <p>
+        Thus the history buffer may store
+      </p>
+
+      <ul>
+        <li>inputs,</li>
+        <li>measurement events,</li>
+        <li>update decisions.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Why later measurements may need replay</h4>
+        <p>Any later update was computed from a state trajectory that has now changed. Replaying later measurements keeps both state and covariance consistent with the corrected historical trajectory.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.50 Rewind–Update–Replay</h3>
+
+      <p>
+        A common delayed-measurement architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Rewind} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Update at Historical Time} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Replay Inputs and Later Measurements} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Recover Current State}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.51 Computational Cost of Repropagation</h3>
+
+      <p>
+        If delay is large, many historical propagation steps may need to be repeated.
+      </p>
+
+      <p>
+        Thus computational cost grows approximately with
+      </p>
+
+      <p>
+        \[
+        \boxed{ \frac{\tau_{\text{delay}}} {\Delta t_{\text{propagation}}}. }
+        \]
+      </p>
+
+      <p>
+        For high-rate IMU systems, even modest delays can require many replay steps.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.52 Example</h3>
+
+      <p>
+        Suppose IMU rate is
+      </p>
+
+      <p>
+        \[
+        200~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        and camera delay is
+      </p>
+
+      <p>
+        \[
+        150~\mathrm{ms}.
+        \]
+      </p>
+
+      <p>
+        The number of IMU intervals that may need replay is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ 0.15\times200 = 30. }
+        \]
+      </p>
+
+      <p>
+        Thus one delayed camera update may require replaying around 30 inertial propagation steps.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.53 Out-of-Sequence Measurement</h3>
+
+      <p>
+        An <strong>Out-of-Sequence Measurement (OOSM)</strong> is a measurement that arrives after one or more measurements with later timestamps have already been processed.
+      </p>
+
+      <p>
+        Suppose processing order is
+      </p>
+
+      <p>
+        \[
+        z(t_1)
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        z(t_3)
+        \]
+      </p>
+
+      <p>
+        then later
+      </p>
+
+      <p>
+        \[
+        z(t_2)
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        t_1<t_2<t_3.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        z(t_2)
+        \]
+      </p>
+
+      <p>
+        is an out-of-sequence measurement.
+      </p>
+
+      <div class="concept-note">
+        <h4>What makes OOSM special</h4>
+        <p>An out-of-sequence measurement is more than ordinary latency because one or more later-time measurements have already been fused. Correct handling must preserve chronological information flow.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.54 Why OOSM Is More Difficult</h3>
+
+      <p>
+        A simple delayed measurement may arrive after prediction only.
+      </p>
+
+      <p>
+        An OOSM may arrive after later sensor updates have already modified the state.
+      </p>
+
+      <p>
+        Therefore handling it correctly may require replaying not only dynamics but also later measurement updates.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.55 OOSM Example</h3>
+
+      <p>
+        Consider:
+      </p>
+
+      <p>
+        \[
+        t_1: \text{GNSS}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_2: \text{Camera}
+        \]
+      </p>
+
+      <p>
+        \[
+        t_3: \text{LiDAR}.
+        \]
+      </p>
+
+      <p>
+        Suppose arrival order is
+      </p>
+
+      <p>
+        \[
+        \boxed{ GNSS \rightarrow LiDAR \rightarrow Camera. }
+        \]
+      </p>
+
+      <p>
+        The camera update belongs between GNSS and LiDAR in time.
+      </p>
+
+      <p>
+        Proper reconstruction may require reprocessing the LiDAR update after the camera correction.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.56 OOSM Handling Strategies</h3>
+
+      <p>
+        Possible strategies include
+      </p>
+
+      <ul>
+        <li>reject old measurements,</li>
+        <li>approximate current-time correction,</li>
+        <li>rewind and replay,</li>
+        <li>fixed-lag smoothing,</li>
+        <li>specialized OOSM filters.</li>
+      </ul>
+
+      <p>
+        The best choice depends on
+      </p>
+
+      <ul>
+        <li>delay magnitude,</li>
+        <li>processor capability,</li>
+        <li>mission criticality,</li>
+        <li>update frequency.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.57 Rejecting Old Measurements</h3>
+
+      <p>
+        A simple strategy is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\text{age}} > \Delta t_{\max} \Rightarrow \text{Reject Measurement}. }
+        \]
+      </p>
+
+      <p>
+        This avoids computational complexity but discards potentially useful information.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.58 When Rejection May Be Acceptable</h3>
+
+      <p>
+        Rejection may be reasonable when
+      </p>
+
+      <ul>
+        <li>delay is very large,</li>
+        <li>sensor information is low value,</li>
+        <li>measurements arrive frequently,</li>
+        <li>processor load is constrained,</li>
+        <li>current state is already well observed.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.59 When Rejection May Be Dangerous</h3>
+
+      <p>
+        Rejecting delayed measurements may be unacceptable when
+      </p>
+
+      <ul>
+        <li>the sensor provides rare absolute information,</li>
+        <li>other sensors are unavailable,</li>
+        <li>navigation uncertainty is large,</li>
+        <li>close-proximity operations require high accuracy.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.60 Approximate Current-Time Update</h3>
+
+      <p>
+        One simplified method tries to transform an old measurement into an equivalent current measurement.
+      </p>
+
+      <p>
+        This may work for some simple dynamics.
+      </p>
+
+      <p>
+        However, the approximation can become inaccurate for
+      </p>
+
+      <ul>
+        <li>nonlinear motion,</li>
+        <li>long delays,</li>
+        <li>rapid attitude changes,</li>
+        <li>thruster events.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.61 Fixed-Lag Smoothing</h3>
+
+      <p>
+        A <strong>fixed-lag smoother</strong> maintains a moving history window:
+      </p>
+
+      <p>
+        \[
+        \boxed{ [t-T_L,t]. }
+        \]
+      </p>
+
+      <p>
+        Measurements arriving inside this window can update historical states.
+      </p>
+
+      <p>
+        Older states are finalized and removed.
+      </p>
+
+      <div class="concept-note">
+        <h4>When fixed-lag smoothing is attractive</h4>
+        <p>A fixed-lag smoother is useful when delays are common but bounded. It avoids retaining the entire mission history while still allowing measurements to update recent past states.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.62 Why Fixed-Lag Smoothing Is Useful</h3>
+
+      <p>
+        Fixed-lag smoothing provides a compromise between
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Real-Time Filtering} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Full Batch Smoothing}. }
+        \]
+      </p>
+
+      <p>
+        It can handle moderate measurement delays while keeping memory and computation bounded.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.63 Fixed-Lag Window</h3>
+
+      <p>
+        Let lag be
+      </p>
+
+      <p>
+        \[
+        T_L.
+        \]
+      </p>
+
+      <p>
+        Then measurements are accepted for historical correction if
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m \ge t_{\text{current}}-T_L. }
+        \]
+      </p>
+
+      <p>
+        Older measurements may be rejected.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.64 Delay-Aware State Augmentation</h3>
+
+      <p>
+        Another method is to augment the state with delayed states.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ X_k = \begin{bmatrix} x_k\\ x_{k-1}\\ x_{k-2} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Then a delayed measurement can directly update the relevant historical component.
+      </p>
+
+      <p>
+        However, state dimension grows substantially.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.65 State Augmentation Cost</h3>
+
+      <p>
+        If original state dimension is
+      </p>
+
+      <p>
+        \[
+        n
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        L
+        \]
+      </p>
+
+      <p>
+        historical states are included, augmented dimension becomes approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ n(L+1). }
+        \]
+      </p>
+
+      <p>
+        Covariance size then scales approximately as
+      </p>
+
+      <p>
+        \[
+        \boxed{ n^2(L+1)^2. }
+        \]
+      </p>
+
+      <p>
+        Thus long delay windows can be computationally expensive.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.66 Factor-Graph Interpretation</h3>
+
+      <p>
+        In a factor graph, each state exists at its own time node.
+      </p>
+
+      <p>
+        A delayed measurement can simply attach a new measurement factor to the historical state node corresponding to
+      </p>
+
+      <p>
+        \[
+        t_m.
+        \]
+      </p>
+
+      <p>
+        Then optimization updates the affected states.
+      </p>
+
+      <p>
+        This is one reason factor-graph approaches are attractive for asynchronous sensor fusion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.67 Filtering vs Smoothing</h3>
+
+      <p>
+        Filtering estimates
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_k | z_{1:k}. }
+        \]
+      </p>
+
+      <p>
+        Smoothing may estimate past states using future measurements:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_j | z_{1:k}, \qquad j<k. }
+        \]
+      </p>
+
+      <p>
+        Delayed measurements naturally introduce smoothing-like behavior because they provide new information about past states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.68 Time-Correlation Error</h3>
+
+      <p>
+        Suppose sensor time and master time are related by
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_s = a t+b. }
+        \]
+      </p>
+
+      <p>
+        Then calibration requires estimating
+      </p>
+
+      <p>
+        \[
+        a
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        b.
+        \]
+      </p>
+
+      <p>
+        This process is called <strong>time correlation</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.69 Clock-Calibration Experiment</h3>
+
+      <p>
+        A simple timing calibration may record pairs:
+      </p>
+
+      <p>
+        \[
+        \boxed{ (t_{\text{sensor},i}, t_{\text{master},i}) }
+        \]
+      </p>
+
+      <p>
+        and fit
+      </p>
+
+      <p>
+        \[
+        t_{\text{sensor}} = a t_{\text{master}} + b.
+        \]
+      </p>
+
+      <p>
+        The estimated
+      </p>
+
+      <p>
+        \[
+        a,b
+        \]
+      </p>
+
+      <p>
+        are then used to convert sensor time into master spacecraft time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.70 Online Clock-State Estimation</h3>
+
+      <p>
+        Timing offset itself may be included in the navigation state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x = \begin{bmatrix} x_{\text{nav}}\\ \delta t \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \delta t
+        \]
+      </p>
+
+      <p>
+        can be estimated jointly with navigation states if the system is sufficiently observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.71 Clock Drift as a State</h3>
+
+      <p>
+        A more complete timing model may include
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_t = \begin{bmatrix} \delta t\\ \dot{\delta t} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        with dynamics
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\delta t} = \delta f }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\delta f} = n_f. }
+        \]
+      </p>
+
+      <p>
+        This resembles clock models used in GNSS navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.72 Timing-Error Observability</h3>
+
+      <p>
+        A timing offset is observable only if changing the measurement time produces a distinguishable measurement effect.
+      </p>
+
+      <p>
+        If the system is nearly static,
+      </p>
+
+      <p>
+        \[
+        \frac{\partial h}{\partial t} \approx0,
+        \]
+      </p>
+
+      <p>
+        then timing error may be difficult to estimate.
+      </p>
+
+      <p>
+        During dynamic motion, timing offset becomes more observable.
+      </p>
+
+      <div class="concept-note">
+        <h4>Observability interpretation</h4>
+        <p>Timing offset becomes observable only when shifting the measurement time changes the predicted measurement sufficiently. Nearly static motion provides little information about delay, whereas deliberate excitation can reveal it.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.73 Motion Excites Timing Observability</h3>
+
+      <p>
+        Suppose position changes rapidly.
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \frac{\partial r}{\partial t} = v. }
+        \]
+      </p>
+
+      <p>
+        Large velocity increases sensitivity to time offset.
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \frac{\partial\theta}{\partial t} = \omega. }
+        \]
+      </p>
+
+      <p>
+        Thus dynamic maneuvers can improve timing calibration.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.74 But Motion Also Makes Timing Error More Dangerous</h3>
+
+      <p>
+        The same sensitivity that improves observability also increases navigation error if timing is wrong.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High Dynamics} \rightarrow \text{Better Timing Observability} }
+        \]
+      </p>
+
+      <p>
+        but also
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High Dynamics} \rightarrow \text{Greater Sensitivity to Timing Error}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.75 Sensor Latency Estimation</h3>
+
+      <p>
+        Persistent latency may be estimated by comparing sensor outputs with a reference.
+      </p>
+
+      <p>
+        One approach is to vary candidate delay
+      </p>
+
+      <p>
+        \[
+        \tau
+        \]
+      </p>
+
+      <p>
+        and find the value that minimizes residuals:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau^\star = \arg\min_\tau \sum_k \| z_k - h( x(t_k-\tau) ) \|^2. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.76 Cross-Correlation Timing Estimation</h3>
+
+      <p>
+        For correlated signals, timing offset can be estimated from cross-correlation.
+      </p>
+
+      <p>
+        For signals
+      </p>
+
+      <p>
+        \[
+        a(t)
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        b(t),
+        \]
+      </p>
+
+      <p>
+        estimate delay from
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{ab}(\tau) = \int a(t)b(t+\tau)\,dt. }
+        \]
+      </p>
+
+      <p>
+        The peak identifies the likely time shift.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.77 Gyro–Camera Time Calibration</h3>
+
+      <p>
+        A common calibration problem is synchronizing camera attitude motion with gyroscope angular rate.
+      </p>
+
+      <p>
+        Image-based orientation changes can be compared with integrated gyro rotation.
+      </p>
+
+      <p>
+        The delay producing the smallest disagreement estimates camera-to-IMU timing offset.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.78 GNSS–IMU Time Calibration</h3>
+
+      <p>
+        GNSS velocity changes can be compared with accelerometer-integrated velocity.
+      </p>
+
+      <p>
+        Timing mismatch appears as phase shift between the two signals.
+      </p>
+
+      <p>
+        Dynamic maneuvers help reveal this offset.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.79 LiDAR–Camera Time Calibration</h3>
+
+      <p>
+        For relative navigation, camera and LiDAR motion estimates can be compared over time.
+      </p>
+
+      <p>
+        A persistent shift between their predicted target motion may indicate timing misalignment.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.80 Timing Error Can Mimic Lever-Arm Error</h3>
+
+      <p>
+        Suppose the spacecraft rotates.
+      </p>
+
+      <p>
+        A delayed measurement from an offset sensor location may look like an incorrect lever arm.
+      </p>
+
+      <p>
+        Thus timing and geometric calibration errors can become coupled.
+      </p>
+
+      <p>
+        This means:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Timing Calibration} \neq \text{Independent of Sensor Geometry}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Calibration coupling</h4>
+        <p>Timing, lever arm, and boresight errors can generate similar residual signatures during motion. These parameters should therefore be calibrated with sufficiently rich maneuvers and not tuned independently without checking cross-coupling.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.81 Timing Error Can Mimic Boresight Error</h3>
+
+      <p>
+        Likewise, delayed camera measurements during rotation may appear as a constant angular misalignment.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Apparent Boresight Error} }
+        \]
+      </p>
+
+      <p>
+        may partly arise from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Timestamp Error}. }
+        \]
+      </p>
+
+      <p>
+        Timing should be validated before final boresight calibration.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.82 Timing Error Can Mimic Sensor Bias</h3>
+
+      <p>
+        Persistent delay can create systematic residuals.
+      </p>
+
+      <p>
+        The estimator may incorrectly absorb these residuals into
+      </p>
+
+      <ul>
+        <li>gyro bias,</li>
+        <li>accelerometer bias,</li>
+        <li>position bias,</li>
+        <li>attitude bias.</li>
+      </ul>
+
+      <p>
+        Thus badly synchronized data can corrupt bias estimation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.83 Frame Transformation at Correct Time</h3>
+
+      <p>
+        Suppose camera measurement requires transformation
+      </p>
+
+      <p>
+        \[
+        C_{IC}(t_m).
+        \]
+      </p>
+
+      <p>
+        Using
+      </p>
+
+      <p>
+        \[
+        C_{IC}(t_a)
+        \]
+      </p>
+
+      <p>
+        instead may produce a false line-of-sight residual.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Coordinate Transformation Must Use the Measurement Epoch}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.84 Lever Arm at Measurement Time</h3>
+
+      <p>
+        For a sensor located at body-fixed lever arm
+      </p>
+
+      <p>
+        \[
+        r_{S/CG}^B,
+        \]
+      </p>
+
+      <p>
+        its inertial position is
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_S^I(t) = r_{CG}^I(t) + C_{IB}(t) r_{S/CG}^B. }
+        \]
+      </p>
+
+      <p>
+        Therefore both spacecraft position and attitude must correspond to the sensor measurement time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.85 Delayed Thruster Telemetry</h3>
+
+      <p>
+        Actuation data can also be delayed.
+      </p>
+
+      <p>
+        Suppose thruster actually fires at
+      </p>
+
+      <p>
+        \[
+        t_b
+        \]
+      </p>
+
+      <p>
+        but telemetry reports the event later.
+      </p>
+
+      <p>
+        Navigation propagation should still include thrust at
+      </p>
+
+      <p>
+        \[
+        t_b.
+        \]
+      </p>
+
+      <p>
+        Otherwise the estimator may incorrectly attribute the resulting motion to sensor error.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.86 Command Time vs Execution Time</h3>
+
+      <p>
+        A control command may be generated at
+      </p>
+
+      <p>
+        \[
+        t_c
+        \]
+      </p>
+
+      <p>
+        but actuator response begins at
+      </p>
+
+      <p>
+        \[
+        t_a=t_c+\tau_{\text{act}}.
+        \]
+      </p>
+
+      <p>
+        The navigation model should ideally use execution time rather than command-generation time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.87 Valve Latency Example</h3>
+
+      <p>
+        For a thruster valve:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{thrust start}} = t_{\text{command}} + \tau_{\text{valve}}. }
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \tau_{\text{valve}}
+        \]
+      </p>
+
+      <p>
+        is not represented, propagation during burns becomes slightly phase shifted.
+      </p>
+
+      <p>
+        This can matter during precision RPO.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.88 Sensor and Actuator Timing Together</h3>
+
+      <p>
+        Navigation accuracy depends on both
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{When Sensors Observe Motion} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{When Actuators Actually Change Motion}. }
+        \]
+      </p>
+
+      <p>
+        Thus sensor synchronization and actuator timing should be considered together in high-fidelity GNC simulation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.89 Delayed Measurement and RPO</h3>
+
+      <p>
+        During RPO, delayed data may occur from
+      </p>
+
+      <ul>
+        <li>image processing,</li>
+        <li>LiDAR pose reconstruction,</li>
+        <li>inter-spacecraft communication,</li>
+        <li>onboard processor load.</li>
+      </ul>
+
+      <p>
+        A delayed relative-state measurement can significantly affect final approach if relative motion is changing rapidly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.90 Far-Range RPO Timing</h3>
+
+      <p>
+        At far range, relative motion is typically slower and navigation tolerances may be looser.
+      </p>
+
+      <p>
+        Moderate measurement latency may therefore be acceptable.
+      </p>
+
+      <p>
+        However, long communication delays can still matter.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.91 Mid-Range RPO Timing</h3>
+
+      <p>
+        As the chaser approaches, camera and relative GNSS measurements become increasingly important.
+      </p>
+
+      <p>
+        Timing inconsistencies can create
+      </p>
+
+      <ul>
+        <li>incorrect relative position,</li>
+        <li>incorrect relative velocity,</li>
+        <li>inconsistent sensor fusion.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.92 Close-Range RPO Timing</h3>
+
+      <p>
+        Near the target, centimetre-level errors may matter.
+      </p>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        v_{rel}=0.1~\mathrm{m/s}.
+        \]
+      </p>
+
+      <p>
+        A delay of
+      </p>
+
+      <p>
+        \[
+        100~\mathrm{ms}
+        \]
+      </p>
+
+      <p>
+        corresponds to approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ 1~\mathrm{cm} }
+        \]
+      </p>
+
+      <p>
+        of position mismatch.
+      </p>
+
+      <p>
+        This may already be significant for capture logic.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.93 Capture-Phase Timing</h3>
+
+      <p>
+        Capture readiness may require
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|r_{rel}\| < r_c }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|v_{rel}\| < v_c }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|\theta_{rel}\| < \theta_c }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|\omega_{rel}\| < \omega_c. }
+        \]
+      </p>
+
+      <p>
+        All of these quantities must refer to the same epoch.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.94 Timing and Capture Dwell</h3>
+
+      <p>
+        Suppose capture conditions must hold for
+      </p>
+
+      <p>
+        \[
+        T_d.
+        \]
+      </p>
+
+      <p>
+        The navigation system should ensure each sample used in the dwell logic corresponds to a valid synchronized state.
+      </p>
+
+      <p>
+        Otherwise stale data can create a false dwell condition.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.95 Navigation Age Requirement</h3>
+
+      <p>
+        A practical safety requirement may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{current}} - t_{\text{last valid update}} < T_{\max}. }
+        \]
+      </p>
+
+      <p>
+        If the latest absolute navigation information is too old, approach may be inhibited.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.96 Latency-Aware Guidance</h3>
+
+      <p>
+        Guidance may receive
+      </p>
+
+      <p>
+        \[
+        \hat x(t_c)
+        \]
+      </p>
+
+      <p>
+        that has already been propagated to current time.
+      </p>
+
+      <p>
+        This is preferable to giving guidance an old measurement directly.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Delayed Measurement} \rightarrow \text{Correct Historical Update} \rightarrow \text{Current Navigation State} \rightarrow \text{Guidance}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.97 Do Not Feed Delayed Raw State Directly to Control</h3>
+
+      <p>
+        A controller should generally not act directly on a delayed sensor state.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{\text{camera}}(t_m) }
+        \]
+      </p>
+
+      <p>
+        should not be used as though it were
+      </p>
+
+      <p>
+        \[
+        r(t_c).
+        \]
+      </p>
+
+      <p>
+        The estimator should first reconcile timing and propagate to current time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.98 Latency Compensation</h3>
+
+      <p>
+        For simple systems, one may predict measurement forward:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x(t_a) \approx f( z(t_m), t_a-t_m ). }
+        \]
+      </p>
+
+      <p>
+        However, estimator-based delay correction is generally more rigorous because it also propagates uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.99 Timestamp Uncertainty</h3>
+
+      <p>
+        A timestamp itself may have uncertainty:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m = \bar t_m + \delta t. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \delta t
+        \]
+      </p>
+
+      <p>
+        acts like an additional uncertainty source.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.100 Converting Timing Uncertainty into Measurement Uncertainty</h3>
+
+      <p>
+        For small timing error,
+      </p>
+
+      <p>
+        \[
+        z(t+\delta t) \approx z(t) + \dot z(t)\delta t.
+        \]
+      </p>
+
+      <p>
+        Therefore timing uncertainty contributes approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_t = \dot z \sigma_t^2 \dot z^T. }
+        \]
+      </p>
+
+      <p>
+        Then effective measurement covariance may be approximated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{\text{eff}} = R_{\text{sensor}} + R_t. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why timing can be represented as covariance</h4>
+        <p>For small timestamp uncertainty, the measurement changes approximately linearly with time. This lets timing uncertainty be mapped into an equivalent measurement covariance contribution using the local measurement time derivative.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.101 Physical Meaning of Timing Covariance</h3>
+
+      <p>
+        If the measured quantity changes rapidly,
+      </p>
+
+      <p>
+        \[
+        \|\dot z\|
+        \]
+      </p>
+
+      <p>
+        is large.
+      </p>
+
+      <p>
+        Then a small
+      </p>
+
+      <p>
+        \[
+        \sigma_t
+        \]
+      </p>
+
+      <p>
+        creates large additional measurement uncertainty.
+      </p>
+
+      <p>
+        If the system is nearly static,
+      </p>
+
+      <p>
+        \[
+        \dot z\approx0,
+        \]
+      </p>
+
+      <p>
+        timing uncertainty matters much less.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.102 Timing Uncertainty in RPO Position</h3>
+
+      <p>
+        For position measurement,
+      </p>
+
+      <p>
+        \[
+        \dot r=v.
+        \]
+      </p>
+
+      <p>
+        Thus timing-induced covariance can be approximated by
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_t \approx v\,\sigma_t^2\,v^T. }
+        \]
+      </p>
+
+      <p>
+        This shows directly that higher relative speed increases sensitivity to timing uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.103 Timing Uncertainty in Attitude</h3>
+
+      <p>
+        For small attitude motion,
+      </p>
+
+      <p>
+        \[
+        \dot\theta\approx\omega.
+        \]
+      </p>
+
+      <p>
+        Then approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_\theta \approx |\omega|\sigma_t. }
+        \]
+      </p>
+
+      <p>
+        Thus high angular rate magnifies timestamp uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.104 Time Offset as a Calibration Parameter</h3>
+
+      <p>
+        A sensor model may explicitly include delay:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_k = h( x(t_k-\tau) ) + v_k. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \tau
+        \]
+      </p>
+
+      <p>
+        may be estimated offline or online.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.105 Measurement Jacobian with Respect to Delay</h3>
+
+      <p>
+        For small delay uncertainty,
+      </p>
+
+      <p>
+        \[
+        h(x(t-\tau))
+        \]
+      </p>
+
+      <p>
+        can be linearized with respect to
+      </p>
+
+      <p>
+        \[
+        \tau.
+        \]
+      </p>
+
+      <p>
+        Approximately,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \frac{\partial h}{\partial\tau} = - \frac{\partial h}{\partial x} \dot x. }
+        \]
+      </p>
+
+      <p>
+        This can be used when timing offset is included as a filter state.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.106 Delay Estimation Requires Excitation</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \dot x\approx0,
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \frac{\partial h}{\partial\tau} \approx0.
+        \]
+      </p>
+
+      <p>
+        The estimator cannot distinguish delay from no delay.
+      </p>
+
+      <p>
+        Therefore timing calibration requires sufficient dynamic excitation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.107 Calibration Maneuvers</h3>
+
+      <p>
+        Timing calibration may use controlled motion such as
+      </p>
+
+      <ul>
+        <li>sinusoidal rotation,</li>
+        <li>translational oscillation,</li>
+        <li>known slew,</li>
+        <li>known acceleration.</li>
+      </ul>
+
+      <p>
+        The goal is to create clear temporal signatures in multiple sensors.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.108 Time Synchronization in Distributed Spacecraft</h3>
+
+      <p>
+        For multiple spacecraft,
+      </p>
+
+      <p>
+        \[
+        t_A \neq t_B
+        \]
+      </p>
+
+      <p>
+        unless clocks are synchronized.
+      </p>
+
+      <p>
+        Relative measurements exchanged between vehicles therefore require time correlation.
+      </p>
+
+      <p>
+        This becomes especially important for
+      </p>
+
+      <ul>
+        <li>cooperative navigation,</li>
+        <li>inter-satellite ranging,</li>
+        <li>formation flying,</li>
+        <li>docking.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.109 Communication Propagation Delay</h3>
+
+      <p>
+        Between spacecraft, radio signals require finite propagation time.
+      </p>
+
+      <p>
+        For separation
+      </p>
+
+      <p>
+        \[
+        d,
+        \]
+      </p>
+
+      <p>
+        electromagnetic propagation delay is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{prop}} = \frac{d}{c}. }
+        \]
+      </p>
+
+      <p>
+        For close RPO this may be small, but for long-distance cooperative navigation it can matter.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.110 One-Way vs Two-Way Ranging</h3>
+
+      <p>
+        One-way ranging requires good clock synchronization.
+      </p>
+
+      <p>
+        Two-way ranging can reduce dependence on absolute clock offset because round-trip timing is measured.
+      </p>
+
+      <p>
+        However, processing turnaround delay must still be known.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.111 Timestamp Wraparound</h3>
+
+      <p>
+        Digital timestamps may eventually overflow or wrap.
+      </p>
+
+      <p>
+        For example, a finite-width counter may return from its maximum value to zero.
+      </p>
+
+      <p>
+        Navigation software must handle this explicitly.
+      </p>
+
+      <p>
+        Otherwise
+      </p>
+
+      <p>
+        \[
+        \Delta t
+        \]
+      </p>
+
+      <p>
+        can become incorrect.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.112 Timestamp Resolution</h3>
+
+      <p>
+        Timestamp resolution may be
+      </p>
+
+      <p>
+        \[
+        1~\mathrm{ms},
+        \]
+      </p>
+
+      <p>
+        \[
+        1~\mu\mathrm{s},
+        \]
+      </p>
+
+      <p>
+        or another value.
+      </p>
+
+      <p>
+        Quantization introduces timing uncertainty.
+      </p>
+
+      <p>
+        If timestamp resolution is
+      </p>
+
+      <p>
+        \[
+        \Delta t_q,
+        \]
+      </p>
+
+      <p>
+        quantization error is approximately within
+      </p>
+
+      <p>
+        \[
+        \pm\frac{\Delta t_q}{2}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.113 Timing Precision vs Accuracy</h3>
+
+      <p>
+        Timing <strong>precision</strong> describes repeatability or resolution.
+      </p>
+
+      <p>
+        Timing <strong>accuracy</strong> describes closeness to true time.
+      </p>
+
+      <p>
+        A sensor can have
+      </p>
+
+      <ul>
+        <li>precise but biased timestamps,</li>
+        <li>accurate but noisy timestamps.</li>
+      </ul>
+
+      <p>
+        Both matter for sensor fusion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.114 Latency Precision vs Latency Mean</h3>
+
+      <p>
+        A sensor may have average latency
+      </p>
+
+      <p>
+        \[
+        \bar\tau
+        \]
+      </p>
+
+      <p>
+        and latency standard deviation
+      </p>
+
+      <p>
+        \[
+        \sigma_\tau.
+        \]
+      </p>
+
+      <p>
+        A large constant latency can often be compensated.
+      </p>
+
+      <p>
+        A smaller but highly variable latency may be more difficult to correct.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.115 Timing Budget</h3>
+
+      <p>
+        A timing budget may allocate allowable error among components:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_t^2 = \sigma_{\text{clock}}^2 + \sigma_{\text{trigger}}^2 + \sigma_{\text{processing}}^2 + \sigma_{\text{communication}}^2. }
+        \]
+      </p>
+
+      <p>
+        This helps derive sensor and interface timing requirements.
+      </p>
+
+      <div class="concept-note">
+        <h4>Requirement-flow interpretation</h4>
+        <p>A timing budget is most useful when it allocates a total navigation timing allowance among hardware clock error, triggering, processing, and communication. This makes subsystem timing requirements traceable to mission-level GNC performance.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.116 Deriving Timing Requirement from Position Requirement</h3>
+
+      <p>
+        Suppose allowable timing-induced position error is
+      </p>
+
+      <p>
+        \[
+        \Delta r_{\max}.
+        \]
+      </p>
+
+      <p>
+        Given maximum relative velocity
+      </p>
+
+      <p>
+        \[
+        v_{\max},
+        \]
+      </p>
+
+      <p>
+        a simple requirement is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max} \le \frac{ \Delta r_{\max} }{ v_{\max} }. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.117 Deriving Timing Requirement from Attitude Requirement</h3>
+
+      <p>
+        Suppose allowable angular error is
+      </p>
+
+      <p>
+        \[
+        \Delta\theta_{\max}.
+        \]
+      </p>
+
+      <p>
+        Given maximum angular rate
+      </p>
+
+      <p>
+        \[
+        \omega_{\max},
+        \]
+      </p>
+
+      <p>
+        require
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max} \le \frac{ \Delta\theta_{\max} }{ \omega_{\max} }. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.118 RPO Example for Timing Requirement</h3>
+
+      <p>
+        Suppose maximum acceptable timing-induced position error is
+      </p>
+
+      <p>
+        \[
+        1~\mathrm{cm}
+        \]
+      </p>
+
+      <p>
+        and maximum relative speed is
+      </p>
+
+      <p>
+        \[
+        0.2~\mathrm{m/s}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \Delta t_{\max} \le \frac{0.01}{0.2}
+        \]
+      </p>
+
+      <p>
+        so
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max} \le 50~\mathrm{ms}. }
+        \]
+      </p>
+
+      <p>
+        This provides a direct engineering timing requirement.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.119 Attitude Example</h3>
+
+      <p>
+        Suppose allowable timing-induced attitude error is
+      </p>
+
+      <p>
+        \[
+        0.1^\circ
+        \]
+      </p>
+
+      <p>
+        and maximum slew rate is
+      </p>
+
+      <p>
+        \[
+        2^\circ/\mathrm{s}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max} \le 0.05~\mathrm{s} = 50~\mathrm{ms}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.120 Timing Requirements Should Be Mission-Phase Dependent</h3>
+
+      <p>
+        Far from the target:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max,\text{far}} }
+        \]
+      </p>
+
+      <p>
+        may be relatively large.
+      </p>
+
+      <p>
+        Near capture:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max,\text{capture}} }
+        \]
+      </p>
+
+      <p>
+        should generally be much smaller.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max} = \Delta t_{\max}( \text{mission phase} ). }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.121 Measurement Latency Metadata</h3>
+
+      <p>
+        A measurement packet may include
+      </p>
+
+      <ul>
+        <li>acquisition timestamp,</li>
+        <li>arrival timestamp,</li>
+        <li>processing timestamp,</li>
+        <li>sequence number,</li>
+        <li>latency estimate.</li>
+      </ul>
+
+      <p>
+        This allows the estimator and diagnostics software to distinguish where delay occurs.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.122 Recommended Measurement Packet</h3>
+
+      <p>
+        A robust packet could conceptually contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{MeasurementPacket} = \{ t_m, t_a, \text{sensorID}, z, R, \text{valid}, N \}. }
+        \]
+      </p>
+
+      <p>
+        Additional timing metadata can be included when necessary.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.123 Timing Health Flag</h3>
+
+      <p>
+        A measurement should have a timing health condition.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{timeValid} = 1 }
+        \]
+      </p>
+
+      <p>
+        only if
+      </p>
+
+      <ul>
+        <li>timestamp exists,</li>
+        <li>clock is synchronized,</li>
+        <li>measurement age is acceptable,</li>
+        <li>sequence is valid.</li>
+      </ul>
+
+      <p>
+        A numerically good measurement with invalid timing should not automatically be fused.
+      </p>
+
+      <div class="concept-note">
+        <h4>Timing health is separate from sensor health</h4>
+        <p>A sensor can be physically healthy and still provide unusable data if its timestamp is missing, stale, unsynchronized, or ambiguous. Timing validity should therefore be carried explicitly with the measurement.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.124 Maximum Delay Gate</h3>
+
+      <p>
+        A practical system may use
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{delay}} < \tau_{\max}. }
+        \]
+      </p>
+
+      <p>
+        If the delay exceeds this limit, the measurement may be
+      </p>
+
+      <ul>
+        <li>rejected,</li>
+        <li>processed by a smoother,</li>
+        <li>used only for diagnostics.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.125 Delay Gate Should Depend on Sensor Value</h3>
+
+      <p>
+        Different sensors may justify different delay limits.
+      </p>
+
+      <p>
+        A high-accuracy but rare absolute sensor may remain useful even when moderately delayed.
+      </p>
+
+      <p>
+        A low-value high-rate sensor may be discarded if stale.
+      </p>
+
+      <p>
+        Thus delay policy can be sensor specific.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.126 Delay Gate Should Depend on Dynamics</h3>
+
+      <p>
+        If relative motion is slow,
+      </p>
+
+      <p>
+        \[
+        \tau_{\max}
+        \]
+      </p>
+
+      <p>
+        may be larger.
+      </p>
+
+      <p>
+        If motion is fast,
+      </p>
+
+      <p>
+        \[
+        \tau_{\max}
+        \]
+      </p>
+
+      <p>
+        should be smaller.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\max} = f( \text{Sensor}, \text{Dynamics}, \text{Mission Phase} ). }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.127 Timing and Measurement Validation</h3>
+
+      <p>
+        Before performing a measurement update, verify
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Value Valid} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Timestamp Valid}. }
+        \]
+      </p>
+
+      <p>
+        Both are required.
+      </p>
+
+      <p>
+        This provides the connection to the next topic: <strong>measurement validation and innovation gating</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.128 Innovation Can Reveal Timing Error</h3>
+
+      <p>
+        Suppose the sensor itself is accurate but delayed.
+      </p>
+
+      <p>
+        The innovation may become systematically correlated with motion.
+      </p>
+
+      <p>
+        For example, position residual may approximate
+      </p>
+
+      <p>
+        \[
+        \boxed{ r \approx v\Delta t. }
+        \]
+      </p>
+
+      <p>
+        Thus residual patterns can reveal timing problems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.129 Residual Sign During Delay</h3>
+
+      <p>
+        If a target moves steadily in one direction, a delayed measurement may consistently lag the predicted state.
+      </p>
+
+      <p>
+        Residual sign can therefore remain correlated with velocity direction.
+      </p>
+
+      <p>
+        This is a useful diagnostic signature.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.130 Residual vs Angular Rate</h3>
+
+      <p>
+        For attitude measurements, timing error may create residual magnitude proportional to angular rate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|r_\theta\| \propto \|\omega\| |\Delta t|. }
+        \]
+      </p>
+
+      <p>
+        Plotting attitude residual against angular rate can help identify delay.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.131 Timing Calibration from Residual Minimization</h3>
+
+      <p>
+        Suppose residual is
+      </p>
+
+      <p>
+        \[
+        r(\tau) = z - h( x(t-\tau) ).
+        \]
+      </p>
+
+      <p>
+        One can estimate
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau^\star = \arg\min_\tau r(\tau)^TR^{-1}r(\tau). }
+        \]
+      </p>
+
+      <p>
+        This directly connects timing calibration with innovation statistics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.132 Time Synchronization and NIS</h3>
+
+      <p>
+        Incorrect timing can increase
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS = r^TS^{-1}r. }
+        \]
+      </p>
+
+      <p>
+        Thus repeated NIS failures during high dynamics may indicate synchronization problems rather than a purely statistical tuning issue.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.133 Do Not Fix Timing Error Only by Increasing <code>R</code></h3>
+
+      <p>
+        One might increase measurement covariance
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        to reduce the apparent impact of timing-induced residuals.
+      </p>
+
+      <p>
+        This may hide the problem but does not correct the timestamp.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Wrong Timing} \neq \text{Just More Measurement Noise}. }
+        \]
+      </p>
+
+      <p>
+        Correct synchronization should be addressed first.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why covariance inflation is not a true fix</h4>
+        <p>Increasing R may reduce the filter&#x27;s sensitivity to a bad timestamp, but it does not restore temporal consistency. This can mask root-cause timing errors and reduce the value of an otherwise accurate sensor.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.134 Do Not Absorb Timing Error into Bias States</h3>
+
+      <p>
+        Likewise, increasing bias process noise may let the estimator absorb timing errors.
+      </p>
+
+      <p>
+        This can produce apparently smooth results while corrupting physical bias estimates.
+      </p>
+
+      <p>
+        Timing must therefore be treated explicitly whenever significant.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.135 Simulation of Latency</h3>
+
+      <p>
+        A realistic simulation should generate a measurement at
+      </p>
+
+      <p>
+        \[
+        t_m
+        \]
+      </p>
+
+      <p>
+        but deliver it at
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_a = t_m+\tau. }
+        \]
+      </p>
+
+      <p>
+        The estimator should therefore receive measurement packets according to arrival time while using measurement time for fusion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.136 Simulation of Variable Delay</h3>
+
+      <p>
+        Delay may be modelled as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_k = \bar\tau + \delta\tau_k }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \delta\tau_k
+        \]
+      </p>
+
+      <p>
+        is random jitter.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \delta\tau_k \sim \mathcal N( 0,\sigma_\tau^2 ).
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.137 Simulation of Packet Reordering</h3>
+
+      <p>
+        If latency is random, measurement arrival order may differ from measurement-time order.
+      </p>
+
+      <p>
+        Simulation should therefore allow
+      </p>
+
+      <p>
+        \[
+        t_{a,2} < t_{a,1}
+        \]
+      </p>
+
+      <p>
+        even when
+      </p>
+
+      <p>
+        \[
+        t_{m,1} < t_{m,2}.
+        \]
+      </p>
+
+      <p>
+        This tests true out-of-sequence processing.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.138 Simulation of Clock Offset</h3>
+
+      <p>
+        Sensor timestamp may be generated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_s = t_{\text{truth}} + b. }
+        \]
+      </p>
+
+      <p>
+        The estimator then applies calibration to recover common time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.139 Simulation of Clock Drift</h3>
+
+      <p>
+        A drifting clock may be simulated using
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_s = (1+\epsilon)t_{\text{truth}} + b. }
+        \]
+      </p>
+
+      <p>
+        This is useful for long-duration tests.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.140 Simulation of Timestamp Quantization</h3>
+
+      <p>
+        If timestamp resolution is
+      </p>
+
+      <p>
+        \[
+        \Delta t_q,
+        \]
+      </p>
+
+      <p>
+        one may simulate
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_s = \operatorname{round} \left( \frac{t}{\Delta t_q} \right) \Delta t_q. }
+        \]
+      </p>
+
+      <p>
+        This tests sensitivity to finite timestamp resolution.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.141 Monte Carlo Timing Analysis</h3>
+
+      <p>
+        Timing-related Monte Carlo parameters may include
+      </p>
+
+      <ul>
+        <li>clock offset,</li>
+        <li>clock drift,</li>
+        <li>timestamp jitter,</li>
+        <li>camera latency,</li>
+        <li>LiDAR latency,</li>
+        <li>GNSS latency,</li>
+        <li>communication delay,</li>
+        <li>processing delay,</li>
+        <li>packet reordering.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.142 Timing Monte Carlo Outputs</h3>
+
+      <p>
+        Evaluate
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Position RMSE} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Velocity RMSE} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude RMSE} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{NIS} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{NEES} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Capture Success Rate} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Timing-Rejection Rate}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.143 Timing Sensitivity Sweep</h3>
+
+      <p>
+        A useful deterministic sweep is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau = 0, 10, 20, 50, 100, 200~\mathrm{ms}. }
+        \]
+      </p>
+
+      <p>
+        Plot navigation error versus delay.
+      </p>
+
+      <p>
+        This directly identifies allowable timing margins.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.144 Verification Strategy</h3>
+
+      <p>
+        Time synchronization should be verified progressively.
+      </p>
+
+      <h4>4.2.14.144.1 Zero-Latency Baseline</h4>
+
+      <p>
+        Set
+      </p>
+
+      <p>
+        \[
+        \tau=0.
+        \]
+      </p>
+
+      <p>
+        Verify nominal estimator performance.
+      </p>
+
+      <h4>4.2.14.144.2 Constant-Latency Test</h4>
+
+      <p>
+        Introduce known fixed delay.
+      </p>
+
+      <p>
+        Verify compensation recovers baseline behavior.
+      </p>
+
+      <h4>4.2.14.144.3 Variable-Latency Test</h4>
+
+      <p>
+        Add delay jitter.
+      </p>
+
+      <p>
+        Verify timestamps are still handled correctly.
+      </p>
+
+      <h4>4.2.14.144.4 Clock-Offset Test</h4>
+
+      <p>
+        Introduce known
+      </p>
+
+      <p>
+        \[
+        b.
+        \]
+      </p>
+
+      <p>
+        Verify time-correlation compensation.
+      </p>
+
+      <h4>4.2.14.144.5 Clock-Drift Test</h4>
+
+      <p>
+        Introduce nonzero
+      </p>
+
+      <p>
+        \[
+        \epsilon.
+        \]
+      </p>
+
+      <p>
+        Verify long-duration synchronization.
+      </p>
+
+      <h4>4.2.14.144.6 Delayed-Measurement Test</h4>
+
+      <p>
+        Deliver a measurement late.
+      </p>
+
+      <p>
+        Verify rewind–update–repropagate behavior.
+      </p>
+
+      <h4>4.2.14.144.7 OOSM Test</h4>
+
+      <p>
+        Send packets in incorrect arrival order.
+      </p>
+
+      <p>
+        Verify chronological reconstruction.
+      </p>
+
+      <h4>4.2.14.144.8 Packet-Loss Test</h4>
+
+      <p>
+        Drop measurements.
+      </p>
+
+      <p>
+        Verify navigation remains stable.
+      </p>
+
+      <h4>4.2.14.144.9 High-Dynamics Test</h4>
+
+      <p>
+        Perform fast slew or translation.
+      </p>
+
+      <p>
+        Verify timing sensitivity.
+      </p>
+
+      <h4>4.2.14.144.10 Sensor-Handover Timing Test</h4>
+
+      <p>
+        Transition among GNSS, camera, and LiDAR.
+      </p>
+
+      <p>
+        Verify time alignment across sensor changes.
+      </p>
+
+      <div class="concept-note">
+        <h4>Verification philosophy</h4>
+        <p>Timing validation should progress from zero-delay and fixed-delay tests toward jitter, drift, out-of-sequence delivery, and multi-sensor handover. This isolates defects and prevents timing bugs from being confused with estimator-model errors.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.145 Timing Verification with Truth Data</h3>
+
+      <p>
+        In simulation, truth state
+      </p>
+
+      <p>
+        \[
+        x_{\text{truth}}(t)
+        \]
+      </p>
+
+      <p>
+        is available.
+      </p>
+
+      <p>
+        For every sensor packet, compare measurement prediction against truth at
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_m }
+        \]
+      </p>
+
+      <p>
+        rather than
+      </p>
+
+      <p>
+        \[
+        t_a.
+        \]
+      </p>
+
+      <p>
+        This is one of the simplest ways to detect timestamp mistakes.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.146 HIL Timing Verification</h3>
+
+      <p>
+        Hardware-in-the-loop testing should measure actual end-to-end latency.
+      </p>
+
+      <p>
+        Use known trigger signals and record
+      </p>
+
+      <ul>
+        <li>physical trigger time,</li>
+        <li>sensor acquisition time,</li>
+        <li>packet arrival,</li>
+        <li>estimator update time.</li>
+      </ul>
+
+      <p>
+        This identifies latency contributions across the complete hardware chain.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.147 Measuring End-to-End Latency</h3>
+
+      <p>
+        A timing test may measure
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_{\text{E2E}} = t_{\text{filter receive}} - t_{\text{physical acquisition}}. }
+        \]
+      </p>
+
+      <p>
+        Repeat over many samples to estimate
+      </p>
+
+      <p>
+        \[
+        \bar\tau_{\text{E2E}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \sigma_\tau.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.148 Logging Requirements</h3>
+
+      <p>
+        A good timing log should contain
+      </p>
+
+      <ul>
+        <li>spacecraft time,</li>
+        <li>sensor timestamp,</li>
+        <li>acquisition timestamp,</li>
+        <li>packet transmit time,</li>
+        <li>packet receive time,</li>
+        <li>estimator processing time,</li>
+        <li>update accepted/rejected,</li>
+        <li>sensor sequence number.</li>
+      </ul>
+
+      <p>
+        Without these logs, debugging timing issues becomes difficult.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.149 Timing Diagnostic Plots</h3>
+
+      <p>
+        Useful plots include
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tau_k \text{ vs time} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_k \text{ vs }\tau_k }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_k \text{ vs }\omega_k }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_k \text{ vs }v_k }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS \text{ vs delay}. }
+        \]
+      </p>
+
+      <p>
+        These plots can reveal systematic timing problems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.150 Timing and Sensor Health</h3>
+
+      <p>
+        A sensor may be physically healthy but timing-invalid.
+      </p>
+
+      <p>
+        Therefore sensor health should ideally distinguish
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Health} }
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Timing Health}. }
+        \]
+      </p>
+
+      <p>
+        Both may be required before fusion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.151 Example Health Logic</h3>
+
+      <p>
+        A measurement may be accepted only if
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{sensorValid} = 1 }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{timeValid} = 1 }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{innovationValid} = 1. }
+        \]
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Use Measurement} = \text{Sensor Health} \land \text{Timing Health} \land \text{Statistical Validity}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.152 Delay-Aware Sensor Selection</h3>
+
+      <p>
+        Suppose two sensors measure the same quantity.
+      </p>
+
+      <p>
+        Sensor A is more accurate but delayed.
+      </p>
+
+      <p>
+        Sensor B is less accurate but current.
+      </p>
+
+      <p>
+        The navigation system may need to trade
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Accuracy} }
+        \]
+      </p>
+
+      <p>
+        against
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Freshness}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.153 Information Freshness</h3>
+
+      <p>
+        A measurement contains less operational value as it becomes stale.
+      </p>
+
+      <p>
+        This does not mean the historical information is statistically worthless.
+      </p>
+
+      <p>
+        It means more computation is required to correctly propagate that information to the current epoch.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.154 Timing and Computational Architecture</h3>
+
+      <p>
+        Delayed-measurement handling may require
+      </p>
+
+      <ul>
+        <li>historical-state storage,</li>
+        <li>measurement-event storage,</li>
+        <li>rewind logic,</li>
+        <li>replay logic,</li>
+        <li>synchronization manager,</li>
+        <li>timestamp validator.</li>
+      </ul>
+
+      <p>
+        Thus timing is not just a sensor problem.
+      </p>
+
+      <p>
+        It directly affects software architecture.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.155 Real-Time Timing Architecture</h3>
+
+      <p>
+        A robust architecture may be:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Acquisition} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Hardware Timestamp} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Clock Correlation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Buffer} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Timestamp Validation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Historical-State Lookup} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Update at Measurement Epoch} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Repropagate to Current Time}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.156 Timing Manager</h3>
+
+      <p>
+        A dedicated timing manager can provide
+      </p>
+
+      <ul>
+        <li>synchronized spacecraft time,</li>
+        <li>conversion between sensor clocks,</li>
+        <li>latency statistics,</li>
+        <li>measurement-age calculation,</li>
+        <li>history lookup.</li>
+      </ul>
+
+      <p>
+        This keeps timing logic separate from filter equations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.157 Estimator Should Not Guess Timestamps</h3>
+
+      <p>
+        If timestamp information is missing, the estimator should not silently assume
+      </p>
+
+      <p>
+        \[
+        t_m=t_a
+        \]
+      </p>
+
+      <p>
+        unless that assumption is explicitly validated.
+      </p>
+
+      <p>
+        Unknown timing uncertainty should be treated as an actual system limitation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.158 Missing Timestamp Policy</h3>
+
+      <p>
+        Possible policies include
+      </p>
+
+      <ul>
+        <li>reject measurement,</li>
+        <li>use arrival time with inflated uncertainty,</li>
+        <li>use calibrated fixed delay,</li>
+        <li>flag degraded mode.</li>
+      </ul>
+
+      <p>
+        The correct choice depends on mission safety requirements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.159 Delayed Measurement and Covariance Consistency</h3>
+
+      <p>
+        A delayed measurement can reduce past covariance.
+      </p>
+
+      <p>
+        After repropagation, current covariance should also change accordingly.
+      </p>
+
+      <p>
+        Therefore both
+      </p>
+
+      <p>
+        \[
+        \boxed{ x }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ P }
+        \]
+      </p>
+
+      <p>
+        must be replayed consistently.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.160 Cross-Correlation Created by Historical Updates</h3>
+
+      <p>
+        If several delayed measurements update overlapping historical intervals, correlations can become complex.
+      </p>
+
+      <p>
+        This is one reason smoothing and factor-graph formulations may become attractive for heavily asynchronous systems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.161 Filter Approximation vs Smoother</h3>
+
+      <p>
+        For small delays, rewind and replay inside an EKF may be sufficient.
+      </p>
+
+      <p>
+        For frequent long delays or many out-of-sequence measurements, fixed-lag smoothing or factor graphs may provide a cleaner solution.
+      </p>
+
+      <p>
+        Thus architecture depends on delay structure.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.162 Computational Trade</h3>
+
+      <p>
+        Increasing history length improves ability to accept delayed data but increases
+      </p>
+
+      <ul>
+        <li>memory,</li>
+        <li>replay computation,</li>
+        <li>software complexity.</li>
+      </ul>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Delay Tolerance} \leftrightarrow \text{Computational Cost}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.163 Timing Requirements Should Come from Navigation Requirements</h3>
+
+      <p>
+        Timing requirements should not be selected arbitrarily.
+      </p>
+
+      <p>
+        Instead derive them from
+      </p>
+
+      <ul>
+        <li>maximum allowable position error,</li>
+        <li>maximum allowable velocity error,</li>
+        <li>maximum attitude error,</li>
+        <li>expected dynamics,</li>
+        <li>capture tolerances.</li>
+      </ul>
+
+      <p>
+        This connects sensor interface requirements directly to GNC performance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.164 RPO Timing Requirement Flow</h3>
+
+      <p>
+        A useful design flow is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Capture Position Requirement} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Maximum Relative Speed} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Allowable Timestamp Error}. }
+        \]
+      </p>
+
+      <p>
+        Likewise:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Capture Attitude Requirement} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Maximum Angular Rate} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Allowable Timing Error}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.165 Timing During Final Approach</h3>
+
+      <p>
+        During final approach, the estimator may use
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} + \text{IMU} }
+        \]
+      </p>
+
+      <p>
+        with each sensor operating at different times.
+      </p>
+
+      <p>
+        The navigation state used by the controller should be propagated to a single common current epoch after all relevant delayed updates.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.166 Timing During Robotics Handover</h3>
+
+      <p>
+        For robotics handover, relative
+      </p>
+
+      <p>
+        \[
+        r, v, q,\omega
+        \]
+      </p>
+
+      <p>
+        may come from multiple sensor paths.
+      </p>
+
+      <p>
+        All must correspond to one timestamp before evaluating capture-ready logic.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Synchronized State} \rightarrow \text{Capture-Ready Decision}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why synchronization matters for robotics handover</h4>
+        <p>Relative position, velocity, attitude, and angular rate may come from different sensing paths. Capture-ready logic is physically meaningful only when all four describe the same epoch.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.167 Timing and Abort Logic</h3>
+
+      <p>
+        An abort decision should not rely on stale navigation information.
+      </p>
+
+      <p>
+        If state age exceeds a threshold:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\text{nav}} > \Delta t_{\text{safe}} }
+        \]
+      </p>
+
+      <p>
+        the system may
+      </p>
+
+      <ul>
+        <li>hold,</li>
+        <li>retreat,</li>
+        <li>abort.</li>
+      </ul>
+
+      <p>
+        Timing therefore becomes a safety variable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.168 Timing as a GNC Interface Requirement</h3>
+
+      <p>
+        Navigation should provide guidance with
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ P }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{state}} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{health}. }
+        \]
+      </p>
+
+      <p>
+        Guidance should never need to assume the age of the navigation state.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.169 Common Implementation Errors</h3>
+
+      <p>
+        Typical timing errors include:
+      </p>
+
+      <ul>
+        <li>using packet arrival time instead of measurement time,</li>
+        <li>assuming all sensor clocks are aligned,</li>
+        <li>ignoring clock drift,</li>
+        <li>failing to timestamp camera exposure correctly,</li>
+        <li>treating an entire LiDAR scan as instantaneous,</li>
+        <li>using current attitude for an old measurement,</li>
+        <li>applying delayed measurements directly to current state,</li>
+        <li>updating state but not covariance at the historical epoch,</li>
+        <li>repropagating state but not later measurements,</li>
+        <li>processing OOSM in arrival order without correction,</li>
+        <li>forgetting actuator latency,</li>
+        <li>ignoring variable communication latency,</li>
+        <li>hiding timing errors by inflating <code>R</code>,</li>
+        <li>hiding timing errors in bias states,</li>
+        <li>keeping an insufficient state-history buffer,</li>
+        <li>failing to log timing metadata,</li>
+        <li>applying capture logic to mixed-time state components.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.170 Time Synchronization in One Diagram</h3>
+
+      <p>
+        The complete timing problem can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Physical Sensor Event at }t_m }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Timestamp} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Processing} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Communication} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Arrival at }t_a }
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_a=t_m+\tau. }
+        \]
+      </p>
+
+      <p>
+        The estimator then performs
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Find State at }t_m }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Apply Measurement Update at }t_m }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Replay Inputs / Later Measurements} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Return to Current State at }t_c. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.171 Key Equations at a Glance</h3>
+
+      <h4>Measurement Latency</h4>
+
+      <p>
+        \[
+        \boxed{ \tau = t_a-t_m. }
+        \]
+      </p>
+
+      <h4>Total Latency</h4>
+
+      <p>
+        \[
+        \boxed{ \tau = \tau_{\text{sensor}} + \tau_{\text{processing}} + \tau_{\text{communication}} + \tau_{\text{buffering}}. }
+        \]
+      </p>
+
+      <h4>Clock Model</h4>
+
+      <p>
+        \[
+        \boxed{ t_s = (1+\epsilon)t+b. }
+        \]
+      </p>
+
+      <h4>Timing-Induced Position Error</h4>
+
+      <p>
+        \[
+        \boxed{ \Delta r \approx v\Delta t. }
+        \]
+      </p>
+
+      <h4>Timing-Induced Attitude Error</h4>
+
+      <p>
+        \[
+        \boxed{ \Delta\theta \approx \omega\Delta t. }
+        \]
+      </p>
+
+      <h4>Propagation to Measurement Time</h4>
+
+      <p>
+        \[
+        \boxed{ x(t_m) = f( x(t_k), t_m-t_k ). }
+        \]
+      </p>
+
+      <h4>Covariance Propagation</h4>
+
+      <p>
+        \[
+        \boxed{ P(t_m) = \Phi P(t_k) \Phi^T + Q_d. }
+        \]
+      </p>
+
+      <h4>Delayed Innovation</h4>
+
+      <p>
+        \[
+        \boxed{ r_m = z_m - h( x(t_m) ). }
+        \]
+      </p>
+
+      <h4>Historical Measurement Update</h4>
+
+      <p>
+        \[
+        \boxed{ x_m^+ = x_m^- + K_mr_m. }
+        \]
+      </p>
+
+      <h4>Timing-Uncertainty Contribution</h4>
+
+      <p>
+        \[
+        \boxed{ R_t \approx \dot z \sigma_t^2 \dot z^T. }
+        \]
+      </p>
+
+      <h4>Effective Measurement Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ R_{\text{eff}} = R_{\text{sensor}} + R_t. }
+        \]
+      </p>
+
+      <h4>Timing Requirement from Position</h4>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max} \le \frac{ \Delta r_{\max} }{ v_{\max} }. }
+        \]
+      </p>
+
+      <h4>Timing Requirement from Attitude</h4>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\max} \le \frac{ \Delta\theta_{\max} }{ \omega_{\max} }. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.14.172 Key Takeaways</h3>
+
+      <p>
+        The most important concepts of time synchronization, latency, and delayed measurements are:
+      </p>
+
+      <ul>
+        <li>A measurement is associated with the time when the physical quantity was observed.</li>
+        <li>Measurement time and arrival time are generally different.</li>
+        <li>The difference is measurement latency.</li>
+        <li>Total latency may contain sensor, processing, communication, buffering, and scheduling delays.</li>
+        <li>Every sensor should ideally be correlated to a common spacecraft time.</li>
+        <li>Clock offset and clock drift are different timing errors.</li>
+        <li>PPS and hardware trigger signals can provide precise synchronization.</li>
+        <li>Hardware timestamping is generally better than software-only timestamping.</li>
+        <li>Camera exposure may span a finite interval.</li>
+        <li>Rolling-shutter cameras can contain row-dependent timestamps.</li>
+        <li>Scanning LiDAR measurements may span a full scan interval rather than one instant.</li>
+        <li>Delayed measurements must not be compared directly with the current state.</li>
+        <li>The correct principle is:</li>
+      </ul>
+
+      <p>
+        \[
+          \boxed{ \text{Update the State at the Measurement Epoch}. }
+        \]
+      </p>
+
+      <ul>
+        <li>Historical state and covariance may need to be stored.</li>
+        <li>Rewind–update–repropagate is a common delayed-measurement strategy.</li>
+        <li>Later measurements may need to be replayed after a historical correction.</li>
+        <li>Out-of-sequence measurements require more careful handling than simple latency.</li>
+        <li>Fixed-lag smoothing is useful when moderate delays are common.</li>
+        <li>Factor graphs naturally support measurements attached to historical state nodes.</li>
+        <li>Timestamp uncertainty can be converted approximately into additional measurement uncertainty.</li>
+        <li>Timing offsets may be estimated as explicit states when observable.</li>
+        <li>Dynamic motion improves timing observability but also makes timing errors more harmful.</li>
+        <li>Timing errors can mimic position bias, attitude bias, boresight error, lever-arm error, or sensor bias.</li>
+        <li>Timing calibration should therefore be performed before aggressively tuning other error states.</li>
+        <li>Actuator timing is also important because propagation depends on when the spacecraft actually responds to commands.</li>
+        <li>RPO timing requirements become increasingly strict near final approach and capture.</li>
+        <li>Capture-ready quantities must all correspond to the same epoch.</li>
+        <li>Navigation age should be provided explicitly to guidance and control.</li>
+        <li>Delayed data may be statistically useful but operationally stale.</li>
+        <li>Timing requirements should be derived from navigation and capture error budgets.</li>
+        <li>Simulation should include clock offset, clock drift, jitter, latency, packet reordering, and delayed measurements.</li>
+        <li>Monte Carlo timing sweeps should be part of estimator verification.</li>
+        <li>HIL testing should measure real end-to-end acquisition-to-filter latency.</li>
+        <li>Timing metadata should be logged alongside sensor and estimator data.</li>
+        <li>Sensor health and timing health should be treated separately.</li>
+      </ul>
+
+      <p>
+        The most important synchronization principle is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Every Measurement Must Be Associated With the Correct Physical Time}. }
+        \]
+      </p>
+
+      <p>
+        The most important delayed-measurement principle is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Correct the Historical State First, Then Propagate the Correction Forward}. }
+        \]
+      </p>
+
+      <p>
+        And the most important warning is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{A Perfect Measurement Applied at the Wrong Time Can Produce an Incorrect Navigation Update}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3 class="next-title">Next: 4.2.15 Measurement Validation and Innovation Gating</h3>
+
+      <p>
+        Once sensor measurements are properly synchronized and fused at the correct epoch, another question remains:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Should Every Available Measurement Be Trusted?} }
+        \]
+      </p>
+
+      <p>
+        Real spacecraft sensors may produce
+      </p>
+
+      <ul>
+        <li>outliers,</li>
+        <li>incorrect feature associations,</li>
+        <li>GNSS multipath,</li>
+        <li>camera false detections,</li>
+        <li>LiDAR false returns,</li>
+        <li>corrupted packets,</li>
+        <li>sensor faults.</li>
+      </ul>
+
+      <p>
+        Therefore the estimator needs a systematic way to decide whether a measurement is statistically consistent with the predicted state.
+      </p>
+
+      <p>
+        For a predicted measurement
+      </p>
+
+      <p>
+        \[
+        \hat z
+        \]
+      </p>
+
+      <p>
+        and actual measurement
+      </p>
+
+      <p>
+        \[
+        z,
+        \]
+      </p>
+
+      <p>
+        define the innovation
+      </p>
+
+      <p>
+        \[
+        \boxed{ r = z-\hat z. }
+        \]
+      </p>
+
+      <p>
+        Its covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ S = HP^-H^T+R. }
+        \]
+      </p>
+
+      <p>
+        A normalized statistical measure is
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS = r^TS^{-1}r. }
+        \]
+      </p>
+
+      <p>
+        The next section should therefore develop <strong>4.2.15 Measurement Validation and Innovation Gating</strong>, including:
+      </p>
+
+      <ul>
+        <li>measurement residuals,</li>
+        <li>innovation covariance,</li>
+        <li>Mahalanobis distance,</li>
+        <li>Normalised Innovation Squared,</li>
+        <li>chi-square statistics,</li>
+        <li>scalar and multi-dimensional gates,</li>
+        <li>probability-based gate selection,</li>
+        <li>measurement acceptance and rejection,</li>
+        <li>sensor-specific gating,</li>
+        <li>adaptive gates,</li>
+        <li>outlier handling,</li>
+        <li>bad-data detection,</li>
+        <li>camera feature validation,</li>
+        <li>LiDAR range validation,</li>
+        <li>GNSS validation,</li>
+        <li>sequential gating,</li>
+        <li>batch gating,</li>
+        <li>fault detection,</li>
+        <li>false-alarm probability,</li>
+        <li>missed-detection probability,</li>
+        <li>filter consistency,</li>
+        <li>robust update strategies,</li>
+        <li>and RPO measurement-validation requirements.</li>
+      </ul>
+
+      <a href="measurement-validation-and-innovation-gating.html"
+         class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2.15 Measurement Validation and Innovation Gating</h3>
+          <p>
+            Measurement residuals, innovation covariance, Mahalanobis distance,
+            Normalised Innovation Squared, chi-square gates, measurement
+            acceptance and rejection, adaptive and sensor-specific gating,
+            outlier handling, fault detection, and RPO measurement validation.
+          </p>
+          <p class="sensor-link-arrow">
+            Continue to Measurement Validation and Innovation Gating &rarr;
+          </p>
+        </div>
+      </a>
+
+
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+</body>
+</html>
