@@ -1,0 +1,7797 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.17 Observability in Sensor Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+
+  <style>
+    .concept-note {
+      margin: 1.5rem 0 0;
+      padding: 1.1rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+    }
+
+    .concept-note h4 {
+      margin-top: 0;
+      margin-bottom: 0.45rem;
+    }
+
+    .concept-note p {
+      margin-bottom: 0;
+    }
+  </style>
+
+
+</head>
+
+<body>
+
+  <header class="notes-hero">
+
+    <h1>Observability in Sensor Fusion</h1>
+
+    <p class="notes-tagline">
+      Observable and unobservable states, observability matrices, rank and
+      conditioning, nonlinear observability, Lie derivatives, sensor geometry,
+      bearing-only and range-only navigation, attitude and bias observability,
+      calibration-state observability, manoeuvre-dependent observability,
+      sensor-loss cases, RPO geometry, information metrics, and observability-aware guidance.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.17 Observability in Sensor Fusion</h2>
+
+<p>
+        A navigation filter can only estimate a state if the available measurements contain enough information about that state.
+      </p>
+
+      <p>
+        This leads to one of the most important ideas in spacecraft navigation and sensor fusion:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observability} }
+        \]
+      </p>
+
+      <p>
+        Observability answers the question:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Can the internal spacecraft state be reconstructed from the available measurements and known dynamics?} }
+        \]
+      </p>
+
+      <p>
+        This is different from simply asking whether a sensor is available.
+      </p>
+
+      <p>
+        A spacecraft may have several healthy sensors and still be unable to estimate some states uniquely.
+      </p>
+
+      <p>
+        For example, a camera may provide only the direction toward a target. It may determine the line of sight very accurately but provide poor instantaneous information about range.
+      </p>
+
+      <p>
+        Similarly, an IMU may measure angular rate and specific force very accurately but cannot, by itself, prevent position and velocity error from drifting indefinitely.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Availability} \neq \text{State Observability}. }
+        \]
+      </p>
+
+      <p>
+        Observability depends on
+      </p>
+
+      <ul>
+        <li>the states being estimated,</li>
+        <li>spacecraft dynamics,</li>
+        <li>measurement equations,</li>
+        <li>sensor geometry,</li>
+        <li>spacecraft motion,</li>
+        <li>target motion,</li>
+        <li>mission phase,</li>
+        <li>sensor combinations,</li>
+        <li>and sometimes the duration over which measurements are collected.</li>
+      </ul>
+
+      <p>
+        A useful conceptual chain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Spacecraft Dynamics} }
+        \]
+      </p>
+
+      <p>
+        \[
+        +
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Geometry} }
+        \]
+      </p>
+
+      <p>
+        \[
+        +
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Vehicle Motion} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Information About the State} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observable / Weakly Observable / Unobservable States}. }
+        \]
+      </p>
+
+      <p>
+        This becomes particularly important after the sensor faults discussed in Section 4.2.16.
+      </p>
+
+      <p>
+        Removing one sensor does not merely reduce accuracy.
+      </p>
+
+      <p>
+        It may remove the only measurement that made a particular state observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.1 What Does Observable Mean?</h3>
+
+      <p>
+        Consider a state vector
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} x_1\\ x_2\\ \vdots\\ x_n \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        A state is <strong>observable</strong> if its value can, in principle, be determined from the available measurements and the known system dynamics over a finite interval.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Different States} \rightarrow \text{Different Measurement Histories}. }
+        \]
+      </p>
+
+      <p>
+        If two different states always produce exactly the same measurement history, the estimator cannot distinguish them.
+      </p>
+
+      <p>
+        Those state differences are unobservable.
+      </p>
+
+      <div class="concept-note">
+        <h4>Interpretation</h4>
+        <p>Observability is fundamentally about distinguishability. If two different state trajectories produce the same measurement history, no estimator can determine which one is correct from those measurements alone.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.2 Observable Does Not Mean Directly Measured</h3>
+
+      <p>
+        A state does not have to be measured directly to be observable.
+      </p>
+
+      <p>
+        For example, consider
+      </p>
+
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} \theta\\ \omega \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        while the sensor measures only attitude:
+      </p>
+
+      <p>
+        \[
+        \boxed{ y=\theta. }
+        \]
+      </p>
+
+      <p>
+        Angular rate is not directly measured.
+      </p>
+
+      <p>
+        However, because
+      </p>
+
+      <p>
+        \[
+        \dot\theta=\omega,
+        \]
+      </p>
+
+      <p>
+        the evolution of attitude over time contains information about angular rate.
+      </p>
+
+      <p>
+        Therefore <code>\omega</code> can be observable through the system dynamics.
+      </p>
+
+      <p>
+        This gives an important principle:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{A State Can Be Observable Without Being Directly Measured}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.3 Direct Measurement vs Dynamic Observability</h3>
+
+      <p>
+        Direct measurement means a state appears explicitly in the measurement equation.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ z=x+v. }
+        \]
+      </p>
+
+      <p>
+        Dynamic observability means information about a state appears indirectly through how other measured quantities evolve.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \dot x_1=x_2
+        \]
+      </p>
+
+      <p>
+        while only
+      </p>
+
+      <p>
+        \[
+        x_1
+        \]
+      </p>
+
+      <p>
+        is measured.
+      </p>
+
+      <p>
+        Over time, measurements of <code>x_1</code> reveal information about <code>x_2</code>.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Model} + \text{Dynamics} \rightarrow \text{Observability}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.4 Unobservable State</h3>
+
+      <p>
+        A state component is unobservable when changes in that state cannot be distinguished from the available measurements.
+      </p>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        \mathbf x= \begin{bmatrix} x_1\\ x_2 \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        and the measurement is
+      </p>
+
+      <p>
+        \[
+        \boxed{ y=x_1. }
+        \]
+      </p>
+
+      <p>
+        If the dynamics contain no coupling between <code>x_1</code> and <code>x_2</code>, then changing <code>x_2</code> does not affect <code>y</code>.
+      </p>
+
+      <p>
+        Therefore <code>x_2</code> is unobservable.
+      </p>
+
+      <p>
+        The estimator may still contain an estimate for <code>x_2</code>, but that estimate is not being constrained by measurement information.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.5 Why Unobservable States Are Dangerous</h3>
+
+      <p>
+        An estimator may numerically produce
+      </p>
+
+      <p>
+        \[
+        \hat x_2
+        \]
+      </p>
+
+      <p>
+        even when <code>x_2</code> is unobservable.
+      </p>
+
+      <p>
+        This can create a false impression that the state is known.
+      </p>
+
+      <p>
+        The covariance should reveal the lack of information.
+      </p>
+
+      <p>
+        Ideally,
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{22} }
+        \]
+      </p>
+
+      <p>
+        should remain large or grow.
+      </p>
+
+      <p>
+        If the filter instead reports very small covariance for an unobservable state, the estimator is inconsistent.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.6 Weak Observability</h3>
+
+      <p>
+        Observability is not always practically binary.
+      </p>
+
+      <p>
+        Some state directions may technically be observable but only very weakly.
+      </p>
+
+      <p>
+        For example, a camera observing a distant target may contain some range information through apparent target size, but the sensitivity may be extremely small.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mathematically Observable} }
+        \]
+      </p>
+
+      <p>
+        does not always imply
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Practically Well Estimated}. }
+        \]
+      </p>
+
+      <p>
+        This motivates the concept of <strong>weak observability</strong>.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why weak observability matters</h4>
+        <p>A state can satisfy the formal rank test and still be too weakly constrained for useful navigation. In practice, noise, finite sampling, and model uncertainty can make a mathematically observable direction behave almost like an unobservable one.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.7 Strong vs Weak Observability</h3>
+
+      <p>
+        A strongly observable state produces a significant change in measurements when the state changes.
+      </p>
+
+      <p>
+        A weakly observable state produces only a very small measurement change.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \left\| \frac{\partial h}{\partial x_i} \right\| \text{ large} \rightarrow \text{Strong Measurement Sensitivity}. }
+        \]
+      </p>
+
+      <p>
+        Conversely,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \left\| \frac{\partial h}{\partial x_i} \right\| \approx0 \rightarrow \text{Weak Measurement Sensitivity}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.8 Linear State-Space System</h3>
+
+      <p>
+        Consider the linear system
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf x} = A\mathbf x }
+        \]
+      </p>
+
+      <p>
+        and measurement equation
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y = C\mathbf x. }
+        \]
+      </p>
+
+      <p>
+        The classical observability question is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Can }\mathbf x(0)\text{ be reconstructed from }\mathbf y(t)? }
+        \]
+      </p>
+
+      <p>
+        For linear time-invariant systems, this can be tested using the observability matrix.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.9 Observability Matrix</h3>
+
+      <p>
+        For an <code>n</code>-state linear system, define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal O = \begin{bmatrix} C\\ CA\\ CA^2\\ \vdots\\ CA^{n-1} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The system is completely observable if
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathcal O)=n. }
+        \]
+      </p>
+
+      <p>
+        This is the classical Kalman observability rank condition.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why the rank test is important</h4>
+        <p>The observability matrix collects how present and dynamically propagated states influence future measurements. Full rank means every state direction leaves a unique signature in the measurement history.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.10 Why the Matrix Contains <code>C,CA,CA^2,\dots</code></h3>
+
+      <p>
+        The first measurement is
+      </p>
+
+      <p>
+        \[
+        y=Cx.
+        \]
+      </p>
+
+      <p>
+        Differentiate:
+      </p>
+
+      <p>
+        \[
+        \dot y = C\dot x = CAx.
+        \]
+      </p>
+
+      <p>
+        Differentiate again:
+      </p>
+
+      <p>
+        \[
+        \ddot y = CA^2x.
+        \]
+      </p>
+
+      <p>
+        Therefore successive measurement derivatives reveal additional combinations of the state.
+      </p>
+
+      <p>
+        The observability matrix stacks this information.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.11 Rank Interpretation</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \operatorname{rank}(\mathcal O)=n,
+        \]
+      </p>
+
+      <p>
+        all state directions affect the measurement history independently.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \operatorname{rank}(\mathcal O)<n,
+        \]
+      </p>
+
+      <p>
+        some state directions remain indistinguishable.
+      </p>
+
+      <p>
+        The dimension of the unobservable subspace is
+      </p>
+
+      <p>
+        \[
+        \boxed{ n-\operatorname{rank}(\mathcal O). }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.12 Simple Example</h3>
+
+      <p>
+        Consider
+      </p>
+
+      <p>
+        \[
+        A= \begin{bmatrix} 0&1\\ 0&0 \end{bmatrix}, \qquad C= \begin{bmatrix} 1&0 \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        CA = \begin{bmatrix} 0&1 \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \mathcal O = \begin{bmatrix} 1&0\\ 0&1 \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathcal O)=2. }
+        \]
+      </p>
+
+      <p>
+        Both position-like state <code>x_1</code> and velocity-like state <code>x_2</code> are observable even though only <code>x_1</code> is directly measured.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.13 Unobservable Linear Example</h3>
+
+      <p>
+        Now suppose
+      </p>
+
+      <p>
+        \[
+        A= \begin{bmatrix} 0&0\\ 0&0 \end{bmatrix}, \qquad C= \begin{bmatrix} 1&0 \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        CA= \begin{bmatrix} 0&0 \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Hence
+      </p>
+
+      <p>
+        \[
+        \mathcal O = \begin{bmatrix} 1&0\\ 0&0 \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathcal O)=1<2. }
+        \]
+      </p>
+
+      <p>
+        The second state is unobservable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.14 Observability Is a Property of the System Pair</h3>
+
+      <p>
+        For the linear system, observability depends on
+      </p>
+
+      <p>
+        \[
+        \boxed{ (A,C) }
+        \]
+      </p>
+
+      <p>
+        together.
+      </p>
+
+      <p>
+        The dynamics matrix <code>A</code> determines how states influence each other.
+      </p>
+
+      <p>
+        The measurement matrix <code>C</code> determines what combinations of states are sensed.
+      </p>
+
+      <p>
+        Thus the same sensor model can produce different observability when combined with different dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.15 Continuous-Time Observability Gramian</h3>
+
+      <p>
+        Another useful quantity is the observability Gramian:
+      </p>
+
+      <p>
+        \[
+        \boxed{ W_O = \int_{t_0}^{t_1} \Phi(t,t_0)^T C(t)^T C(t) \Phi(t,t_0) \,dt. }
+        \]
+      </p>
+
+      <p>
+        For an LTI system,
+      </p>
+
+      <p>
+        \[
+        \Phi(t,t_0) = e^{A(t-t_0)}.
+        \]
+      </p>
+
+      <p>
+        If <code>W_O</code> is positive definite over the interval, the system is observable over that interval.
+      </p>
+
+      <div class="concept-note">
+        <h4>Gramian interpretation</h4>
+        <p>The observability Gramian is especially useful over a finite time interval. It captures how strongly each state direction contributes to the accumulated measurement information along the actual trajectory.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.16 Physical Meaning of the Observability Gramian</h3>
+
+      <p>
+        The Gramian measures how strongly changes in different state directions affect the accumulated measurements.
+      </p>
+
+      <p>
+        If a state direction produces almost no measurement change, the corresponding Gramian eigenvalue becomes small.
+      </p>
+
+      <p>
+        Thus Gramian eigenvalues provide information about <strong>observability strength</strong>, not only rank.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.17 Smallest Observability Eigenvalue</h3>
+
+      <p>
+        Let the eigenvalues of <code>W_O</code> be
+      </p>
+
+      <p>
+        \[
+        \lambda_1,\lambda_2,\ldots,\lambda_n.
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \lambda_{\min}
+        \]
+      </p>
+
+      <p>
+        is very small, at least one state direction is weakly observable.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \lambda_{\min}(W_O) }
+        \]
+      </p>
+
+      <p>
+        can serve as a practical observability metric.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.18 Observability Condition Number</h3>
+
+      <p>
+        A useful measure is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \kappa_O = \frac{ \lambda_{\max}(W_O) }{ \lambda_{\min}(W_O) }. }
+        \]
+      </p>
+
+      <p>
+        If <code>\kappa_O</code> is very large, observability is highly uneven.
+      </p>
+
+      <p>
+        Some states are much better constrained than others.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.19 Singular Values of the Observability Matrix</h3>
+
+      <p>
+        Similarly, perform singular value decomposition:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal O = U\Sigma V^T. }
+        \]
+      </p>
+
+      <p>
+        The singular values
+      </p>
+
+      <p>
+        \[
+        \sigma_i
+        \]
+      </p>
+
+      <p>
+        indicate observability strength.
+      </p>
+
+      <p>
+        A very small singular value implies a weakly observable state combination.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.20 Why Rank Alone Is Not Enough Numerically</h3>
+
+      <p>
+        A matrix may technically have full rank but still contain one singular value such as
+      </p>
+
+      <p>
+        \[
+        10^{-10}.
+        \]
+      </p>
+
+      <p>
+        Mathematically, the system is observable.
+      </p>
+
+      <p>
+        Practically, estimating the associated state may require extremely accurate measurements.
+      </p>
+
+      <p>
+        Therefore engineering analysis should examine both:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathcal O) }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{\min}(\mathcal O). }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Rank versus conditioning</h4>
+        <p>Full rank is only a yes-or-no mathematical test. Singular values and condition numbers tell us whether the state directions are numerically distinguishable in the presence of realistic sensor noise.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.21 Discrete-Time Observability</h3>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{k+1} = F x_k }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_k = H x_k, }
+        \]
+      </p>
+
+      <p>
+        the discrete-time observability matrix is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal O_d = \begin{bmatrix} H\\ HF\\ HF^2\\ \vdots\\ HF^{n-1} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Complete observability requires
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathcal O_d)=n. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.22 Time-Varying Systems</h3>
+
+      <p>
+        Spacecraft navigation systems are often time varying:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{k+1} = F_kx_k. }
+        \]
+      </p>
+
+      <p>
+        Measurements may also vary:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_k = H_kx_k. }
+        \]
+      </p>
+
+      <p>
+        Then observability depends on the sequence
+      </p>
+
+      <p>
+        \[
+        F_k, H_k
+        \]
+      </p>
+
+      <p>
+        over an interval.
+      </p>
+
+      <p>
+        This is especially relevant when sensor geometry changes with orbital motion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.23 Time-Varying Observability Matrix</h3>
+
+      <p>
+        Over several measurement times, a local observability matrix can be constructed:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal O = \begin{bmatrix} H_0\\ H_1F_0\\ H_2F_1F_0\\ \vdots \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        This reveals whether measurements collected over time constrain all state directions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.24 Nonlinear Spacecraft Systems</h3>
+
+      <p>
+        Spacecraft dynamics and measurement models are usually nonlinear:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot x = f(x,u) }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ z = h(x). }
+        \]
+      </p>
+
+      <p>
+        Examples include:
+      </p>
+
+      <ul>
+        <li>quaternion attitude dynamics,</li>
+        <li>orbital motion,</li>
+        <li>camera projection,</li>
+        <li>LiDAR range,</li>
+        <li>relative navigation.</li>
+      </ul>
+
+      <p>
+        Classical linear observability analysis must therefore be extended.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why spacecraft observability is usually nonlinear</h4>
+        <p>Orbit dynamics, quaternion attitude, camera projection, and range measurements are nonlinear. Therefore observability can change with operating point, geometry, and the trajectory being flown.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.25 Local Linearized Observability</h3>
+
+      <p>
+        A practical approach is to linearize around a nominal trajectory:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot x = F(t)\delta x }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta z = H(t)\delta x. }
+        \]
+      </p>
+
+      <p>
+        Then time-varying linear observability analysis can be applied locally.
+      </p>
+
+      <p>
+        This is particularly relevant to EKF and ESKF design.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.26 Local Observability</h3>
+
+      <p>
+        A nonlinear system may be observable only in a neighborhood of a particular trajectory.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observability Can Depend on the Current State and Trajectory}. }
+        \]
+      </p>
+
+      <p>
+        The same sensor configuration may be well observable in one geometry and weakly observable in another.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.27 Nonlinear Observability Using Lie Derivatives</h3>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        \dot x=f(x)
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        y=h(x),
+        \]
+      </p>
+
+      <p>
+        define the first Lie derivative:
+      </p>
+
+      <p>
+        \[
+        \boxed{ L_f h = \frac{\partial h}{\partial x}f(x). }
+        \]
+      </p>
+
+      <p>
+        Higher derivatives are
+      </p>
+
+      <p>
+        \[
+        \boxed{ L_f^2h = \frac{\partial L_fh}{\partial x}f(x) }
+        \]
+      </p>
+
+      <p>
+        and so on.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.28 Nonlinear Observability Matrix</h3>
+
+      <p>
+        A local nonlinear observability matrix may be formed from gradients:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal O_N = \begin{bmatrix} \nabla h\\ \nabla L_fh\\ \nabla L_f^2h\\ \vdots \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        If this matrix has full rank locally, the state is locally observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.29 Why Nonlinear Observability Matters for GNC</h3>
+
+      <p>
+        Camera and LiDAR measurements are nonlinear functions of spacecraft state.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_{\text{camera}} = \pi( C(q) (r_T-r_C) ) }
+        \]
+      </p>
+
+      <p>
+        where <code>\pi</code> is the perspective projection.
+      </p>
+
+      <p>
+        The observability of range, attitude, and bias therefore depends on geometry and motion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.30 Sensor Geometry</h3>
+
+      <p>
+        Sensor geometry strongly affects observability.
+      </p>
+
+      <p>
+        Suppose two spacecraft lie along the same line of sight.
+      </p>
+
+      <p>
+        A camera may determine direction accurately but be insensitive to motion along that line.
+      </p>
+
+      <p>
+        Thus the uncertainty ellipsoid may be long in the radial direction.
+      </p>
+
+      <p>
+        This is a geometric observability limitation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.31 Line-of-Sight Measurement</h3>
+
+      <p>
+        For relative position
+      </p>
+
+      <p>
+        \[
+        r_{rel},
+        \]
+      </p>
+
+      <p>
+        the unit line-of-sight vector is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \ell = \frac{ r_{rel} }{ \|r_{rel}\| }. }
+        \]
+      </p>
+
+      <p>
+        A bearing sensor measures approximately the direction
+      </p>
+
+      <p>
+        \[
+        \ell.
+        \]
+      </p>
+
+      <p>
+        But the magnitude
+      </p>
+
+      <p>
+        \[
+        \|r_{rel}\|
+        \]
+      </p>
+
+      <p>
+        does not directly appear.
+      </p>
+
+      <p>
+        Therefore instantaneous range is not directly observable from bearing alone.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.32 Bearing-Only Navigation</h3>
+
+      <p>
+        Suppose the measurement is azimuth and elevation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z = \begin{bmatrix} \alpha\\ \beta \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The measurement determines direction to the target.
+      </p>
+
+      <p>
+        However,
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{rel} = \rho\,\ell }
+        \]
+      </p>
+
+      <p>
+        contains unknown range
+      </p>
+
+      <p>
+        \[
+        \rho.
+        \]
+      </p>
+
+      <p>
+        With one static bearing observation, infinitely many points along the ray produce the same measurement.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.33 Bearing-Only Range Observability</h3>
+
+      <p>
+        Range can become observable through relative motion.
+      </p>
+
+      <p>
+        If the observer maneuvers, line-of-sight direction changes differently for different possible ranges.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observer Motion} \rightarrow \text{Parallax} \rightarrow \text{Range Information}. }
+        \]
+      </p>
+
+      <p>
+        This is why maneuvering can improve bearing-only navigation.
+      </p>
+
+      <div class="concept-note">
+        <h4>Bearing-only navigation intuition</h4>
+        <p>A bearing measurement gives direction but not distance. Lateral motion creates parallax, and that parallax changes differently for near and far targets, allowing range information to appear over time.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.34 No-Parallax Geometry</h3>
+
+      <p>
+        If observer and target move such that the line-of-sight direction remains nearly constant, range may remain poorly observable.
+      </p>
+
+      <p>
+        This occurs when motion is mostly along the line of sight.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Pure Radial Relative Motion} \rightarrow \text{Weak Bearing-Only Range Observability}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.35 Lateral Motion Improves Range Observability</h3>
+
+      <p>
+        Suppose the chaser moves sideways relative to the line of sight.
+      </p>
+
+      <p>
+        Then the apparent bearing changes.
+      </p>
+
+      <p>
+        The resulting parallax depends strongly on range.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Lateral Baseline} \rightarrow \text{Improved Range Observability}. }
+        \]
+      </p>
+
+      <p>
+        This principle appears in optical navigation, stereo vision, and angles-only navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.36 Range-Only Navigation</h3>
+
+      <p>
+        A range sensor measures:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho = \| r_{rel} \|. }
+        \]
+      </p>
+
+      <p>
+        One scalar measurement constrains the target to a sphere.
+      </p>
+
+      <p>
+        Instantaneously, many different directions produce the same range.
+      </p>
+
+      <p>
+        Therefore range alone does not fully determine 3-D relative position.
+      </p>
+
+      <div class="concept-note">
+        <h4>Range-only navigation intuition</h4>
+        <p>A single range constrains the target to a sphere. Motion and repeated measurements are required before the dynamics and changing geometry can collapse that spherical ambiguity into a unique relative position.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.37 Geometric Interpretation of Range-Only Measurement</h3>
+
+      <p>
+        For measured range
+      </p>
+
+      <p>
+        \[
+        \rho_m,
+        \]
+      </p>
+
+      <p>
+        the target lies somewhere on:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|r_{rel}\| = \rho_m. }
+        \]
+      </p>
+
+      <p>
+        This is a spherical surface.
+      </p>
+
+      <p>
+        Thus one range measurement eliminates radial uncertainty but leaves angular ambiguity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.38 Range-Only Observability Through Motion</h3>
+
+      <p>
+        As spacecraft dynamics evolve, successive spheres intersect.
+      </p>
+
+      <p>
+        Known vehicle motion can then recover position direction.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Range History} + \text{Known Motion} \rightarrow \text{More Complete Relative-State Information}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.39 Range-Rate Measurement</h3>
+
+      <p>
+        Range rate is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot\rho = \ell^T v_{rel}. }
+        \]
+      </p>
+
+      <p>
+        It measures the component of relative velocity along the line of sight.
+      </p>
+
+      <p>
+        Transverse velocity remains less directly constrained.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.40 Range and Range-Rate Together</h3>
+
+      <p>
+        Using
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho, \dot\rho }
+        \]
+      </p>
+
+      <p>
+        provides direct information about radial position and radial velocity.
+      </p>
+
+      <p>
+        However, lateral position and velocity still depend strongly on geometry and dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.41 Full Relative Position Measurement</h3>
+
+      <p>
+        If a sensor directly provides
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{rel} = \begin{bmatrix} x\\ y\\ z \end{bmatrix}, }
+        \]
+      </p>
+
+      <p>
+        relative position is instantaneously observed.
+      </p>
+
+      <p>
+        Velocity may still need to be inferred through dynamics or measured separately.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.42 Position Measurements Make Velocity Observable Through Dynamics</h3>
+
+      <p>
+        With translational dynamics
+      </p>
+
+      <p>
+        \[
+        \dot r=v,
+        \]
+      </p>
+
+      <p>
+        a sequence of position measurements contains velocity information.
+      </p>
+
+      <p>
+        Thus relative velocity can be observable even when the sensor does not directly measure velocity.
+      </p>
+
+      <p>
+        This is exactly analogous to the simple linear example.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.43 GNSS Position and Velocity</h3>
+
+      <p>
+        GNSS often provides both:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{GNSS} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ v_{GNSS}. }
+        \]
+      </p>
+
+      <p>
+        This directly constrains translational states strongly.
+      </p>
+
+      <p>
+        When GNSS is removed, those states may become significantly less observable depending on remaining sensors.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.44 Relative GNSS</h3>
+
+      <p>
+        Relative or differential GNSS can directly constrain relative position:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{rel} = r_C-r_T. }
+        \]
+      </p>
+
+      <p>
+        Depending on implementation, relative velocity may also be available.
+      </p>
+
+      <p>
+        This can strongly improve far- and mid-range RPO observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.45 Camera Plus GNSS</h3>
+
+      <p>
+        Consider
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS} + \text{Camera}. }
+        \]
+      </p>
+
+      <p>
+        GNSS may provide strong absolute or relative position information.
+      </p>
+
+      <p>
+        The camera provides target bearing and attitude-related information.
+      </p>
+
+      <p>
+        Together, ambiguities present in either sensor alone can be reduced.
+      </p>
+
+      <p>
+        This demonstrates the fundamental advantage of complementary sensor geometry.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.46 Camera Plus LiDAR</h3>
+
+      <p>
+        Near the target:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} }
+        \]
+      </p>
+
+      <p>
+        is a powerful combination.
+      </p>
+
+      <p>
+        The camera may provide precise angular information.
+      </p>
+
+      <p>
+        LiDAR may provide precise range or relative 3-D geometry.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Angular Information} + \text{Range Information} \rightarrow \text{Improved Relative Pose Observability}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.47 Sensor Fusion Improves Observability, Not Just Noise</h3>
+
+      <p>
+        Sensor fusion is often described as improving accuracy by averaging noise.
+      </p>
+
+      <p>
+        But an equally important role is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Combining Complementary Measurements to Eliminate Unobservable Directions}. }
+        \]
+      </p>
+
+      <p>
+        For example, bearing plus range can provide information that neither alone gives completely.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why fusion improves more than noise</h4>
+        <p>Complementary sensors can remove entire unobservable directions. This is often more valuable than simply reducing variance in a state that was already observable.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.48 Attitude Observability</h3>
+
+      <p>
+        Spacecraft attitude has three rotational degrees of freedom.
+      </p>
+
+      <p>
+        A single vector observation does not generally determine all three.
+      </p>
+
+      <p>
+        Suppose a known inertial vector is
+      </p>
+
+      <p>
+        \[
+        v^I
+        \]
+      </p>
+
+      <p>
+        and its measured body-frame direction is
+      </p>
+
+      <p>
+        \[
+        v^B.
+        \]
+      </p>
+
+      <p>
+        This constrains spacecraft orientation.
+      </p>
+
+      <p>
+        But rotation about that vector remains ambiguous.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.49 Single-Vector Attitude Ambiguity</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        v^B = C_{BI}v^I,
+        \]
+      </p>
+
+      <p>
+        many attitude matrices can map the inertial vector onto the same body vector while differing by rotation about <code>v^B</code>.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{One Vector Observation} \rightarrow \text{One Unobservable Rotation}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Single-vector attitude limitation</h4>
+        <p>One vector fixes two rotational degrees of freedom, but rotation about that vector leaves the same measurement. A second non-collinear reference is what removes the remaining rotational ambiguity.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.50 Two Non-Collinear Vector Observations</h3>
+
+      <p>
+        Suppose the spacecraft observes two known non-collinear inertial vectors:
+      </p>
+
+      <p>
+        \[
+        v_1^I, \qquad v_2^I.
+        \]
+      </p>
+
+      <p>
+        Their body-frame measurements are
+      </p>
+
+      <p>
+        \[
+        v_1^B, \qquad v_2^B.
+        \]
+      </p>
+
+      <p>
+        Together they can determine full attitude.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Two Non-Collinear Reference Vectors} \rightarrow \text{Full Attitude Observability}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.51 Sun Sensor and Magnetometer</h3>
+
+      <p>
+        A classical spacecraft example is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sun Vector} + \text{Magnetic Field Vector}. }
+        \]
+      </p>
+
+      <p>
+        Provided the vectors are not nearly parallel, they provide strong attitude information.
+      </p>
+
+      <p>
+        If they become nearly aligned, attitude observability weakens.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.52 Star Tracker Observability</h3>
+
+      <p>
+        A star tracker typically determines full attitude directly because the observed star pattern provides multiple inertial references.
+      </p>
+
+      <p>
+        Thus it offers strong attitude observability.
+      </p>
+
+      <p>
+        However, gyroscope bias still requires dynamic information over time.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.53 Gyroscope Measurement</h3>
+
+      <p>
+        A gyroscope measures
+      </p>
+
+      <p>
+        \[
+        \boxed{ \omega_m = \omega+b_g+n_g. }
+        \]
+      </p>
+
+      <p>
+        The measurement contains both true angular rate and gyro bias.
+      </p>
+
+      <p>
+        Without an independent attitude reference, it is difficult to distinguish persistent bias from true rotation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.54 Gyro Bias Observability</h3>
+
+      <p>
+        Gyro bias becomes observable when an external attitude reference is available.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Propagation} + \text{Star Tracker Attitude} }
+        \]
+      </p>
+
+      <p>
+        allows the estimator to see systematic drift between propagated and measured attitude.
+      </p>
+
+      <p>
+        That drift contains information about <code>b_g</code>.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why gyro bias becomes observable</h4>
+        <p>A gyro bias causes attitude error to accumulate systematically. When an external attitude reference repeatedly corrects that drift, the estimator can attribute the persistent mismatch to the bias state.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.55 Bias Observability Requires Time</h3>
+
+      <p>
+        A constant gyro bias may not be determined instantaneously.
+      </p>
+
+      <p>
+        Its effect accumulates:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\theta \approx b_g\Delta t. }
+        \]
+      </p>
+
+      <p>
+        Therefore a sequence of attitude measurements is required to estimate it reliably.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.56 Accelerometer Bias</h3>
+
+      <p>
+        Accelerometer measurement is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ a_m = a+b_a+n_a. }
+        \]
+      </p>
+
+      <p>
+        Bias
+      </p>
+
+      <p>
+        \[
+        b_a
+        \]
+      </p>
+
+      <p>
+        causes velocity error:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta v \approx b_a t }
+        \]
+      </p>
+
+      <p>
+        and position error:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta r \approx \frac12b_at^2. }
+        \]
+      </p>
+
+      <p>
+        External position or velocity measurements can therefore make accelerometer bias observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.57 Accelerometer Bias with GNSS</h3>
+
+      <p>
+        The combination
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Accelerometer} + \text{GNSS Velocity} }
+        \]
+      </p>
+
+      <p>
+        is particularly useful.
+      </p>
+
+      <p>
+        If integrated accelerometer velocity consistently diverges from GNSS velocity, the filter can estimate accelerometer bias.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.58 Bias Observability and Maneuvering</h3>
+
+      <p>
+        Bias observability often improves during maneuvers.
+      </p>
+
+      <p>
+        A static spacecraft may not sufficiently separate:
+      </p>
+
+      <ul>
+        <li>sensor bias,</li>
+        <li>attitude error,</li>
+        <li>scale factor.</li>
+      </ul>
+
+      <p>
+        Controlled excitation introduces measurement signatures that distinguish these states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.59 Persistent Excitation</h3>
+
+      <p>
+        A system may be theoretically observable but require sufficient motion to reveal the states.
+      </p>
+
+      <p>
+        This is often called <strong>persistent excitation</strong>.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Rich Motion} \rightarrow \text{Distinct Measurement Signatures} \rightarrow \text{Improved Parameter Observability}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Persistent excitation</h4>
+        <p>Some parameters cannot be separated unless the spacecraft moves in ways that excite them differently. Rich motion creates distinct measurement signatures for bias, scale factor, misalignment, and timing states.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.60 Why Stationary Calibration Can Be Insufficient</h3>
+
+      <p>
+        Suppose a spacecraft remains nearly motionless.
+      </p>
+
+      <p>
+        A scale-factor error may produce almost no observable effect.
+      </p>
+
+      <p>
+        Likewise, certain misalignments may remain hidden.
+      </p>
+
+      <p>
+        Therefore some calibration states require deliberate motion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.61 Maneuver Design for Observability</h3>
+
+      <p>
+        Maneuvers can be selected specifically to improve observability.
+      </p>
+
+      <p>
+        Examples include:
+      </p>
+
+      <ul>
+        <li>attitude slews,</li>
+        <li>roll/pitch/yaw excitation,</li>
+        <li>lateral translation,</li>
+        <li>orbital baseline changes.</li>
+      </ul>
+
+      <p>
+        The objective is not merely motion.
+      </p>
+
+      <p>
+        It is motion that excites weak state directions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.62 Observability-Aware Trajectory Design</h3>
+
+      <p>
+        For autonomous navigation, guidance can sometimes choose trajectories that improve state estimation.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Guidance} \rightarrow \text{Better Sensor Geometry} \rightarrow \text{Better Observability} \rightarrow \text{Better Navigation}. }
+        \]
+      </p>
+
+      <p>
+        This creates an important coupling between guidance and navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.63 Example: Bearing-Only RPO Maneuver</h3>
+
+      <p>
+        Suppose the chaser observes only target bearing.
+      </p>
+
+      <p>
+        A purely radial approach may provide poor range observability.
+      </p>
+
+      <p>
+        A small lateral maneuver produces parallax.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Lateral Excitation} \rightarrow \text{Range Becomes More Observable}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.64 Example: Attitude Bias Calibration Maneuver</h3>
+
+      <p>
+        Suppose gyro scale factor and bias are uncertain.
+      </p>
+
+      <p>
+        A sequence of rotations about different body axes can separate:
+      </p>
+
+      <ul>
+        <li>true angular motion,</li>
+        <li>bias,</li>
+        <li>scale factor,</li>
+        <li>axis misalignment.</li>
+      </ul>
+
+      <p>
+        Therefore multi-axis motion is more informative than a single-axis rotation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.65 Sensor Boresight Observability</h3>
+
+      <p>
+        Suppose camera boresight error is represented by
+      </p>
+
+      <p>
+        \[
+        \delta\theta_c.
+        \]
+      </p>
+
+      <p>
+        If the spacecraft always observes the target with nearly identical geometry, boresight error may be strongly correlated with attitude error.
+      </p>
+
+      <p>
+        Changing viewing geometry helps separate the two.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.66 Lever-Arm Observability</h3>
+
+      <p>
+        Suppose a sensor is displaced from the spacecraft center of mass by
+      </p>
+
+      <p>
+        \[
+        r_{S/CG}.
+        \]
+      </p>
+
+      <p>
+        Sensor position is
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_S = r_{CG} + C_{IB}r_{S/CG}. }
+        \]
+      </p>
+
+      <p>
+        Without rotational excitation, the lever-arm contribution may appear nearly constant.
+      </p>
+
+      <p>
+        Rotational motion changes its inertial projection and improves observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.67 Clock-Bias Observability</h3>
+
+      <p>
+        Suppose a sensor time offset is
+      </p>
+
+      <p>
+        \[
+        \delta t.
+        \]
+      </p>
+
+      <p>
+        Measurement may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_k = h( x(t_k-\delta t) ). }
+        \]
+      </p>
+
+      <p>
+        For small <code>\delta t</code>,
+      </p>
+
+      <p>
+        \[
+        z_k \approx h(x_k) - H\dot x_k\delta t.
+        \]
+      </p>
+
+      <p>
+        Thus time offset becomes observable when
+      </p>
+
+      <p>
+        \[
+        \dot x_k
+        \]
+      </p>
+
+      <p>
+        produces measurable change.
+      </p>
+
+      <div class="concept-note">
+        <h4>Timing observability</h4>
+        <p>A time offset only becomes visible when the state is changing. If the vehicle is static, shifting the timestamp slightly may produce almost no change in the predicted measurement.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.68 Static Motion and Clock Bias</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \dot x\approx0,
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \frac{\partial h}{\partial\delta t} \approx0.
+        \]
+      </p>
+
+      <p>
+        Therefore timing offset becomes poorly observable.
+      </p>
+
+      <p>
+        This is why dynamic motion helps time-calibration estimation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.69 Scale-Factor Observability</h3>
+
+      <p>
+        Consider
+      </p>
+
+      <p>
+        \[
+        \boxed{ z = (1+s)x. }
+        \]
+      </p>
+
+      <p>
+        If <code>x</code> varies very little, scale factor <code>s</code> may be difficult to separate from bias or state error.
+      </p>
+
+      <p>
+        Exciting the measured quantity over a broad range improves scale-factor observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.70 Sensor Misalignment Observability</h3>
+
+      <p>
+        Suppose a sensor frame differs from its nominal alignment by
+      </p>
+
+      <p>
+        \[
+        \delta\theta_s.
+        \]
+      </p>
+
+      <p>
+        During limited motion, this error may appear similar to spacecraft attitude error.
+      </p>
+
+      <p>
+        Multi-axis excitation helps separate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Misalignment} }
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Vehicle Attitude Error}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.71 Relative Navigation State</h3>
+
+      <p>
+        For RPO, a typical state may include
+      </p>
+
+      <p>
+        \[
+        \boxed{ x = \begin{bmatrix} r_{rel}\\ v_{rel}\\ q_{rel}\\ \omega_{rel}\\ b_g\\ b_a \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Not every sensor measures every part of this state.
+      </p>
+
+      <p>
+        Observability analysis determines whether the complete state can be reconstructed from the sensor suite.
+      </p>
+
+      <div class="concept-note">
+        <h4>RPO interpretation</h4>
+        <p>The RPO navigation state combines translation, attitude, angular rate, and inertial-sensor biases. Observability therefore has to be assessed across all of these states, not only relative position.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.72 Relative Position Observability</h3>
+
+      <p>
+        Relative position may be constrained by:
+      </p>
+
+      <ul>
+        <li>relative GNSS,</li>
+        <li>LiDAR range/pose,</li>
+        <li>camera bearing,</li>
+        <li>stereo vision.</li>
+      </ul>
+
+      <p>
+        The quality and dimensionality of information differ substantially between these sensors.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.73 Relative Velocity Observability</h3>
+
+      <p>
+        Velocity may be measured directly through:
+      </p>
+
+      <ul>
+        <li>GNSS velocity,</li>
+        <li>Doppler,</li>
+        <li>range rate.</li>
+      </ul>
+
+      <p>
+        Or it may be inferred dynamically from a sequence of relative-position measurements.
+      </p>
+
+      <p>
+        If position measurements are slow or noisy, relative velocity can become weakly observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.74 Relative Attitude Observability</h3>
+
+      <p>
+        Relative attitude may be estimated from:
+      </p>
+
+      <ul>
+        <li>visual target pose,</li>
+        <li>fiducial markers,</li>
+        <li>target feature geometry,</li>
+        <li>star tracker plus known target attitude.</li>
+      </ul>
+
+      <p>
+        A simple range sensor does not provide relative attitude.
+      </p>
+
+      <p>
+        Therefore close-range docking often requires pose-sensitive sensing.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.75 Relative Angular Rate Observability</h3>
+
+      <p>
+        Relative angular rate may be:
+      </p>
+
+      <ul>
+        <li>measured from gyros on both vehicles,</li>
+        <li>estimated from successive relative-attitude measurements.</li>
+      </ul>
+
+      <p>
+        If attitude updates are sparse, angular-rate observability may degrade.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.76 RPO Far-Range Observability</h3>
+
+      <p>
+        Far from the target, useful sensors may include:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS / Relative GNSS} }
+        \]
+      </p>
+
+      <p>
+        with perhaps coarse optical bearing.
+      </p>
+
+      <p>
+        Relative position and velocity may be well observed through GNSS.
+      </p>
+
+      <p>
+        Relative attitude may remain less important or be determined independently.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.77 RPO Mid-Range Observability</h3>
+
+      <p>
+        At mid range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS} + \text{Camera} }
+        \]
+      </p>
+
+      <p>
+        may overlap.
+      </p>
+
+      <p>
+        This is advantageous because GNSS constrains translation while the camera improves relative direction and target geometry.
+      </p>
+
+      <p>
+        The overlap also helps detect cross-sensor inconsistencies.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.78 RPO Close-Range Observability</h3>
+
+      <p>
+        Near the target:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} + \text{IMU} }
+        \]
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        Camera provides angular or pose information.
+      </p>
+
+      <p>
+        LiDAR provides range and geometry.
+      </p>
+
+      <p>
+        IMU propagates high-rate motion.
+      </p>
+
+      <p>
+        Together they can provide strong relative-state observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.79 Capture-Phase Observability</h3>
+
+      <p>
+        During capture, the navigation system may require accurate estimates of
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{rel} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ v_{rel} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \theta_{rel} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \omega_{rel}. }
+        \]
+      </p>
+
+      <p>
+        Observability must therefore be considered for all four, not only relative position.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.80 Observability After Sensor Failure</h3>
+
+      <p>
+        Suppose LiDAR fails.
+      </p>
+
+      <p>
+        Camera plus IMU may still provide adequate relative navigation.
+      </p>
+
+      <p>
+        But range uncertainty may grow.
+      </p>
+
+      <p>
+        Whether the mission can continue depends on whether the remaining sensor suite keeps all required states sufficiently observable.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Failure Analysis} \rightarrow \text{Observability Analysis}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>After a sensor failure</h4>
+        <p>A sensor fault changes the effective measurement model immediately. The correct question is not only whether the estimator still runs, but whether all mission-critical state directions remain sufficiently observable.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.81 GNSS Failure</h3>
+
+      <p>
+        If GNSS is removed, absolute position observability may degrade.
+      </p>
+
+      <p>
+        For RPO, relative optical measurements may still maintain relative position.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Absolute Navigation Observability} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative Navigation Observability} }
+        \]
+      </p>
+
+      <p>
+        should be analyzed separately.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.82 Camera Failure</h3>
+
+      <p>
+        If camera fails during close approach, LiDAR may still provide range or relative position.
+      </p>
+
+      <p>
+        But if LiDAR does not provide full pose, relative attitude may become weakly observable.
+      </p>
+
+      <p>
+        Thus the effect depends on LiDAR measurement type.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.83 LiDAR Failure</h3>
+
+      <p>
+        If LiDAR fails and only monocular camera remains, bearing may remain excellent while range becomes less directly constrained.
+      </p>
+
+      <p>
+        Relative motion can still provide range information, but uncertainty may increase.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.84 IMU Failure</h3>
+
+      <p>
+        Without IMU, high-rate state propagation weakens.
+      </p>
+
+      <p>
+        Slow camera and LiDAR updates may still determine state periodically, but high-frequency motion between updates becomes less observable.
+      </p>
+
+      <p>
+        Thus the system may have sufficient low-rate observability but inadequate control-bandwidth navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.85 Observability vs Update Rate</h3>
+
+      <p>
+        A state can be theoretically observable but poorly estimated if measurements arrive too slowly.
+      </p>
+
+      <p>
+        For example, relative angular rate may be observable from camera pose changes.
+      </p>
+
+      <p>
+        But if camera update rate is only
+      </p>
+
+      <p>
+        \[
+        1~\mathrm{Hz},
+        \]
+      </p>
+
+      <p>
+        it may not support a control loop requiring
+      </p>
+
+      <p>
+        \[
+        50~\mathrm{Hz}
+        \]
+      </p>
+
+      <p>
+        state information.
+      </p>
+
+      <p>
+        This is a practical observability issue.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.86 Observability vs Measurement Noise</h3>
+
+      <p>
+        High noise does not necessarily make a state mathematically unobservable.
+      </p>
+
+      <p>
+        However, it can make the information so weak that the state is practically unusable.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observability} + \text{Measurement Precision} \rightarrow \text{Achievable Estimation Accuracy}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.87 Observability and Fisher Information</h3>
+
+      <p>
+        Measurement information can be approximated by the Fisher information matrix:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal I = H^TR^{-1}H. }
+        \]
+      </p>
+
+      <p>
+        Large information in a state direction means the measurement constrains that direction strongly.
+      </p>
+
+      <p>
+        This links observability to uncertainty reduction.
+      </p>
+
+      <div class="concept-note">
+        <h4>Information-matrix viewpoint</h4>
+        <p>The Fisher-information form makes the role of sensor precision explicit: the same geometry becomes more informative as measurement covariance decreases, while noisy measurements contribute less state information.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.88 Information Accumulation Over Time</h3>
+
+      <p>
+        Over several independent measurements,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal I_{\text{total}} = \sum_k H_k^TR_k^{-1}H_k. }
+        \]
+      </p>
+
+      <p>
+        Changing geometry can cause successive measurements to constrain different state directions.
+      </p>
+
+      <p>
+        Therefore information can accumulate into a fully observable solution.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.89 Geometry and Information Ellipsoid</h3>
+
+      <p>
+        The inverse information matrix is related to uncertainty.
+      </p>
+
+      <p>
+        Poor geometry creates an elongated uncertainty ellipsoid.
+      </p>
+
+      <p>
+        Good geometry creates a more compact ellipsoid.
+      </p>
+
+      <p>
+        This is similar to dilution-of-precision concepts in GNSS.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.90 GNSS Geometry</h3>
+
+      <p>
+        GNSS position observability depends on satellite geometry.
+      </p>
+
+      <p>
+        If satellites are clustered in similar directions, position uncertainty becomes large in some directions.
+      </p>
+
+      <p>
+        If they are well distributed, geometry improves.
+      </p>
+
+      <p>
+        Thus even a nominally available GNSS solution may have weak directional observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.91 Geometric Dilution of Precision</h3>
+
+      <p>
+        GNSS geometry is often summarized using dilution-of-precision metrics.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Poor Geometry} \rightarrow \text{Large DOP} \rightarrow \text{Large Position Uncertainty}. }
+        \]
+      </p>
+
+      <p>
+        This is an operational form of observability-strength analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.92 Camera Feature Geometry</h3>
+
+      <p>
+        Camera pose estimation also depends on feature geometry.
+      </p>
+
+      <p>
+        Features that are:
+      </p>
+
+      <ul>
+        <li>widely distributed,</li>
+        <li>non-collinear,</li>
+        <li>at varying depth,</li>
+      </ul>
+
+      <p>
+        provide stronger pose constraints.
+      </p>
+
+      <p>
+        Poorly distributed features can create weak directions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.93 Collinear Camera Features</h3>
+
+      <p>
+        If several tracked features lie nearly on one image line, pose estimation may become poorly conditioned.
+      </p>
+
+      <p>
+        Certain rotational or translational directions may become difficult to distinguish.
+      </p>
+
+      <p>
+        Thus feature count alone does not determine observability.
+      </p>
+
+      <p>
+        Geometry matters.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.94 Planar Target Geometry</h3>
+
+      <p>
+        A planar docking target can create specific pose ambiguities depending on camera viewpoint.
+      </p>
+
+      <p>
+        Depth estimation may be weaker when the camera views the plane almost frontally and feature baseline is small.
+      </p>
+
+      <p>
+        Changing viewpoint can improve conditioning.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.95 Stereo Vision Observability</h3>
+
+      <p>
+        With two cameras separated by baseline <code>B</code>, depth can be inferred from disparity.
+      </p>
+
+      <p>
+        Approximately:
+      </p>
+
+      <p>
+        \[
+        \boxed{ Z = \frac{fB}{d} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li><code>f</code> is focal length,</li>
+        <li><code>d</code> is disparity.</li>
+      </ul>
+
+      <p>
+        Thus stereo geometry directly improves range observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.96 Stereo Depth Sensitivity</h3>
+
+      <p>
+        Differentiating approximately:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta Z \approx -\frac{fB}{d^2}\delta d. }
+        \]
+      </p>
+
+      <p>
+        At long range, disparity becomes small.
+      </p>
+
+      <p>
+        Therefore depth becomes increasingly sensitive to pixel error.
+      </p>
+
+      <p>
+        Thus stereo range observability weakens with distance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.97 LiDAR Geometry</h3>
+
+      <p>
+        A LiDAR point cloud contains geometry distributed across the target surface.
+      </p>
+
+      <p>
+        Pose observability depends on target shape.
+      </p>
+
+      <p>
+        A richly three-dimensional target may constrain full pose well.
+      </p>
+
+      <p>
+        A highly symmetric object may create ambiguities.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.98 Symmetry-Induced Ambiguity</h3>
+
+      <p>
+        Suppose a target is rotationally symmetric.
+      </p>
+
+      <p>
+        A rotation about the symmetry axis may produce almost identical LiDAR measurements.
+      </p>
+
+      <p>
+        Therefore that attitude direction may be weakly observable.
+      </p>
+
+      <p>
+        This is an example of object geometry limiting observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.99 Target Model Helps Observability</h3>
+
+      <p>
+        If the navigation system knows the target geometry accurately, measurements can be compared against a detailed model.
+      </p>
+
+      <p>
+        This provides richer pose information.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Known Target Shape} + \text{Sensor Geometry} \rightarrow \text{Improved Relative Pose Observability}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.100 Relative Orbit Dynamics</h3>
+
+      <p>
+        For spacecraft RPO, translational dynamics may be approximated using Clohessy-Wiltshire equations:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \ddot x - 3n^2x - 2n\dot y = 0 }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \ddot y + 2n\dot x = 0 }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \ddot z + n^2z = 0. }
+        \]
+      </p>
+
+      <p>
+        These couplings help propagate information between position and velocity components.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why dynamics help in RPO</h4>
+        <p>Clohessy-Wiltshire coupling means radial and along-track states influence each other over time. This dynamic coupling can make states observable even when they are not directly measured at each instant.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.101 CW Dynamics and Observability</h3>
+
+      <p>
+        Because radial and along-track motion are dynamically coupled, measuring one component over time can provide information about another.
+      </p>
+
+      <p>
+        Thus the orbital dynamics themselves contribute to observability.
+      </p>
+
+      <p>
+        This is why relative navigation should not be analyzed using measurement geometry alone.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.102 Unforced Motion Can Improve Observability</h3>
+
+      <p>
+        Even without active maneuvers, orbital dynamics evolve the geometry.
+      </p>
+
+      <p>
+        A state direction poorly observable at one instant may become better observed later.
+      </p>
+
+      <p>
+        Therefore observability should often be evaluated over a time window rather than at one instant.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.103 Maneuver-Induced Observability</h3>
+
+      <p>
+        Active thrust changes the relative trajectory.
+      </p>
+
+      <p>
+        This may improve geometry.
+      </p>
+
+      <p>
+        However, maneuvers also introduce process uncertainty and actuator errors.
+      </p>
+
+      <p>
+        Therefore observability-enhancing maneuvers should balance:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Information Gain} }
+        \]
+      </p>
+
+      <p>
+        against
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Control Cost and Risk}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.104 Observability and Process Noise</h3>
+
+      <p>
+        Process noise does not directly determine mathematical observability.
+      </p>
+
+      <p>
+        However, large <code>Q</code> can overwhelm weak measurement information.
+      </p>
+
+      <p>
+        Thus a weakly observable state may experience covariance growth despite technically being observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.105 Observability and Covariance</h3>
+
+      <p>
+        In a Kalman filter,
+      </p>
+
+      <p>
+        \[
+        \boxed{ P^+ = (I-KH)P^-. }
+        \]
+      </p>
+
+      <p>
+        Measurements reduce covariance primarily in state directions to which they are sensitive.
+      </p>
+
+      <p>
+        Unobservable directions receive little or no covariance reduction.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.106 Covariance Signature of Unobservability</h3>
+
+      <p>
+        Suppose a state direction is unobservable.
+      </p>
+
+      <p>
+        Prediction repeatedly adds process uncertainty.
+      </p>
+
+      <p>
+        But measurements do not constrain that direction.
+      </p>
+
+      <p>
+        Therefore its covariance tends to grow:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{\text{unobs}} \uparrow. }
+        \]
+      </p>
+
+      <p>
+        This is a useful practical indicator.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.107 Covariance Cross-Coupling</h3>
+
+      <p>
+        Even if a sensor does not directly measure state <code>x_i</code>, covariance cross-correlation with measured states may allow the update to reduce its uncertainty.
+      </p>
+
+      <p>
+        This is another manifestation of dynamic observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.108 Kalman Gain and Observability</h3>
+
+      <p>
+        Kalman gain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ K = PH^T ( HPH^T+R )^{-1}. }
+        \]
+      </p>
+
+      <p>
+        If a state has no covariance coupling to measured quantities, the corresponding rows of <code>K</code> may be small.
+      </p>
+
+      <p>
+        Thus the measurement has little effect on that state.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.109 Filter Convergence Requires Observability</h3>
+
+      <p>
+        A well-tuned Kalman filter cannot estimate an unobservable state accurately simply by waiting longer.
+      </p>
+
+      <p>
+        Without information,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{No Estimator Algorithm Can Recover What the Measurements Do Not Contain}. }
+        \]
+      </p>
+
+      <p>
+        This is a fundamental limitation.
+      </p>
+
+      <div class="concept-note">
+        <h4>Estimator sophistication cannot replace information</h4>
+        <p>If a state does not affect the measurements through the dynamics or sensor model, no EKF, UKF, particle filter, or tuning change can recover it. The missing information must come from geometry, motion, prior knowledge, or another sensor.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.110 Tuning Cannot Create Observability</h3>
+
+      <p>
+        Increasing
+      </p>
+
+      <p>
+        \[
+        Q
+        \]
+      </p>
+
+      <p>
+        or decreasing
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        cannot make an unobservable state physically observable.
+      </p>
+
+      <p>
+        It may change filter behavior, but not the information content.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Filter Tuning} \neq \text{Observability Creation}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.111 More Complex Filters Cannot Create Observability</h3>
+
+      <p>
+        Similarly, replacing an EKF with UKF or Particle Filter does not automatically solve an observability problem.
+      </p>
+
+      <p>
+        A more sophisticated estimator may better handle nonlinearities.
+      </p>
+
+      <p>
+        But:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{No Filter Can Estimate Information That the Sensors and Dynamics Do Not Provide}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.112 Adding a Sensor Can Create Observability</h3>
+
+      <p>
+        Suppose bearing-only navigation leaves range weakly observable.
+      </p>
+
+      <p>
+        Adding LiDAR range measurement introduces:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho }
+        \]
+      </p>
+
+      <p>
+        directly.
+      </p>
+
+      <p>
+        The previously weak radial direction may become strongly observable.
+      </p>
+
+      <p>
+        Thus sensor selection is fundamentally an observability design problem.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.113 Sensor Placement and Observability</h3>
+
+      <p>
+        Sensor location on the spacecraft matters.
+      </p>
+
+      <p>
+        For example, two cameras separated by a baseline provide stereo information.
+      </p>
+
+      <p>
+        Two nearly co-located sensors may provide redundant noise reduction but little new geometric information.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Placement} \rightarrow \text{Measurement Geometry} \rightarrow \text{Observability}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.114 Baseline Length</h3>
+
+      <p>
+        For stereo or multi-antenna systems, larger baseline often improves angular or depth sensitivity.
+      </p>
+
+      <p>
+        However, baseline is constrained by:
+      </p>
+
+      <ul>
+        <li>spacecraft dimensions,</li>
+        <li>structural alignment,</li>
+        <li>thermal distortion,</li>
+        <li>calibration.</li>
+      </ul>
+
+      <p>
+        Therefore observability is part of mechanical design.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.115 Multi-Antenna GNSS Attitude</h3>
+
+      <p>
+        Multiple GNSS antennas separated by known baselines can provide attitude information.
+      </p>
+
+      <p>
+        The carrier-phase difference depends on baseline orientation relative to satellite directions.
+      </p>
+
+      <p>
+        Thus antenna geometry determines attitude observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.116 Differential GNSS Relative Navigation</h3>
+
+      <p>
+        If target and chaser both have GNSS, differencing can reduce common errors.
+      </p>
+
+      <p>
+        Relative position can become highly observable.
+      </p>
+
+      <p>
+        However, performance still depends on:
+      </p>
+
+      <ul>
+        <li>common satellite visibility,</li>
+        <li>baseline,</li>
+        <li>signal environment,</li>
+        <li>synchronization.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.117 Observability and Sensor Synchronization</h3>
+
+      <p>
+        Two individually informative sensors may produce poor combined estimation if their measurements are not synchronized.
+      </p>
+
+      <p>
+        Timing errors can introduce apparent states or biases.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observability Analysis Assumes Correct Measurement Timing}. }
+        \]
+      </p>
+
+      <p>
+        This connects observability to Section 4.2.14.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.118 Observability and Frame Calibration</h3>
+
+      <p>
+        Incorrect frame transformations can appear as state errors.
+      </p>
+
+      <p>
+        For example, camera boresight error may be confused with spacecraft attitude error.
+      </p>
+
+      <p>
+        If both are estimated simultaneously, their separability depends on motion and geometry.
+      </p>
+
+      <p>
+        Therefore calibration states must be included in observability analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.119 State Augmentation Changes Observability</h3>
+
+      <p>
+        Suppose the original state is
+      </p>
+
+      <p>
+        \[
+        x.
+        \]
+      </p>
+
+      <p>
+        Now augment with:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_a = \begin{bmatrix} x\\ b_g\\ b_a\\ \delta t\\ \delta\theta_c \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The original system may have been observable.
+      </p>
+
+      <p>
+        The augmented system may not be.
+      </p>
+
+      <p>
+        Every new estimated parameter requires measurement information.
+      </p>
+
+      <div class="concept-note">
+        <h4>State augmentation warning</h4>
+        <p>Every added calibration or bias state creates another degree of freedom that the measurements must distinguish. Augmentation should therefore be accompanied by a new observability analysis.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.120 Too Many Calibration States</h3>
+
+      <p>
+        Adding many calibration parameters can create strong correlations.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <ul>
+        <li>camera boresight,</li>
+        <li>spacecraft attitude bias,</li>
+        <li>target pose bias,</li>
+      </ul>
+
+      <p>
+        may generate similar measurement effects.
+      </p>
+
+      <p>
+        If the data cannot distinguish them, the augmented filter becomes weakly observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.121 State Correlation as an Observability Indicator</h3>
+
+      <p>
+        Very high covariance correlation between two states may indicate they are difficult to distinguish.
+      </p>
+
+      <p>
+        For states <code>x_i,x_j</code>, define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho_{ij} = \frac{ P_{ij} }{ \sqrt{P_{ii}P_{jj}} }. }
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        |\rho_{ij}| \approx1,
+        \]
+      </p>
+
+      <p>
+        the states may be strongly coupled.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.122 Correlation Does Not Always Mean Unobservable</h3>
+
+      <p>
+        High correlation can occur even in observable systems.
+      </p>
+
+      <p>
+        However, persistent near-perfect correlation is a useful warning that two states may be weakly distinguishable.
+      </p>
+
+      <p>
+        Thus covariance diagnostics complement formal observability analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.123 Observability and Estimator Initialization</h3>
+
+      <p>
+        An unobservable state cannot be corrected later by measurements.
+      </p>
+
+      <p>
+        Therefore its initial value may remain strongly influential.
+      </p>
+
+      <p>
+        This means initialization becomes especially important for weakly observable states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.124 Prior Information</h3>
+
+      <p>
+        A Bayesian estimator can use prior information:
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(x_0). }
+        \]
+      </p>
+
+      <p>
+        A prior can reduce uncertainty in an unobservable direction.
+      </p>
+
+      <p>
+        But this does not mean the state becomes observable from measurements.
+      </p>
+
+      <p>
+        The information originates from the prior, not the sensor data.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.125 Prior vs Measurement Observability</h3>
+
+      <p>
+        Suppose a calibration parameter is fixed using ground calibration.
+      </p>
+
+      <p>
+        The filter may know it accurately.
+      </p>
+
+      <p>
+        But if in-flight measurements contain no sensitivity to that parameter, it is still unobservable in flight.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Known from Prior} \neq \text{Observable from Measurements}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.126 Fixing Unobservable States</h3>
+
+      <p>
+        If a state is known to be unobservable and sufficiently calibrated, one option is not to estimate it online.
+      </p>
+
+      <p>
+        Instead:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_i=x_{i,\text{calibrated}}. }
+        \]
+      </p>
+
+      <p>
+        This reduces filter dimension and avoids artificial covariance interactions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.127 When to Estimate a Calibration State</h3>
+
+      <p>
+        Estimate a parameter online only if:
+      </p>
+
+      <ul>
+        <li>it may change significantly,</li>
+        <li>measurements contain information about it,</li>
+        <li>the required motion exists,</li>
+        <li>its observability has been verified.</li>
+      </ul>
+
+      <p>
+        Otherwise keeping it fixed may be better.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.128 Observability and Sensor Dropout</h3>
+
+      <p>
+        Suppose the nominal suite is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS} + \text{Camera} + \text{LiDAR} + \text{IMU}. }
+        \]
+      </p>
+
+      <p>
+        If one sensor drops out, the measurement matrix changes.
+      </p>
+
+      <p>
+        Therefore observability changes immediately.
+      </p>
+
+      <p>
+        This should be analyzed for each failure combination.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.129 Fault-Case Observability Matrix</h3>
+
+      <p>
+        For failure case <code>j</code>, construct
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal O^{(j)}. }
+        \]
+      </p>
+
+      <p>
+        Then evaluate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank} \left( \mathcal O^{(j)} \right). }
+        \]
+      </p>
+
+      <p>
+        This determines whether all required states remain observable after the fault.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.130 N-Minus-One Observability</h3>
+
+      <p>
+        A useful fault-tolerance requirement is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{All Required States Remain Observable After Loss of Any One Non-Critical Sensor}. }
+        \]
+      </p>
+
+      <p>
+        This can be called an <code>N-1</code> observability requirement.
+      </p>
+
+      <p>
+        It is especially valuable for critical RPO missions.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why N-1 observability is useful</h4>
+        <p>For fault-tolerant navigation, it is not enough for the nominal sensor set to be observable. The required state set should remain sufficiently observable after credible single-sensor losses.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.131 Sensor Criticality from Observability</h3>
+
+      <p>
+        A sensor is observability-critical if removing it causes:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank} ( \mathcal O ) <n_{\text{required}}. }
+        \]
+      </p>
+
+      <p>
+        This provides a rigorous way to classify sensor criticality.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.132 Weak Observability After Sensor Loss</h3>
+
+      <p>
+        Rank may remain full after sensor loss, but the smallest singular value may collapse.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{\min} \downarrow }
+        \]
+      </p>
+
+      <p>
+        can reveal severe performance degradation even when rank remains unchanged.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.133 Observability Margin</h3>
+
+      <p>
+        A practical metric may be based on:
+      </p>
+
+      <p>
+        \[
+        \boxed{ M_O = \sigma_{\min}(\mathcal O) }
+        \]
+      </p>
+
+      <p>
+        or the smallest Gramian eigenvalue.
+      </p>
+
+      <p>
+        Larger <code>M_O</code> indicates stronger worst-direction observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.134 Observability Margin and Mission Phase</h3>
+
+      <p>
+        The margin may vary with range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ M_O=M_O(\rho). }
+        \]
+      </p>
+
+      <p>
+        A sensor suite may be adequate at 100 m but poorly conditioned at 5 m, or vice versa.
+      </p>
+
+      <p>
+        Therefore observability should be evaluated throughout the RPO trajectory.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.135 Observability Map</h3>
+
+      <p>
+        For RPO, one can compute an observability metric over relative geometry.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ M_O(x,y,z). }
+        \]
+      </p>
+
+      <p>
+        This creates an observability map showing favorable and unfavorable approach regions.
+      </p>
+
+      <p>
+        Such maps can support trajectory design.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.136 Observability Along a Planned Trajectory</h3>
+
+      <p>
+        Evaluate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{\min} ( \mathcal O(t) ) }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \lambda_{\min} ( W_O(t) ) }
+        \]
+      </p>
+
+      <p>
+        along the mission trajectory.
+      </p>
+
+      <p>
+        This shows where observability becomes weak.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.137 Guidance Constraint from Observability</h3>
+
+      <p>
+        Guidance may impose:
+      </p>
+
+      <p>
+        \[
+        \boxed{ M_O > M_{O,\min}. }
+        \]
+      </p>
+
+      <p>
+        If observability falls below the threshold, guidance may:
+      </p>
+
+      <ul>
+        <li>alter trajectory,</li>
+        <li>introduce lateral motion,</li>
+        <li>wait for better geometry,</li>
+        <li>activate another sensor.</li>
+      </ul>
+
+      <p>
+        This is <strong>observability-aware guidance</strong>.
+      </p>
+
+      <div class="concept-note">
+        <h4>Observability-aware guidance</h4>
+        <p>Guidance can sometimes improve navigation simply by choosing a trajectory that produces better geometry. A small lateral maneuver can provide more navigation information than remaining on a perfectly radial path.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.138 Observability and Hold Points</h3>
+
+      <p>
+        RPO hold points are often used for:
+      </p>
+
+      <ul>
+        <li>navigation verification,</li>
+        <li>sensor handover,</li>
+        <li>state convergence.</li>
+      </ul>
+
+      <p>
+        A hold location should ideally also provide favorable sensor geometry.
+      </p>
+
+      <p>
+        Thus hold-point selection can include observability criteria.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.139 Static Hold Limitation</h3>
+
+      <p>
+        However, remaining completely stationary at a hold point may reduce observability of certain parameters.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <ul>
+        <li>range from bearing-only sensing,</li>
+        <li>timing offset,</li>
+        <li>scale factor.</li>
+      </ul>
+
+      <p>
+        Therefore small calibration maneuvers may sometimes be useful.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.140 Observability and Sensor Handover</h3>
+
+      <p>
+        During handover:
+      </p>
+
+      <p>
+        \[
+        \boxed{ A \rightarrow A+B \rightarrow B. }
+        \]
+      </p>
+
+      <p>
+        The overlap period provides observability redundancy.
+      </p>
+
+      <p>
+        Before removing sensor A, verify that sensor B plus remaining sensors maintain required observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.141 Handover Criterion</h3>
+
+      <p>
+        A robust handover condition may require:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{New Sensor Valid} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \land
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{New Sensor Consistent} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \land
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Required States Observable}. }
+        \]
+      </p>
+
+      <p>
+        This is stronger than simply checking that the new sensor produces data.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.142 Observability During Sensor Reacquisition</h3>
+
+      <p>
+        After a sensor dropout, the estimator covariance may have grown significantly.
+      </p>
+
+      <p>
+        When the sensor returns, some state directions may reconverge quickly while others remain weak.
+      </p>
+
+      <p>
+        Therefore reacquisition time depends on observability strength.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.143 Convergence Rate and Observability</h3>
+
+      <p>
+        Strongly observable states tend to converge quickly.
+      </p>
+
+      <p>
+        Weakly observable states may require many measurements.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observability Strength} \rightarrow \text{Estimator Convergence Rate}. }
+        \]
+      </p>
+
+      <p>
+        This provides the connection to Section 4.2.18.
+      </p>
+
+      <div class="concept-note">
+        <h4>Connection to convergence</h4>
+        <p>Weak observability usually appears as slow estimator convergence. Strongly observable states receive more measurement information and tend to contract their covariance more rapidly.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.144 Observability vs Controllability</h3>
+
+      <p>
+        Observability should not be confused with controllability.
+      </p>
+
+      <p>
+        Observability asks:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Can the state be inferred?} }
+        \]
+      </p>
+
+      <p>
+        Controllability asks:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Can the state be driven by control inputs?} }
+        \]
+      </p>
+
+      <p>
+        They are dual concepts for linear systems but represent different physical questions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.145 Why GNC Needs Both</h3>
+
+      <p>
+        A spacecraft may be able to control a state that it cannot accurately observe.
+      </p>
+
+      <p>
+        That is dangerous because the controller has poor knowledge of what it is controlling.
+      </p>
+
+      <p>
+        Similarly, a state can be well observed but not effectively actuated.
+      </p>
+
+      <p>
+        Successful GNC requires both.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.146 Detectability</h3>
+
+      <p>
+        A weaker concept than observability is <strong>detectability</strong>.
+      </p>
+
+      <p>
+        A system is detectable if all unobservable modes are stable.
+      </p>
+
+      <p>
+        Thus unobservable states may exist, but they do not grow dangerously.
+      </p>
+
+      <p>
+        For estimator stability, detectability can sometimes be sufficient.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.147 Why Detectability Matters</h3>
+
+      <p>
+        If an unobservable mode is unstable, estimation error can grow without bound.
+      </p>
+
+      <p>
+        If the unobservable mode is stable, its error may naturally decay or remain bounded.
+      </p>
+
+      <p>
+        Therefore detectability is relevant to observer design.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.148 Unobservable Bias Modes</h3>
+
+      <p>
+        Bias states often behave as:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot b = w_b. }
+        \]
+      </p>
+
+      <p>
+        They are approximately random walks.
+      </p>
+
+      <p>
+        An unobservable bias therefore does not naturally decay.
+      </p>
+
+      <p>
+        Its uncertainty tends to grow.
+      </p>
+
+      <p>
+        This makes bias observability especially important.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.149 Gauge Freedoms</h3>
+
+      <p>
+        Some estimation problems contain inherent coordinate freedoms.
+      </p>
+
+      <p>
+        For example, if only relative positions are measured in a multi-spacecraft system, global translation may be unobservable.
+      </p>
+
+      <p>
+        The complete formation can shift by the same vector without changing relative measurements.
+      </p>
+
+      <p>
+        This is called a gauge freedom.
+      </p>
+
+      <div class="concept-note">
+        <h4>Gauge freedoms</h4>
+        <p>Gauge freedoms are not estimator failures; they are inherent ambiguities in the problem definition. Relative-only measurements cannot determine absolute translation unless an external reference is introduced.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.150 Relative Navigation Gauge</h3>
+
+      <p>
+        If measurements depend only on
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_i-r_j, }
+        \]
+      </p>
+
+      <p>
+        then adding the same translation
+      </p>
+
+      <p>
+        \[
+        c
+        \]
+      </p>
+
+      <p>
+        to all spacecraft positions leaves measurements unchanged.
+      </p>
+
+      <p>
+        Therefore absolute position is unobservable unless an external reference is added.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.151 Absolute vs Relative Observability</h3>
+
+      <p>
+        A system may have excellent relative-state observability while lacking absolute-state observability.
+      </p>
+
+      <p>
+        This is often acceptable for docking.
+      </p>
+
+      <p>
+        The mission requirement determines which states actually need to be observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.152 Mission-Required State Set</h3>
+
+      <p>
+        Define the required navigation state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{\text{req}}. }
+        \]
+      </p>
+
+      <p>
+        Not every internal estimator state must necessarily be observable to the same level.
+      </p>
+
+      <p>
+        For RPO, the most critical states may be:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{rel}, v_{rel}, q_{rel}, \omega_{rel}. }
+        \]
+      </p>
+
+      <p>
+        Observability requirements should be tied to mission needs.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.153 Reduced Observability Requirement</h3>
+
+      <p>
+        A mission may tolerate unobservable absolute yaw while requiring full relative pose.
+      </p>
+
+      <p>
+        Therefore the appropriate question is not always:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathcal O)=n? }
+        \]
+      </p>
+
+      <p>
+        but:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Are All Mission-Critical State Combinations Observable?} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.154 Observability of State Combinations</h3>
+
+      <p>
+        Sometimes individual states cannot be separated, but a combination can be observed.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_1+x_2 }
+        \]
+      </p>
+
+      <p>
+        may be observable while <code>x_1</code> and <code>x_2</code> separately are not.
+      </p>
+
+      <p>
+        This is important when interpreting covariance and filter states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.155 Unobservable Subspace</h3>
+
+      <p>
+        If the observability matrix has null space
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal N(\mathcal O), }
+        \]
+      </p>
+
+      <p>
+        then any perturbation
+      </p>
+
+      <p>
+        \[
+        \delta x \in \mathcal N(\mathcal O)
+        \]
+      </p>
+
+      <p>
+        produces no observable measurement change.
+      </p>
+
+      <p>
+        This subspace identifies exactly which state combinations are invisible.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.156 Computing the Unobservable Directions</h3>
+
+      <p>
+        Using SVD:
+      </p>
+
+      <p>
+        \[
+        \mathcal O=U\Sigma V^T.
+        \]
+      </p>
+
+      <p>
+        Columns of <code>V</code> associated with zero or near-zero singular values represent unobservable or weakly observable state combinations.
+      </p>
+
+      <p>
+        This is often more informative than rank alone.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.157 State-Combination Interpretation</h3>
+
+      <p>
+        Suppose an unobservable singular vector is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ v_u = \begin{bmatrix} 0.7\\ -0.7\\ 0 \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        This means a change that increases one state while decreasing another in that combination produces little measurement change.
+      </p>
+
+      <p>
+        Such interpretation can guide sensor or maneuver design.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.158 Observability and Covariance Eigenvectors</h3>
+
+      <p>
+        Covariance can also be decomposed:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P = V_P\Lambda_PV_P^T. }
+        \]
+      </p>
+
+      <p>
+        The eigenvector corresponding to the largest covariance often points toward a poorly observed state direction.
+      </p>
+
+      <p>
+        This provides a practical diagnostic.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.159 Navigation Uncertainty Ellipsoid</h3>
+
+      <p>
+        For position covariance
+      </p>
+
+      <p>
+        \[
+        P_r,
+        \]
+      </p>
+
+      <p>
+        the uncertainty ellipsoid satisfies approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta r^TP_r^{-1}\delta r = c. }
+        \]
+      </p>
+
+      <p>
+        The long axis indicates the weakest position direction.
+      </p>
+
+      <p>
+        Sensor geometry should ideally reduce this axis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.160 Observability and Capture Corridor</h3>
+
+      <p>
+        Suppose capture corridor is narrow laterally.
+      </p>
+
+      <p>
+        If navigation uncertainty is largest laterally, the spacecraft may be unable to verify that it lies safely inside the corridor.
+      </p>
+
+      <p>
+        Thus observability must be aligned with mission-critical directions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.161 Directional Accuracy Requirement</h3>
+
+      <p>
+        Instead of one scalar position uncertainty requirement, define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_x, \sigma_y, \sigma_z. }
+        \]
+      </p>
+
+      <p>
+        This allows sensor geometry to be evaluated against directional mission requirements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.162 Along-Track, Cross-Track and Radial Observability</h3>
+
+      <p>
+        For orbital relative motion, useful axes include:
+      </p>
+
+      <ul>
+        <li>radial,</li>
+        <li>along-track,</li>
+        <li>cross-track.</li>
+      </ul>
+
+      <p>
+        Sensor sensitivity may differ strongly across these axes.
+      </p>
+
+      <p>
+        Therefore covariance should often be transformed into the Hill frame for interpretation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.163 Hill-Frame Covariance</h3>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        C_{HI}
+        \]
+      </p>
+
+      <p>
+        transform inertial position error into Hill frame.
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_H = C_{HI} P_I C_{HI}^T. }
+        \]
+      </p>
+
+      <p>
+        This reveals radial, along-track, and cross-track uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.164 Observability in the Hill Frame</h3>
+
+      <p>
+        A sensor may constrain radial motion strongly but cross-track motion weakly.
+      </p>
+
+      <p>
+        Plotting:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_R, \sigma_T, \sigma_N }
+        \]
+      </p>
+
+      <p>
+        can make this immediately visible.
+      </p>
+
+      <p>
+        This is highly useful in RPO analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.165 Observability and Relative Orbital Elements</h3>
+
+      <p>
+        RPO can also be represented with relative orbital elements.
+      </p>
+
+      <p>
+        Certain sensor combinations may observe some ROE components better than others.
+      </p>
+
+      <p>
+        Observability analysis can therefore be performed in either Cartesian or orbital-element state coordinates.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.166 State Coordinate Transformation</h3>
+
+      <p>
+        Observability itself is invariant under nonsingular coordinate transformations.
+      </p>
+
+      <p>
+        However, interpretation can become much easier in a physically meaningful coordinate system.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Same Information} }
+        \]
+      </p>
+
+      <p>
+        may be viewed as:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Cartesian State} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative Orbital Elements}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.167 Numerical Observability Analysis</h3>
+
+      <p>
+        A practical analysis workflow is:
+      </p>
+
+      <ol>
+        <li>define state vector,</li>
+        <li>define dynamic model,</li>
+        <li>define sensor models,</li>
+        <li>linearize along trajectory,</li>
+        <li>construct observability matrix or Gramian,</li>
+        <li>compute rank,</li>
+        <li>compute singular values,</li>
+        <li>identify weak state directions,</li>
+        <li>repeat for different mission phases and sensor failures.</li>
+      </ol>
+
+      <div class="concept-note">
+        <h4>Practical workflow</h4>
+        <p>This sequence separates modelling, linearization, numerical analysis, and mission-case verification. Repeating it across ranges, mission phases, and sensor-failure cases is what turns observability from a theoretical check into an engineering requirement.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.168 Observability Simulation</h3>
+
+      <p>
+        One practical test is to perturb one state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_0 \rightarrow x_0+\delta x_i. }
+        \]
+      </p>
+
+      <p>
+        Then propagate both trajectories and compare predicted measurements.
+      </p>
+
+      <p>
+        If the measurement histories remain nearly identical, that state direction is weakly observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.169 Sensitivity Matrix</h3>
+
+      <p>
+        Define measurement sensitivity to initial state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ S_z = \frac{\partial z}{\partial x_0}. }
+        \]
+      </p>
+
+      <p>
+        Stack sensitivities over time:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal S = \begin{bmatrix} S_{z,1}\\ S_{z,2}\\ \vdots \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        This matrix provides a numerical observability measure for nonlinear trajectories.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.170 Finite-Difference Sensitivity</h3>
+
+      <p>
+        If analytical Jacobians are difficult, use:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \frac{\partial z}{\partial x_i} \approx \frac{ z(x+\epsilon e_i) - z(x-\epsilon e_i) }{ 2\epsilon }. }
+        \]
+      </p>
+
+      <p>
+        This can estimate local sensitivity numerically.
+      </p>
+
+      <p>
+        Care is required when selecting <code>\epsilon</code>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.171 Automatic Differentiation</h3>
+
+      <p>
+        For complex navigation models, automatic differentiation can generate accurate Jacobians for:
+      </p>
+
+      <p>
+        \[
+        F
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        H.
+        \]
+      </p>
+
+      <p>
+        This reduces finite-difference errors and can improve observability analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.172 Empirical Observability Gramian</h3>
+
+      <p>
+        For nonlinear systems, an empirical observability Gramian can be constructed by perturbing initial states and observing output differences.
+      </p>
+
+      <p>
+        This is useful when analytical nonlinear observability calculations become impractical.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.173 Monte Carlo Observability Interpretation</h3>
+
+      <p>
+        Monte Carlo runs can reveal weakly observable states indirectly.
+      </p>
+
+      <p>
+        Symptoms include:
+      </p>
+
+      <ul>
+        <li>large dispersion,</li>
+        <li>slow convergence,</li>
+        <li>sensitivity to initialization,</li>
+        <li>strong state correlations.</li>
+      </ul>
+
+      <p>
+        However, Monte Carlo does not replace formal observability analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.174 Observability and NEES</h3>
+
+      <p>
+        If a state direction is weakly observable, actual errors may grow.
+      </p>
+
+      <p>
+        A correctly tuned covariance should grow accordingly.
+      </p>
+
+      <p>
+        NEES can help check whether the filter's uncertainty reflects this weakness.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.175 Observability and NIS</h3>
+
+      <p>
+        NIS mainly tests measurement-space consistency.
+      </p>
+
+      <p>
+        A filter may have acceptable NIS while some internal states remain weakly observable.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Good NIS} \not\Rightarrow \text{All States Well Observable}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>NIS is not an observability test</h4>
+        <p>A filter may produce statistically reasonable innovations while some internal states remain weakly constrained. Measurement consistency and state observability answer different questions and should be checked separately.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.176 Innovation Cannot Reveal Every Hidden State</h3>
+
+      <p>
+        If a state lies in an unobservable direction, changing it may produce almost no innovation.
+      </p>
+
+      <p>
+        Thus innovation monitoring alone cannot diagnose all observability problems.
+      </p>
+
+      <p>
+        Formal state-information analysis is still necessary.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.177 Observability and Filter Divergence</h3>
+
+      <p>
+        Weak observability can lead to:
+      </p>
+
+      <ul>
+        <li>slow convergence,</li>
+        <li>large covariance,</li>
+        <li>sensitivity to model errors.</li>
+      </ul>
+
+      <p>
+        But divergence may also occur because of:
+      </p>
+
+      <ul>
+        <li>incorrect tuning,</li>
+        <li>bad linearization,</li>
+        <li>numerical problems.</li>
+      </ul>
+
+      <p>
+        Therefore observability should be checked before attributing convergence issues solely to the filter implementation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.178 Observability and Covariance Collapse</h3>
+
+      <p>
+        A dangerous failure occurs when the filter reports small covariance in a weakly observable state.
+      </p>
+
+      <p>
+        Then:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Reported Confidence} \gg \text{Actual Information}. }
+        \]
+      </p>
+
+      <p>
+        This can occur through incorrect tuning or inconsistent constraints.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.179 Artificial Constraints</h3>
+
+      <p>
+        Sometimes engineers artificially constrain states using tiny process noise or very small prior covariance.
+      </p>
+
+      <p>
+        This can make the filter numerically stable.
+      </p>
+
+      <p>
+        But it does not create real observability.
+      </p>
+
+      <p>
+        The filter may simply become overconfident.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.180 Pseudo-Measurements</h3>
+
+      <p>
+        A pseudo-measurement introduces known physical information.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ v_z\approx0 }
+        \]
+      </p>
+
+      <p>
+        during a known hold condition.
+      </p>
+
+      <p>
+        Pseudo-measurements can improve estimation if the physical constraint is valid.
+      </p>
+
+      <p>
+        They should not be used merely to hide unobservable dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.181 Physical Constraints Can Add Information</h3>
+
+      <p>
+        If a docking mechanism physically constrains certain motion, that constraint is real information.
+      </p>
+
+      <p>
+        Then the constraint can legitimately improve observability.
+      </p>
+
+      <p>
+        The key requirement is that the assumption reflects actual physics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.182 Observability and Target Cooperation</h3>
+
+      <p>
+        A cooperative target may provide:
+      </p>
+
+      <ul>
+        <li>GNSS position,</li>
+        <li>attitude telemetry,</li>
+        <li>inter-satellite ranging,</li>
+        <li>beacon signals.</li>
+      </ul>
+
+      <p>
+        This greatly improves observability compared with a fully non-cooperative target.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.183 Non-Cooperative Target</h3>
+
+      <p>
+        For a non-cooperative target, navigation may rely on:
+      </p>
+
+      <ul>
+        <li>passive camera,</li>
+        <li>LiDAR,</li>
+        <li>radar.</li>
+      </ul>
+
+      <p>
+        Target pose and motion may then be harder to estimate.
+      </p>
+
+      <p>
+        Sensor geometry and target features become especially important.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.184 Unknown Target Motion</h3>
+
+      <p>
+        If target dynamics are also estimated,
+      </p>
+
+      <p>
+        \[
+        x
+        \]
+      </p>
+
+      <p>
+        may include target angular rate or translational acceleration.
+      </p>
+
+      <p>
+        Adding these states can reduce observability unless measurements provide sufficient information.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.185 Target Dynamic Model Helps</h3>
+
+      <p>
+        A known or constrained target motion model adds dynamic relationships.
+      </p>
+
+      <p>
+        For example, assuming near-constant angular velocity couples successive pose measurements.
+      </p>
+
+      <p>
+        This can make angular-rate states observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.186 But Wrong Dynamic Assumptions Are Dangerous</h3>
+
+      <p>
+        An assumed constant target motion may artificially constrain the estimator.
+      </p>
+
+      <p>
+        If the target actually maneuvers, residuals may grow.
+      </p>
+
+      <p>
+        Therefore strong model constraints should be used only when justified.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.187 Observability and Multi-Rate Sensors</h3>
+
+      <p>
+        High-rate IMU plus low-rate camera is a common architecture.
+      </p>
+
+      <p>
+        IMU provides temporal propagation.
+      </p>
+
+      <p>
+        Camera provides absolute corrections.
+      </p>
+
+      <p>
+        The combination can make states observable even though neither is sufficient alone for long-duration accuracy.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.188 Low-Rate Absolute Sensor</h3>
+
+      <p>
+        Suppose camera updates every
+      </p>
+
+      <p>
+        \[
+        1~\mathrm{s}.
+        \]
+      </p>
+
+      <p>
+        Bias information may accumulate during the interval.
+      </p>
+
+      <p>
+        The next camera update corrects the resulting drift.
+      </p>
+
+      <p>
+        Thus bias observability exists, but convergence speed depends on update rate.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.189 Observability During Long Sensor Gaps</h3>
+
+      <p>
+        During long gaps, the system temporarily operates with reduced measurement information.
+      </p>
+
+      <p>
+        Some states may become effectively unobservable over that interval.
+      </p>
+
+      <p>
+        Covariance should grow until measurements return.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.190 Instantaneous vs Interval Observability</h3>
+
+      <p>
+        A state may be unobservable at one instant but observable over a time interval.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Instantaneous Measurement Rank} }
+        \]
+      </p>
+
+      <p>
+        is not the same as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Dynamic Observability Over Time}. }
+        \]
+      </p>
+
+      <p>
+        This distinction is crucial in spacecraft navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.191 Sensor Geometry Can Change Continuously</h3>
+
+      <p>
+        As spacecraft move, line-of-sight vectors, ranges, and target orientation change.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ H=H(t). }
+        \]
+      </p>
+
+      <p>
+        Observability can improve or deteriorate continuously throughout the mission.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.192 Periods of Poor Geometry</h3>
+
+      <p>
+        A temporary loss of strong observability may be acceptable if:
+      </p>
+
+      <ul>
+        <li>duration is short,</li>
+        <li>process model is accurate,</li>
+        <li>uncertainty remains within limits.</li>
+      </ul>
+
+      <p>
+        The mission should therefore consider both observability strength and duration.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.193 Observability Recovery</h3>
+
+      <p>
+        After geometry improves, measurements may again constrain the previously weak states.
+      </p>
+
+      <p>
+        The covariance should then decrease.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Poor Geometry} \rightarrow P\uparrow }
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Improved Geometry} \rightarrow P\downarrow. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.194 Observability and Filter Initialization</h3>
+
+      <p>
+        At startup, some states may not yet be observable because sufficient motion has not occurred.
+      </p>
+
+      <p>
+        For example, gyro bias may require time and attitude-reference updates.
+      </p>
+
+      <p>
+        Therefore initialization strategy should distinguish:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{States Known Initially} }
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{States That Must Converge Dynamically}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Initialization depends on observability</h4>
+        <p>Some states cannot be estimated well at startup because the required geometry or motion has not yet occurred. Their initial covariance should reflect that they will converge only after sufficient measurement information accumulates.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.195 Delayed Observability</h3>
+
+      <p>
+        Some states become observable only after enough measurements are accumulated.
+      </p>
+
+      <p>
+        Thus initialization may involve:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Initial Guess} \rightarrow \text{Data Accumulation} \rightarrow \text{Convergence}. }
+        \]
+      </p>
+
+      <p>
+        This leads directly to the next section on initialization and convergence.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.196 Observability Test for Filter Design</h3>
+
+      <p>
+        Before implementing a large EKF or ESKF:
+      </p>
+
+      <ol>
+        <li>list every state,</li>
+        <li>identify which sensor constrains it,</li>
+        <li>identify whether that constraint is direct or dynamic,</li>
+        <li>identify required maneuvers,</li>
+        <li>test each sensor-loss case.</li>
+      </ol>
+
+      <p>
+        This prevents building filters with unnecessary or unobservable states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.197 State-to-Sensor Mapping Table</h3>
+
+      <p>
+        A useful engineering table may be:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>State</th>
+              <th>GNSS</th>
+              <th>Camera</th>
+              <th>LiDAR</th>
+              <th>IMU</th>
+              <th>Star Tracker</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Relative Position</td>
+              <td>Strong</td>
+              <td>Direction/Pose</td>
+              <td>Strong</td>
+              <td>Propagation</td>
+              <td>None</td>
+            </tr>
+            <tr>
+              <td>Relative Velocity</td>
+              <td>Strong/Direct</td>
+              <td>Dynamic</td>
+              <td>Dynamic</td>
+              <td>Propagation</td>
+              <td>None</td>
+            </tr>
+            <tr>
+              <td>Attitude</td>
+              <td>Weak/Indirect</td>
+              <td>Possible</td>
+              <td>Possible</td>
+              <td>Propagation</td>
+              <td>Strong</td>
+            </tr>
+            <tr>
+              <td>Gyro Bias</td>
+              <td>Indirect</td>
+              <td>Indirect</td>
+              <td>Indirect</td>
+              <td>Contains Bias</td>
+              <td>Strong Indirect</td>
+            </tr>
+            <tr>
+              <td>Accelerometer Bias</td>
+              <td>Indirect</td>
+              <td>Indirect</td>
+              <td>Indirect</td>
+              <td>Contains Bias</td>
+              <td>None</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Such a table provides an intuitive observability overview before formal analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.198 Sensor-Loss Matrix</h3>
+
+      <p>
+        Similarly, define scenarios:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Available Sensors</th>
+              <th>Expected Impact</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Nominal</td>
+              <td>GNSS + Camera + LiDAR + IMU</td>
+              <td>Full observability</td>
+            </tr>
+            <tr>
+              <td>GNSS Loss</td>
+              <td>Camera + LiDAR + IMU</td>
+              <td>Relative state retained; absolute state degraded</td>
+            </tr>
+            <tr>
+              <td>Camera Loss</td>
+              <td>GNSS + LiDAR + IMU</td>
+              <td>Relative attitude may degrade</td>
+            </tr>
+            <tr>
+              <td>LiDAR Loss</td>
+              <td>GNSS + Camera + IMU</td>
+              <td>Range precision may degrade</td>
+            </tr>
+            <tr>
+              <td>IMU Loss</td>
+              <td>GNSS + Camera + LiDAR</td>
+              <td>High-rate propagation degraded</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        This helps connect observability with FDIR.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.199 Observability Should Be Verified, Not Assumed</h3>
+
+      <p>
+        A sensor suite that looks intuitively rich may still contain hidden unobservable directions.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Count} \neq \text{Observability Proof}. }
+        \]
+      </p>
+
+      <p>
+        Formal and numerical analysis should be performed.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.200 Observability Verification with Simulation</h3>
+
+      <p>
+        A verification campaign can:
+      </p>
+
+      <ul>
+        <li>perturb each state,</li>
+        <li>simulate measurements,</li>
+        <li>run the estimator,</li>
+        <li>examine convergence,</li>
+        <li>inspect covariance,</li>
+        <li>compute singular values.</li>
+      </ul>
+
+      <p>
+        This combines theoretical and practical verification.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.201 State Perturbation Test</h3>
+
+      <p>
+        For each state <code>x_i</code>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_i(0) \rightarrow x_i(0)+\Delta x_i. }
+        \]
+      </p>
+
+      <p>
+        Run the estimator.
+      </p>
+
+      <p>
+        If the error consistently converges, this supports practical observability.
+      </p>
+
+      <p>
+        If it persists, investigate weak observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.202 Multiple Initial Conditions</h3>
+
+      <p>
+        Repeat with different perturbation directions.
+      </p>
+
+      <p>
+        Nonlinear observability can depend on initial geometry.
+      </p>
+
+      <p>
+        Therefore one initial condition is not sufficient.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.203 Sensor-Dropout Observability Test</h3>
+
+      <p>
+        Disable each sensor individually.
+      </p>
+
+      <p>
+        For each case, monitor:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P(t), }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{state error}, }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{\min}(\mathcal O). }
+        \]
+      </p>
+
+      <p>
+        This connects sensor failure directly to navigation capability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.204 Geometry Sweep</h3>
+
+      <p>
+        For RPO, vary:
+      </p>
+
+      <ul>
+        <li>range,</li>
+        <li>lateral offset,</li>
+        <li>approach direction,</li>
+        <li>target orientation.</li>
+      </ul>
+
+      <p>
+        Compute observability metrics.
+      </p>
+
+      <p>
+        This identifies weak geometric configurations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.205 Maneuver Sweep</h3>
+
+      <p>
+        Test different excitation maneuvers.
+      </p>
+
+      <p>
+        Compare:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \lambda_{\min}(W_O). }
+        \]
+      </p>
+
+      <p>
+        The maneuver giving larger minimum eigenvalue generally provides better worst-direction observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.206 Range Sweep</h3>
+
+      <p>
+        For camera navigation, evaluate observability at:
+      </p>
+
+      <p>
+        \[
+        100~\mathrm{m}, \quad 50~\mathrm{m}, \quad 15~\mathrm{m}, \quad 5~\mathrm{m}, \quad 1~\mathrm{m}.
+        \]
+      </p>
+
+      <p>
+        Sensor sensitivity can vary greatly with range.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.207 Monte Carlo Observability Verification</h3>
+
+      <p>
+        Randomize:
+      </p>
+
+      <ul>
+        <li>state errors,</li>
+        <li>sensor noise,</li>
+        <li>target orientation,</li>
+        <li>geometry,</li>
+        <li>biases.</li>
+      </ul>
+
+      <p>
+        Evaluate whether weakly observable states converge consistently.
+      </p>
+
+      <p>
+        This provides statistical confidence.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.208 HIL Observability Verification</h3>
+
+      <p>
+        Hardware-in-the-loop tests can verify whether the actual sensors provide the information predicted by simulation.
+      </p>
+
+      <p>
+        This catches:
+      </p>
+
+      <ul>
+        <li>calibration errors,</li>
+        <li>real noise levels,</li>
+        <li>timing limitations,</li>
+        <li>sensor geometry imperfections.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.209 Observability Diagnostic Plots</h3>
+
+      <p>
+        Useful plots include:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{\min}(\mathcal O) \text{ vs time} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \lambda_{\min}(W_O) \text{ vs range} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{ii} \text{ vs time} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho_{ij} \text{ vs time}. }
+        \]
+      </p>
+
+      <p>
+        These show when observability weakens.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.210 Covariance Eigenvalue Plot</h3>
+
+      <p>
+        Plot eigenvalues of
+      </p>
+
+      <p>
+        \[
+        P.
+        \]
+      </p>
+
+      <p>
+        A rapidly growing eigenvalue indicates an increasingly uncertain state combination.
+      </p>
+
+      <p>
+        The associated eigenvector identifies the weak direction.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.211 Observability Metric Telemetry</h3>
+
+      <p>
+        For advanced autonomous navigation, the system may monitor an online metric such as:
+      </p>
+
+      <p>
+        \[
+        \boxed{ M_O. }
+        \]
+      </p>
+
+      <p>
+        Guidance could then respond if observability becomes poor.
+      </p>
+
+      <p>
+        This is especially useful for long autonomous RPO sequences.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.212 Online Observability Monitoring</h3>
+
+      <p>
+        A sliding-window information matrix can be constructed:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal I_W = \sum_{k=t-W}^{t} \Phi_k^TH_k^TR_k^{-1}H_k\Phi_k. }
+        \]
+      </p>
+
+      <p>
+        Its minimum eigenvalue indicates recent observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.213 Online Observability Warning</h3>
+
+      <p>
+        If:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \lambda_{\min} ( \mathcal I_W ) < \lambda_{\text{warn}}, }
+        \]
+      </p>
+
+      <p>
+        navigation may raise:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{OBSERVABILITY\_DEGRADED}. }
+        \]
+      </p>
+
+      <p>
+        This can support autonomous mission management.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.214 Observability and Navigation Health</h3>
+
+      <p>
+        A more complete navigation-health model is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ H_{\text{nav}} = f( P, \text{sensor health}, \text{state age}, M_O ). }
+        \]
+      </p>
+
+      <p>
+        This improves on simply checking whether sensors are online.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.215 Observability and Capture Readiness</h3>
+
+      <p>
+        Capture-ready logic can include:
+      </p>
+
+      <p>
+        \[
+        \boxed{ M_O > M_{O,\min}. }
+        \]
+      </p>
+
+      <p>
+        This ensures that the relative state is not only within limits but also sufficiently observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.216 Why Low Covariance Alone Is Not Enough</h3>
+
+      <p>
+        A filter can occasionally report low covariance because of incorrect assumptions.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P\text{ Small} }
+        \]
+      </p>
+
+      <p>
+        does not by itself prove observability.
+      </p>
+
+      <p>
+        Formal or empirical observability analysis should support the covariance interpretation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.217 Observability and Model Fidelity</h3>
+
+      <p>
+        Incorrect dynamics may artificially create or destroy apparent observability.
+      </p>
+
+      <p>
+        For example, assuming a fixed target when the target actually rotates can cause incorrect state coupling.
+      </p>
+
+      <p>
+        Thus observability analysis should use realistic dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.218 Observability and Process Constraints</h3>
+
+      <p>
+        Strong deterministic dynamics can make states appear observable.
+      </p>
+
+      <p>
+        But if real process uncertainty is large, those states may be only weakly constrained in practice.
+      </p>
+
+      <p>
+        Therefore theoretical observability and stochastic estimation performance should both be considered.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.219 Observability and Sensor Selection</h3>
+
+      <p>
+        When comparing candidate sensors, ask not only:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Which Sensor Has Lower Noise?} }
+        \]
+      </p>
+
+      <p>
+        but also:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Which Sensor Adds New State Information?} }
+        \]
+      </p>
+
+      <p>
+        A moderately accurate sensor with complementary geometry may be more valuable than another extremely accurate measurement of an already well-observed direction.
+      </p>
+
+      <div class="concept-note">
+        <h4>Sensor selection implication</h4>
+        <p>A sensor that adds a new measurement direction can be more valuable than a lower-noise sensor that repeats information already available. Observability should therefore be part of sensor trade studies.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.220 Example: Camera vs Second Camera</h3>
+
+      <p>
+        A second camera mounted almost at the same location and orientation may mostly reduce noise.
+      </p>
+
+      <p>
+        A second camera with useful baseline can add stereo depth information.
+      </p>
+
+      <p>
+        Thus the second configuration improves both accuracy and observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.221 Example: LiDAR Addition</h3>
+
+      <p>
+        Adding LiDAR to monocular optical navigation provides direct range.
+      </p>
+
+      <p>
+        This specifically strengthens the radial state direction.
+      </p>
+
+      <p>
+        Therefore its value is not merely lower noise but removal of a geometric ambiguity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.222 Observability in Sensor Procurement</h3>
+
+      <p>
+        Sensor specifications should therefore include not only:
+      </p>
+
+      <ul>
+        <li>accuracy,</li>
+        <li>bias,</li>
+        <li>noise,</li>
+        <li>update rate,</li>
+      </ul>
+
+      <p>
+        but also how the sensor contributes to state observability in the mission geometry.
+      </p>
+
+      <p>
+        This connects sensor selection directly to navigation architecture.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.223 Observability and Field of View</h3>
+
+      <p>
+        A camera may technically make states observable only while the target remains inside the field of view.
+      </p>
+
+      <p>
+        If target geometry leaves the FOV, the measurement disappears and observability changes.
+      </p>
+
+      <p>
+        Thus sensor coverage is part of observability analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.224 Occlusion</h3>
+
+      <p>
+        Target features may become occluded.
+      </p>
+
+      <p>
+        This reduces the number and geometry of available features.
+      </p>
+
+      <p>
+        Therefore camera pose observability can change abruptly even if the camera hardware remains healthy.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.225 Illumination</h3>
+
+      <p>
+        Poor illumination may remove usable camera features.
+      </p>
+
+      <p>
+        Therefore environmental conditions can indirectly affect observability by reducing the available measurement set.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.226 LiDAR Visibility</h3>
+
+      <p>
+        LiDAR requires sufficient target surface returns.
+      </p>
+
+      <p>
+        At shallow incidence angles or poor geometry, the usable point-cloud structure may weaken.
+      </p>
+
+      <p>
+        Thus target orientation affects LiDAR pose observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.227 Sensor Saturation and Observability</h3>
+
+      <p>
+        If a sensor saturates,
+      </p>
+
+      <p>
+        \[
+        z
+        \]
+      </p>
+
+      <p>
+        no longer represents true state sensitivity.
+      </p>
+
+      <p>
+        During saturation, the effective information content may collapse.
+      </p>
+
+      <p>
+        The sensor should then be considered unavailable for observability purposes.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.228 Observability and Measurement Gating</h3>
+
+      <p>
+        A sensor may be nominally available but repeatedly rejected by innovation gates.
+      </p>
+
+      <p>
+        Then its effective information contribution is approximately zero.
+      </p>
+
+      <p>
+        Thus practical observability depends on <strong>accepted</strong> measurements, not merely generated measurements.
+      </p>
+
+      <div class="concept-note">
+        <h4>Effective observability uses accepted data</h4>
+        <p>A sensor that is repeatedly rejected by validation contributes essentially no information to the estimator. Observability analysis should therefore be based on the sensors actually being fused.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.229 Effective Sensor Set</h3>
+
+      <p>
+        Define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal S_{\text{effective}} = \{ \text{Healthy, Valid, Accepted Sensors} \}. }
+        \]
+      </p>
+
+      <p>
+        Observability should be evaluated using this effective sensor set.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.230 Fault Isolation Can Change Observability Immediately</h3>
+
+      <p>
+        When FDIR excludes a sensor,
+      </p>
+
+      <p>
+        \[
+        H
+        \]
+      </p>
+
+      <p>
+        changes immediately.
+      </p>
+
+      <p>
+        Therefore the navigation system should reassess whether the remaining state estimate still satisfies mission requirements.
+      </p>
+
+      <p>
+        This directly connects Sections 4.2.16 and 4.2.17.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.231 Observability-Aware FDIR</h3>
+
+      <p>
+        A sensor should not necessarily be isolated solely because it is suspicious if removing it would make navigation unsafe.
+      </p>
+
+      <p>
+        Instead the system may choose:
+      </p>
+
+      <ul>
+        <li>reduced weight,</li>
+        <li>monitor-only operation,</li>
+        <li>mission hold,</li>
+      </ul>
+
+      <p>
+        while resolving the fault.
+      </p>
+
+      <p>
+        This is an architecture-level trade.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.232 Degraded Navigation Decision</h3>
+
+      <p>
+        A degraded navigation mode should consider:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Remaining Sensors} }
+        \]
+      </p>
+
+      <p>
+        \[
+        +
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ P }
+        \]
+      </p>
+
+      <p>
+        \[
+        +
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ M_O }
+        \]
+      </p>
+
+      <p>
+        \[
+        +
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mission Phase}. }
+        \]
+      </p>
+
+      <p>
+        This determines whether continued operation is safe.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.233 Observability and Safe Hold</h3>
+
+      <p>
+        A hold maneuver may be selected when observability deteriorates.
+      </p>
+
+      <p>
+        At hold, the spacecraft can:
+      </p>
+
+      <ul>
+        <li>stop approach,</li>
+        <li>wait for sensor recovery,</li>
+        <li>perform calibration motion,</li>
+        <li>reacquire target features.</li>
+      </ul>
+
+      <p>
+        Thus hold points serve both guidance and navigation functions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.234 Observability and Retreat</h3>
+
+      <p>
+        If critical state directions become unobservable near capture, retreat may improve:
+      </p>
+
+      <ul>
+        <li>range,</li>
+        <li>field of view,</li>
+        <li>target visibility,</li>
+        <li>sensor geometry.</li>
+      </ul>
+
+      <p>
+        Therefore retreat can restore observability as well as increase physical separation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.235 Observability and Abort</h3>
+
+      <p>
+        If required observability cannot be restored within safe limits, the mission may need to abort.
+      </p>
+
+      <p>
+        The trigger should be based on navigation performance and safety requirements, not merely one sensor-health flag.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.236 Observability Requirements</h3>
+
+      <p>
+        A navigation requirement may state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathcal O) = n_{\text{req}} }
+        \]
+      </p>
+
+      <p>
+        for required states.
+      </p>
+
+      <p>
+        A stronger practical requirement may also impose:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{\min}(\mathcal O) > \sigma_{\min,\text{req}}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Formal versus practical requirement</h4>
+        <p>Rank verifies that information exists in principle. A minimum singular value or covariance requirement verifies that the information is strong enough for the mission.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.237 Covariance-Based Requirement</h3>
+
+      <p>
+        Mission requirements may instead specify:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{r} < \sigma_{r,\max} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_v < \sigma_{v,\max} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_\theta < \sigma_{\theta,\max}. }
+        \]
+      </p>
+
+      <p>
+        These are operational consequences of sufficient observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.238 Why Both Formal and Covariance Requirements Are Useful</h3>
+
+      <p>
+        Rank confirms that information theoretically exists.
+      </p>
+
+      <p>
+        Covariance confirms whether the information is sufficient under realistic noise.
+      </p>
+
+      <p>
+        Therefore a robust design should consider both.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.239 Observability Design Flow</h3>
+
+      <p>
+        A practical design flow is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mission State Requirements} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Required Observable States} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Candidate Sensors} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Geometry and Dynamics Analysis} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observability Metrics} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Covariance / Monte Carlo Verification}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.240 Observability Checklist for Each State</h3>
+
+      <p>
+        For each state, ask:
+      </p>
+
+      <ol>
+        <li>Which sensor directly measures it?</li>
+        <li>Which dynamics couple it into measured states?</li>
+        <li>Which maneuvers make it visible?</li>
+        <li>What happens if one sensor fails?</li>
+        <li>How quickly does its covariance grow?</li>
+        <li>Is its accuracy sufficient for the mission?</li>
+      </ol>
+
+      <p>
+        This is a practical engineering method.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.241 Common Observability Mistakes</h3>
+
+      <p>
+        Typical mistakes include:
+      </p>
+
+      <ul>
+        <li>assuming a state is observable because it is included in the filter,</li>
+        <li>assuming more sensors automatically mean full observability,</li>
+        <li>checking only instantaneous <code>H</code>,</li>
+        <li>ignoring dynamic coupling,</li>
+        <li>checking only matrix rank and not conditioning,</li>
+        <li>estimating too many calibration states,</li>
+        <li>ignoring sensor geometry,</li>
+        <li>ignoring motion dependence,</li>
+        <li>ignoring sensor-dropout cases,</li>
+        <li>assuming small covariance proves observability,</li>
+        <li>trying to fix unobservability by tuning <code>Q</code> or <code>R</code>,</li>
+        <li>failing to analyze mission-phase transitions.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.242 Observability in One Diagram</h3>
+
+      <p>
+        The complete idea can be summarized as:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{State} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Dynamics} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Geometry and Motion} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement History} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Observable State Information}. }
+        \]
+      </p>
+
+      <p>
+        If a state change produces no distinguishable measurement change:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{State Direction} \rightarrow \text{Unobservable}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.243 Key Equations at a Glance</h3>
+
+      <h4>Linear System</h4>
+
+      <p>
+        \[
+        \boxed{ \dot x=Ax }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ y=Cx. }
+        \]
+      </p>
+
+      <h4>Observability Matrix</h4>
+
+      <p>
+        \[
+        \boxed{ \mathcal O = \begin{bmatrix} C\\ CA\\ CA^2\\ \vdots\\ CA^{n-1} \end{bmatrix}. }
+        \]
+      </p>
+
+      <h4>Rank Condition</h4>
+
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathcal O)=n. }
+        \]
+      </p>
+
+      <h4>Discrete-Time Observability Matrix</h4>
+
+      <p>
+        \[
+        \boxed{ \mathcal O_d = \begin{bmatrix} H\\ HF\\ HF^2\\ \vdots\\ HF^{n-1} \end{bmatrix}. }
+        \]
+      </p>
+
+      <h4>Observability Gramian</h4>
+
+      <p>
+        \[
+        \boxed{ W_O = \int \Phi^TC^TC\Phi \,dt. }
+        \]
+      </p>
+
+      <h4>Nonlinear Lie Derivative</h4>
+
+      <p>
+        \[
+        \boxed{ L_fh = \frac{\partial h}{\partial x}f(x). }
+        \]
+      </p>
+
+      <h4>Local Nonlinear Observability Matrix</h4>
+
+      <p>
+        \[
+        \boxed{ \mathcal O_N = \begin{bmatrix} \nabla h\\ \nabla L_fh\\ \nabla L_f^2h\\ \vdots \end{bmatrix}. }
+        \]
+      </p>
+
+      <h4>Range</h4>
+
+      <p>
+        \[
+        \boxed{ \rho = \|r_{rel}\|. }
+        \]
+      </p>
+
+      <h4>Line of Sight</h4>
+
+      <p>
+        \[
+        \boxed{ \ell = \frac{r_{rel}}{\|r_{rel}\|}. }
+        \]
+      </p>
+
+      <h4>Range Rate</h4>
+
+      <p>
+        \[
+        \boxed{ \dot\rho = \ell^Tv_{rel}. }
+        \]
+      </p>
+
+      <h4>Information Matrix</h4>
+
+      <p>
+        \[
+        \boxed{ \mathcal I = H^TR^{-1}H. }
+        \]
+      </p>
+
+      <h4>Accumulated Information</h4>
+
+      <p>
+        \[
+        \boxed{ \mathcal I_{\text{total}} = \sum_k H_k^TR_k^{-1}H_k. }
+        \]
+      </p>
+
+      <h4>State Correlation</h4>
+
+      <p>
+        \[
+        \boxed{ \rho_{ij} = \frac{ P_{ij} }{ \sqrt{P_{ii}P_{jj}} }. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.17.244 Key Takeaways</h3>
+
+      <p>
+        The most important concepts of observability in sensor fusion are:
+      </p>
+
+      <ul>
+        <li>Observability determines whether internal states can be reconstructed from measurements and dynamics.</li>
+        <li>A state does not need to be directly measured to be observable.</li>
+        <li>Dynamic coupling can reveal unmeasured states.</li>
+        <li>If different states produce identical measurement histories, their difference is unobservable.</li>
+        <li>For linear systems, observability is tested with the observability matrix.</li>
+        <li>Full rank means complete mathematical observability.</li>
+        <li>Rank alone does not describe observability strength.</li>
+        <li>Singular values and Gramian eigenvalues reveal weak directions.</li>
+        <li>A state may be mathematically observable but practically difficult to estimate.</li>
+        <li>Nonlinear spacecraft systems often require local trajectory-dependent observability analysis.</li>
+        <li>Sensor geometry strongly affects observability.</li>
+        <li>Bearing-only measurements generally provide weak instantaneous range information.</li>
+        <li>Relative motion and parallax can make range observable.</li>
+        <li>Range-only measurements do not instantly determine 3-D direction.</li>
+        <li>Position histories can make velocity observable.</li>
+        <li>One inertial vector does not generally determine complete attitude.</li>
+        <li>Two non-collinear vector observations can determine full attitude.</li>
+        <li>Gyro bias becomes observable through comparison with external attitude references.</li>
+        <li>Accelerometer bias becomes observable through position or velocity references.</li>
+        <li>Calibration states require sufficient excitation.</li>
+        <li>Clock offset becomes observable when system motion creates measurable timing sensitivity.</li>
+        <li>Sensor boresight and lever-arm calibration depend on changing geometry.</li>
+        <li>Adding states to a filter can reduce overall observability.</li>
+        <li>A more advanced filter cannot create missing information.</li>
+        <li>Tuning <code>Q</code> and <code>R</code> cannot create observability.</li>
+        <li>Adding complementary sensors can remove unobservable directions.</li>
+        <li>Camera and LiDAR are complementary because they provide different geometric information.</li>
+        <li>Sensor placement affects observability.</li>
+        <li>Redundancy should be evaluated in terms of independent information, not merely hardware count.</li>
+        <li>Observability may change with mission phase.</li>
+        <li>Observability may change after sensor failure.</li>
+        <li>Each degraded sensor configuration should be analyzed separately.</li>
+        <li>Full rank after a fault does not guarantee good conditioning.</li>
+        <li>The smallest singular value can provide a practical observability margin.</li>
+        <li>Guidance can deliberately improve observability through maneuver design.</li>
+        <li>Lateral motion can improve bearing-only range observability.</li>
+        <li>Hold points can be chosen partly for favorable sensor geometry.</li>
+        <li>Sensor handover should verify that the new sensor suite preserves required observability.</li>
+        <li>Covariance growth often reveals weak or missing observability.</li>
+        <li>Unobservable states should not become artificially overconfident.</li>
+        <li>Prior information can constrain a state but does not make it measurement-observable.</li>
+        <li>Not every estimator state necessarily needs full observability; mission-critical state combinations do.</li>
+        <li>Relative navigation may remain observable even when absolute position is not.</li>
+        <li>Online observability metrics can support autonomous navigation health monitoring.</li>
+        <li>RPO capture readiness should consider observability together with state error, covariance, sensor health, and measurement freshness.</li>
+      </ul>
+
+      <p>
+        The central observability principle is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{The Estimator Can Only Recover State Information That Is Actually Encoded in the Measurements and Dynamics}. }
+        \]
+      </p>
+
+      <p>
+        The most important engineering warning is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{A State Existing in the Filter Does Not Mean That the State Is Observable}. }
+        \]
+      </p>
+
+      <p>
+        And the most important sensor-fusion principle is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Complementary Sensors Are Valuable Not Only Because They Reduce Noise, but Because They Observe Different State Directions}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3 class="next-title">Next: 4.2.18 Filter Initialization and Convergence</h3>
+
+      <p>
+        Once the sensor suite provides sufficient observability, another fundamental question remains:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{How Should the Estimator Be Started?} }
+        \]
+      </p>
+
+      <p>
+        A Kalman filter, EKF, ESKF, MEKF, or UKF requires an initial state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x_0 }
+        \]
+      </p>
+
+      <p>
+        and an initial covariance:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_0. }
+        \]
+      </p>
+
+      <p>
+        If the initial state is poor, the estimator may require significant time to converge.
+      </p>
+
+      <p>
+        If the initial covariance is unrealistically small, valid measurements may be rejected and the filter may become overconfident.
+      </p>
+
+      <p>
+        If it is excessively large, the filter may experience large transients.
+      </p>
+
+      <p>
+        Attitude initialization is particularly important because quaternion estimation and small-angle error filters assume specific error representations.
+      </p>
+
+      <p>
+        Bias states may also need special treatment because they are often only gradually observable.
+      </p>
+
+      <p>
+        Therefore the next section, <strong>4.2.18 Filter Initialization and Convergence</strong>, should develop:
+      </p>
+
+      <ul>
+        <li>initial-state selection,</li>
+        <li>initial covariance,</li>
+        <li>prior uncertainty,</li>
+        <li>position and velocity initialization,</li>
+        <li>quaternion and attitude initialization,</li>
+        <li>coarse alignment,</li>
+        <li>gyro-bias initialization,</li>
+        <li>accelerometer-bias initialization,</li>
+        <li>initializing calibration states,</li>
+        <li>initialization from multiple sensors,</li>
+        <li>covariance consistency,</li>
+        <li>filter transients,</li>
+        <li>convergence time,</li>
+        <li>convergence criteria,</li>
+        <li>covariance contraction,</li>
+        <li>covariance collapse,</li>
+        <li>filter overconfidence,</li>
+        <li>poor initialization and innovation gating,</li>
+        <li>delayed bias convergence,</li>
+        <li>initialization after sensor reset,</li>
+        <li>estimator reinitialization,</li>
+        <li>sensor reacquisition,</li>
+        <li>warm start vs cold start,</li>
+        <li>Monte Carlo convergence testing,</li>
+        <li>RPO phase initialization,</li>
+        <li>and practical initialization logic for flight software.</li>
+      </ul>
+
+      <a href="filter-initialization-and-convergence.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.18 Filter Initialization and Convergence</h3>
+
+          <p>
+            Initial-state selection, initial covariance, prior uncertainty,
+            position and velocity initialization, quaternion and attitude
+            initialization, coarse alignment, gyro-bias and accelerometer-bias
+            initialization, calibration-state initialization, covariance
+            consistency, filter transients, convergence criteria, covariance
+            contraction, covariance collapse, reinitialization, warm starts,
+            sensor reacquisition, Monte Carlo convergence testing, and RPO
+            initialization logic.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Filter Initialization and Convergence &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+</body>
+</html>
