@@ -1,0 +1,5874 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.16 Outlier Rejection, Fault Detection and Robust Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+
+  <style>
+    .concept-note {
+      margin: 1.5rem 0 0;
+      padding: 1.1rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+    }
+    .concept-note h4 {
+      margin-top: 0;
+      margin-bottom: 0.45rem;
+    }
+    .concept-note p {
+      margin-bottom: 0;
+    }
+  </style>
+
+
+</head>
+
+<body>
+
+  <header class="notes-hero">
+
+    <h1>Outlier Rejection, Fault Detection and Robust Fusion</h1>
+
+    <p class="notes-tagline">
+      Sensor faults, bad data, outliers, measurement dropouts, persistent bias,
+      drift faults, frozen measurements, fault detection and isolation, FDIR,
+      robust weighting, sensor exclusion, redundancy, degraded navigation,
+      integrity, continuity, recovery, and fault-tolerant RPO navigation.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.16 Outlier Rejection, Fault Detection and Robust Fusion</h2>
+
+<p>
+        Innovation gating, discussed in the previous section, answers an immediate question:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Should this particular measurement be used in the estimator update?} }
+        \]
+      </p>
+
+      <p>
+        But spacecraft navigation must answer a broader and more difficult set of questions:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Is the sensor actually becoming faulty?} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Is the abnormal measurement only a temporary outlier?} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Should the sensor be isolated from the estimator?} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Can navigation continue safely using the remaining sensors?} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Should the mission enter a degraded navigation mode?} }
+        \]
+      </p>
+
+      <p>
+        These questions form the basis of <strong>outlier rejection, fault detection, fault isolation, recovery, and robust sensor fusion</strong>.
+      </p>
+
+      <p>
+        A practical spacecraft estimator cannot be designed under the assumption that every sensor always behaves exactly according to its nominal Gaussian noise model.
+      </p>
+
+      <p>
+        Real sensors may experience:
+      </p>
+
+      <ul>
+        <li>isolated spikes,</li>
+        <li>temporary bad measurements,</li>
+        <li>persistent bias,</li>
+        <li>slowly drifting bias,</li>
+        <li>excessive noise,</li>
+        <li>frozen measurements,</li>
+        <li>intermittent dropouts,</li>
+        <li>timestamp corruption,</li>
+        <li>communication faults,</li>
+        <li>incorrect covariance reporting,</li>
+        <li>saturation,</li>
+        <li>false target detections,</li>
+        <li>incorrect feature associations,</li>
+        <li>environmental interference,</li>
+        <li>complete sensor failure.</li>
+      </ul>
+
+      <p>
+        Therefore, robust navigation requires several layers of protection.
+      </p>
+
+      <p>
+        A useful high-level architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Measurement} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Basic Validation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Innovation / Outlier Test} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fault Detection} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fault Isolation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Reweighting / Exclusion} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Degraded or Reconfigured Navigation}. }
+        \]
+      </p>
+
+      <p>
+        The important principle is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Robust Sensor Fusion Does Not Merely Estimate the State; It Also Evaluates Whether Its Information Sources Can Still Be Trusted.} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.1 Outlier, Fault and Failure Are Not the Same</h3>
+
+      <p>
+        These terms should be distinguished carefully.
+      </p>
+
+      <p>
+        An <strong>outlier</strong> is an individual measurement that is inconsistent with the expected measurement distribution.
+      </p>
+
+      <p>
+        A <strong>fault</strong> is an abnormal condition in a sensor, interface, model, or processing chain.
+      </p>
+
+      <p>
+        A <strong>failure</strong> is a condition where the subsystem can no longer perform its required function.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Outlier} \neq \text{Fault} \neq \text{Failure}. }
+        \]
+      </p>
+
+      <p>
+        For example, one camera feature may be mismatched while the camera itself remains fully healthy.
+      </p>
+
+      <p>
+        Similarly, one GNSS measurement may contain multipath without implying receiver failure.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why the terminology must stay separate</h4>
+        <p>An isolated outlier can be a one-time measurement anomaly, while a fault is a continuing abnormal condition and a failure is loss of required function. Treating these as identical would make the estimator either overreact to harmless events or underreact to genuine failures.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.2 Why This Distinction Matters</h3>
+
+      <p>
+        If every outlier is treated as a sensor failure, healthy sensors may be unnecessarily disabled.
+      </p>
+
+      <p>
+        If every abnormal measurement is treated as harmless noise, a genuine fault may remain undetected.
+      </p>
+
+      <p>
+        Therefore the estimator must distinguish between:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Temporary Measurement Problem} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Persistent Sensor Problem}. }
+        \]
+      </p>
+
+      <p>
+        This usually requires considering behavior over time rather than one measurement alone.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.3 Categories of Measurement Abnormalities</h3>
+
+      <p>
+        A useful classification is:
+      </p>
+
+      <h4>Isolated Outlier</h4>
+
+      <p>
+        One unusual sample appears but subsequent measurements return to normal.
+      </p>
+
+      <h4>Persistent Bias</h4>
+
+      <p>
+        Measurements remain shifted by approximately a constant amount.
+      </p>
+
+      <h4>Drift</h4>
+
+      <p>
+        Measurement error gradually increases with time.
+      </p>
+
+      <h4>Excessive Noise</h4>
+
+      <p>
+        The mean may remain correct, but measurement variance increases significantly.
+      </p>
+
+      <h4>Frozen Measurement</h4>
+
+      <p>
+        The sensor repeatedly outputs an old or constant value.
+      </p>
+
+      <h4>Dropout</h4>
+
+      <p>
+        Measurements stop arriving.
+      </p>
+
+      <h4>Intermittent Fault</h4>
+
+      <p>
+        The sensor alternates between valid and invalid behavior.
+      </p>
+
+      <h4>Complete Failure</h4>
+
+      <p>
+        The sensor provides no useful navigation information.
+      </p>
+
+      <p>
+        These cases require different detection and recovery strategies.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.4 Isolated Outliers</h3>
+
+      <p>
+        Suppose the nominal measurement is
+      </p>
+
+      <p>
+        \[
+        z_k = h(x_k)+v_k.
+        \]
+      </p>
+
+      <p>
+        An outlier may be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_k = h(x_k) + v_k + o_k }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        o_k
+        \]
+      </p>
+
+      <p>
+        is a large abnormal error.
+      </p>
+
+      <p>
+        For most samples:
+      </p>
+
+      <p>
+        \[
+        o_k=0.
+        \]
+      </p>
+
+      <p>
+        For occasional outliers:
+      </p>
+
+      <p>
+        \[
+        |o_k| \gg \sigma_v.
+        \]
+      </p>
+
+      <p>
+        Innovation gating is usually very effective against this type of error.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.5 Why One Outlier Can Be Dangerous</h3>
+
+      <p>
+        In a Kalman-type estimator:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x^+ = \hat x^- + Kr. }
+        \]
+      </p>
+
+      <p>
+        If the innovation
+      </p>
+
+      <p>
+        \[
+        r
+        \]
+      </p>
+
+      <p>
+        is extremely large, then the correction
+      </p>
+
+      <p>
+        \[
+        Kr
+        \]
+      </p>
+
+      <p>
+        can also become large.
+      </p>
+
+      <p>
+        Therefore one bad measurement can abruptly pull the estimated state away from the true trajectory.
+      </p>
+
+      <p>
+        This is especially dangerous during close RPO, where state estimates are directly used to generate control commands.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.6 Persistent Bias</h3>
+
+      <p>
+        A biased sensor may be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_k = h(x_k) + b + v_k. }
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        b
+        \]
+      </p>
+
+      <p>
+        is small, individual measurements may still pass the innovation gate.
+      </p>
+
+      <p>
+        But the innovation mean becomes approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ E[r_k] \approx b. }
+        \]
+      </p>
+
+      <p>
+        Therefore persistent innovation bias is often more informative than a single gate failure.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why bias needs long-term monitoring</h4>
+        <p>A small constant bias may remain inside instantaneous innovation gates. Monitoring the innovation mean over time makes persistent offsets visible even when individual samples appear statistically acceptable.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.7 Bias Detection</h3>
+
+      <p>
+        A moving-average innovation can be defined as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \bar r_k = \frac{1}{N} \sum_{i=k-N+1}^{k} r_i. }
+        \]
+      </p>
+
+      <p>
+        For an unbiased measurement process:
+      </p>
+
+      <p>
+        \[
+        \bar r_k \approx0.
+        \]
+      </p>
+
+      <p>
+        A persistent nonzero value can indicate:
+      </p>
+
+      <ul>
+        <li>sensor bias,</li>
+        <li>calibration error,</li>
+        <li>timing bias,</li>
+        <li>frame misalignment,</li>
+        <li>modelling bias.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.8 Drift Fault</h3>
+
+      <p>
+        A drift fault develops gradually.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ b_{k+1} = b_k + d\Delta t }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        d
+        \]
+      </p>
+
+      <p>
+        is the drift rate.
+      </p>
+
+      <p>
+        Because each individual change may be small, instantaneous innovation gating may not detect the fault early.
+      </p>
+
+      <p>
+        Trend-based monitoring becomes necessary.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.9 Why Slowly Developing Faults Are Difficult</h3>
+
+      <p>
+        A slowly drifting sensor may remain inside the statistical gate for a long period.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Passes Gate} }
+        \]
+      </p>
+
+      <p>
+        does not necessarily imply
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Is Healthy}. }
+        \]
+      </p>
+
+      <p>
+        Long-term residual statistics are needed.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.10 Excessive Noise Fault</h3>
+
+      <p>
+        Suppose the expected measurement covariance is
+      </p>
+
+      <p>
+        \[
+        R.
+        \]
+      </p>
+
+      <p>
+        A degraded sensor may instead have
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{\text{actual}} > R_{\text{nominal}}. }
+        \]
+      </p>
+
+      <p>
+        The mean measurement may still be correct, but innovations become more variable.
+      </p>
+
+      <p>
+        Symptoms include:
+      </p>
+
+      <ul>
+        <li>frequent gate failures,</li>
+        <li>larger innovation variance,</li>
+        <li>unstable measurement corrections.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.11 Detecting Excessive Noise</h3>
+
+      <p>
+        Compare empirical innovation covariance:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat S = \frac{1}{N-1} \sum_{k=1}^{N} (r_k-\bar r)(r_k-\bar r)^T }
+        \]
+      </p>
+
+      <p>
+        with the predicted covariance:
+      </p>
+
+      <p>
+        \[
+        \boxed{ S_k = HP^-H^T+R. }
+        \]
+      </p>
+
+      <p>
+        If the empirical covariance becomes consistently larger than predicted, the sensor noise model may no longer be valid.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.12 Frozen Sensor Fault</h3>
+
+      <p>
+        A frozen sensor may output
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_k=z_{k-1} }
+        \]
+      </p>
+
+      <p>
+        for many consecutive samples.
+      </p>
+
+      <p>
+        This is dangerous because the value may still look numerically reasonable.
+      </p>
+
+      <p>
+        If vehicle motion is small, the frozen measurement may even pass innovation gates initially.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why frozen data can be deceptive</h4>
+        <p>A frozen measurement can look perfectly reasonable numerically, particularly during slow motion. Temporal checks therefore complement innovation tests and help distinguish a physically plausible value from a stale one.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.13 Frozen-Data Detection</h3>
+
+      <p>
+        A simple test monitors
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta z_k = z_k-z_{k-1}. }
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \Delta z_k=0
+        \]
+      </p>
+
+      <p>
+        for an unexpectedly long duration while the predicted state is changing, the sensor may be stuck.
+      </p>
+
+      <p>
+        A stronger test compares the measurement derivative with predicted dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.14 Measurement Dropout</h3>
+
+      <p>
+        A dropout means no valid measurement is received.
+      </p>
+
+      <p>
+        This is different from an outlier.
+      </p>
+
+      <p>
+        For dropout:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{No Measurement Update}. }
+        \]
+      </p>
+
+      <p>
+        The estimator should continue propagation using:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Dynamics} + \text{Remaining Sensors}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.15 What Happens During Dropout</h3>
+
+      <p>
+        Without measurement correction:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{k+1}^- = F_kP_k^+F_k^T+Q_k. }
+        \]
+      </p>
+
+      <p>
+        Covariance therefore generally grows.
+      </p>
+
+      <p>
+        This correctly reflects increasing uncertainty.
+      </p>
+
+      <p>
+        A healthy estimator should not artificially keep covariance small during prolonged measurement absence.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.16 Intermittent Dropout</h3>
+
+      <p>
+        Some sensors may alternate between:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Available} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Unavailable}. }
+        \]
+      </p>
+
+      <p>
+        This can happen because of:
+      </p>
+
+      <ul>
+        <li>camera occlusion,</li>
+        <li>GNSS blockage,</li>
+        <li>star-tracker blinding,</li>
+        <li>LiDAR geometry,</li>
+        <li>communication interruption.</li>
+      </ul>
+
+      <p>
+        The estimator should therefore support event-driven availability rather than assuming periodic measurements always arrive.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.17 Bad Data</h3>
+
+      <p>
+        Bad data is a broad term that can include:
+      </p>
+
+      <ul>
+        <li>corrupted packet values,</li>
+        <li>incorrect timestamps,</li>
+        <li>invalid units,</li>
+        <li>wrong frame transformations,</li>
+        <li>impossible measurements,</li>
+        <li>incorrect sensor health flags.</li>
+      </ul>
+
+      <p>
+        Not all bad data originate from the sensor hardware itself.
+      </p>
+
+      <p>
+        The complete measurement chain must therefore be monitored.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.18 Fault Detection</h3>
+
+      <p>
+        <strong>Fault detection</strong> asks:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Has Something Abnormal Occurred?} }
+        \]
+      </p>
+
+      <p>
+        Detection does not yet determine which component is responsible.
+      </p>
+
+      <p>
+        Possible detection quantities include:
+      </p>
+
+      <ul>
+        <li>innovation magnitude,</li>
+        <li>NIS,</li>
+        <li>innovation mean,</li>
+        <li>innovation variance,</li>
+        <li>innovation autocorrelation,</li>
+        <li>sensor quality flags,</li>
+        <li>packet errors,</li>
+        <li>timeout conditions.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Detection does not identify the culprit</h4>
+        <p>Fault detection only establishes that behavior is abnormal. Isolation needs additional evidence because the same residual growth can be caused by sensor faults, model errors, timing mistakes, frame errors, or real vehicle maneuvers.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.19 Fault Isolation</h3>
+
+      <p>
+        <strong>Fault isolation</strong> asks:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Which Sensor or Subsystem Is Responsible?} }
+        \]
+      </p>
+
+      <p>
+        This is usually more difficult than fault detection.
+      </p>
+
+      <p>
+        For example, high camera innovation could result from:
+      </p>
+
+      <ul>
+        <li>bad camera measurement,</li>
+        <li>incorrect attitude prediction,</li>
+        <li>timing error,</li>
+        <li>frame transformation error,</li>
+        <li>target maneuver.</li>
+      </ul>
+
+      <p>
+        Isolation requires additional evidence.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.20 Detection vs Isolation</h3>
+
+      <p>
+        The sequence is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Detect Abnormal Behavior} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Determine Its Source} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Take Corrective Action}. }
+        \]
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fault Detection} \neq \text{Fault Isolation}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.21 FDI</h3>
+
+      <p>
+        <strong>FDI</strong> means:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fault Detection and Isolation}. }
+        \]
+      </p>
+
+      <p>
+        A navigation FDI system may monitor:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_i, \quad NIS_i, \quad \text{health}_i, \quad \text{availability}_i. }
+        \]
+      </p>
+
+      <p>
+        The objective is to identify abnormal sensor behavior before it corrupts the state estimate.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.22 FDIR</h3>
+
+      <p>
+        <strong>FDIR</strong> extends FDI to include recovery:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fault Detection, Isolation and Recovery}. }
+        \]
+      </p>
+
+      <p>
+        The complete sequence is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Detect} \rightarrow \text{Isolate} \rightarrow \text{Recover / Reconfigure}. }
+        \]
+      </p>
+
+      <p>
+        Recovery may mean:
+      </p>
+
+      <ul>
+        <li>excluding one sensor,</li>
+        <li>switching to redundancy,</li>
+        <li>changing estimator mode,</li>
+        <li>increasing covariance,</li>
+        <li>holding the spacecraft,</li>
+        <li>entering safe navigation mode.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>FDIR closes the loop</h4>
+        <p>Detection and isolation are incomplete until the system decides how to recover. Reconfiguration, redundancy switching, covariance adjustment, hold logic, or safe-mode entry are the actions that turn diagnostics into fault tolerance.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.23 Role of the Navigation Filter in FDIR</h3>
+
+      <p>
+        The estimator normally should not make every mission-level FDIR decision itself.
+      </p>
+
+      <p>
+        Instead it provides diagnostic information such as:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Validity} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Innovation Statistics} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Covariance} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Navigation Health}. }
+        \]
+      </p>
+
+      <p>
+        Higher-level flight software can then determine the required mission response.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.24 Innovation-Based Fault Detection</h3>
+
+      <p>
+        A simple fault detector uses:
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS_k = r_k^TS_k^{-1}r_k. }
+        \]
+      </p>
+
+      <p>
+        If:
+      </p>
+
+      <p>
+        \[
+        NIS_k>\gamma,
+        \]
+      </p>
+
+      <p>
+        the measurement is suspicious.
+      </p>
+
+      <p>
+        However, one threshold crossing is weak evidence.
+      </p>
+
+      <p>
+        Repeated crossings provide stronger evidence.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.25 Consecutive Failure Logic</h3>
+
+      <p>
+        Define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{fail}} }
+        \]
+      </p>
+
+      <p>
+        as the number of consecutive failed gates.
+      </p>
+
+      <p>
+        A sensor may transition to suspect when:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{fail}} \ge N_1. }
+        \]
+      </p>
+
+      <p>
+        It may transition to faulted when:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{fail}} \ge N_2. }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        N_2>N_1.
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why persistence logic matters</h4>
+        <p>Because nominal Gaussian measurements occasionally exceed statistical limits, requiring repeated failures before declaring a fault greatly reduces false isolation of otherwise healthy sensors.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.26 Why Consecutive Logic Helps</h3>
+
+      <p>
+        Gaussian noise occasionally creates legitimate large residuals.
+      </p>
+
+      <p>
+        Therefore a single failure should rarely trigger permanent isolation.
+      </p>
+
+      <p>
+        Consecutive logic distinguishes:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Random Statistical Event} }
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Persistent Abnormal Behavior}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.27 Moving-Window Fault Logic</h3>
+
+      <p>
+        Instead of requiring consecutive failures, count failures in a window.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{reject}} = \sum_{i=k-W+1}^{k} I_i }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        I_i= \begin{cases} 1,&\text{measurement rejected}\\ 0,&\text{measurement accepted}. \end{cases}
+        \]
+      </p>
+
+      <p>
+        A sensor becomes suspect if too many failures occur within the window.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.28 Rejection Ratio</h3>
+
+      <p>
+        Define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ f_{\text{reject}} = \frac{ N_{\text{rejected}} }{ N_{\text{total}} }. }
+        \]
+      </p>
+
+      <p>
+        A rising rejection ratio may indicate:
+      </p>
+
+      <ul>
+        <li>sensor degradation,</li>
+        <li>worsening environment,</li>
+        <li>covariance mismatch,</li>
+        <li>model mismatch.</li>
+      </ul>
+
+      <p>
+        It provides a useful long-term health metric.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.29 CUSUM Fault Detection</h3>
+
+      <p>
+        Small persistent faults may not cross instantaneous gates.
+      </p>
+
+      <p>
+        A <strong>Cumulative Sum (CUSUM)</strong> detector can accumulate evidence.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ g_k = \max \left( 0, g_{k-1} + s_k-\nu \right) }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        s_k
+        \]
+      </p>
+
+      <p>
+        is a fault-sensitive statistic.
+      </p>
+
+      <p>
+        If:
+      </p>
+
+      <p>
+        \[
+        g_k>h,
+        \]
+      </p>
+
+      <p>
+        a fault is declared.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.30 Why CUSUM Helps</h3>
+
+      <p>
+        Suppose innovation has a small positive bias.
+      </p>
+
+      <p>
+        Each sample may remain inside the NIS gate.
+      </p>
+
+      <p>
+        But repeated small deviations accumulate.
+      </p>
+
+      <p>
+        CUSUM therefore detects:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Small Persistent Faults} }
+        \]
+      </p>
+
+      <p>
+        that instantaneous gates may miss.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.31 Generalized Likelihood Ratio</h3>
+
+      <p>
+        Another approach compares:
+      </p>
+
+      <p>
+        \[
+        \boxed{ H_0: \text{Sensor Healthy} }
+        \]
+      </p>
+
+      <p>
+        against
+      </p>
+
+      <p>
+        \[
+        \boxed{ H_1: \text{Sensor Faulted}. }
+        \]
+      </p>
+
+      <p>
+        The likelihood ratio is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Lambda = \frac{ p(z|H_1) }{ p(z|H_0) }. }
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \Lambda
+        \]
+      </p>
+
+      <p>
+        becomes sufficiently large, the fault hypothesis is favored.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.32 Sensor Health State Machine</h3>
+
+      <p>
+        A practical sensor-health machine may use:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Healthy} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Suspect} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Faulted} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Recovering} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Healthy}. }
+        \]
+      </p>
+
+      <p>
+        This is much more robust than one Boolean health flag.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why a state machine is better than one Boolean flag</h4>
+        <p>Health evolves over time. Intermediate states such as Suspect and Recovering make it possible to increase monitoring, reduce trust, and confirm recovery without abrupt switching between fully trusted and fully rejected.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.33 Healthy State</h3>
+
+      <p>
+        In the healthy state:
+      </p>
+
+      <ul>
+        <li>measurements pass validation,</li>
+        <li>NIS statistics are nominal,</li>
+        <li>packet integrity is good,</li>
+        <li>timing is valid,</li>
+        <li>sensor quality flags are acceptable.</li>
+      </ul>
+
+      <p>
+        The measurements are fused normally.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.34 Suspect State</h3>
+
+      <p>
+        A sensor may become suspect after:
+      </p>
+
+      <ul>
+        <li>repeated gate failures,</li>
+        <li>abnormal covariance,</li>
+        <li>intermittent packet errors,</li>
+        <li>unusual innovation trends.</li>
+      </ul>
+
+      <p>
+        In this state, the estimator may:
+      </p>
+
+      <ul>
+        <li>reduce measurement weight,</li>
+        <li>increase monitoring,</li>
+        <li>require additional confirmation.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.35 Faulted State</h3>
+
+      <p>
+        When sufficient evidence indicates failure:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Contribution} \rightarrow 0. }
+        \]
+      </p>
+
+      <p>
+        The sensor is excluded from state correction.
+      </p>
+
+      <p>
+        It may still be monitored diagnostically.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.36 Recovering State</h3>
+
+      <p>
+        A faulted sensor should not necessarily be trusted immediately after valid data reappears.
+      </p>
+
+      <p>
+        The system may require:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{good}} \ge N_{\text{recover}}. }
+        \]
+      </p>
+
+      <p>
+        Only then is it reintroduced.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.37 Why Recovery Hysteresis Is Important</h3>
+
+      <p>
+        Without hysteresis, a marginal sensor may rapidly switch:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Healthy} \leftrightarrow \text{Faulted}. }
+        \]
+      </p>
+
+      <p>
+        This can destabilize estimator behavior.
+      </p>
+
+      <p>
+        Different fault and recovery criteria reduce such oscillations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.38 Sensor Exclusion</h3>
+
+      <p>
+        Sensor exclusion means removing one sensor's measurement update from the estimator.
+      </p>
+
+      <p>
+        If sensor <code>i</code> is excluded:
+      </p>
+
+      <p>
+        \[
+        \boxed{ K_i r_i \rightarrow 0. }
+        \]
+      </p>
+
+      <p>
+        The filter continues using the remaining measurements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.39 Exclusion Must Preserve Covariance Consistency</h3>
+
+      <p>
+        When a sensor is excluded, no information from that measurement is gained.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P^+ = P^- }
+        \]
+      </p>
+
+      <p>
+        for that skipped update.
+      </p>
+
+      <p>
+        The covariance should not be artificially reduced.
+      </p>
+
+      <div class="concept-note">
+        <h4>Covariance must reflect information actually used</h4>
+        <p>If a measurement is excluded, no information has entered the estimator. Reducing covariance anyway would make the filter overconfident and statistically inconsistent.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.40 Sensor Isolation vs Measurement Rejection</h3>
+
+      <p>
+        Measurement rejection is temporary:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Reject One Measurement}. }
+        \]
+      </p>
+
+      <p>
+        Sensor isolation is persistent:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Exclude Future Measurements Until Recovery}. }
+        \]
+      </p>
+
+      <p>
+        This distinction is fundamental.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.41 Robust Fusion</h3>
+
+      <p>
+        Robust fusion attempts to reduce the effect of abnormal measurements without requiring perfect binary classification.
+      </p>
+
+      <p>
+        Instead of:
+      </p>
+
+      <p>
+        \[
+        w \in \{0,1\},
+        \]
+      </p>
+
+      <p>
+        a robust estimator may use:
+      </p>
+
+      <p>
+        \[
+        \boxed{ 0\le w\le1. }
+        \]
+      </p>
+
+      <p>
+        Thus a suspicious measurement can influence the estimator less strongly.
+      </p>
+
+      <div class="concept-note">
+        <h4>Binary rejection is not always necessary</h4>
+        <p>Robust fusion provides a continuum between full trust and full rejection. This is useful when measurements are degraded or heavy-tailed but still contain partial information.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.42 Hard Rejection</h3>
+
+      <p>
+        Hard rejection means:
+      </p>
+
+      <p>
+        \[
+        \boxed{ w=0. }
+        \]
+      </p>
+
+      <p>
+        A valid measurement receives:
+      </p>
+
+      <p>
+        \[
+        \boxed{ w=1. }
+        \]
+      </p>
+
+      <p>
+        This approach is simple and easy to interpret.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.43 Soft Reweighting</h3>
+
+      <p>
+        For a moderately abnormal residual:
+      </p>
+
+      <p>
+        \[
+        \boxed{ 0<w<1. }
+        \]
+      </p>
+
+      <p>
+        The measurement is retained but its influence is reduced.
+      </p>
+
+      <p>
+        This may improve continuity when sensor errors are occasionally heavy-tailed rather than completely invalid.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.44 Robust M-Estimators</h3>
+
+      <p>
+        An M-estimator minimizes:
+      </p>
+
+      <p>
+        \[
+        \boxed{ J = \sum_i \rho(e_i) }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        e_i
+        \]
+      </p>
+
+      <p>
+        is a normalized residual and
+      </p>
+
+      <p>
+        \[
+        \rho
+        \]
+      </p>
+
+      <p>
+        is a robust loss function.
+      </p>
+
+      <p>
+        Unlike ordinary least squares, large residuals are given reduced influence.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.45 Ordinary Least Squares</h3>
+
+      <p>
+        Standard Gaussian estimation corresponds approximately to:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho(e) = \frac12e^2. }
+        \]
+      </p>
+
+      <p>
+        The penalty grows quadratically.
+      </p>
+
+      <p>
+        Thus extremely large residuals can dominate the optimization.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.46 Huber Loss</h3>
+
+      <p>
+        Huber loss is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho(e) = \begin{cases} \frac12e^2, & |e|\le c \\ c|e|-\frac12c^2, & |e|>c. \end{cases} }
+        \]
+      </p>
+
+      <p>
+        Small residuals behave like Gaussian least squares.
+      </p>
+
+      <p>
+        Large residuals grow only linearly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.47 Huber Weight</h3>
+
+      <p>
+        The corresponding approximate weight is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ w(e) = \begin{cases} 1, & |e|\le c \\ \dfrac{c}{|e|}, & |e|>c. \end{cases} }
+        \]
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Large Residual} \rightarrow \text{Reduced Influence}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.48 Tukey Biweight</h3>
+
+      <p>
+        A stronger robust method is the Tukey biweight.
+      </p>
+
+      <p>
+        For sufficiently large residuals:
+      </p>
+
+      <p>
+        \[
+        \boxed{ w(e)\rightarrow0. }
+        \]
+      </p>
+
+      <p>
+        Therefore extreme measurements are effectively ignored.
+      </p>
+
+      <p>
+        This can work well when genuine gross outliers are expected.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.49 Cauchy-Type Robust Loss</h3>
+
+      <p>
+        Another heavy-tailed loss is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho(e) = \frac{c^2}{2} \ln \left( 1+\frac{e^2}{c^2} \right). }
+        \]
+      </p>
+
+      <p>
+        It grows more slowly than quadratic loss for large residuals.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.50 Choosing a Robust Loss</h3>
+
+      <p>
+        The choice depends on expected data characteristics.
+      </p>
+
+      <p>
+        Huber:
+      </p>
+
+      <ul>
+        <li>keeps moderate residuals,</li>
+        <li>easy to tune.</li>
+      </ul>
+
+      <p>
+        Tukey:
+      </p>
+
+      <ul>
+        <li>strongly suppresses extreme outliers.</li>
+      </ul>
+
+      <p>
+        Cauchy:
+      </p>
+
+      <ul>
+        <li>useful for heavy-tailed error distributions.</li>
+      </ul>
+
+      <p>
+        No robust loss is universally best.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.51 Robust Weighting Through <code>R</code></h3>
+
+      <p>
+        A robust weight can be implemented by modifying effective covariance:
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{\text{eff}} = \frac{R}{w}. }
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        w<1,
+        \]
+      </p>
+
+      <p>
+        then:
+      </p>
+
+      <p>
+        \[
+        R_{\text{eff}}>R.
+        \]
+      </p>
+
+      <p>
+        The Kalman gain decreases, reducing measurement influence.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.52 Interpretation of Robust Covariance Scaling</h3>
+
+      <p>
+        For:
+      </p>
+
+      <p>
+        \[
+        w=1,
+        \]
+      </p>
+
+      <p>
+        use nominal covariance.
+      </p>
+
+      <p>
+        For:
+      </p>
+
+      <p>
+        \[
+        w\ll1,
+        \]
+      </p>
+
+      <p>
+        treat the sensor as highly uncertain.
+      </p>
+
+      <p>
+        For:
+      </p>
+
+      <p>
+        \[
+        w\rightarrow0,
+        \]
+      </p>
+
+      <p>
+        the measurement is effectively ignored.
+      </p>
+
+      <p>
+        This provides a smooth transition between normal fusion and rejection.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.53 Robust Fusion Is Not a Substitute for FDIR</h3>
+
+      <p>
+        A severely failed sensor should not simply remain in the estimator with tiny weight forever.
+      </p>
+
+      <p>
+        Persistent abnormal behavior should trigger:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fault Detection} \rightarrow \text{Isolation}. }
+        \]
+      </p>
+
+      <p>
+        Robust weighting is most useful for transient contamination and moderate outliers.
+      </p>
+
+      <div class="concept-note">
+        <h4>Robust weighting and FDIR serve different purposes</h4>
+        <p>Downweighting limits the impact of transient contamination. Persistent faults still need explicit detection and isolation so a failed sensor does not remain connected indefinitely.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.54 Heavy-Tailed Measurement Models</h3>
+
+      <p>
+        Gaussian measurement models assume:
+      </p>
+
+      <p>
+        \[
+        v \sim \mathcal N(0,R).
+        \]
+      </p>
+
+      <p>
+        But real data may exhibit heavy tails.
+      </p>
+
+      <p>
+        A heavy-tailed likelihood assigns more probability to large errors than a Gaussian distribution.
+      </p>
+
+      <p>
+        This reduces overreaction to occasional large residuals.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.55 Gaussian Mixture Model</h3>
+
+      <p>
+        A robust measurement model may be:
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(z|x) = (1-\epsilon) \mathcal N( h(x),R ) + \epsilon \mathcal N( h(x),R_{\text{out}} ). }
+        \]
+      </p>
+
+      <p>
+        where:
+      </p>
+
+      <p>
+        \[
+        R_{\text{out}} \gg R.
+        \]
+      </p>
+
+      <p>
+        The second component represents outliers.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.56 Interpretation of Mixture Models</h3>
+
+      <p>
+        The estimator acknowledges that a measurement could originate from either:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal Sensor Distribution} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Outlier Distribution}. }
+        \]
+      </p>
+
+      <p>
+        This is statistically richer than a strict Gaussian assumption.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.57 Student-<code>t</code> Measurement Model</h3>
+
+      <p>
+        Another robust choice is a Student-<code>t</code> likelihood.
+      </p>
+
+      <p>
+        Compared with Gaussian noise, it has heavier tails.
+      </p>
+
+      <p>
+        Therefore large residuals are less surprising and exert less excessive influence.
+      </p>
+
+      <p>
+        This can be useful for optical and LiDAR data with occasional contamination.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.58 Robust Sensor Fusion and Particle Filters</h3>
+
+      <p>
+        Particle Filters naturally support non-Gaussian likelihoods.
+      </p>
+
+      <p>
+        Each particle receives weight:
+      </p>
+
+      <p>
+        \[
+        \boxed{ w_i \propto p(z|x_i). }
+        \]
+      </p>
+
+      <p>
+        Using robust likelihoods prevents one bad measurement from collapsing the particle distribution incorrectly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.59 Particle Weight Collapse</h3>
+
+      <p>
+        If a corrupted measurement gives almost zero likelihood to nearly all particles:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} = \frac{ 1 }{ \sum_i w_i^2 } }
+        \]
+      </p>
+
+      <p>
+        may become very small.
+      </p>
+
+      <p>
+        External validation or robust likelihoods can reduce this risk.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.60 Redundancy</h3>
+
+      <p>
+        Fault-tolerant navigation relies heavily on sensor redundancy.
+      </p>
+
+      <p>
+        Redundancy can be:
+      </p>
+
+      <ul>
+        <li>identical sensors,</li>
+        <li>different sensors measuring the same quantity,</li>
+        <li>different sensors indirectly observing the same state.</li>
+      </ul>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera Range} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{LiDAR Range} }
+        \]
+      </p>
+
+      <p>
+        may provide cross-checking.
+      </p>
+
+      <div class="concept-note">
+        <h4>Redundancy must include independence thinking</h4>
+        <p>Multiple sensors only improve fault tolerance when their failure modes are sufficiently independent. Shared clocks, frames, calibration, power, or software can create common-mode failures.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.61 Hardware Redundancy</h3>
+
+      <p>
+        Hardware redundancy means multiple physical units.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU A} + \text{IMU B}. }
+        \]
+      </p>
+
+      <p>
+        If one fails, the other can continue navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.62 Analytical Redundancy</h3>
+
+      <p>
+        Analytical redundancy uses models or other sensors rather than duplicate hardware.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Predicted Angular Rate} }
+        \]
+      </p>
+
+      <p>
+        can be compared with:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyroscope Measurement}. }
+        \]
+      </p>
+
+      <p>
+        The difference provides a residual for fault detection.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.63 Cross-Sensor Residual</h3>
+
+      <p>
+        For two sensors measuring the same quantity:
+      </p>
+
+      <p>
+        \[
+        z_A, z_B,
+        \]
+      </p>
+
+      <p>
+        define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_{AB} = z_A-z_B. }
+        \]
+      </p>
+
+      <p>
+        If independent:
+      </p>
+
+      <p>
+        \[
+        \boxed{ S_{AB} = R_A+R_B. }
+        \]
+      </p>
+
+      <p>
+        Then:
+      </p>
+
+      <p>
+        \[
+        \boxed{ d_{AB}^2 = r_{AB}^T S_{AB}^{-1} r_{AB}. }
+        \]
+      </p>
+
+      <p>
+        This can detect disagreement.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.64 Three-Sensor Isolation</h3>
+
+      <p>
+        With sensors:
+      </p>
+
+      <p>
+        \[
+        A, B,C,
+        \]
+      </p>
+
+      <p>
+        suppose:
+      </p>
+
+      <p>
+        \[
+        A\approx B
+        \]
+      </p>
+
+      <p>
+        but:
+      </p>
+
+      <p>
+        \[
+        C
+        \]
+      </p>
+
+      <p>
+        disagrees strongly with both.
+      </p>
+
+      <p>
+        Then C becomes the most likely faulty branch.
+      </p>
+
+      <p>
+        This is a common redundancy principle.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.65 Limitation of Majority Voting</h3>
+
+      <p>
+        Suppose:
+      </p>
+
+      <p>
+        \[
+        A
+        \]
+      </p>
+
+      <p>
+        is highly accurate while:
+      </p>
+
+      <p>
+        \[
+        B,C
+        \]
+      </p>
+
+      <p>
+        are both poor.
+      </p>
+
+      <p>
+        Simple voting could incorrectly reject A.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Covariance-Weighted Consistency} }
+        \]
+      </p>
+
+      <p>
+        is preferable to raw voting.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.66 Common-Mode Faults</h3>
+
+      <p>
+        Redundant sensors may share common dependencies.
+      </p>
+
+      <p>
+        Examples include:
+      </p>
+
+      <ul>
+        <li>common time reference,</li>
+        <li>common attitude transformation,</li>
+        <li>common power supply,</li>
+        <li>common thermal environment,</li>
+        <li>common calibration database.</li>
+      </ul>
+
+      <p>
+        Therefore multiple sensors can agree and still be wrong.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.67 Example of Common-Mode Failure</h3>
+
+      <p>
+        Suppose camera and LiDAR both transform measurements using the same incorrect attitude matrix.
+      </p>
+
+      <p>
+        Both may agree with each other.
+      </p>
+
+      <p>
+        Yet both may produce incorrect inertial relative position.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Agreement} \neq \text{Guaranteed Correctness}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.68 Federated Fault Isolation</h3>
+
+      <p>
+        In a federated filter, each sensor or sensor group may have a local estimator.
+      </p>
+
+      <p>
+        For branch <code>i</code>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x_i, \quad P_i, \quad NIS_i. }
+        \]
+      </p>
+
+      <p>
+        The master estimator can monitor local-filter health.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.69 Benefit of Local Filters</h3>
+
+      <p>
+        If one local branch becomes faulty, it can be isolated without contaminating all other branches immediately.
+      </p>
+
+      <p>
+        This is one reason federated architectures are attractive for fault-tolerant spacecraft navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.70 Local Filter Exclusion</h3>
+
+      <p>
+        If branch <code>j</code> becomes unhealthy:
+      </p>
+
+      <p>
+        \[
+        \boxed{ I_j \rightarrow 0 }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        I_j
+        \]
+      </p>
+
+      <p>
+        represents its information contribution.
+      </p>
+
+      <p>
+        The master filter then fuses only healthy branches.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.71 Degraded Navigation Mode</h3>
+
+      <p>
+        A degraded mode occurs when the full nominal sensor set is unavailable, but navigation can still continue with reduced performance.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS + Camera + LiDAR + IMU} }
+        \]
+      </p>
+
+      <p>
+        may degrade to:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera + IMU}. }
+        \]
+      </p>
+
+      <p>
+        The estimator must reflect the increased uncertainty.
+      </p>
+
+      <div class="concept-note">
+        <h4>Degraded mode should be performance based</h4>
+        <p>A degraded configuration is acceptable only if the remaining sensors still satisfy the mission&#x27;s accuracy, observability, freshness, and integrity requirements. Sensor count alone is not enough.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.72 Degraded Does Not Mean Failed</h3>
+
+      <p>
+        A degraded mode means:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Reduced Navigation Capability} }
+        \]
+      </p>
+
+      <p>
+        not necessarily:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Navigation Failure}. }
+        \]
+      </p>
+
+      <p>
+        The key question is whether the remaining performance still satisfies mission requirements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.73 Covariance in Degraded Mode</h3>
+
+      <p>
+        When sensors are removed, state observability may weaken.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P }
+        \]
+      </p>
+
+      <p>
+        typically grows.
+      </p>
+
+      <p>
+        Guidance and mission logic should respond to actual covariance, not simply sensor count.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.74 Example: GNSS Loss</h3>
+
+      <p>
+        Suppose GNSS becomes unavailable.
+      </p>
+
+      <p>
+        Navigation may continue using:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU} + \text{Camera}. }
+        \]
+      </p>
+
+      <p>
+        But absolute position observability may degrade.
+      </p>
+
+      <p>
+        The covariance should reflect this.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.75 Example: Camera Loss</h3>
+
+      <p>
+        During close RPO, loss of camera may leave:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{LiDAR} + \text{IMU}. }
+        \]
+      </p>
+
+      <p>
+        Relative range may remain strong, but some angular or feature-based information may weaken depending on the LiDAR measurement type.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.76 Example: LiDAR Loss</h3>
+
+      <p>
+        If LiDAR fails during final approach, camera pose estimation may continue.
+      </p>
+
+      <p>
+        However, range precision or robustness may degrade.
+      </p>
+
+      <p>
+        Guidance may therefore reduce approach rate or move to a hold point.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.77 Example: IMU Fault</h3>
+
+      <p>
+        An IMU fault is especially important because inertial propagation often runs at the highest rate.
+      </p>
+
+      <p>
+        Possible responses include:
+      </p>
+
+      <ul>
+        <li>switch to redundant IMU,</li>
+        <li>use gyro-only or accelerometer-only fallback,</li>
+        <li>reduce maneuvering,</li>
+        <li>enter safe mode.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.78 Navigation Mode State Machine</h3>
+
+      <p>
+        A navigation system may define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{NOMINAL} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{DEGRADED\_1} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{DEGRADED\_2} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{NAV\_UNAVAILABLE}. }
+        \]
+      </p>
+
+      <p>
+        Transitions depend on sensor health and estimator uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.79 Navigation Availability</h3>
+
+      <p>
+        Navigation availability asks:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Can the navigation system provide a usable state estimate right now?} }
+        \]
+      </p>
+
+      <p>
+        It depends on:
+      </p>
+
+      <ul>
+        <li>active sensors,</li>
+        <li>covariance,</li>
+        <li>observability,</li>
+        <li>state age,</li>
+        <li>estimator health.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Availability is a navigation-level property</h4>
+        <p>A navigation solution is available when it remains usable for the current task. This depends on covariance, observability, state age, and health—not merely on whether some sensors are still producing data.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.80 Navigation Integrity</h3>
+
+      <p>
+        Integrity asks:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Can the system trust that dangerous navigation errors are unlikely to remain undetected?} }
+        \]
+      </p>
+
+      <p>
+        Fault detection and robust fusion contribute directly to integrity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.81 Continuity</h3>
+
+      <p>
+        Continuity refers to maintaining valid navigation without unexpected interruption during a required operation.
+      </p>
+
+      <p>
+        Frequent false sensor isolation can damage continuity.
+      </p>
+
+      <p>
+        Therefore fault detection must balance protection with availability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.82 Integrity–Availability Trade-Off</h3>
+
+      <p>
+        A very aggressive fault detector may reject sensors quickly.
+      </p>
+
+      <p>
+        This protects integrity but can reduce availability.
+      </p>
+
+      <p>
+        A permissive detector may preserve availability but risk accepting faulty data.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Integrity} \leftrightarrow \text{Availability}. }
+        \]
+      </p>
+
+      <p>
+        This is an important design trade.
+      </p>
+
+      <div class="concept-note">
+        <h4>Integrity and availability must be balanced</h4>
+        <p>Rejecting aggressively protects against bad data but can remove too much useful information. Allowing measurements too freely preserves continuity but increases the risk of undetected hazardous errors.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.83 False Alarm</h3>
+
+      <p>
+        A false alarm occurs when a healthy sensor is declared faulty.
+      </p>
+
+      <p>
+        Define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{FA} = P( \text{Declare Fault} | \text{Sensor Healthy} ). }
+        \]
+      </p>
+
+      <p>
+        High false-alarm rates unnecessarily reduce navigation availability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.84 Missed Detection</h3>
+
+      <p>
+        A missed detection occurs when a faulty sensor remains undetected.
+      </p>
+
+      <p>
+        Define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{MD} = P( \text{No Fault Declared} | \text{Sensor Faulty} ). }
+        \]
+      </p>
+
+      <p>
+        This can threaten navigation integrity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.85 Detection Probability</h3>
+
+      <p>
+        Define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_D = 1-P_{MD}. }
+        \]
+      </p>
+
+      <p>
+        A good fault detector aims for:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_D \rightarrow1 }
+        \]
+      </p>
+
+      <p>
+        while keeping:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{FA} }
+        \]
+      </p>
+
+      <p>
+        acceptably low.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.86 Detection Delay</h3>
+
+      <p>
+        Fault detection also has a time dimension.
+      </p>
+
+      <p>
+        Define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ T_D = t_{\text{detected}} - t_{\text{fault onset}}. }
+        \]
+      </p>
+
+      <p>
+        A detector may have high detection probability but still be too slow for close-proximity operations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.87 Why Detection Delay Matters in RPO</h3>
+
+      <p>
+        During final approach, spacecraft state can change significantly over short times.
+      </p>
+
+      <p>
+        A sensor fault that remains undetected for several seconds may cause:
+      </p>
+
+      <ul>
+        <li>incorrect position estimate,</li>
+        <li>wrong relative velocity,</li>
+        <li>unsafe thrust command.</li>
+      </ul>
+
+      <p>
+        Therefore detection speed becomes part of navigation safety.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.88 Fault Isolation Delay</h3>
+
+      <p>
+        Isolation may take longer than detection.
+      </p>
+
+      <p>
+        The system might first know:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Something Is Wrong} }
+        \]
+      </p>
+
+      <p>
+        before determining:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Which Sensor Is Wrong}. }
+        \]
+      </p>
+
+      <p>
+        During this interval, conservative guidance behavior may be appropriate.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.89 RPO Far-Range Fault Response</h3>
+
+      <p>
+        At far range, navigation usually has larger margins.
+      </p>
+
+      <p>
+        A temporary sensor issue may lead to:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Continue with Reduced Sensor Set}. }
+        \]
+      </p>
+
+      <p>
+        Rapid abort may not be necessary.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.90 RPO Mid-Range Fault Response</h3>
+
+      <p>
+        At mid range, the system may:
+      </p>
+
+      <ul>
+        <li>reduce approach rate,</li>
+        <li>hold position,</li>
+        <li>switch sensor source,</li>
+        <li>wait for reacquisition.</li>
+      </ul>
+
+      <p>
+        The exact response depends on remaining observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.91 RPO Close-Range Fault Response</h3>
+
+      <p>
+        Near the target, fault tolerance becomes much more critical.
+      </p>
+
+      <p>
+        A critical navigation sensor fault may cause:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Hold} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Retreat} }
+        \]
+      </p>
+
+      <p>
+        before uncertainty exceeds the safe corridor.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.92 Capture-Phase Fault Logic</h3>
+
+      <p>
+        Capture readiness should not depend only on:
+      </p>
+
+      <p>
+        \[
+        r_{rel}, v_{rel}, \theta_{rel}, \omega_{rel}.
+        \]
+      </p>
+
+      <p>
+        It should also include:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Navigation Health} }
+        \]
+      </p>
+
+      <p>
+        and:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Health}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.93 Capture Condition with Health</h3>
+
+      <p>
+        A conceptual condition is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{CaptureReady} = C_r \land C_v \land C_\theta \land C_\omega \land C_P \land C_H }
+        \]
+      </p>
+
+      <p>
+        where:
+      </p>
+
+      <ul>
+        <li><code>C_r</code>: position condition,</li>
+        <li><code>C_v</code>: velocity condition,</li>
+        <li><code>C_\theta</code>: attitude condition,</li>
+        <li><code>C_\omega</code>: angular-rate condition,</li>
+        <li><code>C_P</code>: covariance condition,</li>
+        <li><code>C_H</code>: navigation-health condition.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Capture-ready should include trustworthiness</h4>
+        <p>Geometric thresholds alone are insufficient near docking. The navigation state should also have acceptable covariance and health so the capture-ready flag represents a credible, not merely numerically convenient, condition.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.94 Fault During Capture Dwell</h3>
+
+      <p>
+        Suppose capture conditions must remain valid for:
+      </p>
+
+      <p>
+        \[
+        T_d.
+        \]
+      </p>
+
+      <p>
+        If a critical sensor becomes faulted during dwell, the timer should normally not continue blindly.
+      </p>
+
+      <p>
+        Possible actions include:
+      </p>
+
+      <ul>
+        <li>pause dwell,</li>
+        <li>reset dwell,</li>
+        <li>enter hold.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.95 Sensor Reconfiguration</h3>
+
+      <p>
+        After isolating a faulty sensor, the estimator may need to change:
+      </p>
+
+      <ul>
+        <li>measurement model,</li>
+        <li>state dimension,</li>
+        <li>covariance structure,</li>
+        <li>update frequency,</li>
+        <li>process-noise tuning.</li>
+      </ul>
+
+      <p>
+        This is called estimator reconfiguration.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.96 State-Dimension Reconfiguration</h3>
+
+      <p>
+        Suppose a bias state is only associated with a sensor that has been permanently disabled.
+      </p>
+
+      <p>
+        The filter may either:
+      </p>
+
+      <ul>
+        <li>retain the state,</li>
+        <li>freeze it,</li>
+        <li>remove it.</li>
+      </ul>
+
+      <p>
+        Changing state dimension dynamically is possible but increases implementation complexity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.97 Covariance Inflation After Reconfiguration</h3>
+
+      <p>
+        After losing an important sensor, the estimator may need to increase uncertainty.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P \leftarrow P+\Delta P. }
+        \]
+      </p>
+
+      <p>
+        This should be based on physical reasoning and verification rather than arbitrary inflation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.98 Reinitialization</h3>
+
+      <p>
+        A severe estimator fault may require reinitialization.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x \rightarrow \hat x_0 }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ P \rightarrow P_0. }
+        \]
+      </p>
+
+      <p>
+        Reinitialization should generally be a last resort because it discards accumulated navigation information.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.99 Sensor Reintroduction</h3>
+
+      <p>
+        If a sensor recovers, it should usually undergo:
+      </p>
+
+      <ul>
+        <li>packet validation,</li>
+        <li>timing validation,</li>
+        <li>physical validation,</li>
+        <li>innovation monitoring,</li>
+        <li>confirmation period.</li>
+      </ul>
+
+      <p>
+        Only then should normal fusion resume.
+      </p>
+
+      <div class="concept-note">
+        <h4>Recovery should be deliberate</h4>
+        <p>A returning sensor may still have stale alignment, wrong target association, or timing problems. Reintroduction after a confirmation period avoids immediately contaminating the estimator again.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.100 Reintroduction Gate</h3>
+
+      <p>
+        A returning sensor may require:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{good}} \ge N_{\text{required}}. }
+        \]
+      </p>
+
+      <p>
+        The measurements may first be monitored without affecting the state.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.101 Monitor-Only Mode</h3>
+
+      <p>
+        In monitor-only mode:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Compute Residuals} }
+        \]
+      </p>
+
+      <p>
+        but:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Do Not Update State}. }
+        \]
+      </p>
+
+      <p>
+        This allows health to be evaluated before restoring trust.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.102 Why Monitor-Only Mode Is Useful</h3>
+
+      <p>
+        Suppose a camera resumes after temporary blinding.
+      </p>
+
+      <p>
+        Immediately trusting the first measurement may be risky.
+      </p>
+
+      <p>
+        Monitoring several measurements first confirms:
+      </p>
+
+      <ul>
+        <li>target association,</li>
+        <li>timing,</li>
+        <li>consistency,</li>
+        <li>covariance.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.103 Fault-Tolerant Fusion Architecture</h3>
+
+      <p>
+        A robust architecture may be:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Inputs} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor-Specific Validation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Innovation Generation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Outlier Rejection} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Health Monitoring} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fault Isolation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Robust Weight / Sensor Exclusion} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fused Navigation State}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.104 Sensor Health Vector</h3>
+
+      <p>
+        The estimator can maintain:
+      </p>
+
+      <p>
+        \[
+        \boxed{ h = \begin{bmatrix} h_{\text{GNSS}}\\ h_{\text{camera}}\\ h_{\text{LiDAR}}\\ h_{\text{star tracker}}\\ h_{\text{IMU}} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Each element may contain more than a Boolean value.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.105 Rich Sensor Health State</h3>
+
+      <p>
+        For each sensor, health information may include:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \{ \text{available}, \text{valid}, \text{suspect}, \text{faulted}, \text{recovering} \}. }
+        \]
+      </p>
+
+      <p>
+        Additional metrics may include:
+      </p>
+
+      <ul>
+        <li>rejection ratio,</li>
+        <li>last valid timestamp,</li>
+        <li>NIS,</li>
+        <li>internal quality.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.106 Navigation Health Output</h3>
+
+      <p>
+        The estimator can produce a global health flag:
+      </p>
+
+      <p>
+        \[
+        \boxed{ H_{\text{nav}}. }
+        \]
+      </p>
+
+      <p>
+        Possible states:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{NOMINAL} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{DEGRADED} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UNSAFE} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{INVALID}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.107 Navigation Health Should Depend on Covariance</h3>
+
+      <p>
+        Sensor count alone is insufficient.
+      </p>
+
+      <p>
+        Two healthy sensors may still provide poor observability.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ H_{\text{nav}} = f( \text{sensor health}, P, \text{observability}, \text{state age} ). }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why covariance and observability belong in health</h4>
+        <p>Several healthy sensors can still leave important state directions weakly observable. A global navigation-health flag should therefore reflect what the remaining sensor geometry can actually determine.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.108 Sensor Exclusion and Observability</h3>
+
+      <p>
+        Removing a sensor can make some states weakly observable or completely unobservable.
+      </p>
+
+      <p>
+        Therefore every sensor-failure mode should be analyzed in terms of remaining observability.
+      </p>
+
+      <p>
+        This connects directly to the next section:
+      </p>
+
+      <p>
+        \[
+        \boxed{ 4.2.17\ \text{Observability in Sensor Fusion}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.109 Fault Detection Using Redundant State Estimates</h3>
+
+      <p>
+        Another approach is to run separate estimators:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x^{(1)}, \hat x^{(2)}, \hat x^{(3)}. }
+        \]
+      </p>
+
+      <p>
+        Each excludes or uses different sensors.
+      </p>
+
+      <p>
+        Comparing their outputs can help isolate faults.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.110 Solution Separation</h3>
+
+      <p>
+        Suppose:
+      </p>
+
+      <p>
+        \[
+        \hat x_{\text{all}}
+        \]
+      </p>
+
+      <p>
+        uses all sensors and:
+      </p>
+
+      <p>
+        \[
+        \hat x_{(-i)}
+        \]
+      </p>
+
+      <p>
+        excludes sensor <code>i</code>.
+      </p>
+
+      <p>
+        Then define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta x_i = \hat x_{\text{all}} - \hat x_{(-i)}. }
+        \]
+      </p>
+
+      <p>
+        Large separation may indicate that sensor <code>i</code> strongly influences the full solution.
+      </p>
+
+      <div class="concept-note">
+        <h4>Solution separation gives a system-level view</h4>
+        <p>Innovation checks test individual measurements. Solution separation tests how much the total navigation state depends on one sensor branch, which can reveal hazardous influence that is not obvious from one residual alone.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.111 Why Solution Separation Helps</h3>
+
+      <p>
+        Innovation monitoring checks one measurement against one prediction.
+      </p>
+
+      <p>
+        Solution separation examines how the complete navigation solution changes when a sensor is removed.
+      </p>
+
+      <p>
+        This can provide stronger integrity monitoring.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.112 Residual Bank</h3>
+
+      <p>
+        A <strong>residual bank</strong> may contain several diagnostic residuals:
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_1, r_2, \dots, r_M. }
+        \]
+      </p>
+
+      <p>
+        Each residual is designed to respond differently to different faults.
+      </p>
+
+      <p>
+        The pattern of residual activation helps isolate the faulty sensor.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.113 Structured Residuals</h3>
+
+      <p>
+        Suppose:
+      </p>
+
+      <p>
+        \[
+        r_1
+        \]
+      </p>
+
+      <p>
+        is sensitive to GNSS faults but insensitive to camera faults.
+      </p>
+
+      <p>
+        Suppose:
+      </p>
+
+      <p>
+        \[
+        r_2
+        \]
+      </p>
+
+      <p>
+        is sensitive to camera faults.
+      </p>
+
+      <p>
+        Then the combination of residuals gives a fault signature.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.114 Fault Signature Matrix</h3>
+
+      <p>
+        A conceptual matrix may be:
+      </p>
+
+      <p>
+        \[
+        \boxed{ F = \begin{bmatrix} 1&0&0\\ 1&1&0\\ 0&1&1 \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Each column represents a possible fault.
+      </p>
+
+      <p>
+        Each row represents a residual.
+      </p>
+
+      <p>
+        The observed residual pattern can help identify the fault source.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.115 False Camera Detection</h3>
+
+      <p>
+        During vision-based RPO, a false target or feature association may produce a large pose error.
+      </p>
+
+      <p>
+        Detection layers may include:
+      </p>
+
+      <ul>
+        <li>geometric validation,</li>
+        <li>RANSAC,</li>
+        <li>reprojection error,</li>
+        <li>pose-solver confidence,</li>
+        <li>innovation gate,</li>
+        <li>cross-check with LiDAR.</li>
+      </ul>
+
+      <p>
+        This is an example of layered fault protection.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.116 False LiDAR Pose</h3>
+
+      <p>
+        LiDAR registration may converge to an incorrect local solution.
+      </p>
+
+      <p>
+        Internal metrics such as:
+      </p>
+
+      <ul>
+        <li>ICP residual,</li>
+        <li>inlier fraction,</li>
+        <li>convergence score</li>
+      </ul>
+
+      <p>
+        should be combined with navigation innovation.
+      </p>
+
+      <p>
+        A numerically converged ICP solution is not automatically correct.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.117 GNSS Faults</h3>
+
+      <p>
+        GNSS-related anomalies may include:
+      </p>
+
+      <ul>
+        <li>multipath,</li>
+        <li>low satellite count,</li>
+        <li>poor geometry,</li>
+        <li>cycle slip,</li>
+        <li>incorrect fix status,</li>
+        <li>receiver reset.</li>
+      </ul>
+
+      <p>
+        Therefore GNSS fault logic should combine receiver status with estimator residuals.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.118 Star-Tracker Faults</h3>
+
+      <p>
+        Star trackers may experience:
+      </p>
+
+      <ul>
+        <li>blinding,</li>
+        <li>false star identification,</li>
+        <li>lost-in-space failure,</li>
+        <li>Earth limb contamination.</li>
+      </ul>
+
+      <p>
+        Internal status flags are especially valuable because estimator residuals alone may not identify the cause.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.119 Magnetometer Faults</h3>
+
+      <p>
+        Magnetometer anomalies may result from:
+      </p>
+
+      <ul>
+        <li>onboard current,</li>
+        <li>magnetic torquers,</li>
+        <li>nearby mechanisms,</li>
+        <li>calibration errors.</li>
+      </ul>
+
+      <p>
+        A useful test compares measured field magnitude with expected geomagnetic magnitude.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.120 IMU Faults</h3>
+
+      <p>
+        IMU fault modes include:
+      </p>
+
+      <ul>
+        <li>gyro bias jump,</li>
+        <li>accelerometer bias jump,</li>
+        <li>excessive noise,</li>
+        <li>saturation,</li>
+        <li>frozen axis,</li>
+        <li>scale-factor error.</li>
+      </ul>
+
+      <p>
+        Because the IMU drives propagation, these faults can affect the state continuously rather than only at update times.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.121 Axis-Level IMU Fault Isolation</h3>
+
+      <p>
+        A three-axis gyro may have only one faulty axis.
+      </p>
+
+      <p>
+        Therefore health monitoring can operate at the component level:
+      </p>
+
+      <p>
+        \[
+        \boxed{ h_{\omega_x}, h_{\omega_y}, h_{\omega_z}. }
+        \]
+      </p>
+
+      <p>
+        This can allow partial sensor use if architecture permits.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.122 Fault Detection in Propagation Sensors</h3>
+
+      <p>
+        Measurement sensors produce residuals naturally.
+      </p>
+
+      <p>
+        Propagation sensors such as IMUs require indirect residuals.
+      </p>
+
+      <p>
+        Examples:
+      </p>
+
+      <ul>
+        <li>gyro vs star tracker,</li>
+        <li>accelerometer vs GNSS-derived acceleration,</li>
+        <li>IMU propagation vs camera pose.</li>
+      </ul>
+
+      <p>
+        This is analytical redundancy.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.123 Fault Detection After Thruster Firing</h3>
+
+      <p>
+        During a burn, sensor residuals may grow because of:
+      </p>
+
+      <ul>
+        <li>vibration,</li>
+        <li>timing error,</li>
+        <li>incorrect thrust model.</li>
+      </ul>
+
+      <p>
+        Before isolating sensors, the system should determine whether the anomaly is correlated with actuator events.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.124 Actuator Faults Can Look Like Sensor Faults</h3>
+
+      <p>
+        Suppose commanded thrust is:
+      </p>
+
+      <p>
+        \[
+        F_c
+        \]
+      </p>
+
+      <p>
+        but actual thrust is:
+      </p>
+
+      <p>
+        \[
+        F_a \neq F_c.
+        \]
+      </p>
+
+      <p>
+        The estimator prediction becomes incorrect.
+      </p>
+
+      <p>
+        Multiple sensors may then generate large innovations.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Large Sensor Residual} \neq \text{Necessarily Sensor Fault}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Sensor residuals can be caused by actuator problems</h4>
+        <p>If the vehicle motion differs from the commanded actuation, every sensor may disagree with the predicted state. Common residual growth during burns should therefore trigger checks of the actuator and dynamics model before isolating sensors.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.125 Common-Model Check</h3>
+
+      <p>
+        If many independent sensors simultaneously disagree with prediction, investigate:
+      </p>
+
+      <ul>
+        <li>dynamics model,</li>
+        <li>actuator model,</li>
+        <li>time synchronization,</li>
+        <li>common frame transformation.</li>
+      </ul>
+
+      <p>
+        This is usually more plausible than simultaneous independent sensor failures.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.126 Fault-Tolerant RPO Navigation</h3>
+
+      <p>
+        A robust RPO estimator should support failure of at least some sensing channels while preserving enough information to:
+      </p>
+
+      <ul>
+        <li>hold safely,</li>
+        <li>retreat,</li>
+        <li>abort,</li>
+        <li>continue degraded approach if permitted.</li>
+      </ul>
+
+      <p>
+        This requires sensor redundancy and observability analysis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.127 Mission-Phase Sensor Priority</h3>
+
+      <p>
+        Different sensors may be critical in different phases.
+      </p>
+
+      <p>
+        Far range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS / Relative GNSS} }
+        \]
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        Mid range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS + Camera} }
+        \]
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        Close range:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera + LiDAR + IMU} }
+        \]
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        Fault handling should therefore be mission-phase aware.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.128 Critical vs Non-Critical Sensor Fault</h3>
+
+      <p>
+        A fault is mission critical if loss of that sensor causes navigation requirements to be violated.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Criticality} = f( \text{Mission Phase}, \text{Redundancy}, \text{Required Accuracy} ). }
+        \]
+      </p>
+
+      <p>
+        The same sensor can be noncritical in one phase and critical in another.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.129 Fault Response Matrix</h3>
+
+      <p>
+        A practical system can define a table:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Fault</th>
+            <th>Far Range</th>
+            <th>Mid Range</th>
+            <th>Close Range</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>GNSS Loss</td>
+              <td>Continue / Degrade</td>
+              <td>Hold / Alternate Nav</td>
+              <td>Possibly irrelevant if optical nav active</td>
+            </tr>
+            <tr>
+              <td>Camera Loss</td>
+              <td>Continue</td>
+              <td>Degrade</td>
+              <td>Hold / Retreat</td>
+            </tr>
+            <tr>
+              <td>LiDAR Loss</td>
+              <td>Continue</td>
+              <td>Continue</td>
+              <td>Degrade / Hold</td>
+            </tr>
+            <tr>
+              <td>IMU Loss</td>
+              <td>Switch Redundant IMU</td>
+              <td>Switch / Hold</td>
+              <td>Hold / Abort</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Exact actions depend on mission design.
+      </p>
+
+      <div class="concept-note">
+        <h4>Fault response is mission-phase dependent</h4>
+        <p>The same sensor loss can have very different consequences at far range, mid range, and final approach. Fault-response matrices are useful because they encode this dependence explicitly.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.130 Robust Navigation Does Not Mean Ignoring Bad Sensors</h3>
+
+      <p>
+        The objective is not to make the estimator tolerate arbitrarily bad data.
+      </p>
+
+      <p>
+        The objective is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Detect} + \text{Limit Influence} + \text{Isolate} + \text{Continue Safely if Possible}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.131 Fault Injection Testing</h3>
+
+      <p>
+        Estimator robustness should be verified through intentional fault injection.
+      </p>
+
+      <p>
+        Examples include:
+      </p>
+
+      <ul>
+        <li>measurement spikes,</li>
+        <li>step bias,</li>
+        <li>ramp drift,</li>
+        <li>increased noise,</li>
+        <li>frozen values,</li>
+        <li>packet loss,</li>
+        <li>stale timestamps,</li>
+        <li>covariance errors.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.132 Step-Bias Injection</h3>
+
+      <p>
+        Inject:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_{\text{fault}} = z_{\text{nominal}} + b }
+        \]
+      </p>
+
+      <p>
+        at time:
+      </p>
+
+      <p>
+        \[
+        t_f.
+        \]
+      </p>
+
+      <p>
+        Measure:
+      </p>
+
+      <ul>
+        <li>innovation response,</li>
+        <li>detection delay,</li>
+        <li>isolation time,</li>
+        <li>navigation error.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.133 Drift Injection</h3>
+
+      <p>
+        Use:
+      </p>
+
+      <p>
+        \[
+        \boxed{ b(t) = d(t-t_f) }
+        \]
+      </p>
+
+      <p>
+        for:
+      </p>
+
+      <p>
+        \[
+        t\ge t_f.
+        \]
+      </p>
+
+      <p>
+        This tests sensitivity to slowly developing faults.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.134 Noise Increase Injection</h3>
+
+      <p>
+        At fault time:
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{\text{true}} : R_0 \rightarrow \lambda R_0. }
+        \]
+      </p>
+
+      <p>
+        with:
+      </p>
+
+      <p>
+        \[
+        \lambda>1.
+        \]
+      </p>
+
+      <p>
+        Evaluate whether the monitoring logic identifies the increasing residual variance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.135 Frozen Measurement Injection</h3>
+
+      <p>
+        After:
+      </p>
+
+      <p>
+        \[
+        t_f,
+        \]
+      </p>
+
+      <p>
+        set:
+      </p>
+
+      <p>
+        \[
+        \boxed{ z_k=z(t_f). }
+        \]
+      </p>
+
+      <p>
+        Verify whether frozen-data detection triggers before state error becomes excessive.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.136 Dropout Injection</h3>
+
+      <p>
+        Remove measurements for duration:
+      </p>
+
+      <p>
+        \[
+        T_{\text{drop}}.
+        \]
+      </p>
+
+      <p>
+        Evaluate:
+      </p>
+
+      <ul>
+        <li>covariance growth,</li>
+        <li>degraded-mode behavior,</li>
+        <li>reacquisition.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.137 Intermittent Fault Injection</h3>
+
+      <p>
+        Introduce faults randomly:
+      </p>
+
+      <p>
+        \[
+        \boxed{ I_k \sim \text{Bernoulli}(p_f). }
+        \]
+      </p>
+
+      <p>
+        Then:
+      </p>
+
+      <p>
+        \[
+        z_k = z_k^{nominal} + I_ko_k.
+        \]
+      </p>
+
+      <p>
+        This tests robust behavior under intermittent corruption.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.138 False Covariance Injection</h3>
+
+      <p>
+        Keep measurement values correct but provide:
+      </p>
+
+      <p>
+        \[
+        \boxed{ R_{\text{reported}} \neq R_{\text{true}}. }
+        \]
+      </p>
+
+      <p>
+        This tests whether consistency monitoring identifies covariance misreporting.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.139 Timing Fault Injection</h3>
+
+      <p>
+        Add:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Delta t_{\text{fault}}. }
+        \]
+      </p>
+
+      <p>
+        Even with perfect sensor values, wrong timing can generate abnormal innovations.
+      </p>
+
+      <p>
+        This verifies that timing faults are not incorrectly classified as sensor hardware faults.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.140 Frame Fault Injection</h3>
+
+      <p>
+        Introduce frame rotation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ C_{\text{wrong}} = \Delta C C_{\text{true}}. }
+        \]
+      </p>
+
+      <p>
+        Observe systematic residual signatures.
+      </p>
+
+      <p>
+        This tests fault isolation between sensor and frame-processing logic.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.141 Monte Carlo Fault Analysis</h3>
+
+      <p>
+        Monte Carlo campaigns should randomize:
+      </p>
+
+      <ul>
+        <li>fault onset,</li>
+        <li>fault magnitude,</li>
+        <li>fault duration,</li>
+        <li>affected sensor,</li>
+        <li>environmental condition,</li>
+        <li>initial state.</li>
+      </ul>
+
+      <p>
+        Performance should be evaluated statistically.
+      </p>
+
+      <div class="concept-note">
+        <h4>Monte Carlo fault analysis should test the full response chain</h4>
+        <p>Randomizing only sensor noise is not enough. Fault onset, magnitude, duration, environment, and sensor identity should vary so detection, isolation, reconfiguration, and mission consequences can all be evaluated statistically.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.142 Monte Carlo Fault Metrics</h3>
+
+      <p>
+        Useful metrics include:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_D }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{FA} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ T_D }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{\text{isolation correct}} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Navigation RMSE} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mission Success Rate}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.143 Fault Containment Metric</h3>
+
+      <p>
+        Measure maximum navigation error after fault onset:
+      </p>
+
+      <p>
+        \[
+        \boxed{ e_{\max} = \max_{t\ge t_f} \| x(t)-\hat x(t) \|. }
+        \]
+      </p>
+
+      <p>
+        This measures how well robust fusion limits the impact of the fault.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.144 Detection Before Hazard</h3>
+
+      <p>
+        A useful requirement is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ T_D < T_{\text{hazard}}. }
+        \]
+      </p>
+
+      <p>
+        The fault must be detected before navigation error reaches a hazardous level.
+      </p>
+
+      <div class="concept-note">
+        <h4>Detection must occur before safety is lost</h4>
+        <p>A detector that eventually identifies every fault can still be inadequate if the state error exceeds a hazardous bound first. Detection delay is therefore a safety requirement, not only a diagnostic metric.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.145 Recovery Time</h3>
+
+      <p>
+        Define:
+      </p>
+
+      <p>
+        \[
+        \boxed{ T_R = t_{\text{recovered}} - t_{\text{fault cleared}}. }
+        \]
+      </p>
+
+      <p>
+        This measures how quickly the system safely returns to nominal operation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.146 HIL Fault Testing</h3>
+
+      <p>
+        Hardware-in-the-loop testing should inject faults at the sensor interface whenever possible.
+      </p>
+
+      <p>
+        Examples:
+      </p>
+
+      <ul>
+        <li>freeze data stream,</li>
+        <li>corrupt selected packets,</li>
+        <li>introduce delays,</li>
+        <li>alter measurement values,</li>
+        <li>change covariance fields.</li>
+      </ul>
+
+      <p>
+        This validates the actual onboard implementation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.147 Fault Logging</h3>
+
+      <p>
+        For every detected fault, log:
+      </p>
+
+      <p>
+        \[
+        \boxed{ t_{\text{fault}} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{sensorID} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{faultType} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{health transition} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{recovery action}. }
+        \]
+      </p>
+
+      <p>
+        This supports post-flight diagnosis.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.148 Fault Reason Codes</h3>
+
+      <p>
+        Examples:
+      </p>
+
+      <ul>
+        <li><code>OUTLIER</code></li>
+        <li><code>BIAS_SUSPECTED</code></li>
+        <li><code>DRIFT_SUSPECTED</code></li>
+        <li><code>FROZEN_DATA</code></li>
+        <li><code>EXCESS_NOISE</code></li>
+        <li><code>DROPOUT</code></li>
+        <li><code>TIME_INVALID</code></li>
+        <li><code>FRAME_INVALID</code></li>
+        <li><code>COVARIANCE_INVALID</code></li>
+      </ul>
+
+      <p>
+        Specific reason codes improve traceability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.149 Fault Dashboard</h3>
+
+      <p>
+        A diagnostic display may show:
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Sensor</th>
+            <th>Health</th>
+            <th>NIS</th>
+            <th>Reject Rate</th>
+            <th>Last Valid</th>
+            <th>Mode</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>GNSS</td>
+              <td>Healthy</td>
+              <td>—</td>
+              <td>—</td>
+              <td>—</td>
+              <td>Fused</td>
+            </tr>
+            <tr>
+              <td>Camera</td>
+              <td>Suspect</td>
+              <td>—</td>
+              <td>—</td>
+              <td>—</td>
+              <td>Monitor</td>
+            </tr>
+            <tr>
+              <td>LiDAR</td>
+              <td>Healthy</td>
+              <td>—</td>
+              <td>—</td>
+              <td>—</td>
+              <td>Fused</td>
+            </tr>
+            <tr>
+              <td>IMU</td>
+              <td>Healthy</td>
+              <td>—</td>
+              <td>—</td>
+              <td>—</td>
+              <td>Propagation</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        This gives immediate visibility into navigation health.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.150 Robust Fusion in Simulink</h3>
+
+      <p>
+        A practical Simulink chain may be:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Measurement} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Validation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Innovation / NIS} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Fault Monitor} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Weight / Enable Signal} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Update}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.151 Enabled Measurement Update</h3>
+
+      <p>
+        A hard-rejection implementation can use:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{measurementEnable} \in \{0,1\}. }
+        \]
+      </p>
+
+      <p>
+        If:
+      </p>
+
+      <p>
+        \[
+        \text{measurementEnable}=0,
+        \]
+      </p>
+
+      <p>
+        the update block is bypassed.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.152 Weighted Measurement Update</h3>
+
+      <p>
+        A robust implementation may use:
+      </p>
+
+      <p>
+        \[
+        \boxed{ w\in[0,1]. }
+        \]
+      </p>
+
+      <p>
+        Then either:
+      </p>
+
+      <p>
+        \[
+        R_{\text{eff}} = \frac{R}{w}
+        \]
+      </p>
+
+      <p>
+        or another robust weighting formulation is used.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.153 Sensor-Fault State Machine in Simulink</h3>
+
+      <p>
+        A Stateflow chart may implement:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Healthy} \rightarrow \text{Suspect} \rightarrow \text{Faulted} \rightarrow \text{Recovering}. }
+        \]
+      </p>
+
+      <p>
+        Transitions can use:
+      </p>
+
+      <ul>
+        <li>NIS thresholds,</li>
+        <li>consecutive failure counts,</li>
+        <li>timeout conditions,</li>
+        <li>recovery counters.</li>
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.154 MATLAB Fault-Monitor Function</h3>
+
+      <p>
+        A conceptual function may be:
+      </p>
+
+      <p>
+        \[
+        \boxed{ [ \text{health}, w, \text{reason} ] = \text{updateSensorHealth} ( NIS, \gamma, q, t ). }
+        \]
+      </p>
+
+      <p>
+        This keeps fault-monitoring logic modular.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.155 Interface Between Estimator and FDIR</h3>
+
+      <p>
+        The estimator may output:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \{ \hat x, P, H_{\text{nav}}, h_i, NIS_i, \text{age}_i \}. }
+        \]
+      </p>
+
+      <p>
+        FDIR then decides mission-level actions.
+      </p>
+
+      <div class="concept-note">
+        <h4>Keep estimator diagnostics separate from mission action</h4>
+        <p>The estimator should report state, covariance, and health evidence. Guidance and FDIR can then decide whether to hold, retreat, abort, or continue, making interfaces clearer and verification easier.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.156 Do Not Mix Navigation and Mission Decisions Unnecessarily</h3>
+
+      <p>
+        The estimator should identify:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Navigation Health}. }
+        \]
+      </p>
+
+      <p>
+        Guidance and FDIR should decide:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Hold / Retreat / Abort}. }
+        \]
+      </p>
+
+      <p>
+        This separation improves software architecture and verification.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.157 Fault-Tolerant Design Philosophy</h3>
+
+      <p>
+        A useful philosophy is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Detect Early} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Limit Fault Influence} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Isolate Correctly} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Preserve Navigation if Possible} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Enter Safe Mode if Necessary}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.158 Common Implementation Mistakes</h3>
+
+      <p>
+        Typical mistakes include:
+      </p>
+
+      <ul>
+        <li>declaring sensor failure after one rejected sample,</li>
+        <li>confusing dropout with rejection,</li>
+        <li>reducing covariance after rejected data,</li>
+        <li>ignoring fault persistence,</li>
+        <li>ignoring common-mode failures,</li>
+        <li>using majority voting without covariance,</li>
+        <li>keeping a permanently failed sensor weakly weighted forever,</li>
+        <li>re-enabling a sensor immediately after one valid sample,</li>
+        <li>failing to grow covariance in degraded mode,</li>
+        <li>assuming redundancy guarantees observability,</li>
+        <li>interpreting all high NIS as sensor faults,</li>
+        <li>not checking timing and frame errors first,</li>
+        <li>allowing navigation health to depend only on sensor count,</li>
+        <li>failing to log rejected measurements.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Why these implementation mistakes are serious</h4>
+        <p>Most failures listed here create inconsistency between the estimator&#x27;s numerical confidence and the information actually available. That can make the system look healthy while its state uncertainty is understated.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.159 Robust Fusion and Safety</h3>
+
+      <p>
+        Robust fusion creates a protective barrier:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Fault} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \not\Rightarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Immediate Navigation Failure}. }
+        \]
+      </p>
+
+      <p>
+        Instead:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Fault} \rightarrow \text{Detection} \rightarrow \text{Isolation} \rightarrow \text{Reconfiguration}. }
+        \]
+      </p>
+
+      <p>
+        That is the essential purpose of fault-tolerant sensor fusion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.160 Key Equations at a Glance</h3>
+
+      <h4>Faulted Measurement</h4>
+
+      <p>
+        \[
+        \boxed{ z = h(x) + v + f }
+        \]
+      </p>
+
+      <p>
+        where <code>f</code> represents fault contribution.
+      </p>
+
+      <h4>Innovation</h4>
+
+      <p>
+        \[
+        \boxed{ r = z-\hat z. }
+        \]
+      </p>
+
+      <h4>NIS</h4>
+
+      <p>
+        \[
+        \boxed{ NIS = r^TS^{-1}r. }
+        \]
+      </p>
+
+      <h4>Persistent Innovation Mean</h4>
+
+      <p>
+        \[
+        \boxed{ \bar r = \frac1N \sum_k r_k. }
+        \]
+      </p>
+
+      <h4>Rejection Ratio</h4>
+
+      <p>
+        \[
+        \boxed{ f_{\text{reject}} = \frac{ N_{\text{rejected}} }{ N_{\text{total}} }. }
+        \]
+      </p>
+
+      <h4>Robust Weight</h4>
+
+      <p>
+        \[
+        \boxed{ 0\le w\le1. }
+        \]
+      </p>
+
+      <h4>Effective Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ R_{\text{eff}} = \frac{R}{w}. }
+        \]
+      </p>
+
+      <h4>CUSUM</h4>
+
+      <p>
+        \[
+        \boxed{ g_k = \max \left( 0, g_{k-1}+s_k-\nu \right). }
+        \]
+      </p>
+
+      <h4>Detection Delay</h4>
+
+      <p>
+        \[
+        \boxed{ T_D = t_{\text{detected}} - t_{\text{fault onset}}. }
+        \]
+      </p>
+
+      <h4>Effective Particle Number</h4>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} = \frac{1}{ \sum_i w_i^2 }. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.161 Key Takeaways</h3>
+
+      <p>
+        The main ideas of robust sensor fusion are:
+      </p>
+
+      <ul>
+        <li>An outlier is not automatically a sensor fault.</li>
+        <li>A sensor fault is not automatically complete navigation failure.</li>
+        <li>Isolated outliers are usually handled by innovation gating.</li>
+        <li>Persistent faults require health monitoring over time.</li>
+        <li>Bias faults often appear as nonzero innovation mean.</li>
+        <li>Drift faults require trend monitoring.</li>
+        <li>Excessive noise appears as increased innovation variance.</li>
+        <li>Frozen sensors require temporal checks, not only NIS.</li>
+        <li>Dropout and rejection are different conditions.</li>
+        <li>Fault detection determines whether abnormal behavior exists.</li>
+        <li>Fault isolation determines where it originates.</li>
+        <li>FDIR adds recovery and system reconfiguration.</li>
+        <li>One rejected measurement should rarely disable a sensor permanently.</li>
+        <li>Consecutive failure logic reduces false isolation.</li>
+        <li>Moving-window statistics help detect intermittent problems.</li>
+        <li>CUSUM helps detect small persistent faults.</li>
+        <li>Robust weighting can reduce measurement influence without full rejection.</li>
+        <li>Huber and other M-estimators provide continuous outlier suppression.</li>
+        <li>Heavy-tailed likelihoods improve robustness when Gaussian assumptions are poor.</li>
+        <li>Robust weighting does not replace fault isolation.</li>
+        <li>Redundant sensors enable cross-checking.</li>
+        <li>Covariance should be considered when comparing sensors.</li>
+        <li>Common-mode faults remain possible even with redundancy.</li>
+        <li>Federated filters can simplify sensor-fault isolation.</li>
+        <li>Sensor exclusion must preserve covariance consistency.</li>
+        <li>Degraded navigation can remain usable even when one sensor fails.</li>
+        <li>Remaining observability must be checked after sensor loss.</li>
+        <li>Navigation health should depend on covariance and observability, not sensor count alone.</li>
+        <li>Capture logic should include navigation-health conditions.</li>
+        <li>A critical sensor failure during final approach may require hold, retreat, or abort.</li>
+        <li>Sensor reintroduction should normally use a confirmation period.</li>
+        <li>Monitor-only mode is useful during recovery.</li>
+        <li>Fault-injection testing is essential.</li>
+        <li>Monte Carlo analysis should evaluate detection probability and false-alarm probability.</li>
+        <li>Detection delay is important for safety.</li>
+        <li>HIL testing should verify the implemented FDIR logic.</li>
+        <li>Estimator outputs should include sensor and navigation health.</li>
+        <li>Mission-level recovery decisions should remain coordinated with guidance and FDIR.</li>
+      </ul>
+
+      <p>
+        The most important distinction is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Rejecting One Measurement Is Not the Same as Declaring a Sensor Fault}. }
+        \]
+      </p>
+
+      <p>
+        The most important robust-fusion objective is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Prevent Abnormal Measurements from Causing Large Navigation Errors While Preserving as Much Useful Information as Possible}. }
+        \]
+      </p>
+
+      <p>
+        And the most important fault-tolerant navigation principle is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{A Sensor Fault Should Degrade Navigation Gracefully Rather Than Cause Immediate Estimator Failure}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3 class="next-title">Next: 4.2.17 Observability in Sensor Fusion</h3>
+
+      <p>
+        Once a faulty sensor is removed, the next critical question becomes:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Can the Remaining Sensors Still Determine All Required Spacecraft States?} }
+        \]
+      </p>
+
+      <p>
+        For example, removing GNSS may leave the spacecraft with camera and IMU measurements, but whether the complete position, velocity, attitude, and bias states remain recoverable depends on the measurement geometry and spacecraft motion.
+      </p>
+
+      <p>
+        This leads directly to <strong>4.2.17 Observability in Sensor Fusion</strong>, where the key topics should include:
+      </p>
+
+      <ul>
+        <li>observable and unobservable states,</li>
+        <li>observability matrices,</li>
+        <li>rank conditions,</li>
+        <li>nonlinear observability,</li>
+        <li>local observability,</li>
+        <li>sensor geometry,</li>
+        <li>range-only observability,</li>
+        <li>bearing-only observability,</li>
+        <li>attitude observability,</li>
+        <li>bias observability,</li>
+        <li>clock-bias observability,</li>
+        <li>lever-arm and calibration-state observability,</li>
+        <li>maneuver-dependent observability,</li>
+        <li>persistent excitation,</li>
+        <li>sensor dropout and loss of observability,</li>
+        <li>observability during RPO phases,</li>
+        <li>observability after sensor failures,</li>
+        <li>and the connection between observability, covariance growth, and degraded navigation.</li>
+      </ul>
+
+      <a href="fusion-observability.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.17 Observability in Sensor Fusion</h3>
+
+          <p>
+            Observable and unobservable states, observability matrices,
+            rank conditions, nonlinear and local observability, sensor geometry,
+            range-only and bearing-only observability, attitude and bias
+            observability, clock and calibration-state observability,
+            manoeuvre-dependent observability, persistent excitation,
+            sensor dropout, degraded navigation, and RPO observability.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Observability in Sensor Fusion &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+</body>
+</html>
