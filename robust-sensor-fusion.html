@@ -47,7 +47,7 @@
       Sensor faults, bad data, outliers, measurement dropouts, persistent bias,
       drift faults, frozen measurements, fault detection and isolation, FDIR,
       robust weighting, sensor exclusion, redundancy, degraded navigation,
-      integrity, continuity, recovery, and fault-tolerant RPO navigation.
+      integrity, continuity, recovery, and fault-tolerant spacecraft navigation, including RPO applications.
     </p>
 
     <nav class="pill-nav">
@@ -496,7 +496,7 @@
       </p>
 
       <p>
-        This is especially dangerous during close RPO, where state estimates are directly used to generate control commands.
+        This is especially dangerous during close-proximity RPO, where navigation errors can propagate directly into guidance and control commands.
       </p>
 
     </section>
@@ -2937,7 +2937,7 @@
 <h3>4.2.16.75 Example: Camera Loss</h3>
 
       <p>
-        During close RPO, loss of camera may leave:
+        During close-proximity RPO, loss of camera may leave:
       </p>
 
       <p>
@@ -2958,7 +2958,7 @@
 <h3>4.2.16.76 Example: LiDAR Loss</h3>
 
       <p>
-        If LiDAR fails during final approach, camera pose estimation may continue.
+        If LiDAR fails during close-proximity RPO, camera pose estimation may continue.
       </p>
 
       <p>
@@ -3255,7 +3255,7 @@
       </p>
 
       <p>
-        A detector may have high detection probability but still be too slow for close-proximity operations.
+        A detector may have high detection probability but still be too slow for close-proximity spacecraft operations.
       </p>
 
     </section>
@@ -3405,71 +3405,35 @@
 
     <section class="notes-section-card">
 
-<h3>4.2.16.92 Capture-Phase Fault Logic</h3>
+<h3>4.2.16.92 Precision Relative-Navigation Fault Logic</h3>
 
       <p>
-        Capture readiness should not depend only on:
+        During precision RPO, navigation decisions should not depend only on estimated relative state.
       </p>
 
       <p>
-        \[
-        r_{rel}, v_{rel}, \theta_{rel}, \omega_{rel}.
-        \]
+        The estimator should also confirm that the solution remains trustworthy through:
       </p>
 
       <p>
-        It should also include:
-      </p>
-
-      <p>
-        \[
+        \\[
         \boxed{ \text{Navigation Health} }
-        \]
+        \\]
       </p>
 
       <p>
-        and:
+        and
       </p>
 
       <p>
-        \[
+        \\[
         \boxed{ \text{Sensor Health}. }
-        \]
+        \\]
       </p>
-
-    </section>
-
-
-    <section class="notes-section-card">
-
-<h3>4.2.16.93 Capture Condition with Health</h3>
-
-      <p>
-        A conceptual condition is:
-      </p>
-
-      <p>
-        \[
-        \boxed{ \text{CaptureReady} = C_r \land C_v \land C_\theta \land C_\omega \land C_P \land C_H }
-        \]
-      </p>
-
-      <p>
-        where:
-      </p>
-
-      <ul>
-        <li><code>C_r</code>: position condition,</li>
-        <li><code>C_v</code>: velocity condition,</li>
-        <li><code>C_\theta</code>: attitude condition,</li>
-        <li><code>C_\omega</code>: angular-rate condition,</li>
-        <li><code>C_P</code>: covariance condition,</li>
-        <li><code>C_H</code>: navigation-health condition.</li>
-      </ul>
 
       <div class="concept-note">
-        <h4>Capture-ready should include trustworthiness</h4>
-        <p>Geometric thresholds alone are insufficient near docking. The navigation state should also have acceptable covariance and health so the capture-ready flag represents a credible, not merely numerically convenient, condition.</p>
+        <h4>Why health belongs in precision navigation</h4>
+        <p>At short range, a numerically plausible state is not enough. Guidance should use the estimate only when covariance, sensor health, timing, and estimator consistency indicate that the state is trustworthy.</p>
       </div>
 
     </section>
@@ -3477,31 +3441,70 @@
 
     <section class="notes-section-card">
 
-<h3>4.2.16.94 Fault During Capture Dwell</h3>
+<h3>4.2.16.93 Precision-Navigation Condition with Health</h3>
 
       <p>
-        Suppose capture conditions must remain valid for:
+        A conceptual precision-navigation condition can combine state quality and estimator health:
       </p>
 
       <p>
-        \[
-        T_d.
-        \]
+        \\[
+        \boxed{ \text{PrecisionNavReady} = C_r \land C_v \land C_\theta \land C_\omega \land C_P \land C_H }
+        \\]
       </p>
 
       <p>
-        If a critical sensor becomes faulted during dwell, the timer should normally not continue blindly.
-      </p>
-
-      <p>
-        Possible actions include:
+        where:
       </p>
 
       <ul>
-        <li>pause dwell,</li>
-        <li>reset dwell,</li>
-        <li>enter hold.</li>
+        <li><code>C_r</code>: relative-position condition,</li>
+        <li><code>C_v</code>: relative-velocity condition,</li>
+        <li><code>C_\theta</code>: relative-attitude condition,</li>
+        <li><code>C_\omega</code>: relative angular-rate condition,</li>
+        <li><code>C_P</code>: covariance condition,</li>
+        <li><code>C_H</code>: navigation-health condition.</li>
       </ul>
+
+      <div class="concept-note">
+        <h4>State thresholds and trustworthiness must be combined</h4>
+        <p>Precision RPO should require both acceptable estimated relative states and credible navigation uncertainty. This prevents progression based on a state estimate that happens to be inside a numerical threshold while the estimator is unhealthy or overconfident.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.16.94 Fault During Precision-Navigation Dwell</h3>
+
+      <p>
+        Some mission transitions require navigation conditions to remain valid continuously for a dwell time
+      </p>
+
+      <p>
+        \\[
+        T_d.
+        \\]
+      </p>
+
+      <p>
+        If a critical sensor becomes faulted during this interval, the dwell should not continue blindly.
+      </p>
+
+      <p>Possible responses include:</p>
+
+      <ul>
+        <li>pause the dwell,</li>
+        <li>reset the dwell,</li>
+        <li>hold the current relative-navigation phase,</li>
+        <li>transition to a degraded navigation mode.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Why dwell logic matters</h4>
+        <p>A dwell requirement is intended to prove that acceptable navigation performance is persistent, not momentary. A newly detected fault invalidates that evidence unless the remaining sensor set still satisfies the same navigation-health criteria.</p>
+      </div>
 
     </section>
 
@@ -5742,8 +5745,8 @@
         <li>Degraded navigation can remain usable even when one sensor fails.</li>
         <li>Remaining observability must be checked after sensor loss.</li>
         <li>Navigation health should depend on covariance and observability, not sensor count alone.</li>
-        <li>Capture logic should include navigation-health conditions.</li>
-        <li>A critical sensor failure during final approach may require hold, retreat, or abort.</li>
+        <li>Precision relative-navigation logic should include navigation-health conditions.</li>
+        <li>A critical sensor failure during close-proximity RPO may require hold, retreat, or abort.</li>
         <li>Sensor reintroduction should normally use a confirmation period.</li>
         <li>Monitor-only mode is useful during recovery.</li>
         <li>Fault-injection testing is essential.</li>
@@ -5830,7 +5833,7 @@
         <li>and the connection between observability, covariance growth, and degraded navigation.</li>
       </ul>
 
-      <a href="fusion-observability.html"
+      <a href="observability-in-sensor-fusion.html"
          class="sensor-link-card">
 
         <div class="sensor-link-content">
