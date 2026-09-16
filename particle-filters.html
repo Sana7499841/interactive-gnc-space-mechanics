@@ -1,0 +1,6276 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.12 Particle Filters and Non-Gaussian Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+
+  <style>
+    .concept-note {
+      margin: 1.5rem 0 0;
+      padding: 1.1rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+    }
+
+    .concept-note h4 {
+      margin-top: 0;
+      margin-bottom: 0.45rem;
+    }
+
+    .concept-note p {
+      margin-bottom: 0;
+    }
+  </style>
+
+
+</head>
+
+
+<body>
+
+  <!-- ========================================================= -->
+  <!-- PAGE HEADER                                                -->
+  <!-- ========================================================= -->
+
+  <header class="notes-hero">
+
+    <h1>Particle Filters and Non-Gaussian Fusion</h1>
+
+    <p class="notes-tagline">
+      Particle representation of probability distributions, importance
+      weighting, resampling, nonlinear and non-Gaussian estimation,
+      degeneracy, computational cost, spacecraft navigation, RPO,
+      multimodal uncertainty, acquisition, reacquisition, and risk-aware
+      sensor fusion.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN CONTENT                                               -->
+  <!-- ========================================================= -->
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.12 Particle Filters and Non-Gaussian Fusion</h2>
+
+<p>
+        The <strong>Particle Filter (PF)</strong> is a nonlinear Bayesian state-estimation method designed for situations where the state probability distribution cannot be represented adequately by a single Gaussian mean and covariance.
+      </p>
+
+      <p>
+        The Kalman Filter, EKF, ESKF, MEKF, and UKF all fundamentally summarize uncertainty using quantities such as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P. }
+        \]
+      </p>
+
+      <p>
+        Even when the system dynamics are nonlinear, these filters still approximate the posterior distribution mainly through its <strong>mean and covariance</strong>.
+      </p>
+
+      <p>
+        This works extremely well when the state uncertainty is approximately Gaussian and unimodal.
+      </p>
+
+      <p>
+        But some navigation problems produce distributions that are
+      </p>
+
+      <ul>
+
+        <li>
+          strongly nonlinear,
+        </li>
+
+        <li>
+          skewed,
+        </li>
+
+        <li>
+          heavy-tailed,
+        </li>
+
+        <li>
+          bounded,
+        </li>
+
+        <li>
+          multimodal,
+        </li>
+
+        <li>
+          discontinuous,
+        </li>
+
+        <li>
+          ambiguous.
+        </li>
+
+      </ul>
+
+      <p>
+        For example, a vision-based relative-navigation system may initially admit two or more possible spacecraft poses.
+      </p>
+
+      <p>
+        A bearing-only measurement may produce several geometrically plausible target locations.
+      </p>
+
+      <p>
+        A sensor may occasionally generate outliers.
+      </p>
+
+      <p>
+        A spacecraft may lose track of the target and later reacquire it with significant ambiguity.
+      </p>
+
+      <p>
+        In such situations, forcing the posterior into a single Gaussian distribution may discard important information.
+      </p>
+
+      <p>
+        The Particle Filter addresses this by representing the posterior distribution using a set of weighted samples called <strong>particles</strong>.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|\mathbf z_{1:k}) \approx \sum_{i=1}^{N_p} w_k^{(i)} \delta \left( \mathbf x_k-\mathbf x_k^{(i)} \right) }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>N_p</code> is the number of particles,
+        </li>
+
+        <li>
+          <code>\mathbf x_k^{(i)}</code> is particle <code>i</code>,
+        </li>
+
+        <li>
+          <code>w_k^{(i)}</code> is its normalized weight,
+        </li>
+
+        <li>
+          <code>\delta(\cdot)</code> denotes a Dirac delta distribution.
+        </li>
+
+      </ul>
+
+      <p>
+        Thus, instead of
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{One Mean + One Covariance} }
+        \]
+      </p>
+
+      <p>
+        the Particle Filter maintains
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Many Possible States + Their Probabilities}. }
+        \]
+      </p>
+
+      <p>
+        This makes Particle Filters especially useful for <strong>nonlinear and non-Gaussian sensor fusion</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.1 Why Particle Filters Are Needed</h3>
+
+      <p>
+        Suppose the posterior state distribution is approximately Gaussian:
+      </p>
+
+      <p>
+        \[
+        p(x) = \mathcal N(\mu,\sigma^2).
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \mu
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \sigma^2
+        \]
+      </p>
+
+      <p>
+        describe the distribution well.
+      </p>
+
+      <p>
+        A Kalman-family estimator is appropriate.
+      </p>
+
+      <p>
+        Now suppose instead that
+      </p>
+
+      <p>
+        \[
+        p(x)
+        \]
+      </p>
+
+      <p>
+        has two strong peaks.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(x) = 0.5\,\mathcal N(-10,1) + 0.5\,\mathcal N(10,1). }
+        \]
+      </p>
+
+      <p>
+        The mean is
+      </p>
+
+      <p>
+        \[
+        \mu=0.
+        \]
+      </p>
+
+      <p>
+        But
+      </p>
+
+      <p>
+        \[
+        x=0
+        \]
+      </p>
+
+      <p>
+        is actually one of the least likely states.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mean Alone Can Be Physically Misleading in a Multimodal Distribution}. }
+        \]
+      </p>
+
+      <p>
+        A Particle Filter can preserve both hypotheses around
+      </p>
+
+      <p>
+        \[
+        x=-10
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        x=10.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.2 Core Particle-Filter Idea</h3>
+
+      <p>
+        The Particle Filter approximates the posterior using particles:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \left\{ \mathbf x_k^{(i)}, w_k^{(i)} \right\}_{i=1}^{N_p}. }
+        \]
+      </p>
+
+      <p>
+        Each particle is a possible system state.
+      </p>
+
+      <p>
+        The associated weight indicates how plausible that state is given the measurements.
+      </p>
+
+      <p>
+        The algorithm repeatedly performs:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate} \rightarrow \text{Weight} \rightarrow \text{Normalize} \rightarrow \text{Resample}. }
+        \]
+      </p>
+
+      <p>
+        This process approximates recursive Bayesian estimation without requiring the posterior to remain Gaussian.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.3 Connection to Bayesian Estimation</h3>
+
+      <p>
+        Recall the Bayesian recursion:
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|\mathbf z_{1:k}) \propto p(\mathbf z_k|\mathbf x_k) p(\mathbf x_k|\mathbf z_{1:k-1}). }
+        \]
+      </p>
+
+      <p>
+        The prediction step is
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|\mathbf z_{1:k-1}) = \int p(\mathbf x_k|\mathbf x_{k-1}) p(\mathbf x_{k-1}|\mathbf z_{1:k-1}) d\mathbf x_{k-1}. }
+        \]
+      </p>
+
+      <p>
+        The correction step is
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|\mathbf z_{1:k}) \propto p(\mathbf z_k|\mathbf x_k) p(\mathbf x_k|\mathbf z_{1:k-1}). }
+        \]
+      </p>
+
+      <p>
+        The Particle Filter approximates these probability distributions numerically using particles.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.4 Particle Representation of a Distribution</h3>
+
+      <p>
+        Suppose we have
+      </p>
+
+      <p>
+        \[
+        N_p
+        \]
+      </p>
+
+      <p>
+        particles.
+      </p>
+
+      <p>
+        Then the posterior is approximated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(\mathbf x) \approx \sum_{i=1}^{N_p} w^{(i)} \delta \left( \mathbf x-\mathbf x^{(i)} \right). }
+        \]
+      </p>
+
+      <p>
+        Each particle contributes probability mass at
+      </p>
+
+      <p>
+        \[
+        \mathbf x^{(i)}.
+        \]
+      </p>
+
+      <p>
+        If all particles initially have equal weight,
+      </p>
+
+      <p>
+        \[
+        \boxed{ w^{(i)} = \frac{1}{N_p}. }
+        \]
+      </p>
+
+      <p>
+        After incorporating measurements, the weights generally become unequal.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.5 Particle Interpretation</h3>
+
+      <p>
+        Each particle can be interpreted as a hypothesis:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i)} = \text{One Possible True State}. }
+        \]
+      </p>
+
+      <p>
+        The weight
+      </p>
+
+      <p>
+        \[
+        w^{(i)}
+        \]
+      </p>
+
+      <p>
+        represents
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{How Plausible That Hypothesis Is Given the Measurements}. }
+        \]
+      </p>
+
+      <p>
+        Thus a Particle Filter naturally maintains multiple competing possibilities.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.6 Particle Filter State Model</h3>
+
+      <p>
+        Consider the nonlinear process model
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k = f( \mathbf x_{k-1}, \mathbf u_{k-1}, \mathbf w_{k-1} ). }
+        \]
+      </p>
+
+      <p>
+        The process noise
+      </p>
+
+      <p>
+        \[
+        \mathbf w_{k-1}
+        \]
+      </p>
+
+      <p>
+        may be non-Gaussian.
+      </p>
+
+      <p>
+        Each particle is propagated independently:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k^{(i)} \sim p( \mathbf x_k| \mathbf x_{k-1}^{(i)} ). }
+        \]
+      </p>
+
+      <p>
+        Thus the particle cloud moves according to the physical system dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.7 Measurement Model</h3>
+
+      <p>
+        Suppose the measurement model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h( \mathbf x_k, \mathbf v_k ). }
+        \]
+      </p>
+
+      <p>
+        The likelihood of a measurement given a particle is
+      </p>
+
+      <p>
+        \[
+        \boxed{ p( \mathbf z_k| \mathbf x_k^{(i)} ). }
+        \]
+      </p>
+
+      <p>
+        Particles that predict measurements close to the actual sensor observation receive high weight.
+      </p>
+
+      <p>
+        Particles inconsistent with the measurement receive low weight.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.8 The Measurement Likelihood</h3>
+
+      <p>
+        Suppose measurement noise is Gaussian:
+      </p>
+
+      <p>
+        \[
+        \mathbf v_k \sim \mathcal N( 0,\mathbf R ).
+        \]
+      </p>
+
+      <p>
+        Then for particle <code>i</code>,
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf z}_k^{(i)} = h( \mathbf x_k^{(i)} )
+        \]
+      </p>
+
+      <p>
+        and residual
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_k^{(i)} = \mathbf z_k - \hat{\mathbf z}_k^{(i)}. }
+        \]
+      </p>
+
+      <p>
+        The measurement likelihood is proportional to
+      </p>
+
+      <p>
+        \[
+        \boxed{ p( \mathbf z_k| \mathbf x_k^{(i)} ) \propto \exp \left[ -\frac12 \mathbf r_k^{(i)T} \mathbf R^{-1} \mathbf r_k^{(i)} \right]. }
+        \]
+      </p>
+
+      <p>
+        Thus measurement likelihood plays a role analogous to the innovation in a Kalman Filter.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.9 Weight Update</h3>
+
+      <p>
+        A general importance-weight update is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tilde w_k^{(i)} = w_{k-1}^{(i)} \frac{ p( \mathbf z_k| \mathbf x_k^{(i)} ) p( \mathbf x_k^{(i)}| \mathbf x_{k-1}^{(i)} ) }{ q( \mathbf x_k^{(i)}| \mathbf x_{0:k-1}^{(i)}, \mathbf z_{1:k} ) } }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        q(\cdot)
+        \]
+      </p>
+
+      <p>
+        is the proposal distribution.
+      </p>
+
+      <p>
+        For the common bootstrap Particle Filter, the proposal is chosen as the process transition density:
+      </p>
+
+      <p>
+        \[
+        q( \mathbf x_k| \mathbf x_{k-1}, \mathbf z_k ) = p( \mathbf x_k| \mathbf x_{k-1} ).
+        \]
+      </p>
+
+      <p>
+        Then the weight update simplifies to
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tilde w_k^{(i)} = w_{k-1}^{(i)} p( \mathbf z_k| \mathbf x_k^{(i)} ). }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why this matters</h4>
+        <p>The importance-weight equation corrects for the fact that particles may be sampled from a proposal distribution different from the true transition density. The numerator represents how plausible the particle is under the physical model and current measurement, while the denominator compensates for how it was actually sampled.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.10 Weight Normalization</h3>
+
+      <p>
+        The unnormalized weights are
+      </p>
+
+      <p>
+        \[
+        \tilde w_k^{(i)}.
+        \]
+      </p>
+
+      <p>
+        Normalize them using
+      </p>
+
+      <p>
+        \[
+        \boxed{ w_k^{(i)} = \frac{ \tilde w_k^{(i)} }{ \sum_{j=1}^{N_p} \tilde w_k^{(j)} }. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sum_{i=1}^{N_p} w_k^{(i)} = 1. }
+        \]
+      </p>
+
+      <p>
+        These normalized weights represent the posterior particle probabilities.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.11 Estimated State Mean</h3>
+
+      <p>
+        If a single state estimate is required, compute the weighted mean:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k = \sum_{i=1}^{N_p} w_k^{(i)} \mathbf x_k^{(i)}. }
+        \]
+      </p>
+
+      <p>
+        However, one must remember:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{The Mean Does Not Fully Describe a Non-Gaussian Particle Distribution}. }
+        \]
+      </p>
+
+      <p>
+        The complete particle cloud often contains important information that the mean alone hides.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.12 Estimated Covariance</h3>
+
+      <p>
+        A weighted covariance can be computed as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_k = \sum_{i=1}^{N_p} w_k^{(i)} \left( \mathbf x_k^{(i)} - \hat{\mathbf x}_k \right) \left( \mathbf x_k^{(i)} - \hat{\mathbf x}_k \right)^T. }
+        \]
+      </p>
+
+      <p>
+        This provides a familiar covariance summary.
+      </p>
+
+      <p>
+        But again,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x,\;P }
+        \]
+      </p>
+
+      <p>
+        may not fully represent the actual posterior if it is multimodal or strongly skewed.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.13 Sequential Importance Sampling</h3>
+
+      <p>
+        The basic algorithm without resampling is called <strong>Sequential Importance Sampling (SIS)</strong>.
+      </p>
+
+      <p>
+        The steps are
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sample / Propagate Particles} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Calculate Measurement Likelihood} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Update Weights} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Normalize Weights}. }
+        \]
+      </p>
+
+      <p>
+        However, SIS suffers from an important problem called <strong>weight degeneracy</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.14 What Is Particle Degeneracy?</h3>
+
+      <p>
+        After repeated measurement updates, most particles may receive extremely small weights.
+      </p>
+
+      <p>
+        Eventually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ w^{(i)} \approx0 }
+        \]
+      </p>
+
+      <p>
+        for almost all particles except a few.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        w_1=0.95
+        \]
+      </p>
+
+      <p>
+        while the remaining 999 particles share only
+      </p>
+
+      <p>
+        \[
+        0.05.
+        \]
+      </p>
+
+      <p>
+        Then most computational effort is spent propagating particles that contribute almost nothing to the posterior.
+      </p>
+
+      <p>
+        This is called <strong>particle degeneracy</strong>.
+      </p>
+
+      <div class="concept-note">
+        <h4>Practical interpretation</h4>
+        <p>Degeneracy means the nominal particle count can be misleading: although thousands of particles may exist in memory, only a small number may carry meaningful probability mass. The effective sample size introduced later is therefore a better indicator of the useful particle population.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.15 Why Degeneracy Occurs</h3>
+
+      <p>
+        Particles are sampled from a proposal distribution.
+      </p>
+
+      <p>
+        If many sampled particles lie in regions that are inconsistent with the measurement, they receive tiny weights.
+      </p>
+
+      <p>
+        Over repeated updates, the mismatch accumulates.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Repeated Importance Weighting} \rightarrow \text{Increasing Weight Imbalance}. }
+        \]
+      </p>
+
+      <p>
+        Resampling is introduced to address this problem.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.16 Effective Sample Size</h3>
+
+      <p>
+        A common measure of degeneracy is the <strong>effective sample size</strong>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} = \frac{ 1 }{ \sum_{i=1}^{N_p} \left( w_k^{(i)} \right)^2 }. }
+        \]
+      </p>
+
+      <p>
+        If all particles have equal weights,
+      </p>
+
+      <p>
+        \[
+        w^{(i)}=\frac1{N_p},
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} = N_p. }
+        \]
+      </p>
+
+      <p>
+        If one particle dominates,
+      </p>
+
+      <p>
+        \[
+        N_{\text{eff}} \rightarrow1.
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Interpretation of effective sample size</h4>
+        <p>The effective sample size is not the literal number of stored particles. It is an equivalent number of equally weighted particles that would provide approximately the same weight concentration. A rapid fall in this quantity is a strong warning that the proposal or measurement model is causing weight collapse.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.17 Resampling Trigger</h3>
+
+      <p>
+        A common strategy is to resample when
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} < N_{\text{threshold}}. }
+        \]
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        N_{\text{threshold}} = 0.5N_p.
+        \]
+      </p>
+
+      <p>
+        Thus resampling occurs only when the particle population becomes sufficiently degenerate.
+      </p>
+
+      <p>
+        This avoids unnecessary resampling at every time step.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.18 What Is Resampling?</h3>
+
+      <p>
+        Resampling generates a new particle set by drawing particles according to their current weights.
+      </p>
+
+      <p>
+        Particles with high weights are likely to be copied.
+      </p>
+
+      <p>
+        Particles with low weights are likely to disappear.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Many Low-Probability Particles} \rightarrow \text{Discarded} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-Probability Particles} \rightarrow \text{Replicated}. }
+        \]
+      </p>
+
+      <p>
+        After resampling, weights are usually reset to
+      </p>
+
+      <p>
+        \[
+        \boxed{ w^{(i)} = \frac1{N_p}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why resampling works</h4>
+        <p>Resampling reallocates computational effort toward regions of high posterior probability. It does not create new information; it redistributes the existing particle population according to the current posterior weights.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.19 Resampling Example</h3>
+
+      <p>
+        Suppose there are five particles:
+      </p>
+
+      <p>
+        \[
+        x_1,\dots,x_5
+        \]
+      </p>
+
+      <p>
+        with weights
+      </p>
+
+      <p>
+        \[
+        [0.05,\;0.10,\;0.10,\;0.65,\;0.10].
+        \]
+      </p>
+
+      <p>
+        Particle 4 carries most posterior probability.
+      </p>
+
+      <p>
+        After resampling, a possible new set could be
+      </p>
+
+      <p>
+        \[
+        [x_2,x_4,x_4,x_4,x_5].
+        \]
+      </p>
+
+      <p>
+        All new particles then receive equal weight.
+      </p>
+
+      <p>
+        Thus the particle population concentrates around the likely region.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.20 Common Resampling Methods</h3>
+
+      <p>
+        Common methods include
+      </p>
+
+      <ul>
+
+        <li>
+          multinomial resampling,
+        </li>
+
+        <li>
+          systematic resampling,
+        </li>
+
+        <li>
+          stratified resampling,
+        </li>
+
+        <li>
+          residual resampling.
+        </li>
+
+      </ul>
+
+      <p>
+        They differ in
+      </p>
+
+      <ul>
+
+        <li>
+          computational cost,
+        </li>
+
+        <li>
+          variance,
+        </li>
+
+        <li>
+          implementation complexity.
+        </li>
+
+      </ul>
+
+      <p>
+        Systematic resampling is commonly used because it is efficient and simple.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.21 Multinomial Resampling</h3>
+
+      <p>
+        Multinomial resampling independently draws
+      </p>
+
+      <p>
+        \[
+        N_p
+        \]
+      </p>
+
+      <p>
+        particles according to the discrete probability distribution defined by
+      </p>
+
+      <p>
+        \[
+        w^{(i)}.
+        \]
+      </p>
+
+      <p>
+        It is conceptually simple but can have relatively high sampling variance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.22 Systematic Resampling</h3>
+
+      <p>
+        Systematic resampling uses a single random offset and then samples at uniformly spaced cumulative-probability intervals.
+      </p>
+
+      <p>
+        It has complexity approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ O(N_p) }
+        \]
+      </p>
+
+      <p>
+        and usually lower resampling variance than multinomial resampling.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.23 Stratified Resampling</h3>
+
+      <p>
+        Stratified resampling divides the unit interval into
+      </p>
+
+      <p>
+        \[
+        N_p
+        \]
+      </p>
+
+      <p>
+        segments.
+      </p>
+
+      <p>
+        A random sample is drawn inside each segment.
+      </p>
+
+      <p>
+        This reduces sampling variance compared with unrestricted multinomial resampling.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.24 Residual Resampling</h3>
+
+      <p>
+        Residual resampling first deterministically assigns copies according to the integer part of
+      </p>
+
+      <p>
+        \[
+        N_pw_i.
+        \]
+      </p>
+
+      <p>
+        The remaining particles are selected probabilistically.
+      </p>
+
+      <p>
+        This can reduce resampling noise.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.25 Particle Impoverishment</h3>
+
+      <p>
+        Resampling solves degeneracy but creates another problem.
+      </p>
+
+      <p>
+        If one particle has high weight, resampling may generate many identical copies.
+      </p>
+
+      <p>
+        Then particle diversity decreases.
+      </p>
+
+      <p>
+        This is called <strong>sample impoverishment</strong> or <strong>particle impoverishment</strong>.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Resampling} \rightarrow \text{Less Degeneracy} + \text{Potential Loss of Diversity}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Design trade-off</h4>
+        <p>Degeneracy and impoverishment are competing problems. Resampling too rarely wastes computation on negligible particles, while resampling too aggressively destroys diversity. A practical design therefore combines an effective-sample-size trigger with diversity-preserving methods such as roughening or better proposal distributions.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.26 Why Particle Diversity Matters</h3>
+
+      <p>
+        Particles must explore the plausible state space.
+      </p>
+
+      <p>
+        If too many particles become identical, the filter may become unable to recover when the true state moves outside the concentrated particle region.
+      </p>
+
+      <p>
+        This is particularly dangerous during
+      </p>
+
+      <ul>
+
+        <li>
+          manoeuvres,
+        </li>
+
+        <li>
+          sensor reacquisition,
+        </li>
+
+        <li>
+          abrupt model changes,
+        </li>
+
+        <li>
+          ambiguous measurements.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.27 Regularization and Roughening</h3>
+
+      <p>
+        One strategy for maintaining diversity is to add small perturbations after resampling.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k^{(i)} \leftarrow \mathbf x_k^{(i)} + \boldsymbol\epsilon^{(i)} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \boldsymbol\epsilon^{(i)}
+        \]
+      </p>
+
+      <p>
+        is small random noise.
+      </p>
+
+      <p>
+        This is sometimes called <strong>roughening</strong>.
+      </p>
+
+      <p>
+        It must be applied carefully so that artificial noise does not distort the physical posterior excessively.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.28 Proposal Distribution</h3>
+
+      <p>
+        The proposal distribution is
+      </p>
+
+      <p>
+        \[
+        \boxed{ q( \mathbf x_k| \mathbf x_{0:k-1}, \mathbf z_{1:k} ). }
+        \]
+      </p>
+
+      <p>
+        It determines where new particles are generated.
+      </p>
+
+      <p>
+        A good proposal places particles in regions with high posterior probability.
+      </p>
+
+      <p>
+        A poor proposal wastes particles in unlikely regions.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why the proposal is central</h4>
+        <p>The proposal distribution determines where computational effort is spent. A proposal that uses current measurement information can place particles directly in high-likelihood regions and dramatically reduce the number of particles required for a given estimation quality.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.29 Bootstrap Particle Filter</h3>
+
+      <p>
+        The most common simple Particle Filter chooses
+      </p>
+
+      <p>
+        \[
+        \boxed{ q( x_k|x_{k-1},z_k ) = p( x_k|x_{k-1} ). }
+        \]
+      </p>
+
+      <p>
+        This means particles are propagated only using the process model before measurement weighting.
+      </p>
+
+      <p>
+        The algorithm is often called
+      </p>
+
+      <ul>
+
+        <li>
+          bootstrap Particle Filter,
+        </li>
+
+        <li>
+          condensation algorithm,
+        </li>
+
+        <li>
+          sampling importance resampling filter.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.30 Limitation of the Bootstrap Proposal</h3>
+
+      <p>
+        If the measurement is very informative but the process model is broad, most particles may be propagated far from the measurement-consistent region.
+      </p>
+
+      <p>
+        Then nearly all receive negligible weight.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Very Informative Measurement} + \text{Poor Proposal} \rightarrow \text{Severe Degeneracy}. }
+        \]
+      </p>
+
+      <p>
+        More advanced proposals can use the current measurement when generating particles.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.31 Optimal Proposal Concept</h3>
+
+      <p>
+        An ideal proposal would be
+      </p>
+
+      <p>
+        \[
+        \boxed{ q( x_k|x_{k-1},z_k ) = p( x_k|x_{k-1},z_k ). }
+        \]
+      </p>
+
+      <p>
+        This incorporates the new measurement before sampling.
+      </p>
+
+      <p>
+        In many nonlinear systems this distribution cannot be calculated analytically.
+      </p>
+
+      <p>
+        Approximate techniques are therefore used.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.32 EKF-Based Proposal</h3>
+
+      <p>
+        One possibility is to construct a local EKF for each particle.
+      </p>
+
+      <p>
+        The EKF uses
+      </p>
+
+      <p>
+        \[
+        z_k
+        \]
+      </p>
+
+      <p>
+        to define a proposal around the measurement-consistent region.
+      </p>
+
+      <p>
+        This can improve particle efficiency but substantially increases computation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.33 UKF-Based Proposal</h3>
+
+      <p>
+        Similarly, a UKF may generate a proposal distribution for each particle.
+      </p>
+
+      <p>
+        This creates a <strong>Unscented Particle Filter</strong>.
+      </p>
+
+      <p>
+        It can handle nonlinear proposal shaping better than an EKF-based proposal in some systems.
+      </p>
+
+      <p>
+        However, computational cost increases significantly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.34 Complete Bootstrap Particle Filter Algorithm</h3>
+
+      <p>
+        A basic algorithm is:
+      </p>
+
+      <h4>4.2.12.34.1 Initialization</h4>
+
+      <p>
+        Generate
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_0^{(i)} \sim p(x_0) }
+        \]
+      </p>
+
+      <p>
+        for
+      </p>
+
+      <p>
+        \[
+        i=1,\dots,N_p.
+        \]
+      </p>
+
+      <p>
+        Set
+      </p>
+
+      <p>
+        \[
+        \boxed{ w_0^{(i)} = \frac1{N_p}. }
+        \]
+      </p>
+
+      <h4>4.2.12.34.2 Prediction</h4>
+
+      <p>
+        For each particle,
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_k^{(i)} \sim p( x_k| x_{k-1}^{(i)} ). }
+        \]
+      </p>
+
+      <h4>4.2.12.34.3 Measurement Prediction</h4>
+
+      <p>
+        Compute
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat z_k^{(i)} = h( x_k^{(i)} ). }
+        \]
+      </p>
+
+      <h4>4.2.12.34.4 Measurement Likelihood</h4>
+
+      <p>
+        Evaluate
+      </p>
+
+      <p>
+        \[
+        \boxed{ L_k^{(i)} = p( z_k| x_k^{(i)} ). }
+        \]
+      </p>
+
+      <h4>4.2.12.34.5 Weight Update</h4>
+
+      <p>
+        \[
+        \boxed{ \tilde w_k^{(i)} = w_{k-1}^{(i)} L_k^{(i)}. }
+        \]
+      </p>
+
+      <h4>4.2.12.34.6 Normalize</h4>
+
+      <p>
+        \[
+        \boxed{ w_k^{(i)} = \frac{ \tilde w_k^{(i)} }{ \sum_j \tilde w_k^{(j)} }. }
+        \]
+      </p>
+
+      <h4>4.2.12.34.7 Effective Sample Size</h4>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} = \frac1{ \sum_i (w_k^{(i)})^2 }. }
+        \]
+      </p>
+
+      <h4>4.2.12.34.8 Resample if Required</h4>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        N_{\text{eff}} < N_{\text{threshold}},
+        \]
+      </p>
+
+      <p>
+        resample the particles.
+      </p>
+
+      <h4>4.2.12.34.9 Estimate State</h4>
+
+      <p>
+        Compute required outputs such as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x_k = \sum_i w_k^{(i)} x_k^{(i)}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.35 Particle Filter Conceptual Flow</h3>
+
+      <p>
+        The complete cycle is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Previous Particle Cloud} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate Each Particle Through Dynamics} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Predicted Particle Cloud} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Compare Each Particle With Measurement} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Assign Likelihood Weights} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Normalize Weights} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Check Degeneracy} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Resample if Necessary} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior Particle Cloud}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.36 Particle Filter vs Kalman Filter</h3>
+
+      <p>
+        The Kalman Filter assumes linear Gaussian dynamics and maintains
+      </p>
+
+      <p>
+        \[
+        \hat x, P.
+        \]
+      </p>
+
+      <p>
+        The Particle Filter makes much weaker assumptions about posterior shape.
+      </p>
+
+      <p>
+        A comparison is:
+      </p>
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Kalman Filter</th>
+              <th>Particle Filter</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>Linear systems</td>
+              <td>Excellent</td>
+              <td>Possible</td>
+            </tr>
+
+            <tr>
+              <td>Nonlinear systems</td>
+              <td>Requires extension</td>
+              <td>Natural</td>
+            </tr>
+
+            <tr>
+              <td>Gaussian uncertainty</td>
+              <td>Excellent</td>
+              <td>Natural</td>
+            </tr>
+
+            <tr>
+              <td>Non-Gaussian uncertainty</td>
+              <td>Limited</td>
+              <td>Strong</td>
+            </tr>
+
+            <tr>
+              <td>Multimodal distributions</td>
+              <td>No</td>
+              <td>Yes</td>
+            </tr>
+
+            <tr>
+              <td>State representation</td>
+              <td>Mean + covariance</td>
+              <td>Weighted particles</td>
+            </tr>
+
+            <tr>
+              <td>Computational cost</td>
+              <td>Low</td>
+              <td>High</td>
+            </tr>
+
+            <tr>
+              <td>High-dimensional scaling</td>
+              <td>Good</td>
+              <td>Difficult</td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.37 Particle Filter vs EKF</h3>
+
+      <p>
+        The EKF approximates nonlinear dynamics locally.
+      </p>
+
+      <p>
+        The Particle Filter instead approximates the complete posterior numerically.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{EKF} = \text{Local Gaussian Approximation} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{PF} = \text{Weighted Sample Approximation}. }
+        \]
+      </p>
+
+      <p>
+        Particle Filters avoid Jacobians but require many state propagations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.38 Particle Filter vs UKF</h3>
+
+      <p>
+        The UKF represents uncertainty with
+      </p>
+
+      <p>
+        \[
+        2n+1
+        \]
+      </p>
+
+      <p>
+        deterministic sigma points.
+      </p>
+
+      <p>
+        These points reconstruct one approximate mean and covariance.
+      </p>
+
+      <p>
+        The Particle Filter may use hundreds or thousands of particles with independent weights.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UKF Sigma Points} \neq \text{Particle-Filter Particles}. }
+        \]
+      </p>
+
+      <p>
+        Sigma points are deterministic quadrature points.
+      </p>
+
+      <p>
+        Particle-filter particles approximate the probability density itself.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.39 Particle Filter vs Monte Carlo Simulation</h3>
+
+      <p>
+        Both use random sampling, but their goals differ.
+      </p>
+
+      <p>
+        Monte Carlo analysis often runs many independent simulation realizations to assess system performance.
+      </p>
+
+      <p>
+        A Particle Filter uses a particle population <strong>inside the estimator itself</strong> to represent the current posterior state distribution.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Monte Carlo} = \text{Analysis / Verification} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Filter} = \text{Online State Estimation}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.40 Why Particle Filters Handle Multimodal Distributions</h3>
+
+      <p>
+        Suppose the posterior contains two possible target locations.
+      </p>
+
+      <p>
+        Half the particles may cluster around hypothesis A.
+      </p>
+
+      <p>
+        The other half may cluster around hypothesis B.
+      </p>
+
+      <p>
+        Thus the Particle Filter can represent
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Hypothesis A} + \text{Hypothesis B} }
+        \]
+      </p>
+
+      <p>
+        simultaneously.
+      </p>
+
+      <p>
+        A Gaussian filter tends to collapse both into one mean and covariance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.41 Example: Bearing-Only Navigation</h3>
+
+      <p>
+        Suppose a camera measures only bearing to a target.
+      </p>
+
+      <p>
+        The measurement provides direction but limited range information.
+      </p>
+
+      <p>
+        Many target ranges may initially be consistent with the same bearing.
+      </p>
+
+      <p>
+        Particles can be distributed along the line of sight:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Near} ,\; \text{Medium} ,\; \text{Far} }
+        \]
+      </p>
+
+      <p>
+        hypotheses.
+      </p>
+
+      <p>
+        As the spacecraft moves and geometry changes, incorrect range hypotheses receive lower likelihood.
+      </p>
+
+      <p>
+        The particle cloud gradually concentrates around the true range.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.42 Example: Ambiguous Optical Pose</h3>
+
+      <p>
+        A visual pose algorithm may return several plausible orientations.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_A }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_B. }
+        \]
+      </p>
+
+      <p>
+        A Gaussian attitude estimator must generally select one local mode.
+      </p>
+
+      <p>
+        A particle-based estimator can preserve both hypotheses until later measurements resolve the ambiguity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.43 Example: Non-Gaussian Sensor Noise</h3>
+
+      <p>
+        Suppose a range sensor usually has small Gaussian noise but occasionally produces large outliers.
+      </p>
+
+      <p>
+        A realistic noise distribution may resemble a mixture:
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(v) = (1-\epsilon) \mathcal N(0,\sigma_1^2) + \epsilon \mathcal N(0,\sigma_2^2) }
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        \sigma_2 \gg \sigma_1.
+        \]
+      </p>
+
+      <p>
+        The Particle Filter can directly evaluate this non-Gaussian likelihood.
+      </p>
+
+      <p>
+        A standard Kalman Filter cannot represent it exactly through a single <code>R</code>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.44 Heavy-Tailed Measurement Models</h3>
+
+      <p>
+        Outlier-prone measurements can be modeled using heavy-tailed distributions such as Student's <code>t</code>.
+      </p>
+
+      <p>
+        Particle weights can use
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(z|x) = t_\nu( z-h(x) ). }
+        \]
+      </p>
+
+      <p>
+        This reduces the influence of extreme residuals compared with a Gaussian likelihood.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.45 Bounded Measurement Models</h3>
+
+      <p>
+        Suppose measurement error is known to lie inside a bounded interval.
+      </p>
+
+      <p>
+        A uniform likelihood may be appropriate:
+      </p>
+
+      <p>
+        \[
+        p(z|x) = \begin{cases} c, & |z-h(x)|<\Delta \\ 0, & \text{otherwise}. \end{cases}
+        \]
+      </p>
+
+      <p>
+        Particle Filters can use such likelihoods directly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.46 Nonlinear Process Models</h3>
+
+      <p>
+        Particle Filters do not require process-model linearization.
+      </p>
+
+      <p>
+        Each particle may be propagated using the full nonlinear dynamics:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot x^{(i)} = f( x^{(i)},u,w^{(i)} ). }
+        \]
+      </p>
+
+      <p>
+        This is useful for
+      </p>
+
+      <ul>
+
+        <li>
+          nonlinear orbit propagation,
+        </li>
+
+        <li>
+          attitude dynamics,
+        </li>
+
+        <li>
+          RPO dynamics,
+        </li>
+
+        <li>
+          aerodynamic entry,
+        </li>
+
+        <li>
+          terrain-relative navigation.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.47 Particle Filters for Spacecraft Orbit Estimation</h3>
+
+      <p>
+        A particle state may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ x = \begin{bmatrix} r\\ v \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Each particle represents a possible spacecraft orbit.
+      </p>
+
+      <p>
+        Particles can be propagated with
+      </p>
+
+      <ul>
+
+        <li>
+          central gravity,
+        </li>
+
+        <li>
+          <code>J_2</code>,
+        </li>
+
+        <li>
+          drag,
+        </li>
+
+        <li>
+          solar radiation pressure,
+        </li>
+
+        <li>
+          third-body gravity,
+        </li>
+
+        <li>
+          manoeuvres.
+        </li>
+
+      </ul>
+
+      <p>
+        Tracking measurements then update particle weights.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.48 Particle Filters for Ballistic Coefficient Estimation</h3>
+
+      <p>
+        The state may be augmented with ballistic coefficient:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x = \begin{bmatrix} r\\ v\\ B \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Different particles can represent different plausible ballistic coefficients.
+      </p>
+
+      <p>
+        As tracking data arrives, particles associated with better trajectory predictions gain weight.
+      </p>
+
+      <p>
+        This is useful when atmospheric drag uncertainty creates non-Gaussian uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.49 Particle Filters for Re-Entry Prediction</h3>
+
+      <p>
+        Re-entry prediction may involve large uncertainty in
+      </p>
+
+      <ul>
+
+        <li>
+          atmospheric density,
+        </li>
+
+        <li>
+          ballistic coefficient,
+        </li>
+
+        <li>
+          attitude,
+        </li>
+
+        <li>
+          drag coefficient,
+        </li>
+
+        <li>
+          fragmentation state.
+        </li>
+
+      </ul>
+
+      <p>
+        The resulting predicted re-entry time or location can become strongly non-Gaussian.
+      </p>
+
+      <p>
+        A particle approach can maintain an ensemble of plausible trajectories.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Cloud} \rightarrow \text{Distribution of Re-entry Outcomes}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.50 Particle Filters for RPO</h3>
+
+      <p>
+        An RPO state may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{rel} = \begin{bmatrix} r_{rel}\\ v_{rel} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        or may include
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{rel}, \omega_{rel}, b_g, b_a. }
+        \]
+      </p>
+
+      <p>
+        Each particle represents a possible relative state.
+      </p>
+
+      <p>
+        Measurements from
+      </p>
+
+      <ul>
+
+        <li>
+          camera,
+        </li>
+
+        <li>
+          LiDAR,
+        </li>
+
+        <li>
+          relative GNSS,
+        </li>
+
+        <li>
+          radar,
+        </li>
+
+        <li>
+          pose estimation
+        </li>
+
+      </ul>
+
+      <p>
+        determine particle likelihood.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.51 Camera-Based RPO</h3>
+
+      <p>
+        Suppose the camera measurement is
+      </p>
+
+      <p>
+        \[
+        z = \begin{bmatrix} u\\ v \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Each relative-position particle predicts
+      </p>
+
+      <p>
+        \[
+        u_i, \qquad v_i.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        r_i = z- \hat z_i.
+        \]
+      </p>
+
+      <p>
+        Particle weight is computed from the image-plane likelihood.
+      </p>
+
+      <p>
+        This avoids deriving camera Jacobians.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.52 LiDAR-Based RPO</h3>
+
+      <p>
+        For a LiDAR range measurement,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho = \|r_{rel}\|. }
+        \]
+      </p>
+
+      <p>
+        Each particle predicts
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho_i = \|r_{rel}^{(i)}\|. }
+        \]
+      </p>
+
+      <p>
+        Particles whose predicted range agrees with measurement receive higher weights.
+      </p>
+
+      <p>
+        LiDAR bearing or pose measurements can be incorporated similarly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.53 Relative GNSS Update</h3>
+
+      <p>
+        Relative GNSS may provide
+      </p>
+
+      <p>
+        \[
+        r_{rel,m}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        v_{rel,m}.
+        \]
+      </p>
+
+      <p>
+        The likelihood for each particle may use
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_i = \begin{bmatrix} r_{rel,m}-r_{rel}^{(i)}\\ v_{rel,m}-v_{rel}^{(i)} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        A Gaussian likelihood can then be evaluated using the GNSS covariance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.54 Multi-Sensor Particle Filter</h3>
+
+      <p>
+        Different sensors can contribute to the same particle weight.
+      </p>
+
+      <p>
+        For conditionally independent measurements,
+      </p>
+
+      <p>
+        \[
+        \boxed{ p( z_1,z_2,\dots,z_m|x ) = \prod_{j=1}^{m} p( z_j|x ). }
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ w_i \propto w_i^- \prod_j p( z_j|x_i ). }
+        \]
+      </p>
+
+      <p>
+        This enables fusion of
+      </p>
+
+      <ul>
+
+        <li>
+          GNSS,
+        </li>
+
+        <li>
+          camera,
+        </li>
+
+        <li>
+          LiDAR,
+        </li>
+
+        <li>
+          IMU-derived information,
+        </li>
+
+        <li>
+          star tracker,
+        </li>
+
+        <li>
+          radar.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.55 Log-Likelihood Computation</h3>
+
+      <p>
+        Multiplying many small likelihoods can cause numerical underflow.
+      </p>
+
+      <p>
+        Instead compute log likelihood:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \log\tilde w_i = \log w_i^- + \sum_j \log p( z_j|x_i ). }
+        \]
+      </p>
+
+      <p>
+        Then subtract the maximum log weight before exponentiation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \bar l_i = l_i-\max_j l_j. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        w_i = \frac{ e^{\bar l_i} }{ \sum_j e^{\bar l_j} }.
+        \]
+      </p>
+
+      <p>
+        This is a highly recommended numerical practice.
+      </p>
+
+      <div class="concept-note">
+        <h4>Numerical note</h4>
+        <p>For realistic sensor dimensions, likelihood values may become smaller than machine precision even when the model is correct. Log-domain computation avoids this underflow and is therefore strongly preferred in software implementations.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.56 Sensor Dropout</h3>
+
+      <p>
+        If a sensor becomes unavailable, simply omit its likelihood contribution.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{No Measurement} \rightarrow \text{Prediction Only}. }
+        \]
+      </p>
+
+      <p>
+        The particle cloud usually spreads because process uncertainty accumulates.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.57 Sensor Reacquisition</h3>
+
+      <p>
+        When a sensor returns, measurement likelihood can reconcentrate the particle distribution.
+      </p>
+
+      <p>
+        However, if resampling previously destroyed all particles near the true state, recovery may be impossible.
+      </p>
+
+      <p>
+        This highlights the importance of maintaining adequate diversity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.58 Particle Injection During Reacquisition</h3>
+
+      <p>
+        Some tracking systems inject new particles after loss of lock.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Existing Particles} + \text{Broad Reacquisition Particles}. }
+        \]
+      </p>
+
+      <p>
+        This allows the estimator to recover from large state uncertainty or track loss.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.59 Global Localization</h3>
+
+      <p>
+        Particle Filters are particularly useful when the initial state is highly uncertain.
+      </p>
+
+      <p>
+        Instead of starting near one assumed state, particles can cover a broad state region.
+      </p>
+
+      <p>
+        Measurements progressively eliminate inconsistent hypotheses.
+      </p>
+
+      <p>
+        This is often called <strong>global localization</strong> in other navigation fields.
+      </p>
+
+      <p>
+        A similar concept can apply to ambiguous spacecraft relative pose.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.60 Particle Filter for Attitude Estimation</h3>
+
+      <p>
+        Particle Filters can also represent attitude uncertainty.
+      </p>
+
+      <p>
+        However, quaternion states require careful treatment because
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|q\|=1 }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ q\equiv -q. }
+        \]
+      </p>
+
+      <p>
+        Particles may contain normalized quaternions.
+      </p>
+
+      <p>
+        But averaging attitude particles requires manifold-aware methods.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.61 Quaternion Particle Propagation</h3>
+
+      <p>
+        For particle <code>i</code>,
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_{k+1}^{(i)} = \delta q^{(i)} \otimes q_k^{(i)}. }
+        \]
+      </p>
+
+      <p>
+        Each quaternion should remain normalized.
+      </p>
+
+      <p>
+        Gyro noise and bias uncertainty may be sampled independently for each particle.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.62 Attitude Likelihood</h3>
+
+      <p>
+        If a star tracker measures
+      </p>
+
+      <p>
+        \[
+        q_m,
+        \]
+      </p>
+
+      <p>
+        compute relative quaternion error for particle <code>i</code>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta q_i = q_m \otimes (q_i)^{-1}. }
+        \]
+      </p>
+
+      <p>
+        Convert this into a small-angle or rotation-angle error and evaluate the likelihood.
+      </p>
+
+      <p>
+        Quaternion component subtraction should generally be avoided.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.63 Particle Mean for Euclidean States</h3>
+
+      <p>
+        For ordinary Euclidean states,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x = \sum_iw_ix_i. }
+        \]
+      </p>
+
+      <p>
+        This is straightforward.
+      </p>
+
+      <p>
+        But angular and manifold variables require specialized averaging.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.64 Circular Mean for Angles</h3>
+
+      <p>
+        For heading particles
+      </p>
+
+      <p>
+        \[
+        \theta_i,
+        \]
+      </p>
+
+      <p>
+        compute
+      </p>
+
+      <p>
+        \[
+        \boxed{ \bar\theta = \operatorname{atan2} \left( \sum_iw_i\sin\theta_i, \sum_iw_i\cos\theta_i \right). }
+        \]
+      </p>
+
+      <p>
+        Ordinary arithmetic averaging may fail near angle wrap boundaries.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.65 Quaternion Mean</h3>
+
+      <p>
+        A quaternion mean can be calculated using methods based on weighted rotation matrices, eigenvectors, or tangent-space averaging.
+      </p>
+
+      <p>
+        A naive calculation
+      </p>
+
+      <p>
+        \[
+        \boxed{ \bar q = \sum_iw_iq_i }
+        \]
+      </p>
+
+      <p>
+        followed by normalization may work only under limited conditions and does not correctly handle all quaternion distributions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.66 Curse of Dimensionality</h3>
+
+      <p>
+        The major limitation of Particle Filters is the <strong>curse of dimensionality</strong>.
+      </p>
+
+      <p>
+        As state dimension increases, the required number of particles may grow dramatically.
+      </p>
+
+      <p>
+        For a low-dimensional state,
+      </p>
+
+      <p>
+        \[
+        N_p=500
+        \]
+      </p>
+
+      <p>
+        may be adequate.
+      </p>
+
+      <p>
+        For a high-dimensional spacecraft navigation problem, thousands or millions of particles may still poorly cover the state space.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Filters Scale Poorly With State Dimension}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Why dimensionality is the main limitation</h4>
+        <p>As the state dimension grows, a finite particle set becomes exponentially sparse relative to the available state-space volume. This is why fully particle-based estimation is usually reserved for a small number of strongly non-Gaussian states or for acquisition and recovery phases.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.67 Why High-Dimensional Particle Filters Are Difficult</h3>
+
+      <p>
+        The volume of state space grows rapidly with dimension.
+      </p>
+
+      <p>
+        A finite number of particles becomes sparse.
+      </p>
+
+      <p>
+        Measurements then give significant likelihood to only a tiny fraction of particles.
+      </p>
+
+      <p>
+        Degeneracy becomes severe.
+      </p>
+
+      <p>
+        This is one reason Kalman-family methods remain dominant for many high-dimensional navigation problems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.68 Rao-Blackwellized Particle Filters</h3>
+
+      <p>
+        Some states may be conditionally Gaussian given other states.
+      </p>
+
+      <p>
+        Then only the strongly nonlinear/non-Gaussian states need to be represented by particles.
+      </p>
+
+      <p>
+        The remaining states can be estimated analytically using Kalman filters.
+      </p>
+
+      <p>
+        This leads to a <strong>Rao-Blackwellized Particle Filter (RBPF)</strong>.
+      </p>
+
+      <p>
+        Conceptually:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particles for Difficult States} + \text{Kalman Filter for Conditional Gaussian States}. }
+        \]
+      </p>
+
+      <p>
+        This can greatly reduce computational cost.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why Rao-Blackwellization helps</h4>
+        <p>Rao-Blackwellization uses particles only where sampling is genuinely needed and solves the remaining conditional subproblem analytically. This often gives much lower variance and computational cost than representing every state dimension with particles.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.69 Example of Rao-Blackwellization</h3>
+
+      <p>
+        Suppose target mode or discrete ambiguity is non-Gaussian, while continuous kinematics are approximately linear-Gaussian.
+      </p>
+
+      <p>
+        Particles may represent the mode:
+      </p>
+
+      <p>
+        \[
+        m^{(i)}
+        \]
+      </p>
+
+      <p>
+        while each particle carries a Kalman Filter for
+      </p>
+
+      <p>
+        \[
+        r,v.
+        \]
+      </p>
+
+      <p>
+        Thus one can maintain multiple hypotheses efficiently.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.70 Auxiliary Particle Filter</h3>
+
+      <p>
+        An Auxiliary Particle Filter attempts to favor particles that are likely to perform well under the upcoming measurement.
+      </p>
+
+      <p>
+        Instead of resampling only using current weights, it also considers predicted measurement likelihood.
+      </p>
+
+      <p>
+        This can reduce degeneracy when measurements are informative.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.71 Regularized Particle Filter</h3>
+
+      <p>
+        A regularized Particle Filter replaces repeated point masses after resampling with samples drawn from a smooth kernel approximation.
+      </p>
+
+      <p>
+        This helps maintain diversity and reduces particle impoverishment.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.72 Gaussian-Sum Particle Approaches</h3>
+
+      <p>
+        Some estimators approximate the posterior using multiple Gaussian components:
+      </p>
+
+      <p>
+        \[
+        \boxed{ p(x) = \sum_{j=1}^{M} \pi_j \mathcal N( \mu_j,P_j ). }
+        \]
+      </p>
+
+      <p>
+        This lies conceptually between a single-Gaussian Kalman Filter and a fully sample-based Particle Filter.
+      </p>
+
+      <p>
+        Such approaches can represent multimodality with fewer components than raw particles in some problems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.73 Particle Filter and Data Association</h3>
+
+      <p>
+        Tracking systems may have uncertain measurement association.
+      </p>
+
+      <p>
+        Suppose several image detections could correspond to the target.
+      </p>
+
+      <p>
+        Particles can carry different association hypotheses.
+      </p>
+
+      <p>
+        This can be useful in cluttered or ambiguous optical-navigation environments.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.74 Particle Filter and Multiple Hypothesis Tracking</h3>
+
+      <p>
+        Particle Filters can naturally support multiple hypotheses.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Target Hypothesis A} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Target Hypothesis B} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Target Hypothesis C}. }
+        \]
+      </p>
+
+      <p>
+        Each group of particles can represent one hypothesis.
+      </p>
+
+      <p>
+        Measurement evidence gradually changes their relative probability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.75 Outlier Robustness</h3>
+
+      <p>
+        A Particle Filter can incorporate robust or mixture measurement models.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        p(z|x) = (1-\epsilon) \mathcal N( h(x),R ) + \epsilon p_{\text{outlier}}(z).
+        \]
+      </p>
+
+      <p>
+        Thus the filter need not assume every measurement comes from the nominal sensor-noise model.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.76 Fault Detection</h3>
+
+      <p>
+        The total measurement likelihood can be used as a health indicator.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        p(z_k|x_k^{(i)})
+        \]
+      </p>
+
+      <p>
+        is tiny for nearly all particles, the measurement may be inconsistent with the entire predicted state distribution.
+      </p>
+
+      <p>
+        Possible causes include
+      </p>
+
+      <ul>
+
+        <li>
+          sensor fault,
+        </li>
+
+        <li>
+          incorrect frame,
+        </li>
+
+        <li>
+          incorrect timestamp,
+        </li>
+
+        <li>
+          target mismatch,
+        </li>
+
+        <li>
+          poor dynamics,
+        </li>
+
+        <li>
+          filter divergence.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.77 Weight Collapse as Diagnostic</h3>
+
+      <p>
+        If one update causes
+      </p>
+
+      <p>
+        \[
+        N_{\text{eff}} \rightarrow1,
+        \]
+      </p>
+
+      <p>
+        this may indicate
+      </p>
+
+      <ul>
+
+        <li>
+          very informative measurement,
+        </li>
+
+        <li>
+          inadequate particle count,
+        </li>
+
+        <li>
+          proposal mismatch,
+        </li>
+
+        <li>
+          underestimated measurement noise,
+        </li>
+
+        <li>
+          measurement outlier.
+        </li>
+
+      </ul>
+
+      <p>
+        Thus effective sample size is not just a resampling trigger; it is also a useful diagnostic quantity.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.78 Initialization</h3>
+
+      <p>
+        Particles should represent the true prior uncertainty.
+      </p>
+
+      <p>
+        If the initial state is
+      </p>
+
+      <p>
+        \[
+        p(x_0),
+        \]
+      </p>
+
+      <p>
+        then sample
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_0^{(i)} \sim p(x_0). }
+        \]
+      </p>
+
+      <p>
+        If prior uncertainty is Gaussian:
+      </p>
+
+      <p>
+        \[
+        x_0^{(i)} \sim \mathcal N( \hat x_0,P_0 ).
+        \]
+      </p>
+
+      <p>
+        If prior uncertainty is multimodal, particles should represent all relevant modes.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.79 Poor Initialization</h3>
+
+      <p>
+        If no particles are placed near the true state, the Particle Filter may fail completely.
+      </p>
+
+      <p>
+        Unlike a Gaussian estimator, it cannot estimate a region containing no particles.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{No Particles Near Truth} \rightarrow \text{No Posterior Recovery Without Rejuvenation or Injection}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.80 Particle Count Selection</h3>
+
+      <p>
+        The number of particles
+      </p>
+
+      <p>
+        \[
+        N_p
+        \]
+      </p>
+
+      <p>
+        is one of the major design choices.
+      </p>
+
+      <p>
+        Too few particles cause
+      </p>
+
+      <ul>
+
+        <li>
+          poor distribution approximation,
+        </li>
+
+        <li>
+          high Monte Carlo noise,
+        </li>
+
+        <li>
+          missed modes,
+        </li>
+
+        <li>
+          severe degeneracy.
+        </li>
+
+      </ul>
+
+      <p>
+        Too many particles cause
+      </p>
+
+      <ul>
+
+        <li>
+          high CPU load,
+        </li>
+
+        <li>
+          memory usage,
+        </li>
+
+        <li>
+          increased latency.
+        </li>
+
+      </ul>
+
+      <p>
+        There is no universal particle count.
+      </p>
+
+      <p>
+        It depends on
+      </p>
+
+      <ul>
+
+        <li>
+          state dimension,
+        </li>
+
+        <li>
+          nonlinearity,
+        </li>
+
+        <li>
+          measurement informativeness,
+        </li>
+
+        <li>
+          posterior complexity,
+        </li>
+
+        <li>
+          onboard computing resources.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.81 Computational Cost</h3>
+
+      <p>
+        For each update, the estimator may need to evaluate
+      </p>
+
+      <p>
+        \[
+        f(x_i)
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        h(x_i)
+        \]
+      </p>
+
+      <p>
+        for every particle.
+      </p>
+
+      <p>
+        Thus computational cost is approximately proportional to
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_p. }
+        \]
+      </p>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        N_p=10^4,
+        \]
+      </p>
+
+      <p>
+        the system may require 10,000 process and measurement model evaluations per step.
+      </p>
+
+      <p>
+        This can be expensive for onboard spacecraft computers.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.82 Parallel Processing</h3>
+
+      <p>
+        Particles are mostly independent during propagation and likelihood evaluation.
+      </p>
+
+      <p>
+        Therefore Particle Filters are highly parallelizable.
+      </p>
+
+      <p>
+        Particles can potentially be distributed across
+      </p>
+
+      <ul>
+
+        <li>
+          CPU cores,
+        </li>
+
+        <li>
+          GPUs,
+        </li>
+
+        <li>
+          FPGAs,
+        </li>
+
+        <li>
+          distributed processors.
+        </li>
+
+      </ul>
+
+      <p>
+        This can make Particle Filters practical for otherwise demanding applications.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.83 Memory Requirements</h3>
+
+      <p>
+        Each particle stores a state vector.
+      </p>
+
+      <p>
+        For state dimension
+      </p>
+
+      <p>
+        \[
+        n
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        N_p
+        \]
+      </p>
+
+      <p>
+        particles, approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_pn }
+        \]
+      </p>
+
+      <p>
+        state values must be stored, plus weights and auxiliary data.
+      </p>
+
+      <p>
+        If each particle also carries a local covariance or Kalman Filter, memory grows substantially.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.84 Deterministic Execution Time</h3>
+
+      <p>
+        Flight software often requires bounded execution time.
+      </p>
+
+      <p>
+        A Particle Filter with fixed particle count has relatively predictable per-step workload.
+      </p>
+
+      <p>
+        However,
+      </p>
+
+      <ul>
+
+        <li>
+          adaptive particle count,
+        </li>
+
+        <li>
+          complex resampling,
+        </li>
+
+        <li>
+          local EKF proposals,
+        </li>
+
+        <li>
+          particle branching
+        </li>
+
+      </ul>
+
+      <p>
+        can create variable computational load.
+      </p>
+
+      <p>
+        This must be considered in real-time design.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.85 Adaptive Particle Count</h3>
+
+      <p>
+        Some algorithms change
+      </p>
+
+      <p>
+        \[
+        N_p
+        \]
+      </p>
+
+      <p>
+        according to posterior complexity.
+      </p>
+
+      <p>
+        More particles may be used when uncertainty is large or multimodal.
+      </p>
+
+      <p>
+        Fewer particles may be used when the posterior becomes concentrated.
+      </p>
+
+      <p>
+        This can improve computational efficiency.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.86 Particle Filter During Sensor Handover</h3>
+
+      <p>
+        Suppose RPO transitions from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS} }
+        \]
+      </p>
+
+      <p>
+        to
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera} }
+        \]
+      </p>
+
+      <p>
+        to
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{LiDAR}. }
+        \]
+      </p>
+
+      <p>
+        The same particle population can be maintained.
+      </p>
+
+      <p>
+        Only the active measurement likelihood changes.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior Particle Cloud} \rightarrow \text{Prior for Next Sensor Regime}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.87 Multi-Rate Sensors</h3>
+
+      <p>
+        Different sensors update at different rates.
+      </p>
+
+      <p>
+        Particle propagation can occur at the high-rate process-model frequency.
+      </p>
+
+      <p>
+        Whenever a sensor arrives, its likelihood is applied.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        f_{IMU} \gg f_{camera}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        f_{camera} \neq f_{LiDAR}.
+        \]
+      </p>
+
+      <p>
+        Thus Particle Filters naturally support asynchronous measurements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.88 Delayed Measurements</h3>
+
+      <p>
+        If a measurement belongs to an earlier time,
+      </p>
+
+      <p>
+        \[
+        t_k-\tau,
+        \]
+      </p>
+
+      <p>
+        but particles represent
+      </p>
+
+      <p>
+        \[
+        t_k,
+        \]
+      </p>
+
+      <p>
+        direct weighting is inconsistent.
+      </p>
+
+      <p>
+        Possible strategies include
+      </p>
+
+      <ul>
+
+        <li>
+          storing particle histories,
+        </li>
+
+        <li>
+          delayed-state particles,
+        </li>
+
+        <li>
+          backward correction,
+        </li>
+
+        <li>
+          repropagation.
+        </li>
+
+      </ul>
+
+      <p>
+        The computational cost can be large.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.89 Frame Consistency</h3>
+
+      <p>
+        Each particle state and measurement prediction must use consistent coordinate frames.
+      </p>
+
+      <p>
+        For example, if
+      </p>
+
+      <p>
+        \[
+        r_{rel}^{(i)}
+        \]
+      </p>
+
+      <p>
+        is in the Hill frame but the camera model requires the camera frame,
+      </p>
+
+      <p>
+        \[
+        \boxed{ r_C^{(i)} = C_{CH} r_H^{(i)}. }
+        \]
+      </p>
+
+      <p>
+        Every particle requires the transformation.
+      </p>
+
+      <p>
+        Frame errors can cause all particle likelihoods to collapse incorrectly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.90 Unit Consistency</h3>
+
+      <p>
+        Particle states may contain quantities such as
+      </p>
+
+      <ul>
+
+        <li>
+          meters,
+        </li>
+
+        <li>
+          meters per second,
+        </li>
+
+        <li>
+          radians,
+        </li>
+
+        <li>
+          kilograms,
+        </li>
+
+        <li>
+          bias parameters.
+        </li>
+
+      </ul>
+
+      <p>
+        The process and likelihood models must use consistent units.
+      </p>
+
+      <p>
+        Because Particle Filters rely directly on probability likelihoods, unit mistakes can severely distort weights.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.91 Log-Weight Numerical Stability</h3>
+
+      <p>
+        Likelihoods can be extremely small.
+      </p>
+
+      <p>
+        For a large measurement dimension,
+      </p>
+
+      <p>
+        \[
+        p(z|x_i)
+        \]
+      </p>
+
+      <p>
+        may underflow numerically to zero.
+      </p>
+
+      <p>
+        Therefore log weights should often be used:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \ell_i = \log w_i. }
+        \]
+      </p>
+
+      <p>
+        Weight normalization can then use the log-sum-exp technique.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.92 Weight Normalization Failure</h3>
+
+      <p>
+        If all unnormalized weights become numerically zero,
+      </p>
+
+      <p>
+        \[
+        \sum_i\tilde w_i=0,
+        \]
+      </p>
+
+      <p>
+        normalization fails.
+      </p>
+
+      <p>
+        This may indicate
+      </p>
+
+      <ul>
+
+        <li>
+          numerical underflow,
+        </li>
+
+        <li>
+          measurement too far from every particle,
+        </li>
+
+        <li>
+          wrong measurement covariance,
+        </li>
+
+        <li>
+          wrong coordinate frame,
+        </li>
+
+        <li>
+          filter divergence.
+        </li>
+
+      </ul>
+
+      <p>
+        A fallback strategy is required.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.93 Reinitialization Strategy</h3>
+
+      <p>
+        If the filter loses the target completely, a broad reinitialization may be needed.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Detection Region} \rightarrow \text{New Particle Distribution}. }
+        \]
+      </p>
+
+      <p>
+        This is particularly relevant for optical target reacquisition.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.94 Convergence</h3>
+
+      <p>
+        Particle-filter convergence should not be judged only by the weighted mean.
+      </p>
+
+      <p>
+        Useful diagnostics include
+      </p>
+
+      <ul>
+
+        <li>
+          particle spread,
+        </li>
+
+        <li>
+          effective sample size,
+        </li>
+
+        <li>
+          posterior mode structure,
+        </li>
+
+        <li>
+          weight entropy,
+        </li>
+
+        <li>
+          RMSE,
+        </li>
+
+        <li>
+          measurement likelihood.
+        </li>
+
+      </ul>
+
+      <p>
+        A mean estimate may appear accurate while the posterior remains highly ambiguous.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.95 Posterior Mode</h3>
+
+      <p>
+        For multimodal distributions, the posterior mode may be more meaningful than the mean.
+      </p>
+
+      <p>
+        The approximate MAP estimate is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x_{\text{MAP}} \approx x^{(i^\star)} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \boxed{ i^\star = \arg\max_i w_i. }
+        \]
+      </p>
+
+      <p>
+        However, individual-particle MAP estimates can be noisy.
+      </p>
+
+      <p>
+        Cluster-based mode estimation may be preferable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.96 Clustering the Particle Cloud</h3>
+
+      <p>
+        Particles may be grouped into clusters representing different hypotheses.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Cluster A} \rightarrow 60\% }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Cluster B} \rightarrow 35\% }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Other} \rightarrow 5\%. }
+        \]
+      </p>
+
+      <p>
+        This is useful for ambiguous relative-pose or target-tracking problems.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.97 Entropy of Particle Weights</h3>
+
+      <p>
+        Weight entropy can be defined as
+      </p>
+
+      <p>
+        \[
+        \boxed{ H = - \sum_i w_i \log w_i. }
+        \]
+      </p>
+
+      <p>
+        High entropy means weights are distributed broadly.
+      </p>
+
+      <p>
+        Low entropy means a few particles dominate.
+      </p>
+
+      <p>
+        This can provide another measure of degeneracy or information concentration.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.98 Particle Filter Consistency</h3>
+
+      <p>
+        NIS and NEES are less straightforward for arbitrary non-Gaussian particle distributions than for Kalman filters.
+      </p>
+
+      <p>
+        One can still compare
+      </p>
+
+      <ul>
+
+        <li>
+          posterior credible regions,
+        </li>
+
+        <li>
+          coverage probability,
+        </li>
+
+        <li>
+          Monte Carlo error distributions,
+        </li>
+
+        <li>
+          weighted covariance.
+        </li>
+
+      </ul>
+
+      <p>
+        But a full non-Gaussian posterior should not be judged only by Gaussian consistency metrics.
+      </p>
+
+      <div class="concept-note">
+        <h4>Consistency beyond covariance</h4>
+        <p>For a non-Gaussian posterior, an ellipse based on one covariance matrix may hide multiple modes or asymmetric probability. Coverage tests and posterior credible regions therefore provide a more faithful consistency check than Gaussian metrics alone.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.99 Credible Regions</h3>
+
+      <p>
+        A Particle Filter can construct probability regions directly.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ P( x\in\mathcal C ) = 0.95. }
+        \]
+      </p>
+
+      <p>
+        This 95% credible region may be highly non-elliptical.
+      </p>
+
+      <p>
+        This is an important advantage over covariance ellipsoids.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.100 Non-Elliptical Uncertainty</h3>
+
+      <p>
+        A covariance matrix represents ellipsoidal uncertainty.
+      </p>
+
+      <p>
+        A particle cloud can represent shapes such as
+      </p>
+
+      <ul>
+
+        <li>
+          curved manifolds,
+        </li>
+
+        <li>
+          rings,
+        </li>
+
+        <li>
+          multiple clusters,
+        </li>
+
+        <li>
+          truncated distributions.
+        </li>
+
+      </ul>
+
+      <p>
+        This is especially useful for geometric sensor ambiguities.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.101 Range-Only Localization Example</h3>
+
+      <p>
+        Suppose one measurement provides
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho = \|r\|. }
+        \]
+      </p>
+
+      <p>
+        A single range measurement defines a spherical shell of possible positions.
+      </p>
+
+      <p>
+        The posterior may therefore be distributed around a sphere rather than a Gaussian ellipsoid.
+      </p>
+
+      <p>
+        A Particle Filter can represent this naturally.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.102 Bearing-Only Geometry Example</h3>
+
+      <p>
+        A bearing measurement defines a ray from the observer.
+      </p>
+
+      <p>
+        Uncertainty may therefore form a long narrow distribution along that ray.
+      </p>
+
+      <p>
+        This may be strongly non-Gaussian in Cartesian coordinates.
+      </p>
+
+      <p>
+        Particles can directly represent the geometry.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.103 Camera Ambiguity During Far-Range RPO</h3>
+
+      <p>
+        At far range, small image-plane errors can correspond to very large range uncertainty.
+      </p>
+
+      <p>
+        Thus the posterior may be highly stretched and nonlinear.
+      </p>
+
+      <p>
+        A Particle Filter may capture this better than a single covariance ellipse.
+      </p>
+
+      <p>
+        However, computational cost must be weighed against mission requirements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.104 Close-Range RPO</h3>
+
+      <p>
+        At close range, high-quality LiDAR or pose estimates may produce a nearly Gaussian posterior.
+      </p>
+
+      <p>
+        In such a regime, EKF/ESKF/UKF may be much more computationally efficient.
+      </p>
+
+      <p>
+        Therefore a Particle Filter need not be used throughout the mission.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.105 Hybrid Estimator Architecture</h3>
+
+      <p>
+        A mission could use
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Filter During Ambiguous Acquisition} }
+        \]
+      </p>
+
+      <p>
+        then switch to
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{EKF / UKF During Precise Tracking}. }
+        \]
+      </p>
+
+      <p>
+        This combines global hypothesis handling with efficient local estimation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.106 Particle Filter for Target Acquisition</h3>
+
+      <p>
+        During target acquisition, the relative state may be poorly known.
+      </p>
+
+      <p>
+        Particles can cover the expected search region.
+      </p>
+
+      <p>
+        Optical detections update their weights.
+      </p>
+
+      <p>
+        Once one mode becomes dominant, the system may initialize a local Gaussian estimator.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{PF Acquisition} \rightarrow \text{Gaussian Tracking Filter}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.107 Particle Filter for Fault Recovery</h3>
+
+      <p>
+        If a Kalman Filter diverges or loses lock, a Particle Filter may be used as a recovery estimator over a larger state region.
+      </p>
+
+      <p>
+        Once uncertainty collapses again, the system can transfer back to a local filter.
+      </p>
+
+      <p>
+        This can improve robustness in demanding autonomous missions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.108 Particle Filter for Discrete Modes</h3>
+
+      <p>
+        Particle Filters can estimate not only continuous states but also discrete operating modes.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        m_k \in \{ \text{Nominal}, \text{Thruster Fault}, \text{Sensor Bias}, \text{Target Manoeuvre} \}.
+        \]
+      </p>
+
+      <p>
+        Particles can carry both
+      </p>
+
+      <p>
+        \[
+        x_k^{(i)}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        m_k^{(i)}.
+        \]
+      </p>
+
+      <p>
+        This enables joint state-and-mode estimation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.109 Multiple-Model Particle Filtering</h3>
+
+      <p>
+        Different particles may use different dynamic models.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Group 1} \rightarrow \text{No Target Manoeuvre} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Group 2} \rightarrow \text{Target Manoeuvre} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Group 3} \rightarrow \text{Different Ballistic Coefficient}. }
+        \]
+      </p>
+
+      <p>
+        The measurements determine which models remain probable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.110 Particle Filters and Fault Diagnosis</h3>
+
+      <p>
+        A particle state may include unknown fault parameters.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x = \begin{bmatrix} x_{\text{physical}}\\ b_{\text{sensor}}\\ \eta_{\text{thruster}} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Particles can represent different sensor biases or actuator efficiencies.
+      </p>
+
+      <p>
+        Measurements then update probability over both navigation state and fault parameters.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.111 Particle Filter Software Architecture</h3>
+
+      <p>
+        A clean implementation should separate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Initialization} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Propagation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Prediction} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Likelihood Calculation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Log-Weight Update} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Weight Normalization} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Effective Sample Size} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Resampling} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{State / Distribution Outputs}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.112 Recommended Particle-Filter Outputs</h3>
+
+      <p>
+        A useful implementation should provide
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ P }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \max_iw_i }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior Mode} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Spread} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Resampling Flag} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Likelihood / Health}. }
+        \]
+      </p>
+
+      <p>
+        For multimodal cases, cluster probabilities are also useful.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.113 Verification Strategy</h3>
+
+      <p>
+        The Particle Filter should be tested progressively.
+      </p>
+
+      <h4>4.2.12.113.1 Static Distribution Test</h4>
+
+      <p>
+        Sample a known distribution and verify that particles reproduce its statistics.
+      </p>
+
+      <h4>4.2.12.113.2 Linear-Gaussian Test</h4>
+
+      <p>
+        Use a simple linear Gaussian model.
+      </p>
+
+      <p>
+        Compare the Particle Filter against a standard Kalman Filter.
+      </p>
+
+      <p>
+        With enough particles, results should be consistent.
+      </p>
+
+      <h4>4.2.12.113.3 Nonlinear Scalar Test</h4>
+
+      <p>
+        Use a strongly nonlinear function.
+      </p>
+
+      <p>
+        Compare posterior against numerical integration or Monte Carlo truth.
+      </p>
+
+      <h4>4.2.12.113.4 Multimodal Test</h4>
+
+      <p>
+        Construct two distinct state hypotheses and verify both are preserved.
+      </p>
+
+      <h4>4.2.12.113.5 Degeneracy Test</h4>
+
+      <p>
+        Track
+      </p>
+
+      <p>
+        \[
+        N_{\text{eff}}.
+        \]
+      </p>
+
+      <h4>4.2.12.113.6 Resampling Test</h4>
+
+      <p>
+        Verify high-weight particles are replicated with correct statistics.
+      </p>
+
+      <h4>4.2.12.113.7 Particle-Impoverishment Test</h4>
+
+      <p>
+        Evaluate diversity after repeated resampling.
+      </p>
+
+      <h4>4.2.12.113.8 Sensor-Dropout Test</h4>
+
+      <p>
+        Verify particle spread grows appropriately.
+      </p>
+
+      <h4>4.2.12.113.9 Reacquisition Test</h4>
+
+      <p>
+        Verify the filter can reconcentrate after measurements return.
+      </p>
+
+      <h4>4.2.12.113.10 Outlier Test</h4>
+
+      <p>
+        Use heavy-tailed or mixture likelihoods.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.114 Monte Carlo Validation</h3>
+
+      <p>
+        Although the Particle Filter itself uses random samples, it should still be validated through independent Monte Carlo runs.
+      </p>
+
+      <p>
+        Randomize
+      </p>
+
+      <ul>
+
+        <li>
+          initial state,
+        </li>
+
+        <li>
+          particle realization,
+        </li>
+
+        <li>
+          process noise,
+        </li>
+
+        <li>
+          measurement noise,
+        </li>
+
+        <li>
+          outlier occurrence,
+        </li>
+
+        <li>
+          sensor dropout,
+        </li>
+
+        <li>
+          timing errors,
+        </li>
+
+        <li>
+          target manoeuvres.
+        </li>
+
+      </ul>
+
+      <p>
+        Evaluate
+      </p>
+
+      <p>
+        \[
+        \boxed{ RMSE }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Coverage Probability} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mode Recovery Rate} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Track-Loss Rate} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Reacquisition Time} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{CPU Time}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.115 Reproducibility</h3>
+
+      <p>
+        Because Particle Filters use random sampling, verification should use controlled random seeds.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Seed} \rightarrow \text{Repeatable Particle Sequence}. }
+        \]
+      </p>
+
+      <p>
+        This allows software changes to be compared consistently.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.116 Resampling Randomness</h3>
+
+      <p>
+        Even with identical measurements, different random resampling realizations can produce slightly different estimates.
+      </p>
+
+      <p>
+        Therefore one simulation run is not sufficient for validation.
+      </p>
+
+      <p>
+        Performance should be assessed statistically.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.117 Real-Time Flight Considerations</h3>
+
+      <p>
+        For onboard use, practical questions include
+      </p>
+
+      <ul>
+
+        <li>
+          maximum particle count,
+        </li>
+
+        <li>
+          update frequency,
+        </li>
+
+        <li>
+          memory,
+        </li>
+
+        <li>
+          processor utilization,
+        </li>
+
+        <li>
+          deterministic timing,
+        </li>
+
+        <li>
+          numerical precision,
+        </li>
+
+        <li>
+          resampling implementation,
+        </li>
+
+        <li>
+          fault recovery.
+        </li>
+
+      </ul>
+
+      <p>
+        Estimator design must satisfy flight-computer constraints.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.118 Fixed-Point and Reduced Precision</h3>
+
+      <p>
+        Embedded hardware may use reduced numerical precision.
+      </p>
+
+      <p>
+        Particle weights can span many orders of magnitude, making them sensitive to quantization.
+      </p>
+
+      <p>
+        Log-domain weight computation becomes even more valuable under reduced precision.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.119 GPU / FPGA Acceleration</h3>
+
+      <p>
+        Particle propagation and likelihood calculation are highly parallel.
+      </p>
+
+      <p>
+        Therefore hardware acceleration may significantly improve performance.
+      </p>
+
+      <p>
+        This is especially relevant for
+      </p>
+
+      <ul>
+
+        <li>
+          image-based likelihoods,
+        </li>
+
+        <li>
+          high particle counts,
+        </li>
+
+        <li>
+          computationally expensive nonlinear dynamics.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.120 When a Particle Filter Is Worth the Cost</h3>
+
+      <p>
+        A Particle Filter is most justified when the posterior contains features a Gaussian estimator cannot represent adequately.
+      </p>
+
+      <p>
+        Examples include:
+      </p>
+
+      <ul>
+
+        <li>
+          multiple possible target states,
+        </li>
+
+        <li>
+          severe nonlinear ambiguity,
+        </li>
+
+        <li>
+          non-Gaussian noise,
+        </li>
+
+        <li>
+          target acquisition,
+        </li>
+
+        <li>
+          track reacquisition,
+        </li>
+
+        <li>
+          unknown discrete modes,
+        </li>
+
+        <li>
+          strong data-association ambiguity.
+        </li>
+
+      </ul>
+
+      <p>
+        If uncertainty remains approximately Gaussian, an EKF, ESKF, MEKF, or UKF is usually much more efficient.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.121 When Not to Use a Particle Filter</h3>
+
+      <p>
+        A Particle Filter may be unnecessary when
+      </p>
+
+      <ul>
+
+        <li>
+          the posterior remains unimodal and near-Gaussian,
+        </li>
+
+        <li>
+          state dimension is high,
+        </li>
+
+        <li>
+          CPU resources are limited,
+        </li>
+
+        <li>
+          an EKF/UKF already performs well,
+        </li>
+
+        <li>
+          strict flight heritage is required,
+        </li>
+
+        <li>
+          the measurement model is simple.
+        </li>
+
+      </ul>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{More General} \neq \text{Always Better}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.122 Practical Estimator Selection</h3>
+
+      <p>
+        A useful conceptual hierarchy is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Linear + Gaussian} \rightarrow \text{Kalman Filter} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mild Nonlinearity} \rightarrow \text{EKF} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude / Error-State Geometry} \rightarrow \text{ESKF / MEKF} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Stronger Nonlinearity with Near-Gaussian Posterior} \rightarrow \text{UKF} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Strong Non-Gaussianity / Multimodality} \rightarrow \text{Particle Filter}. }
+        \]
+      </p>
+
+      <p>
+        This is not a rigid rule, but it is a useful engineering guide.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.123 Particle Filter During RPO Mission Phases</h3>
+
+      <h4>4.2.12.123.1 Far-Range Acquisition</h4>
+
+      <p>
+        Particles may represent large uncertainty in relative range.
+      </p>
+
+      <p>
+        Optical bearings update the distribution.
+      </p>
+
+      <h4>4.2.12.123.2 Mid-Range Tracking</h4>
+
+      <p>
+        Once relative GNSS or optical geometry improves, particle uncertainty contracts.
+      </p>
+
+      <h4>4.2.12.123.3 Close Range</h4>
+
+      <p>
+        High-quality LiDAR or pose measurements may make the posterior nearly Gaussian.
+      </p>
+
+      <p>
+        A transition to a local EKF/UKF may become efficient.
+      </p>
+
+      <h4>4.2.12.123.4 Capture</h4>
+
+      <p>
+        Precision state estimates are required.
+      </p>
+
+      <p>
+        A Gaussian filter may provide lower-noise real-time control input after ambiguity has been resolved.
+      </p>
+
+      <p>
+        Thus a hybrid architecture can be advantageous.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.124 Capture Readiness</h3>
+
+      <p>
+        A Particle Filter can calculate probability of satisfying capture conditions.
+      </p>
+
+      <p>
+        Instead of evaluating only
+      </p>
+
+      <p>
+        \[
+        \|\hat r_{rel}\| < r_c,
+        \]
+      </p>
+
+      <p>
+        one may approximate
+      </p>
+
+      <p>
+        \[
+        \boxed{ P( \|r_{rel}\|<r_c ) }
+        \]
+      </p>
+
+      <p>
+        using the particle weights.
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \boxed{ P( \|v_{rel}\|<v_c ) }
+        \]
+      </p>
+
+      <p>
+        can be estimated.
+      </p>
+
+      <p>
+        This provides a direct probabilistic interpretation of capture readiness.
+      </p>
+
+      <div class="concept-note">
+        <h4>RPO interpretation</h4>
+        <p>A particle representation allows capture readiness to be expressed as probability mass inside the admissible capture region rather than only as a threshold applied to one point estimate. This can be particularly valuable when the posterior remains asymmetric or multimodal.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.125 Probability of a Safe Region</h3>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \mathcal S
+        \]
+      </p>
+
+      <p>
+        be a safe navigation region.
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ P( x\in\mathcal S ) \approx \sum_{i: x_i\in\mathcal S} w_i. }
+        \]
+      </p>
+
+      <p>
+        This is very natural with particle representations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.126 Collision Probability</h3>
+
+      <p>
+        Similarly, if
+      </p>
+
+      <p>
+        \[
+        \mathcal C
+        \]
+      </p>
+
+      <p>
+        is a collision region,
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{\text{collision}} \approx \sum_{i: x_i\in\mathcal C} w_i. }
+        \]
+      </p>
+
+      <p>
+        Particle Filters therefore provide a direct mechanism for estimating nonlinear event probabilities.
+      </p>
+
+      <div class="concept-note">
+        <h4>Risk interpretation</h4>
+        <p>Collision probability is obtained directly by summing the weights of particles that fall inside the collision set. This avoids forcing a nonlinear keep-out-zone geometry into a Gaussian ellipsoid approximation.</p>
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.127 Particle Filter and Guidance</h3>
+
+      <p>
+        Guidance may use more than a single state estimate.
+      </p>
+
+      <p>
+        For example, guidance could consider
+      </p>
+
+      <ul>
+
+        <li>
+          posterior mean,
+        </li>
+
+        <li>
+          most probable mode,
+        </li>
+
+        <li>
+          collision probability,
+        </li>
+
+        <li>
+          state uncertainty distribution.
+        </li>
+
+      </ul>
+
+      <p>
+        Thus Particle Filters can support risk-aware decision making.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.128 Guidance Must Not Chase Particle Noise</h3>
+
+      <p>
+        Individual particles are noisy samples.
+      </p>
+
+      <p>
+        The controller should not use one arbitrary particle directly.
+      </p>
+
+      <p>
+        Control inputs should usually be based on
+      </p>
+
+      <ul>
+
+        <li>
+          filtered summary states,
+        </li>
+
+        <li>
+          MAP/cluster estimates,
+        </li>
+
+        <li>
+          posterior mean where meaningful.
+        </li>
+
+      </ul>
+
+      <p>
+        Otherwise particle sampling noise can enter the control loop.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.129 Particle Filter and Closed-Loop GNC</h3>
+
+      <p>
+        The complete loop becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensors} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Filter} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior Distribution} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Navigation Summary / Risk Metrics} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Guidance} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Control} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Vehicle Dynamics}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.130 Key Equations at a Glance</h3>
+
+      <h4>Posterior Approximation</h4>
+
+      <p>
+        \[
+        \boxed{ p(x_k|z_{1:k}) \approx \sum_{i=1}^{N_p} w_k^{(i)} \delta( x_k-x_k^{(i)} ). }
+        \]
+      </p>
+
+      <h4>Particle Prediction</h4>
+
+      <p>
+        \[
+        \boxed{ x_k^{(i)} \sim p( x_k| x_{k-1}^{(i)} ). }
+        \]
+      </p>
+
+      <h4>Measurement Likelihood</h4>
+
+      <p>
+        \[
+        \boxed{ L_k^{(i)} = p( z_k| x_k^{(i)} ). }
+        \]
+      </p>
+
+      <h4>Bootstrap Weight Update</h4>
+
+      <p>
+        \[
+        \boxed{ \tilde w_k^{(i)} = w_{k-1}^{(i)} L_k^{(i)}. }
+        \]
+      </p>
+
+      <h4>Weight Normalization</h4>
+
+      <p>
+        \[
+        \boxed{ w_k^{(i)} = \frac{ \tilde w_k^{(i)} }{ \sum_j \tilde w_k^{(j)} }. }
+        \]
+      </p>
+
+      <h4>Effective Sample Size</h4>
+
+      <p>
+        \[
+        \boxed{ N_{\text{eff}} = \frac1{ \sum_i (w_k^{(i)})^2 }. }
+        \]
+      </p>
+
+      <h4>Weighted Mean</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_k = \sum_i w_k^{(i)} x_k^{(i)}. }
+        \]
+      </p>
+
+      <h4>Weighted Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ P_k = \sum_i w_i ( x_i-\hat x ) ( x_i-\hat x )^T. }
+        \]
+      </p>
+
+      <h4>MAP Approximation</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_{\text{MAP}} \approx x^{(\arg\max_iw_i)}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.131 Particle Filter in One Diagram</h3>
+
+      <p>
+        The Particle Filter can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Prior Particle Cloud} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate Every Particle} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Predicted Particle Cloud} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Evaluate Measurement Likelihood} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Update + Normalize Weights} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Compute Effective Sample Size} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Resample if Degenerate} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior Particle Distribution}. }
+        \]
+      </p>
+
+      <p>
+        The key idea is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Represent Probability With Samples Rather Than Forcing It Into One Gaussian}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.12.132 Key Takeaways</h3>
+
+      <p>
+        The Particle Filter and non-Gaussian fusion concepts should be understood through the following points:
+      </p>
+
+      <ul>
+
+        <li>
+          A Particle Filter is a <strong>recursive Bayesian estimator</strong>.
+        </li>
+
+        <li>
+          It approximates the posterior using weighted particles.
+        </li>
+
+        <li>
+          Each particle represents one possible system state.
+        </li>
+
+        <li>
+          Particle weights represent relative posterior probability.
+        </li>
+
+        <li>
+          Particle Filters naturally support nonlinear process and measurement models.
+        </li>
+
+        <li>
+          They do not require Jacobians.
+        </li>
+
+        <li>
+          They can represent skewed, heavy-tailed, bounded, and multimodal distributions.
+        </li>
+
+        <li>
+          This distinguishes them fundamentally from Gaussian Kalman-family filters.
+        </li>
+
+        <li>
+          A bootstrap Particle Filter samples from the process transition density.
+        </li>
+
+        <li>
+          Measurement likelihood determines particle weights.
+        </li>
+
+        <li>
+          Weights must be normalized.
+        </li>
+
+        <li>
+          Repeated weighting causes particle degeneracy.
+        </li>
+
+        <li>
+          Effective sample size provides a practical degeneracy measure.
+        </li>
+
+        <li>
+          Resampling removes low-weight particles and replicates high-weight particles.
+        </li>
+
+        <li>
+          Resampling can cause particle impoverishment.
+        </li>
+
+        <li>
+          Roughening, regularization, and improved proposal distributions can preserve diversity.
+        </li>
+
+        <li>
+          The proposal distribution strongly influences efficiency.
+        </li>
+
+        <li>
+          Log-domain weights are important for numerical stability.
+        </li>
+
+        <li>
+          A Particle Filter can naturally fuse multiple sensor likelihoods.
+        </li>
+
+        <li>
+          Multi-rate and asynchronous sensor updates are straightforward conceptually.
+        </li>
+
+        <li>
+          Sensor dropout causes the particle cloud to spread.
+        </li>
+
+        <li>
+          Reacquisition can reconcentrate the particle cloud if sufficient diversity remains.
+        </li>
+
+        <li>
+          Particle injection may be needed after severe track loss.
+        </li>
+
+        <li>
+          Quaternion and angle states require manifold-aware averaging.
+        </li>
+
+        <li>
+          Particle Filters scale poorly with state dimension.
+        </li>
+
+        <li>
+          This <strong>curse of dimensionality</strong> is their principal limitation.
+        </li>
+
+        <li>
+          Rao-Blackwellized Particle Filters can reduce computation by estimating only difficult states with particles.
+        </li>
+
+        <li>
+          Particle Filters can represent target ambiguity and multiple hypotheses.
+        </li>
+
+        <li>
+          They are useful for acquisition, reacquisition, and nonlinear data-association problems.
+        </li>
+
+        <li>
+          Non-Gaussian measurement likelihoods can be modeled directly.
+        </li>
+
+        <li>
+          Particle Filters can estimate probabilities of collision, safe-region occupancy, and capture readiness directly.
+        </li>
+
+        <li>
+          They are computationally expensive relative to EKF/UKF methods.
+        </li>
+
+        <li>
+          Particle propagation and likelihood evaluation are highly parallelizable.
+        </li>
+
+        <li>
+          GPU or FPGA acceleration may make demanding implementations practical.
+        </li>
+
+        <li>
+          The correct particle count depends on dimension, nonlinearity, ambiguity, and computation.
+        </li>
+
+        <li>
+          A Particle Filter should not be selected merely because it is more general.
+        </li>
+
+        <li>
+          When the posterior is approximately Gaussian, EKF/ESKF/MEKF/UKF approaches are often much more efficient.
+        </li>
+
+        <li>
+          Hybrid PF-to-Gaussian-filter architectures can be attractive for spacecraft RPO.
+        </li>
+
+        <li>
+          Monte Carlo validation remains necessary even though the estimator itself is sample-based.
+        </li>
+
+      </ul>
+
+      <p>
+        The most important Particle Filter idea is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior Probability} \approx \text{Weighted Population of Possible States}. }
+        \]
+      </p>
+
+      <p>
+        The most important operational cycle is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate} \rightarrow \text{Weight} \rightarrow \text{Normalize} \rightarrow \text{Resample}. }
+        \]
+      </p>
+
+      <p>
+        And the most important reason for using a Particle Filter is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{The State Uncertainty Cannot Be Represented Reliably by One Gaussian Distribution}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3 class="next-title">Next: 4.2.13 Multi-Rate and Asynchronous Sensor Fusion</h3>
+
+      <p>
+        The filters developed so far explain <strong>how measurements should be fused probabilistically</strong>.
+      </p>
+
+      <p>
+        In practical spacecraft systems, another difficulty appears:
+      </p>
+
+      <p>
+        the sensors do not arrive at the same time or at the same rate.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ f_{\text{gyro}} \gg f_{\text{star tracker}} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ f_{\text{IMU}} \gg f_{\text{GNSS}} }
+        \]
+      </p>
+
+      <p>
+        while a camera or LiDAR may generate measurements only when processing is complete or when the target is visible.
+      </p>
+
+      <p>
+        Therefore a practical navigation filter must handle
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Different Sensor Rates} + \text{Different Sensor Clocks} + \text{Asynchronous Measurement Arrival} + \text{Measurement Latency}. }
+        \]
+      </p>
+
+      <p>
+        This leads naturally to <strong>4.2.13 Multi-Rate and Asynchronous Sensor Fusion</strong>, including high-rate propagation, event-driven measurement updates, independent sensor clocks, timestamp alignment, delayed measurements, buffering, interpolation, out-of-sequence measurements, sensor latency, dropout, and practical spacecraft multi-rate implementation.
+      </p>
+
+      <a href="multi-rate-and-asynchronous-sensor-fusion.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.13 Multi-Rate and Asynchronous Sensor Fusion</h3>
+
+          <p>
+            High-rate propagation, lower-rate measurement updates, independent
+            sensor clocks, event-driven fusion, timestamp alignment, latency,
+            delayed and out-of-sequence measurements, buffering, interpolation,
+            dropout handling, and practical spacecraft multi-rate implementation.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Multi-Rate and Asynchronous Sensor Fusion &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+
+    </section>
+
+  </main>
+
+
+
+  <!-- ========================================================= -->
+  <!-- FOOTER                                                     -->
+  <!-- ========================================================= -->
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+
+</body>
+
+</html>
