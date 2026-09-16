@@ -1,0 +1,4909 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.8 Error-State Kalman Filter (ESKF) | Interactive GNC &amp; Space Mechanics</title>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+</head>
+
+
+<body>
+
+  <!-- ========================================================= -->
+  <!-- PAGE HEADER                                                -->
+  <!-- ========================================================= -->
+
+  <header class="notes-hero">
+
+    <h1>Error-State Kalman Filter (ESKF)</h1>
+
+    <p class="notes-tagline">
+      Nominal-state propagation, error-state definition, inertial sensor error
+      states, covariance propagation, measurement correction, error injection,
+      reset operations, IMU bias estimation, multi-sensor fusion, RPO
+      navigation, consistency testing, and practical ESKF implementation.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN CONTENT                                               -->
+  <!-- ========================================================= -->
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.8 Error-State Kalman Filter (ESKF)</h2>
+
+<p>
+        The <strong>Error-State Kalman Filter (ESKF)</strong> is a practical formulation of the Extended Kalman Filter that is especially useful when the physical system contains states that evolve naturally through <strong>nonlinear dynamics</strong>, while the estimation errors remain relatively small.
+      </p>
+
+      <p>
+        This situation appears constantly in spacecraft navigation.
+      </p>
+
+      <p>
+        A spacecraft may have a nominal state containing
+      </p>
+
+      <p>
+        \[
+        \mathbf r,\qquad \mathbf v,\qquad \mathbf q,\qquad \mathbf b_g,\qquad \mathbf b_a
+        \]
+      </p>
+
+      <p>
+        representing position, velocity, attitude, gyroscope bias, and accelerometer bias.
+      </p>
+
+      <p>
+        The spacecraft itself must be propagated using the full nonlinear equations of motion. However, the difference between the true state and the current estimated state is often much smaller than the state itself.
+      </p>
+
+      <p>
+        The ESKF exploits this fact.
+      </p>
+
+      <p>
+        Instead of asking the Kalman filter to estimate the complete nonlinear state directly, we separate the navigation solution into
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal State} + \text{Small Error State} }
+        \]
+      </p>
+
+      <p>
+        and write conceptually
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_{\text{true}} = \mathbf x_{\text{nominal}} \oplus \delta\mathbf x }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>\mathbf x_{\text{nominal}}</code> is propagated using the nonlinear spacecraft or inertial-navigation model,
+        </li>
+
+        <li>
+          <code>\delta\mathbf x</code> represents the local estimation error,
+        </li>
+
+        <li>
+          <code>\oplus</code> denotes the appropriate operation for combining the nominal state with its error.
+        </li>
+
+      </ul>
+
+      <p>
+        For ordinary Euclidean quantities such as position or velocity, <code>\oplus</code> may simply mean addition.
+      </p>
+
+      <p>
+        For attitude, however, the operation must respect rotation geometry and is normally performed using a small rotation or quaternion multiplication.
+      </p>
+
+      <p>
+        The fundamental ESKF philosophy is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate the Physical State Nonlinearly} \rightarrow \text{Estimate Only Small Errors with the Kalman Filter} }
+        \]
+      </p>
+
+      <p>
+        After a measurement update, the estimated error is <strong>injected into the nominal state</strong>, and the error-state estimate is then reset close to zero.
+      </p>
+
+      <p>
+        That injection-and-reset operation is one of the defining features of the ESKF.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.1 Why the Error-State Kalman Filter Is Needed</h3>
+
+      <p>
+        A conventional EKF may estimate the full physical state directly.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \mathbf x= \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \mathbf b_g\\ \mathbf b_a \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The nonlinear state is propagated according to
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k = f(\mathbf x_{k-1},\mathbf u_{k-1}) + \mathbf w_{k-1} }
+        \]
+      </p>
+
+      <p>
+        and the EKF linearizes the dynamics and measurement equations around the current state estimate.
+      </p>
+
+      <p>
+        This works well for many problems.
+      </p>
+
+      <p>
+        However, certain spacecraft states are awkward to treat as ordinary additive Euclidean states.
+      </p>
+
+      <p>
+        Attitude is the clearest example.
+      </p>
+
+      <p>
+        A quaternion must satisfy
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|\mathbf q\|=1 }
+        \]
+      </p>
+
+      <p>
+        and two quaternions
+      </p>
+
+      <p>
+        \[
+        \mathbf q
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        -\mathbf q
+        \]
+      </p>
+
+      <p>
+        represent the same physical orientation.
+      </p>
+
+      <p>
+        Simply applying a correction of the form
+      </p>
+
+      <p>
+        \[
+        \mathbf q^+ = \mathbf q^- + \Delta\mathbf q
+        \]
+      </p>
+
+      <p>
+        does not naturally respect quaternion geometry.
+      </p>
+
+      <p>
+        The ESKF avoids this problem by keeping the quaternion in the <strong>nominal state</strong> while the Kalman filter estimates only a small three-dimensional attitude error
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta }
+        \]
+      </p>
+
+      <p>
+        rather than four quaternion components.
+      </p>
+
+      <p>
+        This gives
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal Quaternion} + \text{Small 3-D Attitude Error} }
+        \]
+      </p>
+
+      <p>
+        instead of
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Direct Additive Correction of Four Quaternion Elements} }.
+        \]
+      </p>
+
+      <p>
+        The same philosophy is valuable for inertial navigation because the full position and velocity may be very large, while their estimation errors remain relatively small.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.2 Core ESKF Idea</h3>
+
+      <p>
+        The ESKF maintains two related states.
+      </p>
+
+      <p>
+        The first is the <strong>nominal state</strong>
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} }
+        \]
+      </p>
+
+      <p>
+        which represents the current best physical navigation solution.
+      </p>
+
+      <p>
+        The second is the <strong>error state</strong>
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf x }
+        \]
+      </p>
+
+      <p>
+        which describes the difference between the true state and the nominal state.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_{\text{true}} = \hat{\mathbf x} \oplus \delta\mathbf x }.
+        \]
+      </p>
+
+      <p>
+        The nominal state is propagated continuously using sensor measurements and nonlinear system dynamics.
+      </p>
+
+      <p>
+        The error state is normally maintained near zero:
+      </p>
+
+      <p>
+        \[
+        \boxed{ E[\delta\mathbf x] \approx \mathbf 0 }
+        \]
+      </p>
+
+      <p>
+        while its uncertainty is represented by the covariance
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P = E[ \delta\mathbf x \delta\mathbf x^T ] }.
+        \]
+      </p>
+
+      <p>
+        Thus the ESKF often has the unusual but important property that the Kalman filter's mean error state is approximately zero during propagation, while the covariance carries information about how uncertain that zero-error assumption is.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.3 Nominal State and Error State Are Not the Same Thing</h3>
+
+      <p>
+        This distinction must be clear.
+      </p>
+
+      <p>
+        Suppose the nominal position estimate is
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf r} = \begin{bmatrix} 7000\\ 100\\ 20 \end{bmatrix} \text{ km}.
+        \]
+      </p>
+
+      <p>
+        The filter does not need to estimate another state containing the full 7000-km position.
+      </p>
+
+      <p>
+        Instead, it may estimate an error such as
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf r = \begin{bmatrix} 2\\ -1\\ 0.5 \end{bmatrix} \text{ m}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_{\text{true}} \approx \hat{\mathbf r} + \delta\mathbf r }.
+        \]
+      </p>
+
+      <p>
+        This has an important numerical interpretation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Large Physical State} \quad\text{but}\quad \text{Small Estimation Error} }
+        \]
+      </p>
+
+      <p>
+        which is often easier to linearize accurately.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.4 Typical Spacecraft / Inertial-Navigation ESKF State</h3>
+
+      <p>
+        A common navigation nominal state is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \mathbf b_g\\ \mathbf b_a \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>\mathbf r</code>: position,
+        </li>
+
+        <li>
+          <code>\mathbf v</code>: velocity,
+        </li>
+
+        <li>
+          <code>\mathbf q</code>: attitude quaternion,
+        </li>
+
+        <li>
+          <code>\mathbf b_g</code>: gyroscope bias,
+        </li>
+
+        <li>
+          <code>\mathbf b_a</code>: accelerometer bias.
+        </li>
+
+      </ul>
+
+      <p>
+        The corresponding error state may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \delta\boldsymbol\theta\\ \delta\mathbf b_g\\ \delta\mathbf b_a \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        which contains
+      </p>
+
+      <p>
+        \[
+        3+3+3+3+3=15
+        \]
+      </p>
+
+      <p>
+        states.
+      </p>
+
+      <p>
+        Thus a very common configuration is called a <strong>15-state ESKF</strong>.
+      </p>
+
+      <p>
+        Notice the difference:
+      </p>
+
+      <p>
+        the nominal attitude uses a four-element quaternion,
+      </p>
+
+      <p>
+        \[
+        \mathbf q\in\mathbb R^4,
+        \]
+      </p>
+
+      <p>
+        while the attitude error uses only three components,
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta\in\mathbb R^3.
+        \]
+      </p>
+
+      <p>
+        This is one of the central advantages of the error-state formulation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.5 Nominal-State Propagation</h3>
+
+      <p>
+        The nominal state is propagated using the actual nonlinear equations.
+      </p>
+
+      <p>
+        For position,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\hat{\mathbf r}} = \hat{\mathbf v} }
+        \]
+      </p>
+
+      <p>
+        and for velocity,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\hat{\mathbf v}} = \mathbf a_{\text{model}} }
+        \]
+      </p>
+
+      <p>
+        where <code>\mathbf a_{\text{model}}</code> may contain gravitational acceleration, inertial measurements, control accelerations, or other forces depending on the application.
+      </p>
+
+      <p>
+        For attitude,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\hat{\mathbf q}} = \frac12 \Omega( \hat{\boldsymbol\omega} ) \hat{\mathbf q} }
+        \]
+      </p>
+
+      <p>
+        with bias-corrected angular rate
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m - \hat{\mathbf b}_g }.
+        \]
+      </p>
+
+      <p>
+        Bias states may be propagated as constants,
+      </p>
+
+      <p>
+        \[
+        \dot{\hat{\mathbf b}}_g = \mathbf 0
+        \]
+      </p>
+
+      <p>
+        or using appropriate stochastic models.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal State} \rightarrow \text{Full Nonlinear Propagation} }
+        \]
+      </p>
+
+      <p>
+        while the Kalman equations are applied to the <strong>local error dynamics</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.6 IMU Measurement Models</h3>
+
+      <p>
+        For an IMU, the gyroscope measurement may be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf n_g }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>\boldsymbol\omega</code> is the true angular rate,
+        </li>
+
+        <li>
+          <code>\mathbf b_g</code> is gyro bias,
+        </li>
+
+        <li>
+          <code>\mathbf n_g</code> is gyro measurement noise.
+        </li>
+
+      </ul>
+
+      <p>
+        Similarly, an accelerometer measures specific force:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf f_m = \mathbf f + \mathbf b_a + \mathbf n_a }.
+        \]
+      </p>
+
+      <p>
+        Therefore the nominal estimator uses
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m - \hat{\mathbf b}_g }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf f} = \mathbf f_m - \hat{\mathbf b}_a }.
+        \]
+      </p>
+
+      <p>
+        Any remaining bias error appears in
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf b_g
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf b_a.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.7 Why Bias States Matter</h3>
+
+      <p>
+        Gyroscope bias produces attitude drift.
+      </p>
+
+      <p>
+        Accelerometer bias produces velocity drift and eventually position drift.
+      </p>
+
+      <p>
+        For a roughly constant gyro bias,
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta \propto \mathbf b_g t.
+        \]
+      </p>
+
+      <p>
+        For accelerometer bias,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf v \propto \mathbf b_a t
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf r \propto \frac12 \mathbf b_a t^2.
+        \]
+      </p>
+
+      <p>
+        Thus even small sensor biases can eventually dominate inertial-navigation error.
+      </p>
+
+      <p>
+        The ESKF therefore often includes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf b_g,\qquad \delta\mathbf b_a }
+        \]
+      </p>
+
+      <p>
+        as explicit filter states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.8 Error-State Definition</h3>
+
+      <p>
+        The error state describes how the nominal state differs from truth.
+      </p>
+
+      <p>
+        For position,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_{\text{true}} = \hat{\mathbf r} + \delta\mathbf r }
+        \]
+      </p>
+
+      <p>
+        and velocity,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf v_{\text{true}} = \hat{\mathbf v} + \delta\mathbf v }.
+        \]
+      </p>
+
+      <p>
+        For biases,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf b_{g,\text{true}} = \hat{\mathbf b}_g + \delta\mathbf b_g }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf b_{a,\text{true}} = \hat{\mathbf b}_a + \delta\mathbf b_a. }
+        \]
+      </p>
+
+      <p>
+        Attitude requires a multiplicative relationship rather than ordinary addition.
+      </p>
+
+      <p>
+        One possible convention is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_{\text{true}} = \delta\mathbf q \otimes \hat{\mathbf q} }
+        \]
+      </p>
+
+      <p>
+        while another convention may use
+      </p>
+
+      <p>
+        \[
+        \mathbf q_{\text{true}} = \hat{\mathbf q} \otimes \delta\mathbf q.
+        \]
+      </p>
+
+      <p>
+        Both can be valid.
+      </p>
+
+      <p>
+        The important rule is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Choose One Convention and Use It Everywhere} }.
+        \]
+      </p>
+
+      <p>
+        The sign of several Jacobian terms depends on this choice.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.9 Small-Angle Attitude Error</h3>
+
+      <p>
+        For small orientation error,
+      </p>
+
+      <p>
+        \[
+        \|\delta\boldsymbol\theta\| \ll1,
+        \]
+      </p>
+
+      <p>
+        the error quaternion may be approximated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf q \approx \begin{bmatrix} 1\\ \frac12\delta\boldsymbol\theta \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        for a scalar-first quaternion convention.
+      </p>
+
+      <p>
+        Thus the filter estimates only
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta = \begin{bmatrix} \delta\theta_x\\ \delta\theta_y\\ \delta\theta_z \end{bmatrix} }.
+        \]
+      </p>
+
+      <p>
+        This is much easier to handle in a Gaussian Kalman-filter covariance than a constrained four-component quaternion.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.10 Error-State Dynamics</h3>
+
+      <p>
+        The core mathematical model of the ESKF is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf F \delta\mathbf x + \mathbf G \mathbf w }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+
+        <li>
+          <code>\mathbf F</code> is the error-state dynamics matrix,
+        </li>
+
+        <li>
+          <code>\mathbf G</code> maps process noise into the error states,
+        </li>
+
+        <li>
+          <code>\mathbf w</code> contains driving noise sources.
+        </li>
+
+      </ul>
+
+      <p>
+        The key difference from full-state propagation is that <code>\mathbf F</code> describes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{How Small Estimation Errors Evolve} }
+        \]
+      </p>
+
+      <p>
+        not directly how the complete physical state evolves.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.11 Example 15-State Error Dynamics</h3>
+
+      <p>
+        A common error state is
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf x = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \delta\boldsymbol\theta\\ \delta\mathbf b_g\\ \delta\mathbf b_a \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        A simplified structure is
+      </p>
+
+      <p>
+        \[
+        \delta\dot{\mathbf r} = \delta\mathbf v,
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\dot{\mathbf v} = \mathbf F_{vr}\delta\mathbf r + \mathbf F_{v\theta} \delta\boldsymbol\theta + \mathbf F_{vb_a} \delta\mathbf b_a + \text{noise},
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\dot{\boldsymbol\theta} = \mathbf F_{\theta\theta} \delta\boldsymbol\theta + \mathbf F_{\theta b_g} \delta\mathbf b_g + \text{noise},
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\dot{\mathbf b}_g = \mathbf w_{bg},
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\dot{\mathbf b}_a = \mathbf w_{ba}.
+        \]
+      </p>
+
+      <p>
+        These equations show how an IMU error can propagate through the complete navigation solution.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Accelerometer Bias Error} \rightarrow \text{Velocity Error} \rightarrow \text{Position Error} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Bias Error} \rightarrow \text{Attitude Error} \rightarrow \text{Wrong Acceleration Direction} \rightarrow \text{Velocity/Position Error} }.
+        \]
+      </p>
+
+      <p>
+        This coupling is one reason attitude accuracy is crucial for inertial navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.12 Skew-Symmetric Matrix</h3>
+
+      <p>
+        Cross products appear frequently in ESKF derivations.
+      </p>
+
+      <p>
+        For a vector
+      </p>
+
+      <p>
+        \[
+        \mathbf a= \begin{bmatrix} a_x\\ a_y\\ a_z \end{bmatrix},
+        \]
+      </p>
+
+      <p>
+        define
+      </p>
+
+      <p>
+        \[
+        \boxed{ [\mathbf a]_\times = \begin{bmatrix} 0 & -a_z & a_y\\ a_z & 0 & -a_x\\ -a_y & a_x & 0 \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        such that
+      </p>
+
+      <p>
+        \[
+        \boxed{ [\mathbf a]_\times\mathbf b = \mathbf a\times\mathbf b }.
+        \]
+      </p>
+
+      <p>
+        Terms such as
+      </p>
+
+      <p>
+        \[
+        -[\boldsymbol\omega]_\times
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        -[\mathbf f]_\times
+        \]
+      </p>
+
+      <p>
+        often appear in ESKF attitude and velocity error dynamics.
+      </p>
+
+      <p>
+        Their exact signs depend on frame and attitude-error convention.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.13 Continuous Error-State Matrix</h3>
+
+      <p>
+        The continuous error dynamics may be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf F_c \delta\mathbf x + \mathbf G_c \mathbf w_c }.
+        \]
+      </p>
+
+      <p>
+        For a 15-state inertial filter, <code>\mathbf F_c</code> has a block structure approximately of the form
+      </p>
+
+      <p>
+        \[
+        \mathbf F_c = \begin{bmatrix} 0 & I & 0 & 0 & 0\\ F_{vr} & F_{vv} & F_{v\theta} & 0 & F_{vb_a}\\ 0 & 0 & F_{\theta\theta} & F_{\theta b_g} & 0\\ 0 & 0 & 0 & F_{bg} & 0\\ 0 & 0 & 0 & 0 & F_{ba} \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The exact matrix depends on
+      </p>
+
+      <ul>
+
+        <li>
+          navigation frame,
+        </li>
+
+        <li>
+          attitude convention,
+        </li>
+
+        <li>
+          dynamics,
+        </li>
+
+        <li>
+          gravity model,
+        </li>
+
+        <li>
+          sensor model,
+        </li>
+
+        <li>
+          whether Earth rotation is included,
+        </li>
+
+        <li>
+          whether orbital or relative coordinates are used.
+        </li>
+
+      </ul>
+
+      <p>
+        The important conceptual point is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf F_c = \text{Local Dynamics of Estimation Error} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.14 Error Covariance</h3>
+
+      <p>
+        The ESKF covariance describes uncertainty in the <strong>error state</strong>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P = E[ \delta\mathbf x \delta\mathbf x^T ] }.
+        \]
+      </p>
+
+      <p>
+        For the 15-state example,
+      </p>
+
+      <p>
+        \[
+        \mathbf P \in \mathbb R^{15\times15}.
+        \]
+      </p>
+
+      <p>
+        It contains not only variances such as
+      </p>
+
+      <p>
+        \[
+        \sigma_r^2,\quad \sigma_v^2,\quad \sigma_\theta^2,\quad \sigma_{b_g}^2,\quad \sigma_{b_a}^2
+        \]
+      </p>
+
+      <p>
+        but also correlations such as
+      </p>
+
+      <p>
+        \[
+        \operatorname{cov}( \delta\mathbf r, \delta\mathbf v )
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \operatorname{cov}( \delta\boldsymbol\theta, \delta\mathbf b_g ).
+        \]
+      </p>
+
+      <p>
+        Those cross-correlations are essential because a measurement of one quantity can indirectly correct another state.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.15 Covariance Propagation</h3>
+
+      <p>
+        For continuous dynamics,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf P} = \mathbf F_c\mathbf P + \mathbf P\mathbf F_c^T + \mathbf G_c \mathbf Q_c \mathbf G_c^T }.
+        \]
+      </p>
+
+      <p>
+        For discrete propagation,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_{k+1}^{-} = \mathbf\Phi_k \mathbf P_k^{+} \mathbf\Phi_k^T + \mathbf Q_{d,k} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf\Phi_k = e^{\mathbf F_c\Delta t} }
+        \]
+      </p>
+
+      <p>
+        is the discrete error-state transition matrix.
+      </p>
+
+      <p>
+        For sufficiently small <code>\Delta t</code>,
+      </p>
+
+      <p>
+        \[
+        \mathbf\Phi \approx \mathbf I + \mathbf F_c\Delta t
+        \]
+      </p>
+
+      <p>
+        may be used as a first-order approximation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.16 Continuous-to-Discrete Process Noise</h3>
+
+      <p>
+        The discrete covariance should not always be created by simply multiplying a continuous covariance by <code>\Delta t</code>.
+      </p>
+
+      <p>
+        In general,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf Q_d = \int_0^{\Delta t} \mathbf\Phi(\tau) \mathbf G \mathbf Q_c \mathbf G^T \mathbf\Phi(\tau)^T \,d\tau }.
+        \]
+      </p>
+
+      <p>
+        This matters because process noise passes through the error dynamics before appearing in the state covariance.
+      </p>
+
+      <p>
+        For high-rate IMU systems, an approximate discretization may be acceptable.
+      </p>
+
+      <p>
+        For demanding navigation applications, more accurate discretization may be required.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.17 Nominal State vs Covariance Propagation</h3>
+
+      <p>
+        The complete prediction stage therefore contains two parallel processes.
+      </p>
+
+      <p>
+        ### Nominal propagation
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k+1}^{-} = f( \hat{\mathbf x}_k^{+}, \mathbf u_k ) }
+        \]
+      </p>
+
+      <p>
+        ### Error covariance propagation
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_{k+1}^{-} = \mathbf\Phi_k \mathbf P_k^{+} \mathbf\Phi_k^T + \mathbf Q_{d,k} }.
+        \]
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal State} \rightarrow \text{Nonlinear Dynamics} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{State Uncertainty} \rightarrow \text{Linearized Error Dynamics} }.
+        \]
+      </p>
+
+      <p>
+        This is the same core principle introduced in the EKF, but the ESKF makes the separation much more explicit.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.18 Measurement Model</h3>
+
+      <p>
+        Suppose a sensor provides
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h( \mathbf x_{\text{true},k} ) + \mathbf v_k. }
+        \]
+      </p>
+
+      <p>
+        The estimator predicts the measurement from the nominal state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}_k = h( \hat{\mathbf x}_k^{-} ) }.
+        \]
+      </p>
+
+      <p>
+        Then define the innovation
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_k = \mathbf z_k - \hat{\mathbf z}_k. }
+        \]
+      </p>
+
+      <p>
+        The measurement is linearized with respect to the <strong>error state</strong>, giving approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_k \approx \mathbf H_k \delta\mathbf x_k + \mathbf v_k. }
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H_k = \frac{\partial h} {\partial\delta\mathbf x} }
+        \]
+      </p>
+
+      <p>
+        is the error-state measurement Jacobian.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.19 Why the Measurement Jacobian Is Different Conceptually</h3>
+
+      <p>
+        In a full-state EKF, one often writes
+      </p>
+
+      <p>
+        \[
+        \mathbf H = \frac{\partial h} {\partial\mathbf x}.
+        \]
+      </p>
+
+      <p>
+        In an ESKF, the measurement update asks:
+      </p>
+
+      <blockquote>
+        If the nominal state contains a small error <code>\delta\mathbf x</code>, how does that error change the predicted sensor measurement?
+      </blockquote>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H = \text{Sensitivity of Measurement Residual to Error State} }.
+        \]
+      </p>
+
+      <p>
+        This distinction becomes especially important for attitude.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.20 Innovation Covariance</h3>
+
+      <p>
+        The innovation covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf S_k = \mathbf H_k \mathbf P_k^{-} \mathbf H_k^T + \mathbf R_k. }
+        \]
+      </p>
+
+      <p>
+        It represents the expected uncertainty in the measurement residual.
+      </p>
+
+      <p>
+        Physically,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf S = \text{Predicted Measurement Uncertainty} + \text{Sensor Measurement Uncertainty}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.21 Kalman Gain</h3>
+
+      <p>
+        The ESKF Kalman gain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf K_k = \mathbf P_k^{-} \mathbf H_k^T \mathbf S_k^{-1}. }
+        \]
+      </p>
+
+      <p>
+        This has the same uncertainty-weighting interpretation as in the KF and EKF.
+      </p>
+
+      <p>
+        If the nominal estimate is uncertain while the sensor is accurate,
+      </p>
+
+      <p>
+        \[
+        \mathbf K
+        \]
+      </p>
+
+      <p>
+        becomes larger.
+      </p>
+
+      <p>
+        If the sensor is highly uncertain,
+      </p>
+
+      <p>
+        \[
+        \mathbf K
+        \]
+      </p>
+
+      <p>
+        becomes smaller.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.22 Error-State Measurement Update</h3>
+
+      <p>
+        The Kalman correction estimates the error:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x}_k = \mathbf K_k \mathbf y_k. }
+        \]
+      </p>
+
+      <p>
+        This is the defining difference from a conventional full-state EKF update.
+      </p>
+
+      <p>
+        The Kalman filter does not directly replace the nominal navigation state.
+      </p>
+
+      <p>
+        Instead it estimates
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{How Wrong the Nominal State Is} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.23 Error Injection</h3>
+
+      <p>
+        The estimated error must now be injected into the nominal state.
+      </p>
+
+      <p>
+        For position,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}^{+} = \hat{\mathbf r}^{-} + \delta\hat{\mathbf r}. }
+        \]
+      </p>
+
+      <p>
+        For velocity,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf v}^{+} = \hat{\mathbf v}^{-} + \delta\hat{\mathbf v}. }
+        \]
+      </p>
+
+      <p>
+        For biases,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf b}_g^{+} = \hat{\mathbf b}_g^{-} + \delta\hat{\mathbf b}_g }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf b}_a^{+} = \hat{\mathbf b}_a^{-} + \delta\hat{\mathbf b}_a. }
+        \]
+      </p>
+
+      <p>
+        Attitude requires multiplicative injection.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.24 Attitude Error Injection</h3>
+
+      <p>
+        Construct a correction quaternion from
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\boldsymbol\theta}.
+        \]
+      </p>
+
+      <p>
+        For small errors,
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf q} \approx \begin{bmatrix} 1\\ \frac12 \delta\hat{\boldsymbol\theta} \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then, depending on the selected convention,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} = \delta\hat{\mathbf q} \otimes \hat{\mathbf q}^{-} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} = \hat{\mathbf q}^{-} \otimes \delta\hat{\mathbf q}. }
+        \]
+      </p>
+
+      <p>
+        The updated quaternion should be normalized:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} \leftarrow \frac{ \hat{\mathbf q}^{+} }{ \|\hat{\mathbf q}^{+}\| }. }
+        \]
+      </p>
+
+      <p>
+        Again, quaternion convention must remain consistent throughout propagation, Jacobians, measurement models, and injection.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.25 Why Injection Is Important</h3>
+
+      <p>
+        Suppose the ESKF determines
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf r} = \begin{bmatrix} 0.2\\ -0.1\\ 0.05 \end{bmatrix} \text{ m}.
+        \]
+      </p>
+
+      <p>
+        The nominal position is corrected.
+      </p>
+
+      <p>
+        After that correction, retaining the same error state would mean counting the correction twice.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Estimate Error} \rightarrow \text{Inject Error} \rightarrow \text{Reset Error State}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.26 Error-State Reset</h3>
+
+      <p>
+        After injection,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} \leftarrow \mathbf 0. }
+        \]
+      </p>
+
+      <p>
+        This does <strong>not</strong> mean uncertainty suddenly becomes zero.
+      </p>
+
+      <p>
+        The state correction has been transferred into the nominal state, but uncertainty remains.
+      </p>
+
+      <p>
+        Therefore the covariance must be retained and, for some state definitions, transformed consistently with the reset.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.27 Covariance Reset</h3>
+
+      <p>
+        A simplified reset is sometimes written
+      </p>
+
+      <p>
+        \[
+        \mathbf P \leftarrow \mathbf P^{+}.
+        \]
+      </p>
+
+      <p>
+        But in a rigorous ESKF, resetting the attitude error changes the local coordinates in which the error state is expressed.
+      </p>
+
+      <p>
+        Therefore a reset Jacobian
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf G_{\text{reset}} }
+        \]
+      </p>
+
+      <p>
+        may be required:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P \leftarrow \mathbf G_{\text{reset}} \mathbf P^{+} \mathbf G_{\text{reset}}^T. }
+        \]
+      </p>
+
+      <p>
+        For very small corrections the difference may be small, but for high-quality attitude estimation the reset transformation should be handled correctly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.28 Complete ESKF Measurement-Correction Cycle</h3>
+
+      <p>
+        The complete correction process is
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Measurement}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predicted Measurement from Nominal State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Kalman Gain}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Estimate Error State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Inject Error into Nominal State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Reset Error State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Transform / Continue Covariance}}.
+        \]
+      </p>
+
+      <p>
+        This injection-and-reset process is the fundamental ESKF loop.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.29 Posterior Covariance</h3>
+
+      <p>
+        Before reset, the covariance update may use
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = (\mathbf I-\mathbf K\mathbf H) \mathbf P^{-} }
+        \]
+      </p>
+
+      <p>
+        or preferably the Joseph form,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = (\mathbf I-\mathbf K\mathbf H) \mathbf P^{-} (\mathbf I-\mathbf K\mathbf H)^T + \mathbf K\mathbf R\mathbf K^T. }
+        \]
+      </p>
+
+      <p>
+        The Joseph form has useful numerical properties and helps preserve symmetry and positive semidefiniteness.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.30 Complete ESKF Algorithm</h3>
+
+      <p>
+        A practical ESKF cycle can be summarized as follows.
+      </p>
+
+      <h4>4.2.8.30.1 Nominal-State Propagation</h4>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k}^{-} = f( \hat{\mathbf x}_{k-1}^{+}, \mathbf u_{k-1} ) }
+        \]
+      </p>
+
+      <h4>4.2.8.30.2 Error-Dynamics Linearisation</h4>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf F \delta\mathbf x + \mathbf G\mathbf w }
+        \]
+      </p>
+
+      <h4>4.2.8.30.3 Discretize Error Dynamics</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf\Phi = e^{\mathbf F\Delta t} }
+        \]
+      </p>
+
+      <h4>4.2.8.30.4 Covariance Prediction</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^{-} = \mathbf\Phi \mathbf P^{+} \mathbf\Phi^T + \mathbf Q_d }
+        \]
+      </p>
+
+      <h4>4.2.8.30.5 Predict Measurement</h4>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z} = h( \hat{\mathbf x}^{-} ) }
+        \]
+      </p>
+
+      <h4>4.2.8.30.6 Compute Innovation</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf y = \mathbf z - \hat{\mathbf z} }
+        \]
+      </p>
+
+      <h4>4.2.8.30.7 Compute Error-State Measurement Jacobian</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf H = \frac{\partial h} {\partial\delta\mathbf x} }
+        \]
+      </p>
+
+      <h4>4.2.8.30.8 Innovation Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf S = \mathbf H \mathbf P^{-} \mathbf H^T + \mathbf R }
+        \]
+      </p>
+
+      <h4>4.2.8.30.9 Kalman Gain</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf K = \mathbf P^{-} \mathbf H^T \mathbf S^{-1} }
+        \]
+      </p>
+
+      <h4>4.2.8.30.10 Estimate the Error</h4>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} = \mathbf K\mathbf y }
+        \]
+      </p>
+
+      <h4>4.2.8.30.11 Update Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = (\mathbf I-\mathbf K\mathbf H) \mathbf P^{-} }
+        \]
+      </p>
+
+      <p>
+        or use the Joseph form.
+      </p>
+
+      <h4>4.2.8.30.12 Inject Error</h4>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} \oplus \delta\hat{\mathbf x} }
+        \]
+      </p>
+
+      <h4>4.2.8.30.13 Reset Error State</h4>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} \leftarrow 0 }
+        \]
+      </p>
+
+      <h4>4.2.8.30.14 Reset Covariance Coordinates</h4>
+
+      <p>
+        \[
+        \boxed{ \mathbf P \leftarrow \mathbf G_{\text{reset}} \mathbf P \mathbf G_{\text{reset}}^T. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.31 Why the Error State Remains Small</h3>
+
+      <p>
+        After every measurement update,
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf x}
+        \]
+      </p>
+
+      <p>
+        is injected into the nominal state.
+      </p>
+
+      <p>
+        Therefore the estimator repeatedly moves the nominal state toward its best estimate.
+      </p>
+
+      <p>
+        The error coordinates are then re-centered around zero.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Small Error} \rightarrow \text{Better Linearisation} }
+        \]
+      </p>
+
+      <p>
+        which is one major practical advantage over directly linearizing around a potentially large full-state correction.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.32 ESKF vs Standard EKF</h3>
+
+      <p>
+        The distinction can be summarized as follows.
+      </p>
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>Standard EKF</th>
+              <th>ESKF</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>Main state</td>
+              <td>Full estimated state</td>
+              <td>Nominal physical state</td>
+            </tr>
+
+            <tr>
+              <td>Kalman state</td>
+              <td>Full-state correction</td>
+              <td>Small error state</td>
+            </tr>
+
+            <tr>
+              <td>Nonlinear propagation</td>
+              <td>Full state</td>
+              <td>Nominal state</td>
+            </tr>
+
+            <tr>
+              <td>Covariance</td>
+              <td>Full-state local uncertainty</td>
+              <td>Error-state uncertainty</td>
+            </tr>
+
+            <tr>
+              <td>Attitude correction</td>
+              <td>Can be awkward if direct</td>
+              <td>Naturally multiplicative</td>
+            </tr>
+
+            <tr>
+              <td>After update</td>
+              <td>Correct full state</td>
+              <td>Inject error into nominal state</td>
+            </tr>
+
+            <tr>
+              <td>Error reset</td>
+              <td>Normally not explicit</td>
+              <td>Explicit</td>
+            </tr>
+
+            <tr>
+              <td>IMU navigation</td>
+              <td>Possible</td>
+              <td>Particularly convenient</td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+      <p>
+        The ESKF is not fundamentally a completely different Bayesian estimator.
+      </p>
+
+      <p>
+        It is best understood as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{An EKF Organized Around Local Estimation Errors}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.33 Position Measurement Example</h3>
+
+      <p>
+        Suppose GNSS provides
+      </p>
+
+      <p>
+        \[
+        \mathbf z_{GNSS} = \mathbf r + \mathbf v_r.
+        \]
+      </p>
+
+      <p>
+        The nominal prediction is
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf z} = \hat{\mathbf r}^{-}.
+        \]
+      </p>
+
+      <p>
+        Therefore
+      </p>
+
+      <p>
+        \[
+        \mathbf y = \mathbf z_{GNSS} - \hat{\mathbf r}^{-}.
+        \]
+      </p>
+
+      <p>
+        The measurement is primarily sensitive to the position error:
+      </p>
+
+      <p>
+        \[
+        \mathbf y \approx \delta\mathbf r + \mathbf v_r.
+        \]
+      </p>
+
+      <p>
+        Thus the measurement Jacobian for a 15-state system may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H = \begin{bmatrix} \mathbf I_3 & \mathbf 0 & \mathbf 0 & \mathbf 0 & \mathbf 0 \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        But because the covariance contains cross-correlations, position measurements can also indirectly correct velocity, attitude, and biases.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.34 Velocity Measurement Example</h3>
+
+      <p>
+        If GNSS provides velocity,
+      </p>
+
+      <p>
+        \[
+        \mathbf z_v = \mathbf v + \mathbf n_v,
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \mathbf y_v = \mathbf z_v - \hat{\mathbf v}^{-}
+        \]
+      </p>
+
+      <p>
+        and the direct sensitivity is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H_v = \begin{bmatrix} 0&I&0&0&0 \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Again, correlations in <code>\mathbf P</code> allow this measurement to update more than velocity alone.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.35 Why GNSS Can Help Estimate IMU Biases</h3>
+
+      <p>
+        A GNSS position measurement does not directly measure gyro bias or accelerometer bias.
+      </p>
+
+      <p>
+        Yet an ESKF can estimate them.
+      </p>
+
+      <p>
+        Why?
+      </p>
+
+      <p>
+        Because the dynamics create correlation.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf b_a \rightarrow \delta\mathbf v \rightarrow \delta\mathbf r.
+        \]
+      </p>
+
+      <p>
+        Therefore GNSS position residuals contain indirect information about accelerometer bias over time.
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf b_g \rightarrow \delta\boldsymbol\theta \rightarrow \text{wrong acceleration projection} \rightarrow \delta\mathbf v \rightarrow \delta\mathbf r.
+        \]
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{A State Need Not Be Directly Measured to Be Estimated} }
+        \]
+      </p>
+
+      <p>
+        provided the system dynamics and measurements make it observable.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.36 ESKF for IMU/GNSS Fusion</h3>
+
+      <p>
+        One of the classic ESKF applications is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU} + \text{GNSS} }.
+        \]
+      </p>
+
+      <p>
+        The IMU provides high-rate propagation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} + \text{Accelerometer} \rightarrow \text{High-Rate Nominal Navigation State} }
+        \]
+      </p>
+
+      <p>
+        while GNSS provides absolute or globally referenced corrections:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Position/Velocity} \rightarrow \text{Low-Rate Error-State Correction}. }
+        \]
+      </p>
+
+      <p>
+        The complete flow becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \text{Nominal Propagation} \rightarrow \hat{\mathbf r}, \hat{\mathbf v}, \hat{\mathbf q} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{ESKF} \rightarrow \delta\mathbf r, \delta\mathbf v, \delta\boldsymbol\theta, \delta\mathbf b_g, \delta\mathbf b_a }
+        \]
+      </p>
+
+      <p>
+        and then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Inject} \rightarrow \text{Improved Nominal Navigation State}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.37 ESKF for Spacecraft RPO</h3>
+
+      <p>
+        For rendezvous and proximity operations, a nominal relative state may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_{rel} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol\omega_{rel}\\ \mathbf b_g\\ \mathbf b_a \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The error state may contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf x_{rel} = \begin{bmatrix} \delta\mathbf r_{rel}\\ \delta\mathbf v_{rel}\\ \delta\boldsymbol\theta_{rel}\\ \delta\boldsymbol\omega_{rel}\\ \delta\mathbf b_g\\ \delta\mathbf b_a \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Sensors may include
+      </p>
+
+      <ul>
+
+        <li>
+          relative GNSS,
+        </li>
+
+        <li>
+          camera,
+        </li>
+
+        <li>
+          LiDAR,
+        </li>
+
+        <li>
+          IMU,
+        </li>
+
+        <li>
+          star tracker,
+        </li>
+
+        <li>
+          range sensors,
+        </li>
+
+        <li>
+          pose-estimation algorithms.
+        </li>
+
+      </ul>
+
+      <p>
+        The ESKF then provides a unified mechanism for fusing these measurements with the predicted relative dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.38 Relative-GNSS Update</h3>
+
+      <p>
+        Relative GNSS may provide
+      </p>
+
+      <p>
+        \[
+        \mathbf r_{rel}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf v_{rel}.
+        \]
+      </p>
+
+      <p>
+        The corresponding residuals are approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_r = \mathbf r_{rel,m} - \hat{\mathbf r}_{rel} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_v = \mathbf v_{rel,m} - \hat{\mathbf v}_{rel}. }
+        \]
+      </p>
+
+      <p>
+        These measurements directly constrain translational error states and indirectly improve correlated states.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.39 Camera Update</h3>
+
+      <p>
+        A camera may measure bearing rather than Cartesian position.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \alpha = \tan^{-1} \left( \frac{y}{x} \right)
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \beta = \tan^{-1} \left( \frac{z} {\sqrt{x^2+y^2}} \right).
+        \]
+      </p>
+
+      <p>
+        The nominal state predicts
+      </p>
+
+      <p>
+        \[
+        \hat\alpha, \qquad \hat\beta
+        \]
+      </p>
+
+      <p>
+        and innovation becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_{cam} = \begin{bmatrix} \alpha_m-\hat\alpha\\ \beta_m-\hat\beta \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The corresponding Jacobian maps relative-position errors into angular measurement errors.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.40 LiDAR Update</h3>
+
+      <p>
+        For range,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho = \sqrt{x^2+y^2+z^2}. }
+        \]
+      </p>
+
+      <p>
+        The predicted range is
+      </p>
+
+      <p>
+        \[
+        \hat\rho = \sqrt{ \hat x^2+ \hat y^2+ \hat z^2 }.
+        \]
+      </p>
+
+      <p>
+        Innovation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ y_\rho = \rho_m - \hat\rho. }
+        \]
+      </p>
+
+      <p>
+        The local sensitivity is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H_\rho = \begin{bmatrix} \frac{x}{\rho} & \frac{y}{\rho} & \frac{z}{\rho} & \cdots \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        A single range measurement mainly constrains line-of-sight error.
+      </p>
+
+      <p>
+        Other sensors or changing geometry are required to obtain full relative-state observability.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.41 Attitude Measurements</h3>
+
+      <p>
+        Suppose a star tracker provides absolute attitude.
+      </p>
+
+      <p>
+        Direct quaternion subtraction is generally inappropriate.
+      </p>
+
+      <p>
+        Instead, construct an attitude residual using quaternion composition:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf q_m = \mathbf q_m \otimes (\hat{\mathbf q}^{-})^{-1} }
+        \]
+      </p>
+
+      <p>
+        for one convention.
+      </p>
+
+      <p>
+        For a small mismatch,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q_m \approx \begin{bmatrix} 1\\ \frac12\mathbf y_\theta \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_\theta }
+        \]
+      </p>
+
+      <p>
+        becomes a three-dimensional attitude innovation used by the error-state Kalman filter.
+      </p>
+
+      <p>
+        This is closely related to the MEKF formulation developed next.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.42 Multi-Rate Operation</h3>
+
+      <p>
+        Spacecraft sensors normally operate at different rates.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        f_{IMU} \gg f_{GNSS}
+        \]
+      </p>
+
+      <p>
+        and perhaps
+      </p>
+
+      <p>
+        \[
+        f_{camera} \neq f_{LiDAR} \neq f_{star}.
+        \]
+      </p>
+
+      <p>
+        The ESKF handles this naturally.
+      </p>
+
+      <p>
+        At high rate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \text{Nominal Propagation} + \text{Covariance Propagation} }
+        \]
+      </p>
+
+      <p>
+        while measurement corrections occur only when a valid measurement arrives.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Predict Continuously} + \text{Correct Asynchronously}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.43 Sensor Dropout</h3>
+
+      <p>
+        During GNSS or vision dropout, no measurement correction is available.
+      </p>
+
+      <p>
+        The nominal state continues propagating.
+      </p>
+
+      <p>
+        Meanwhile,
+      </p>
+
+      <p>
+        \[
+        \mathbf P
+        \]
+      </p>
+
+      <p>
+        generally grows because process uncertainty accumulates.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Dropout} \rightarrow \text{Continued Navigation} + \text{Increasing Uncertainty}. }
+        \]
+      </p>
+
+      <p>
+        When the sensor returns, the measurement can reduce accumulated error if the residual remains within a valid convergence region.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.44 Time Synchronization</h3>
+
+      <p>
+        Measurement timing is critical.
+      </p>
+
+      <p>
+        Suppose the nominal state corresponds to
+      </p>
+
+      <p>
+        \[
+        t_k
+        \]
+      </p>
+
+      <p>
+        but the measurement was generated at
+      </p>
+
+      <p>
+        \[
+        t_k-\tau.
+        \]
+      </p>
+
+      <p>
+        Comparing them directly produces a residual partly caused by time misalignment.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Correct Measurement} + \text{Wrong Timestamp} = \text{Incorrect Innovation}. }
+        \]
+      </p>
+
+      <p>
+        Practical ESKF implementations need
+      </p>
+
+      <ul>
+
+        <li>
+          accurate timestamps,
+        </li>
+
+        <li>
+          sensor latency compensation,
+        </li>
+
+        <li>
+          buffering,
+        </li>
+
+        <li>
+          state interpolation or propagation,
+        </li>
+
+        <li>
+          delayed-measurement handling,
+        </li>
+
+        <li>
+          clock synchronization.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.45 Innovation Gating</h3>
+
+      <p>
+        The innovation is
+      </p>
+
+      <p>
+        \[
+        \mathbf y = \mathbf z - h( \hat{\mathbf x}^{-} ).
+        \]
+      </p>
+
+      <p>
+        Its covariance is
+      </p>
+
+      <p>
+        \[
+        \mathbf S = \mathbf H\mathbf P^{-}\mathbf H^T + \mathbf R.
+        \]
+      </p>
+
+      <p>
+        A normalized innovation statistic is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \epsilon = \mathbf y^T \mathbf S^{-1} \mathbf y. }
+        \]
+      </p>
+
+      <p>
+        This can be used to reject measurements inconsistent with the predicted state.
+      </p>
+
+      <p>
+        A practical chain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement} \rightarrow \text{Preprocessing} \rightarrow \text{Innovation} \rightarrow \text{NIS/Gating} \rightarrow \text{Accept or Reject} \rightarrow \text{ESKF Update}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.46 Angle and Quaternion Residual Handling</h3>
+
+      <p>
+        Angular quantities require special care.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \hat\alpha = 179^\circ
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \alpha_m = -179^\circ,
+        \]
+      </p>
+
+      <p>
+        the naive difference is
+      </p>
+
+      <p>
+        \[
+        -358^\circ.
+        \]
+      </p>
+
+      <p>
+        The correct physical residual is approximately
+      </p>
+
+      <p>
+        \[
+        2^\circ.
+        \]
+      </p>
+
+      <p>
+        Therefore angular innovations must be wrapped consistently.
+      </p>
+
+      <p>
+        Similarly, quaternion sign ambiguity must be handled because
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q \equiv -\mathbf q. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.47 Process Noise <code>Q</code></h3>
+
+      <p>
+        The ESKF process covariance represents uncertainty driving the error dynamics.
+      </p>
+
+      <p>
+        Typical noise sources include
+      </p>
+
+      <ul>
+
+        <li>
+          gyro white noise,
+        </li>
+
+        <li>
+          accelerometer white noise,
+        </li>
+
+        <li>
+          gyro-bias random walk,
+        </li>
+
+        <li>
+          accelerometer-bias random walk,
+        </li>
+
+        <li>
+          unmodelled accelerations,
+        </li>
+
+        <li>
+          disturbance torques,
+        </li>
+
+        <li>
+          thruster uncertainty,
+        </li>
+
+        <li>
+          environmental model uncertainty.
+        </li>
+
+      </ul>
+
+      <p>
+        A useful physical workflow is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor / Dynamic Uncertainty} \rightarrow \mathbf Q_c \rightarrow \mathbf G \rightarrow \mathbf Q_d. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.48 Measurement Noise <code>R</code></h3>
+
+      <p>
+        The matrix
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf R }
+        \]
+      </p>
+
+      <p>
+        belongs to the <strong>measurement space</strong>.
+      </p>
+
+      <p>
+        For GNSS position,
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        contains position measurement covariance.
+      </p>
+
+      <p>
+        For camera angles,
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        contains angular measurement uncertainty.
+      </p>
+
+      <p>
+        For LiDAR range,
+      </p>
+
+      <p>
+        \[
+        R_\rho = \sigma_\rho^2.
+        \]
+      </p>
+
+      <p>
+        For relative pose, <code>R</code> may include both translation and attitude uncertainty.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ R \neq \text{State Covariance}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.49 Observability</h3>
+
+      <p>
+        Adding a state to the filter does not guarantee it can be estimated.
+      </p>
+
+      <p>
+        For example, adding
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf b_g
+        \]
+      </p>
+
+      <p>
+        does not automatically make gyro bias observable.
+      </p>
+
+      <p>
+        Measurements and system dynamics must contain enough information to distinguish bias from other errors.
+      </p>
+
+      <p>
+        Likewise,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{State Included in Filter} \neq \text{State Observable}. }
+        \]
+      </p>
+
+      <p>
+        Observability depends on
+      </p>
+
+      <ul>
+
+        <li>
+          sensor types,
+        </li>
+
+        <li>
+          geometry,
+        </li>
+
+        <li>
+          motion,
+        </li>
+
+        <li>
+          excitation,
+        </li>
+
+        <li>
+          measurement sequence,
+        </li>
+
+        <li>
+          state coupling.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.50 Motion Can Improve Observability</h3>
+
+      <p>
+        Suppose a camera measures only bearing.
+      </p>
+
+      <p>
+        At one instant, range may be weakly observable.
+      </p>
+
+      <p>
+        But if the spacecraft moves and viewing geometry changes, successive measurements can constrain range.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Vehicle Motion} + \text{Changing Measurement Geometry} \rightarrow \text{Improved Observability}. }
+        \]
+      </p>
+
+      <p>
+        This creates an important GNC connection:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Guidance Manoeuvre} \rightarrow \text{Measurement Geometry} \rightarrow \text{Navigation Performance}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.51 Initialization</h3>
+
+      <p>
+        The ESKF needs both a nominal initial state and covariance.
+      </p>
+
+      <p>
+        Nominal initialization may include
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf r}_0, \quad \hat{\mathbf v}_0, \quad \hat{\mathbf q}_0, \quad \hat{\mathbf b}_{g,0}, \quad \hat{\mathbf b}_{a,0}.
+        \]
+      </p>
+
+      <p>
+        The initial error covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_0 = E[ \delta\mathbf x_0 \delta\mathbf x_0^T ]. }
+        \]
+      </p>
+
+      <p>
+        If initial uncertainty is unrealistically small, the filter may reject valid measurements or correct too weakly.
+      </p>
+
+      <p>
+        If it is unrealistically large, convergence may be noisy or unnecessarily aggressive.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Good Initial State} + \text{Realistic }P_0 }
+        \]
+      </p>
+
+      <p>
+        are both essential.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.52 Why ESKF Linearisation Is Usually Well Behaved</h3>
+
+      <p>
+        The ESKF linearizes the dynamics with respect to
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf x
+        \]
+      </p>
+
+      <p>
+        rather than the complete state.
+      </p>
+
+      <p>
+        After each update,
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf x} \rightarrow0.
+        \]
+      </p>
+
+      <p>
+        Therefore the local linear model is repeatedly re-centered around the updated nominal trajectory.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Inject Correction} \rightarrow \text{Re-Center Error Coordinates} \rightarrow \text{Keep Linearisation Local}. }
+        \]
+      </p>
+
+      <p>
+        This is one of the main reasons ESKF formulations are attractive for nonlinear navigation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.53 ESKF and Quaternion Geometry</h3>
+
+      <p>
+        Attitude does not live in ordinary Euclidean space.
+      </p>
+
+      <p>
+        It belongs to
+      </p>
+
+      <p>
+        \[
+        SO(3).
+        \]
+      </p>
+
+      <p>
+        A quaternion lies on the unit hypersphere
+      </p>
+
+      <p>
+        \[
+        S^3.
+        \]
+      </p>
+
+      <p>
+        The ESKF handles this by placing the global attitude representation in the nominal state while expressing uncertainty locally in a three-dimensional tangent space.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Global Nonlinear Attitude} + \text{Local Linear Error Coordinates}. }
+        \]
+      </p>
+
+      <p>
+        This idea extends beyond quaternions and appears in modern manifold-based state estimation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.54 ESKF vs MEKF</h3>
+
+      <p>
+        The ESKF and MEKF are closely related.
+      </p>
+
+      <p>
+        The <strong>ESKF</strong> is a general error-state formulation that may include
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf r, \delta\mathbf v, \delta\boldsymbol\theta, \delta\mathbf b_g, \delta\mathbf b_a, \ldots
+        \]
+      </p>
+
+      <p>
+        while the <strong>MEKF</strong> is especially associated with quaternion attitude estimation using multiplicative attitude error.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{MEKF} \subset \text{Error-State / Multiplicative Estimation Philosophy}. }
+        \]
+      </p>
+
+      <p>
+        The next section focuses specifically on the attitude-estimation case.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.55 ESKF vs Full-State EKF</h3>
+
+      <p>
+        A full-state EKF may use
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + \mathbf K\mathbf y.
+        \]
+      </p>
+
+      <p>
+        The ESKF instead uses
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} = \mathbf K\mathbf y }
+        \]
+      </p>
+
+      <p>
+        followed by
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} \oplus \delta\hat{\mathbf x}. }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf x} \leftarrow0.
+        \]
+      </p>
+
+      <p>
+        This is the essential operational distinction.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.56 Advantages of the ESKF</h3>
+
+      <h4>4.2.8.56.1 Small Error Variables</h4>
+
+      <p>
+        Linearisation occurs around small local errors.
+      </p>
+
+      <h4>4.2.8.56.2 Natural Quaternion Handling</h4>
+
+      <p>
+        Attitude uncertainty can be represented using three states.
+      </p>
+
+      <h4>4.2.8.56.3 Good IMU Integration</h4>
+
+      <p>
+        Gyro and accelerometer biases fit naturally into the state.
+      </p>
+
+      <h4>4.2.8.56.4 Numerical Interpretation</h4>
+
+      <p>
+        Large physical states do not have to be treated as small additive corrections.
+      </p>
+
+      <h4>4.2.8.56.5 Modular Navigation Architecture</h4>
+
+      <p>
+        The nominal propagator and uncertainty estimator can be designed and tested separately.
+      </p>
+
+      <h4>4.2.8.56.6 Multi-Sensor Fusion</h4>
+
+      <p>
+        GNSS, camera, LiDAR, star tracker, and other sensors can correct the same error-state covariance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.57 Limitations of the ESKF</h3>
+
+      <p>
+        The ESKF is not automatically superior in every problem.
+      </p>
+
+      <p>
+        Important limitations include
+      </p>
+
+      <ul>
+
+        <li>
+          derivation complexity,
+        </li>
+
+        <li>
+          convention sensitivity,
+        </li>
+
+        <li>
+          difficult error-state Jacobians,
+        </li>
+
+        <li>
+          reset Jacobian requirements,
+        </li>
+
+        <li>
+          covariance discretization complexity,
+        </li>
+
+        <li>
+          observability limitations,
+        </li>
+
+        <li>
+          dependence on realistic <code>Q</code> and <code>R</code>,
+        </li>
+
+        <li>
+          possible divergence if the nominal state becomes far from truth,
+        </li>
+
+        <li>
+          non-Gaussian or multimodal uncertainty,
+        </li>
+
+        <li>
+          measurement-association errors.
+        </li>
+
+      </ul>
+
+      <p>
+        In particular,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Small-Error Assumption} }
+        \]
+      </p>
+
+      <p>
+        must remain sufficiently valid.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.58 Common ESKF Implementation Errors</h3>
+
+      <p>
+        Typical mistakes include:
+      </p>
+
+      <ul>
+
+        <li>
+          mixing left- and right-multiplicative attitude-error conventions,
+        </li>
+
+        <li>
+          incorrect skew-matrix signs,
+        </li>
+
+        <li>
+          wrong frame transformations,
+        </li>
+
+        <li>
+          applying corrections twice,
+        </li>
+
+        <li>
+          failing to reset the error state,
+        </li>
+
+        <li>
+          resetting the error state but not covariance coordinates,
+        </li>
+
+        <li>
+          using raw gyro measurements without bias compensation,
+        </li>
+
+        <li>
+          using raw accelerometer measurements without bias compensation,
+        </li>
+
+        <li>
+          inconsistent quaternion order,
+        </li>
+
+        <li>
+          forgetting quaternion normalization,
+        </li>
+
+        <li>
+          incorrect continuous-to-discrete <code>Q</code>,
+        </li>
+
+        <li>
+          treating accelerometer output as gravity directly,
+        </li>
+
+        <li>
+          using measurement covariance in the wrong frame,
+        </li>
+
+        <li>
+          incorrect timestamps,
+        </li>
+
+        <li>
+          updating with stale measurements,
+        </li>
+
+        <li>
+          using truth signals inside the estimator during simulation.
+        </li>
+
+      </ul>
+
+      <p>
+        The last point is particularly important:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Simulation Truth} \neq \text{Estimator Input}. }
+        \]
+      </p>
+
+      <p>
+        Truth should be used only for verification.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.59 Simulink / Software Architecture</h3>
+
+      <p>
+        A clean implementation should separate the following modules:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU Preprocessing}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nominal-State Propagation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}^{-}}
+        \]
+      </p>
+
+      <p>
+        while in parallel,
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf F,\mathbf G} \rightarrow \boxed{\text{Covariance Propagation}} \rightarrow \boxed{\mathbf P^{-}}.
+        \]
+      </p>
+
+      <p>
+        For measurements:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sensor Measurement}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Time Alignment + Validation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Prediction}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\mathbf H,\mathbf S,\mathbf K}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\delta\hat{\mathbf x}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Error Injection}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Reset}}.
+        \]
+      </p>
+
+      <p>
+        This modular architecture is easier to debug than one monolithic ESKF block.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.60 Verification Strategy</h3>
+
+      <p>
+        A good ESKF should be verified progressively.
+      </p>
+
+      <h4>4.2.8.60.1 Zero-Noise Test</h4>
+
+      <p>
+        Remove all sensor noise and model error.
+      </p>
+
+      <p>
+        Verify that
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x} \rightarrow \mathbf x_{\text{truth}}.
+        \]
+      </p>
+
+      <h4>4.2.8.60.2 Initial Error Test</h4>
+
+      <p>
+        Introduce known initial position, velocity, and attitude offsets.
+      </p>
+
+      <p>
+        Verify convergence.
+      </p>
+
+      <h4>4.2.8.60.3 Gyro Bias Test</h4>
+
+      <p>
+        Inject known
+      </p>
+
+      <p>
+        \[
+        \mathbf b_g
+        \]
+      </p>
+
+      <p>
+        and verify bias estimation.
+      </p>
+
+      <h4>4.2.8.60.4 Accelerometer Bias Test</h4>
+
+      <p>
+        Inject known
+      </p>
+
+      <p>
+        \[
+        \mathbf b_a
+        \]
+      </p>
+
+      <p>
+        and verify its effect on velocity and position is corrected.
+      </p>
+
+      <h4>4.2.8.60.5 GNSS Dropout Test</h4>
+
+      <p>
+        Disable GNSS and observe covariance growth.
+      </p>
+
+      <h4>4.2.8.60.6 Sensor Reacquisition Test</h4>
+
+      <p>
+        Restore GNSS and verify smooth convergence.
+      </p>
+
+      <h4>4.2.8.60.7 Attitude Sensor Dropout</h4>
+
+      <p>
+        Verify inertial attitude propagation and resulting drift.
+      </p>
+
+      <h4>4.2.8.60.8 Outlier Test</h4>
+
+      <p>
+        Inject invalid measurements and verify gating.
+      </p>
+
+      <h4>4.2.8.60.9 Timing Test</h4>
+
+      <p>
+        Introduce sensor delay and confirm handling.
+      </p>
+
+      <h4>4.2.8.60.10 Frame Test</h4>
+
+      <p>
+        Verify every residual in the correct coordinate frame.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.61 Innovation Consistency</h3>
+
+      <p>
+        The innovation is
+      </p>
+
+      <p>
+        \[
+        \mathbf y_k.
+        \]
+      </p>
+
+      <p>
+        Its expected covariance is
+      </p>
+
+      <p>
+        \[
+        \mathbf S_k.
+        \]
+      </p>
+
+      <p>
+        A properly tuned estimator should produce residuals statistically consistent with this covariance.
+      </p>
+
+      <p>
+        The normalized innovation squared is
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS_k = \mathbf y_k^T \mathbf S_k^{-1} \mathbf y_k. }
+        \]
+      </p>
+
+      <p>
+        NIS can be used for
+      </p>
+
+      <ul>
+
+        <li>
+          filter consistency assessment,
+        </li>
+
+        <li>
+          measurement gating,
+        </li>
+
+        <li>
+          fault detection,
+        </li>
+
+        <li>
+          tuning evaluation.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.62 NEES</h3>
+
+      <p>
+        When truth is available in simulation,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf x_k = \mathbf x_{\text{true}} \ominus \hat{\mathbf x}_k
+        \]
+      </p>
+
+      <p>
+        can be compared with the filter covariance.
+      </p>
+
+      <p>
+        The normalized estimation error squared is
+      </p>
+
+      <p>
+        \[
+        \boxed{ NEES_k = \delta\mathbf x_k^T \mathbf P_k^{-1} \delta\mathbf x_k. }
+        \]
+      </p>
+
+      <p>
+        If the actual errors are consistently much larger than predicted by <code>\mathbf P</code>, the estimator is overconfident.
+      </p>
+
+      <p>
+        If much smaller, it may be overly conservative.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.63 Monte Carlo Verification</h3>
+
+      <p>
+        Because ESKF performance depends on random noise and nonlinear coupling, Monte Carlo analysis is highly valuable.
+      </p>
+
+      <p>
+        Randomize parameters such as
+      </p>
+
+      <ul>
+
+        <li>
+          initial position error,
+        </li>
+
+        <li>
+          initial velocity error,
+        </li>
+
+        <li>
+          initial attitude error,
+        </li>
+
+        <li>
+          gyro bias,
+        </li>
+
+        <li>
+          accelerometer bias,
+        </li>
+
+        <li>
+          IMU noise,
+        </li>
+
+        <li>
+          GNSS noise,
+        </li>
+
+        <li>
+          camera noise,
+        </li>
+
+        <li>
+          LiDAR noise,
+        </li>
+
+        <li>
+          sensor misalignment,
+        </li>
+
+        <li>
+          measurement timing,
+        </li>
+
+        <li>
+          dropout duration,
+        </li>
+
+        <li>
+          process disturbances.
+        </li>
+
+      </ul>
+
+      <p>
+        Evaluate distributions of
+      </p>
+
+      <p>
+        \[
+        \boxed{RMSE}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{NIS}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{NEES}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Convergence Time}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Maximum Error}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Divergence Rate}}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.64 ESKF for RPO Mission Phases</h3>
+
+      <p>
+        An RPO system may change sensors with range.
+      </p>
+
+      <p>
+        ### Far Range
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative GNSS} }
+        \]
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        ### Mid Range
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative GNSS} + \text{Camera} }
+        \]
+      </p>
+
+      <p>
+        may be fused.
+      </p>
+
+      <p>
+        ### Close Range
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} }
+        \]
+      </p>
+
+      <p>
+        may dominate.
+      </p>
+
+      <p>
+        ### Capture
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Precision Relative Pose} + \text{Relative Velocity} + \text{Relative Attitude} }
+        \]
+      </p>
+
+      <p>
+        may be required.
+      </p>
+
+      <p>
+        The ESKF's nominal state remains continuous across these phases while measurement models and measurement covariance can change.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.65 Sensor Handover</h3>
+
+      <p>
+        Sensor handover should not mean resetting the complete estimator.
+      </p>
+
+      <p>
+        Suppose the system transitions from GNSS-dominated navigation to camera/LiDAR navigation.
+      </p>
+
+      <p>
+        The existing posterior uncertainty becomes the prior for the next sensor regime.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Previous Navigation Knowledge} \rightarrow \text{Prior} \rightarrow \text{New Sensor Correction}. }
+        \]
+      </p>
+
+      <p>
+        This preserves state continuity across mission phases.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.66 Capture and Handover Conditions</h3>
+
+      <p>
+        For proximity operations, the navigation system may need to evaluate
+      </p>
+
+      <p>
+        \[
+        \|\hat{\mathbf r}_{rel}\| < r_{\text{capture}}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \|\hat{\mathbf v}_{rel}\| < v_{\text{capture}}.
+        \]
+      </p>
+
+      <p>
+        But an ESKF also provides
+      </p>
+
+      <p>
+        \[
+        \mathbf P.
+        \]
+      </p>
+
+      <p>
+        Therefore, it is possible to consider not only estimated relative position and velocity but also confidence in those estimates.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Capture Readiness} = \text{Estimated State} + \text{Navigation Confidence}. }
+        \]
+      </p>
+
+      <p>
+        This is a major advantage over deterministic navigation alone.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.67 Relationship to Guidance and Control</h3>
+
+      <p>
+        The estimator outputs
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf r}, \quad \hat{\mathbf v}, \quad \hat{\mathbf q}, \quad \hat{\boldsymbol\omega},
+        \]
+      </p>
+
+      <p>
+        which are used by guidance and control.
+      </p>
+
+      <p>
+        The complete loop is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensors} \rightarrow \text{ESKF} \rightarrow \text{Navigation Estimate} \rightarrow \text{Guidance} \rightarrow \text{Control} \rightarrow \text{Vehicle Dynamics}. }
+        \]
+      </p>
+
+      <p>
+        Estimator latency, noise, bias, and covariance therefore influence closed-loop GNC performance directly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.68 Key Equations at a Glance</h3>
+
+      <p>
+        ### Nominal State
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_{\text{true}} = \hat{\mathbf x} \oplus \delta\mathbf x }
+        \]
+      </p>
+
+      <p>
+        ### Error Dynamics
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf F \delta\mathbf x + \mathbf G\mathbf w }
+        \]
+      </p>
+
+      <p>
+        ### State Transition
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf\Phi = e^{\mathbf F\Delta t} }
+        \]
+      </p>
+
+      <p>
+        ### Covariance Prediction
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^{-} = \mathbf\Phi \mathbf P^{+} \mathbf\Phi^T + \mathbf Q_d }
+        \]
+      </p>
+
+      <p>
+        ### Innovation
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y = \mathbf z - h( \hat{\mathbf x}^{-} ) }
+        \]
+      </p>
+
+      <p>
+        ### Innovation Covariance
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf S = \mathbf H \mathbf P^{-} \mathbf H^T + \mathbf R }
+        \]
+      </p>
+
+      <p>
+        ### Kalman Gain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf K = \mathbf P^{-} \mathbf H^T \mathbf S^{-1} }
+        \]
+      </p>
+
+      <p>
+        ### Estimated Error
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} = \mathbf K\mathbf y }
+        \]
+      </p>
+
+      <p>
+        ### Error Injection
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} \oplus \delta\hat{\mathbf x} }
+        \]
+      </p>
+
+      <p>
+        ### Error Reset
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} \leftarrow 0 }
+        \]
+      </p>
+
+      <p>
+        ### Covariance Reset
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P \leftarrow \mathbf G_{\text{reset}} \mathbf P \mathbf G_{\text{reset}}^T }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.69 Complete ESKF Conceptual Flow</h3>
+
+      <p>
+        The entire ESKF can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Previous Nominal State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU / Nonlinear Dynamics}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Propagated Nominal State}}
+        \]
+      </p>
+
+      <p>
+        while in parallel,
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Previous Error Covariance}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Linearized Error Dynamics}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predicted Error Covariance}}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{External Measurement}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Residual}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Estimate Error State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Inject Error into Nominal State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Reset Error State}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Continue Propagation}}.
+        \]
+      </p>
+
+      <p>
+        The central philosophy is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate the State} \quad \text{Estimate the Error} \quad \text{Correct the State} \quad \text{Reset the Error} }.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.8.70 Key Takeaways</h3>
+
+      <p>
+        The Error-State Kalman Filter should be understood through the following points:
+      </p>
+
+      <ul>
+
+        <li>
+          The ESKF is a practical <strong>error-coordinate formulation of the EKF</strong>.
+        </li>
+
+        <li>
+          The physical or nominal navigation state is propagated using the full nonlinear model.
+        </li>
+
+        <li>
+          The Kalman filter estimates only the <strong>small difference between truth and nominal state</strong>.
+        </li>
+
+        <li>
+          Position and velocity errors are normally additive.
+        </li>
+
+        <li>
+          Attitude error is normally represented by a small three-dimensional rotation.
+        </li>
+
+        <li>
+          The quaternion remains in the nominal state.
+        </li>
+
+        <li>
+          A common inertial-navigation ESKF uses a <strong>15-state error model</strong>:
+        </li>
+
+      </ul>
+
+      <p>
+        \[
+          \delta\mathbf r,\; \delta\mathbf v,\; \delta\boldsymbol\theta,\; \delta\mathbf b_g,\; \delta\mathbf b_a.
+        \]
+      </p>
+
+      <ul>
+
+        <li>
+          Gyro bias influences attitude error.
+        </li>
+
+        <li>
+          Accelerometer bias influences velocity and position error.
+        </li>
+
+        <li>
+          Attitude error also contaminates translational navigation because acceleration is transformed using attitude.
+        </li>
+
+        <li>
+          Covariance propagation uses the <strong>linearized error dynamics</strong>, not the full nonlinear physical state equations directly.
+        </li>
+
+        <li>
+          External measurements estimate the error in the nominal state.
+        </li>
+
+        <li>
+          The estimated error is injected into the nominal state.
+        </li>
+
+        <li>
+          The error state is then reset to approximately zero.
+        </li>
+
+        <li>
+          Attitude-error reset may require a covariance reset Jacobian.
+        </li>
+
+        <li>
+          Quaternion, frame, and error-definition conventions must be documented carefully.
+        </li>
+
+        <li>
+          <code>Q</code> represents uncertainty driving error-state evolution.
+        </li>
+
+        <li>
+          <code>R</code> represents uncertainty in measurement space.
+        </li>
+
+        <li>
+          GNSS, camera, LiDAR, star tracker, and other measurements can all be fused through appropriate residual and Jacobian models.
+        </li>
+
+        <li>
+          Multi-rate and asynchronous sensors are naturally supported.
+        </li>
+
+        <li>
+          Sensor dropout causes covariance to grow.
+        </li>
+
+        <li>
+          Measurement timing is critical.
+        </li>
+
+        <li>
+          Innovation gating should be used to protect against outliers.
+        </li>
+
+        <li>
+          NIS and NEES are important statistical consistency measures.
+        </li>
+
+        <li>
+          Monte Carlo testing is essential for realistic verification.
+        </li>
+
+        <li>
+          Error-state filtering is especially attractive for <strong>IMU-based navigation, spacecraft relative navigation, and attitude estimation</strong>.
+        </li>
+
+        <li>
+          The ESKF provides a natural foundation for the <strong>Multiplicative Extended Kalman Filter</strong>.
+        </li>
+
+      </ul>
+
+      <p>
+        The most important concept is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{ESKF} = \text{Nonlinear Nominal-State Propagation} + \text{Linearized Small-Error Estimation} + \text{Error Injection} + \text{Error Reset}. }
+        \]
+      </p>
+
+      <p>
+        Or, physically:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Do not continuously re-estimate the entire spacecraft state from scratch; estimate how wrong the current navigation state is.} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3 class="next-title">Next: 4.2.9 Multiplicative Extended Kalman Filter (MEKF)</h3>
+
+      <p>
+        The ESKF introduced the idea
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_{\text{true}} = \mathbf x_{\text{nominal}} \oplus \delta\mathbf x. }
+        \]
+      </p>
+
+      <p>
+        For spacecraft attitude estimation, this becomes especially powerful.
+      </p>
+
+      <p>
+        Instead of estimating quaternion components additively, maintain a nominal quaternion
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q} }
+        \]
+      </p>
+
+      <p>
+        and estimate only a small attitude-error vector
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta. }
+        \]
+      </p>
+
+      <p>
+        The corresponding correction is applied multiplicatively:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_{\text{true}} = \delta\mathbf q \otimes \hat{\mathbf q}. }
+        \]
+      </p>
+
+      <p>
+        This leads naturally to <strong>4.2.9 Multiplicative Extended Kalman Filter (MEKF)</strong>, where the focus should shift specifically to <strong>quaternion attitude estimation, multiplicative attitude-error representation, gyro-bias estimation, star-tracker/Sun-sensor/magnetometer measurements, attitude residuals, covariance propagation, quaternion correction, reset, observability, initialization, and spacecraft attitude-determination applications</strong>.
+      </p>
+
+      <a href="multiplicative-ekf.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.9 Multiplicative EKF (MEKF)</h3>
+
+          <p>
+            Quaternion attitude estimation, multiplicative attitude-error
+            representation, small-angle error states, gyroscope-bias estimation,
+            quaternion correction, reset, and spacecraft attitude determination.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Multiplicative EKF &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+
+    </section>
+
+  </main>
+
+
+
+  <!-- ========================================================= -->
+  <!-- FOOTER                                                     -->
+  <!-- ========================================================= -->
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+
+</body>
+
+</html>
