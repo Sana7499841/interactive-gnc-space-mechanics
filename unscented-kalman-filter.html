@@ -1,0 +1,5364 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.10 Unscented Kalman Filter (UKF) | Interactive GNC &amp; Space Mechanics</title>
+
+  <!-- Main stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+</head>
+
+
+<body>
+
+  <!-- ========================================================= -->
+  <!-- PAGE HEADER                                                -->
+  <!-- ========================================================= -->
+
+  <header class="notes-hero">
+
+    <h1>Unscented Kalman Filter (UKF)</h1>
+
+    <p class="notes-tagline">
+      Sigma-point generation, the unscented transform, nonlinear state
+      propagation, predicted mean and covariance, nonlinear measurement
+      updates, tuning parameters, covariance weights, spacecraft nonlinear
+      navigation, RPO applications, numerical stability, and comparison with
+      the EKF.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+
+
+  <!-- ========================================================= -->
+  <!-- MAIN CONTENT                                               -->
+  <!-- ========================================================= -->
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.10 Unscented Kalman Filter (UKF)</h2>
+
+<p>
+        The <strong>Unscented Kalman Filter (UKF)</strong> is a nonlinear state-estimation method designed to handle systems in which the process dynamics, the measurement models, or both are strongly nonlinear.
+      </p>
+
+      <p>
+        Like the Extended Kalman Filter, it belongs to the broader family of Bayesian recursive estimators. However, the UKF takes a fundamentally different approach to nonlinear uncertainty propagation.
+      </p>
+
+      <p>
+        The EKF asks:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{How can I linearize the nonlinear system locally?} }
+        \]
+      </p>
+
+      <p>
+        The UKF instead asks:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{How does a carefully selected set of representative state samples move through the actual nonlinear function?} }
+        \]
+      </p>
+
+      <p>
+        These representative samples are called <strong>sigma points</strong>.
+      </p>
+
+      <p>
+        Instead of computing Jacobians such as
+      </p>
+
+      <p>
+        \[
+        \mathbf F = \frac{\partial f}{\partial \mathbf x}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf H = \frac{\partial h}{\partial \mathbf x},
+        \]
+      </p>
+
+      <p>
+        the UKF constructs a deterministic collection of sigma points around the current estimated mean and covariance.
+      </p>
+
+      <p>
+        Each point is propagated through the <strong>actual nonlinear model</strong>:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\chi_i \rightarrow f(\boldsymbol\chi_i) }
+        \]
+      </p>
+
+      <p>
+        and the propagated points are then recombined to reconstruct the predicted mean and covariance.
+      </p>
+
+      <p>
+        The central UKF philosophy is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Represent the Distribution by Sigma Points} \rightarrow \text{Propagate Them Through the Nonlinear Model} \rightarrow \text{Reconstruct Mean and Covariance}. }
+        \]
+      </p>
+
+      <p>
+        This makes the UKF particularly attractive for nonlinear spacecraft-navigation problems where Jacobian derivation is difficult, error-prone, or where first-order linearisation may not adequately represent uncertainty propagation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.1 Why the UKF Is Needed</h3>
+
+      <p>
+        The ordinary Kalman filter assumes linear dynamics:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k = \mathbf F_{k-1}\mathbf x_{k-1} + \mathbf B_{k-1}\mathbf u_{k-1} + \mathbf w_{k-1} }
+        \]
+      </p>
+
+      <p>
+        and linear measurements:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_k = \mathbf H_k\mathbf x_k + \mathbf v_k. }
+        \]
+      </p>
+
+      <p>
+        For many spacecraft systems, however,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k = f( \mathbf x_{k-1}, \mathbf u_{k-1} ) + \mathbf w_{k-1} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h( \mathbf x_k ) + \mathbf v_k. }
+        \]
+      </p>
+
+      <p>
+        The functions
+      </p>
+
+      <p>
+        \[
+        f(\cdot)
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        h(\cdot)
+        \]
+      </p>
+
+      <p>
+        may contain
+      </p>
+
+      <ul>
+
+        <li>
+          orbital dynamics,
+        </li>
+
+        <li>
+          nonlinear gravity,
+        </li>
+
+        <li>
+          quaternion attitude dynamics,
+        </li>
+
+        <li>
+          line-of-sight geometry,
+        </li>
+
+        <li>
+          camera projection,
+        </li>
+
+        <li>
+          LiDAR range equations,
+        </li>
+
+        <li>
+          bearing-only navigation,
+        </li>
+
+        <li>
+          nonlinear relative-motion dynamics,
+        </li>
+
+        <li>
+          nonlinear sensor transformations.
+        </li>
+
+      </ul>
+
+      <p>
+        Therefore, nonlinear state estimation is unavoidable in practical spacecraft GNC.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.2 Limitation of EKF Linearisation</h3>
+
+      <p>
+        The EKF handles nonlinear dynamics by linearizing around the current estimate.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        f(\mathbf x)
+        \]
+      </p>
+
+      <p>
+        is approximated near
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}
+        \]
+      </p>
+
+      <p>
+        as
+      </p>
+
+      <p>
+        \[
+        \boxed{ f(\mathbf x) \approx f(\hat{\mathbf x}) + \mathbf F ( \mathbf x-\hat{\mathbf x} ) }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \mathbf F = \left. \frac{\partial f}{\partial\mathbf x} \right|_{\hat{\mathbf x}}.
+        \]
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        h(\mathbf x)
+        \]
+      </p>
+
+      <p>
+        is approximated using
+      </p>
+
+      <p>
+        \[
+        \mathbf H = \left. \frac{\partial h}{\partial\mathbf x} \right|_{\hat{\mathbf x}}.
+        \]
+      </p>
+
+      <p>
+        This method is powerful, but several problems can arise:
+      </p>
+
+      <ul>
+
+        <li>
+          Jacobians may be difficult to derive,
+        </li>
+
+        <li>
+          analytical Jacobians may be coded incorrectly,
+        </li>
+
+        <li>
+          numerical Jacobians can be noisy or computationally expensive,
+        </li>
+
+        <li>
+          first-order approximation may poorly represent strong nonlinearities,
+        </li>
+
+        <li>
+          covariance transformation may become inaccurate,
+        </li>
+
+        <li>
+          large uncertainty can make local linearization unreliable.
+        </li>
+
+      </ul>
+
+      <p>
+        The UKF was developed to address many of these issues.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.3 Core UKF Idea</h3>
+
+      <p>
+        Suppose the current state estimate is described by
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x \sim \mathcal N( \hat{\mathbf x}, \mathbf P ) }.
+        \]
+      </p>
+
+      <p>
+        Instead of linearizing a nonlinear function, the UKF constructs a set of points
+      </p>
+
+      <p>
+        \[
+        \boldsymbol\chi_i
+        \]
+      </p>
+
+      <p>
+        whose weighted mean and covariance match
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf x}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf P.
+        \]
+      </p>
+
+      <p>
+        These points are passed through
+      </p>
+
+      <p>
+        \[
+        f(\cdot).
+        \]
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\chi_i \rightarrow f(\boldsymbol\chi_i) }
+        \]
+      </p>
+
+      <p>
+        for each sigma point.
+      </p>
+
+      <p>
+        From the transformed points, compute
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Predicted Mean} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Predicted Covariance}. }
+        \]
+      </p>
+
+      <p>
+        This process is known as the <strong>unscented transform</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.4 Why It Is Called “Unscented”</h3>
+
+      <p>
+        The name does not refer to sensors or measurement type.
+      </p>
+
+      <p>
+        The term <strong>unscented</strong> originated from the idea that nonlinear transformation of a probability distribution could be approximated without explicitly linearizing the nonlinear function.
+      </p>
+
+      <p>
+        The essential idea is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Approximate the Distribution} \quad \text{Not the Function}. }
+        \]
+      </p>
+
+      <p>
+        The EKF approximates the nonlinear function locally.
+      </p>
+
+      <p>
+        The UKF approximates the probability distribution with deterministic sigma points and propagates those points through the true nonlinear function.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.5 The Unscented Transform</h3>
+
+      <p>
+        Consider a random variable
+      </p>
+
+      <p>
+        \[
+        \mathbf x
+        \]
+      </p>
+
+      <p>
+        with mean
+      </p>
+
+      <p>
+        \[
+        \bar{\mathbf x}
+        \]
+      </p>
+
+      <p>
+        and covariance
+      </p>
+
+      <p>
+        \[
+        \mathbf P_x.
+        \]
+      </p>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        \mathbf y = g(\mathbf x)
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        g(\cdot)
+        \]
+      </p>
+
+      <p>
+        is nonlinear.
+      </p>
+
+      <p>
+        We want
+      </p>
+
+      <p>
+        \[
+        E[\mathbf y]
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \operatorname{Cov}(\mathbf y).
+        \]
+      </p>
+
+      <p>
+        The unscented transform performs the following steps:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mean and Covariance} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Generate Sigma Points} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate Every Sigma Point Through }g }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Weighted Mean} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Weighted Covariance}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.6 State Dimension</h3>
+
+      <p>
+        Let the state dimension be
+      </p>
+
+      <p>
+        \[
+        \boxed{ n }.
+        \]
+      </p>
+
+      <p>
+        For example, if
+      </p>
+
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} x\\ y\\ z\\ v_x\\ v_y\\ v_z \end{bmatrix},
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        n=6.
+        \]
+      </p>
+
+      <p>
+        A standard scaled UKF typically uses
+      </p>
+
+      <p>
+        \[
+        \boxed{ 2n+1 }
+        \]
+      </p>
+
+      <p>
+        sigma points.
+      </p>
+
+      <p>
+        Thus, for a six-state system,
+      </p>
+
+      <p>
+        \[
+        2(6)+1=13
+        \]
+      </p>
+
+      <p>
+        sigma points are generated.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.7 Sigma-Point Set</h3>
+
+      <p>
+        The sigma-point set is usually written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\chi_0, \boldsymbol\chi_1, \dots, \boldsymbol\chi_{2n}. }
+        \]
+      </p>
+
+      <p>
+        The center sigma point is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\chi_0 = \hat{\mathbf x}. }
+        \]
+      </p>
+
+      <p>
+        The remaining points are distributed symmetrically around the mean according to the covariance.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mean} + \text{Covariance Geometry} \rightarrow \text{Sigma-Point Cloud}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.8 Sigma-Point Scaling Parameter</h3>
+
+      <p>
+        Define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \lambda = \alpha^2 ( n+\kappa ) - n. }
+        \]
+      </p>
+
+      <p>
+        The parameters
+      </p>
+
+      <p>
+        \[
+        \alpha,\qquad \beta,\qquad \kappa
+        \]
+      </p>
+
+      <p>
+        control the distribution and weighting of sigma points.
+      </p>
+
+      <p>
+        They are important UKF tuning quantities.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.9 Sigma-Point Generation</h3>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \mathbf P
+        \]
+      </p>
+
+      <p>
+        be the state covariance.
+      </p>
+
+      <p>
+        Compute a matrix square root of
+      </p>
+
+      <p>
+        \[
+        (n+\lambda)\mathbf P.
+        \]
+      </p>
+
+      <p>
+        A common implementation uses Cholesky decomposition:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf L = \operatorname{chol} \left( (n+\lambda)\mathbf P \right). }
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\chi_0 = \hat{\mathbf x} }
+        \]
+      </p>
+
+      <p>
+        and for
+      </p>
+
+      <p>
+        \[
+        i=1,\dots,n,
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\chi_i = \hat{\mathbf x} + \mathbf L_i }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\chi_{i+n} = \hat{\mathbf x} - \mathbf L_i. }
+        \]
+      </p>
+
+      <p>
+        Here,
+      </p>
+
+      <p>
+        \[
+        \mathbf L_i
+        \]
+      </p>
+
+      <p>
+        is the <code>i</code>-th column of the covariance square-root matrix.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.10 Geometric Meaning of Sigma Points</h3>
+
+      <p>
+        The covariance defines the size and direction of the uncertainty ellipsoid.
+      </p>
+
+      <p>
+        The sigma points are placed along principal directions of this uncertainty.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sigma Points} = \text{Deterministic Samples of the Current Uncertainty Geometry}. }
+        \]
+      </p>
+
+      <p>
+        If uncertainty in one direction is large, the sigma points spread farther in that direction.
+      </p>
+
+      <p>
+        If uncertainty is small, they remain closer to the mean.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.11 Why Sigma Points Are Not Random Monte Carlo Samples</h3>
+
+      <p>
+        Sigma points are <strong>deterministically chosen</strong>.
+      </p>
+
+      <p>
+        They are not generated randomly.
+      </p>
+
+      <p>
+        A Monte Carlo simulation may require
+      </p>
+
+      <p>
+        \[
+        10^3, 10^4, 10^5
+        \]
+      </p>
+
+      <p>
+        or more random samples.
+      </p>
+
+      <p>
+        The UKF may use only
+      </p>
+
+      <p>
+        \[
+        \boxed{ 2n+1 }
+        \]
+      </p>
+
+      <p>
+        carefully positioned samples.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UKF Sigma Points} \neq \text{Monte Carlo Samples}. }
+        \]
+      </p>
+
+      <p>
+        The sigma points are specifically constructed so that their weighted statistics reproduce the current mean and covariance.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.12 Mean Weights</h3>
+
+      <p>
+        The standard scaled UKF uses mean weights
+      </p>
+
+      <p>
+        \[
+        \boxed{ W_0^{(m)} = \frac{\lambda} {n+\lambda} }
+        \]
+      </p>
+
+      <p>
+        and for
+      </p>
+
+      <p>
+        \[
+        i=1,\dots,2n,
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ W_i^{(m)} = \frac{1} {2(n+\lambda)}. }
+        \]
+      </p>
+
+      <p>
+        The superscript
+      </p>
+
+      <p>
+        \[
+        (m)
+        \]
+      </p>
+
+      <p>
+        indicates weights used for calculating the mean.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.13 Covariance Weights</h3>
+
+      <p>
+        The first covariance weight is
+      </p>
+
+      <p>
+        \[
+        \boxed{ W_0^{(c)} = \frac{\lambda}{n+\lambda} + ( 1-\alpha^2+\beta ) }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ W_i^{(c)} = \frac{1}{2(n+\lambda)}, \qquad i=1,\dots,2n. }
+        \]
+      </p>
+
+      <p>
+        The covariance weights are therefore slightly different from the mean weights.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.14 The Parameter <code>\alpha</code></h3>
+
+      <p>
+        The parameter
+      </p>
+
+      <p>
+        \[
+        \boxed{ \alpha }
+        \]
+      </p>
+
+      <p>
+        controls how far the sigma points are spread from the mean.
+      </p>
+
+      <p>
+        Small
+      </p>
+
+      <p>
+        \[
+        \alpha
+        \]
+      </p>
+
+      <p>
+        places sigma points close to the mean.
+      </p>
+
+      <p>
+        Larger
+      </p>
+
+      <p>
+        \[
+        \alpha
+        \]
+      </p>
+
+      <p>
+        spreads them farther away.
+      </p>
+
+      <p>
+        Typical choices depend on implementation and problem scaling.
+      </p>
+
+      <p>
+        There is no universal value that is optimal for every spacecraft application.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.15 The Parameter <code>\beta</code></h3>
+
+      <p>
+        The parameter
+      </p>
+
+      <p>
+        \[
+        \boxed{ \beta }
+        \]
+      </p>
+
+      <p>
+        incorporates information about the prior distribution.
+      </p>
+
+      <p>
+        For a Gaussian prior, a commonly used choice is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \beta=2. }
+        \]
+      </p>
+
+      <p>
+        This often improves covariance approximation for Gaussian state uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.16 The Parameter <code>\kappa</code></h3>
+
+      <p>
+        The parameter
+      </p>
+
+      <p>
+        \[
+        \boxed{ \kappa }
+        \]
+      </p>
+
+      <p>
+        provides another degree of freedom for sigma-point scaling.
+      </p>
+
+      <p>
+        Common choices include
+      </p>
+
+      <p>
+        \[
+        \kappa=0
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \kappa=3-n.
+        \]
+      </p>
+
+      <p>
+        Its effect must be considered together with
+      </p>
+
+      <p>
+        \[
+        \alpha
+        \]
+      </p>
+
+      <p>
+        because both affect
+      </p>
+
+      <p>
+        \[
+        \lambda.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.17 Why Tuning Parameters Matter</h3>
+
+      <p>
+        Poor choices of
+      </p>
+
+      <p>
+        \[
+        \alpha, \beta, \kappa
+        \]
+      </p>
+
+      <p>
+        can produce
+      </p>
+
+      <ul>
+
+        <li>
+          overly concentrated sigma points,
+        </li>
+
+        <li>
+          excessive sigma-point spread,
+        </li>
+
+        <li>
+          negative weights,
+        </li>
+
+        <li>
+          numerical sensitivity,
+        </li>
+
+        <li>
+          poor covariance approximation,
+        </li>
+
+        <li>
+          loss of positive definiteness.
+        </li>
+
+      </ul>
+
+      <p>
+        Therefore UKF tuning is not simply cosmetic.
+      </p>
+
+      <p>
+        It influences how the estimator represents nonlinear uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.18 State Prediction</h3>
+
+      <p>
+        Suppose the nonlinear dynamics are
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k = f( \mathbf x_{k-1}, \mathbf u_{k-1} ) + \mathbf w_{k-1}. }
+        \]
+      </p>
+
+      <p>
+        Each sigma point is propagated independently:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\chi_{i,k}^{-} = f( \boldsymbol\chi_{i,k-1}^{+}, \mathbf u_{k-1} ). }
+        \]
+      </p>
+
+      <p>
+        This is the central nonlinear prediction step.
+      </p>
+
+      <p>
+        No dynamic Jacobian is required.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.19 Predicted State Mean</h3>
+
+      <p>
+        Once all sigma points have been propagated,
+      </p>
+
+      <p>
+        \[
+        \boldsymbol\chi_{i,k}^{-},
+        \]
+      </p>
+
+      <p>
+        the predicted state mean is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{-} = \sum_{i=0}^{2n} W_i^{(m)} \boldsymbol\chi_{i,k}^{-}. }
+        \]
+      </p>
+
+      <p>
+        Thus the predicted state is reconstructed from the transformed sigma-point cloud.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.20 Predicted State Covariance</h3>
+
+      <p>
+        The predicted covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{-} = \sum_{i=0}^{2n} W_i^{(c)} \left( \boldsymbol\chi_{i,k}^{-} - \hat{\mathbf x}_k^{-} \right) \left( \boldsymbol\chi_{i,k}^{-} - \hat{\mathbf x}_k^{-} \right)^T + \mathbf Q_k. }
+        \]
+      </p>
+
+      <p>
+        This captures how nonlinear propagation stretches, rotates, or distorts the uncertainty distribution.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.21 Physical Interpretation of Prediction</h3>
+
+      <p>
+        Consider an uncertainty ellipse around the current state.
+      </p>
+
+      <p>
+        If the dynamics are nonlinear, the ellipse may transform into a curved or distorted shape.
+      </p>
+
+      <p>
+        The EKF approximates this transformation using a tangent linear mapping.
+      </p>
+
+      <p>
+        The UKF instead propagates representative points on the uncertainty distribution.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UKF Prediction} = \text{Propagate the Distribution Geometry Through the Nonlinear Dynamics}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.22 Process Noise <code>Q</code></h3>
+
+      <p>
+        The covariance
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf Q }
+        \]
+      </p>
+
+      <p>
+        represents uncertainty in the process model.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <ul>
+
+        <li>
+          unmodelled acceleration,
+        </li>
+
+        <li>
+          disturbance torque,
+        </li>
+
+        <li>
+          atmospheric uncertainty,
+        </li>
+
+        <li>
+          solar-radiation-pressure uncertainty,
+        </li>
+
+        <li>
+          thruster magnitude error,
+        </li>
+
+        <li>
+          gyro noise,
+        </li>
+
+        <li>
+          accelerometer noise,
+        </li>
+
+        <li>
+          model parameter uncertainty.
+        </li>
+
+      </ul>
+
+      <p>
+        As in other Kalman filters,
+      </p>
+
+      <p>
+        \[
+        Q
+        \]
+      </p>
+
+      <p>
+        must have physically meaningful units and dimensions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.23 Additive Process Noise UKF</h3>
+
+      <p>
+        A common simplified formulation assumes process noise is additive:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_k = f( \mathbf x_{k-1} ) + \mathbf w_k. }
+        \]
+      </p>
+
+      <p>
+        Then one can propagate sigma points through
+      </p>
+
+      <p>
+        \[
+        f(\cdot)
+        \]
+      </p>
+
+      <p>
+        and add
+      </p>
+
+      <p>
+        \[
+        Q
+        \]
+      </p>
+
+      <p>
+        after reconstructing covariance.
+      </p>
+
+      <p>
+        This is computationally simpler.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.24 Augmented-State UKF</h3>
+
+      <p>
+        For more general noise models, process and measurement noise may be included in an augmented state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \mathbf w\\ \mathbf v \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The corresponding covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_a = \begin{bmatrix} \mathbf P & 0 & 0\\ 0 & \mathbf Q & 0\\ 0 & 0 & \mathbf R \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Sigma points are then generated from the augmented distribution.
+      </p>
+
+      <p>
+        This allows nonlinear noise effects to be propagated directly.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.25 Cost of State Augmentation</h3>
+
+      <p>
+        If the physical state dimension is
+      </p>
+
+      <p>
+        \[
+        n_x
+        \]
+      </p>
+
+      <p>
+        and the augmented noise dimension is
+      </p>
+
+      <p>
+        \[
+        n_w+n_v,
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        n_a = n_x+n_w+n_v.
+        \]
+      </p>
+
+      <p>
+        The number of sigma points becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ 2n_a+1. }
+        \]
+      </p>
+
+      <p>
+        Therefore augmentation increases computational cost.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.26 Measurement Prediction</h3>
+
+      <p>
+        Suppose the nonlinear measurement model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h( \mathbf x_k ) + \mathbf v_k. }
+        \]
+      </p>
+
+      <p>
+        Pass every predicted sigma point through the measurement function:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\zeta_{i,k} = h( \boldsymbol\chi_{i,k}^{-} ). }
+        \]
+      </p>
+
+      <p>
+        These transformed points exist in measurement space.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.27 Predicted Measurement Mean</h3>
+
+      <p>
+        The predicted measurement is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}_k = \sum_{i=0}^{2n} W_i^{(m)} \boldsymbol\zeta_{i,k}. }
+        \]
+      </p>
+
+      <p>
+        Thus the UKF predicts not just the state but also the complete expected measurement through nonlinear transformation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.28 Innovation Covariance</h3>
+
+      <p>
+        The innovation covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf S_k = \sum_{i=0}^{2n} W_i^{(c)} \left( \boldsymbol\zeta_{i,k} - \hat{\mathbf z}_k \right) \left( \boldsymbol\zeta_{i,k} - \hat{\mathbf z}_k \right)^T + \mathbf R_k. }
+        \]
+      </p>
+
+      <p>
+        This represents the predicted spread of measurement residuals.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.29 State-Measurement Cross Covariance</h3>
+
+      <p>
+        The UKF also calculates
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_{xz,k} = \sum_{i=0}^{2n} W_i^{(c)} \left( \boldsymbol\chi_{i,k}^{-} - \hat{\mathbf x}_k^{-} \right) \left( \boldsymbol\zeta_{i,k} - \hat{\mathbf z}_k \right)^T. }
+        \]
+      </p>
+
+      <p>
+        This cross covariance replaces the role played by
+      </p>
+
+      <p>
+        \[
+        P^-H^T
+        \]
+      </p>
+
+      <p>
+        in an EKF.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.30 Kalman Gain</h3>
+
+      <p>
+        The UKF Kalman gain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf K_k = \mathbf P_{xz,k} \mathbf S_k^{-1}. }
+        \]
+      </p>
+
+      <p>
+        Thus the gain still answers the familiar question:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{How strongly should the measurement change the predicted state?} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.31 Innovation</h3>
+
+      <p>
+        The innovation remains
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf y_k = \mathbf z_k - \hat{\mathbf z}_k. }
+        \]
+      </p>
+
+      <p>
+        The physical interpretation is unchanged from KF and EKF.
+      </p>
+
+      <p>
+        It is the difference between
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{What the Sensor Measured} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{What the Current State Estimate Predicted the Sensor Should Measure}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.32 State Update</h3>
+
+      <p>
+        The posterior state estimate is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{+} = \hat{\mathbf x}_k^{-} + \mathbf K_k \mathbf y_k. }
+        \]
+      </p>
+
+      <p>
+        This resembles the classical Kalman update.
+      </p>
+
+      <p>
+        The major difference lies in how
+      </p>
+
+      <p>
+        \[
+        \hat x^-, P^-, \hat z, S, P_{xz}
+        \]
+      </p>
+
+      <p>
+        were obtained.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.33 Covariance Update</h3>
+
+      <p>
+        The posterior covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{+} = \mathbf P_k^{-} - \mathbf K_k \mathbf S_k \mathbf K_k^T. }
+        \]
+      </p>
+
+      <p>
+        This reduces state uncertainty according to the information supplied by the measurement.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.34 Complete UKF Prediction Cycle</h3>
+
+      <p>
+        The prediction stage can be summarized as follows.
+      </p>
+
+      <h4>4.2.10.34.1 Start with Prior Mean and Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_{k-1}^{+}, \qquad P_{k-1}^{+}. }
+        \]
+      </p>
+
+      <h4>4.2.10.34.2 Generate Sigma Points</h4>
+
+      <p>
+        \[
+        \boxed{ \chi_{i,k-1}^{+}. }
+        \]
+      </p>
+
+      <h4>4.2.10.34.3 Propagate Through Nonlinear Dynamics</h4>
+
+      <p>
+        \[
+        \boxed{ \chi_{i,k}^{-} = f( \chi_{i,k-1}^{+} ). }
+        \]
+      </p>
+
+      <h4>4.2.10.34.4 Reconstruct Predicted Mean</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x_k^{-} = \sum W_i^{(m)} \chi_{i,k}^{-}. }
+        \]
+      </p>
+
+      <h4>4.2.10.34.5 Reconstruct Predicted Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ P_k^{-} = \sum W_i^{(c)} ( \chi_i^{-}-\hat x^{-} ) ( \chi_i^{-}-\hat x^{-} )^T + Q. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.35 Complete UKF Measurement Cycle</h3>
+
+      <h4>4.2.10.35.1 Transform Sigma Points into Measurement Space</h4>
+
+      <p>
+        \[
+        \boxed{ \zeta_i = h( \chi_i^{-} ). }
+        \]
+      </p>
+
+      <h4>4.2.10.35.2 Predicted Measurement</h4>
+
+      <p>
+        \[
+        \boxed{ \hat z = \sum W_i^{(m)} \zeta_i. }
+        \]
+      </p>
+
+      <h4>4.2.10.35.3 Innovation Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ S = \sum W_i^{(c)} ( \zeta_i-\hat z ) ( \zeta_i-\hat z )^T + R. }
+        \]
+      </p>
+
+      <h4>4.2.10.35.4 Cross Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ P_{xz} = \sum W_i^{(c)} ( \chi_i^{-}-\hat x^{-} ) ( \zeta_i-\hat z )^T. }
+        \]
+      </p>
+
+      <h4>4.2.10.35.5 Kalman Gain</h4>
+
+      <p>
+        \[
+        \boxed{ K = P_{xz}S^{-1}. }
+        \]
+      </p>
+
+      <h4>4.2.10.35.6 State Correction</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x^+ = \hat x^- + K( z-\hat z ). }
+        \]
+      </p>
+
+      <h4>4.2.10.35.7 Covariance Correction</h4>
+
+      <p>
+        \[
+        \boxed{ P^+ = P^- - KSK^T. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.36 UKF vs EKF</h3>
+
+      <p>
+        The fundamental difference is:
+      </p>
+
+      <h4>EKF</h4>
+
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Function} \rightarrow \text{Jacobian} \rightarrow \text{Linear Approximation}. }
+        \]
+      </p>
+
+      <h4>UKF</h4>
+
+      <p>
+        \[
+        \boxed{ \text{Sigma Points} \rightarrow \text{Actual Nonlinear Function} \rightarrow \text{Reconstructed Distribution}. }
+        \]
+      </p>
+
+      <p>
+        A comparison is:
+      </p>
+
+      <div class="table-wrap">
+
+        <table>
+
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th>EKF</th>
+              <th>UKF</th>
+            </tr>
+          </thead>
+
+          <tbody>
+
+            <tr>
+              <td>Nonlinear model</td>
+              <td>Yes</td>
+              <td>Yes</td>
+            </tr>
+
+            <tr>
+              <td>Jacobians required</td>
+              <td>Yes</td>
+              <td>No</td>
+            </tr>
+
+            <tr>
+              <td>Sigma points required</td>
+              <td>No</td>
+              <td>Yes</td>
+            </tr>
+
+            <tr>
+              <td>Computational cost</td>
+              <td>Lower</td>
+              <td>Usually higher</td>
+            </tr>
+
+            <tr>
+              <td>Strong nonlinearities</td>
+              <td>Can be sensitive</td>
+              <td>Often better</td>
+            </tr>
+
+            <tr>
+              <td>Implementation complexity</td>
+              <td>Jacobian-heavy</td>
+              <td>Sigma-point-heavy</td>
+            </tr>
+
+            <tr>
+              <td>Covariance propagation</td>
+              <td>Linearized</td>
+              <td>Statistical transform</td>
+            </tr>
+
+            <tr>
+              <td>Model evaluation per step</td>
+              <td>Usually once</td>
+              <td><code>2n+1</code> or more</td>
+            </tr>
+
+          </tbody>
+
+        </table>
+
+      </div>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.37 Why the UKF Can Be More Accurate</h3>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        y=f(x)
+        \]
+      </p>
+
+      <p>
+        is nonlinear.
+      </p>
+
+      <p>
+        The EKF propagates uncertainty using a first-order local derivative.
+      </p>
+
+      <p>
+        The UKF propagates multiple representative points through the actual nonlinear function.
+      </p>
+
+      <p>
+        Therefore the UKF can capture effects that a tangent approximation may miss.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{EKF} \rightarrow \text{Approximate Function} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UKF} \rightarrow \text{Approximate Distribution}. }
+        \]
+      </p>
+
+      <p>
+        For many nonlinear transformations, the unscented transform reproduces mean and covariance to higher-order accuracy than first-order linearization under suitable assumptions.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.38 But UKF Is Not Automatically Better</h3>
+
+      <p>
+        The UKF still relies on assumptions.
+      </p>
+
+      <p>
+        It commonly approximates uncertainty using only mean and covariance.
+      </p>
+
+      <p>
+        If the true posterior is
+      </p>
+
+      <ul>
+
+        <li>
+          strongly multimodal,
+        </li>
+
+        <li>
+          highly skewed,
+        </li>
+
+        <li>
+          discontinuous,
+        </li>
+
+        <li>
+          constrained in unusual ways,
+        </li>
+
+      </ul>
+
+      <p>
+        the UKF can still be inaccurate.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{No Jacobian} \neq \text{No Approximation}. }
+        \]
+      </p>
+
+      <p>
+        The UKF approximates the underlying probability distribution using a finite deterministic point set.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.39 Computational Cost</h3>
+
+      <p>
+        For a state dimension
+      </p>
+
+      <p>
+        \[
+        n,
+        \]
+      </p>
+
+      <p>
+        the standard UKF uses
+      </p>
+
+      <p>
+        \[
+        2n+1
+        \]
+      </p>
+
+      <p>
+        sigma points.
+      </p>
+
+      <p>
+        If the nonlinear model is expensive, each propagation
+      </p>
+
+      <p>
+        \[
+        f(\chi_i)
+        \]
+      </p>
+
+      <p>
+        may be computationally demanding.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UKF Accuracy Benefit} \leftrightarrow \text{Higher Computation}. }
+        \]
+      </p>
+
+      <p>
+        This is important for onboard spacecraft processors.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.40 Example: Nonlinear Range Measurement</h3>
+
+      <p>
+        Suppose
+      </p>
+
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} x\\ y\\ z \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        and a range sensor measures
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho = \sqrt{x^2+y^2+z^2}. }
+        \]
+      </p>
+
+      <p>
+        The measurement is nonlinear.
+      </p>
+
+      <p>
+        In an EKF, derive
+      </p>
+
+      <p>
+        \[
+        H_\rho = \begin{bmatrix} x/\rho & y/\rho & z/\rho \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        In a UKF, no analytical derivative is required.
+      </p>
+
+      <p>
+        Each sigma point
+      </p>
+
+      <p>
+        \[
+        \chi_i = \begin{bmatrix} x_i\\ y_i\\ z_i \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        is transformed:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho_i = \sqrt{ x_i^2+y_i^2+z_i^2 }. }
+        \]
+      </p>
+
+      <p>
+        The predicted range mean and variance are reconstructed from
+      </p>
+
+      <p>
+        \[
+        \rho_i.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.41 Bearing Measurement Example</h3>
+
+      <p>
+        A camera may measure azimuth
+      </p>
+
+      <p>
+        \[
+        \boxed{ \alpha = \tan^{-1} \left( \frac{y}{x} \right). }
+        \]
+      </p>
+
+      <p>
+        Instead of deriving
+      </p>
+
+      <p>
+        \[
+        \frac{\partial \alpha}{\partial x}, \qquad \frac{\partial \alpha}{\partial y},
+        \]
+      </p>
+
+      <p>
+        the UKF calculates
+      </p>
+
+      <p>
+        \[
+        \boxed{ \alpha_i = \tan^{-1} \left( \frac{y_i}{x_i} \right) }
+        \]
+      </p>
+
+      <p>
+        for every sigma point.
+      </p>
+
+      <p>
+        This is particularly attractive for complex optical measurement models.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.42 Angle-Wrapping Problem</h3>
+
+      <p>
+        Angles create a special problem.
+      </p>
+
+      <p>
+        Suppose sigma-point angles are
+      </p>
+
+      <p>
+        \[
+        179^\circ
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        -179^\circ.
+        \]
+      </p>
+
+      <p>
+        A naive arithmetic mean gives approximately
+      </p>
+
+      <p>
+        \[
+        0^\circ,
+        \]
+      </p>
+
+      <p>
+        which is physically wrong.
+      </p>
+
+      <p>
+        The correct mean is near
+      </p>
+
+      <p>
+        \[
+        180^\circ.
+        \]
+      </p>
+
+      <p>
+        Therefore angular means must be calculated using circular statistics.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \bar\theta = \operatorname{atan2} \left( \sum_i W_i\sin\theta_i, \sum_i W_i\cos\theta_i \right). }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.43 Quaternion States Require Special Treatment</h3>
+
+      <p>
+        Quaternions are even more challenging than ordinary angles.
+      </p>
+
+      <p>
+        A naive arithmetic mean of quaternion sigma points may not preserve
+      </p>
+
+      <p>
+        \[
+        \|q\|=1.
+        \]
+      </p>
+
+      <p>
+        Also,
+      </p>
+
+      <p>
+        \[
+        q \equiv -q.
+        \]
+      </p>
+
+      <p>
+        Therefore a UKF for attitude estimation should not simply treat quaternion components like ordinary Euclidean variables without care.
+      </p>
+
+      <p>
+        Possible approaches include
+      </p>
+
+      <ul>
+
+        <li>
+          quaternion normalization,
+        </li>
+
+        <li>
+          multiplicative quaternion UKF,
+        </li>
+
+        <li>
+          error-state UKF,
+        </li>
+
+        <li>
+          manifold UKF,
+        </li>
+
+        <li>
+          sigma points in the tangent space.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.44 Error-State UKF for Attitude</h3>
+
+      <p>
+        One robust attitude approach is conceptually similar to the MEKF.
+      </p>
+
+      <p>
+        Maintain a nominal quaternion
+      </p>
+
+      <p>
+        \[
+        \hat q
+        \]
+      </p>
+
+      <p>
+        and represent uncertainty using
+      </p>
+
+      <p>
+        \[
+        \delta\theta.
+        \]
+      </p>
+
+      <p>
+        Sigma points are generated in the local rotational error state.
+      </p>
+
+      <p>
+        Each error sigma point is mapped to an error quaternion:
+      </p>
+
+      <p>
+        \[
+        \delta q_i.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ q_i = \delta q_i \otimes \hat q. }
+        \]
+      </p>
+
+      <p>
+        These quaternion sigma points can be propagated through nonlinear attitude dynamics.
+      </p>
+
+      <p>
+        This preserves the geometric structure more naturally.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.45 UKF for Spacecraft Orbital Navigation</h3>
+
+      <p>
+        A spacecraft navigation state may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ x = \begin{bmatrix} r\\ v \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Nonlinear dynamics may include
+      </p>
+
+      <ul>
+
+        <li>
+          central gravity,
+        </li>
+
+        <li>
+          <code>J_2</code>,
+        </li>
+
+        <li>
+          drag,
+        </li>
+
+        <li>
+          solar radiation pressure,
+        </li>
+
+        <li>
+          third-body gravity,
+        </li>
+
+        <li>
+          thrust,
+        </li>
+
+        <li>
+          relative orbital dynamics.
+        </li>
+
+      </ul>
+
+      <p>
+        Each sigma point represents a slightly different possible orbital state.
+      </p>
+
+      <p>
+        Propagating all sigma points through the nonlinear orbital model captures how uncertainty evolves under the orbital dynamics.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.46 UKF for RPO</h3>
+
+      <p>
+        A relative-navigation state might contain
+      </p>
+
+      <p>
+        \[
+        \boxed{ x_{rel} = \begin{bmatrix} r_{rel}\\ v_{rel} \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        or include attitude and biases:
+      </p>
+
+      <p>
+        \[
+        \boxed{ x = \begin{bmatrix} r_{rel}\\ v_{rel}\\ q_{rel}\\ b_g\\ b_a \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Sensors may include
+      </p>
+
+      <ul>
+
+        <li>
+          relative GNSS,
+        </li>
+
+        <li>
+          camera,
+        </li>
+
+        <li>
+          LiDAR,
+        </li>
+
+        <li>
+          radar,
+        </li>
+
+        <li>
+          pose estimation,
+        </li>
+
+        <li>
+          star tracker,
+        </li>
+
+        <li>
+          IMU.
+        </li>
+
+      </ul>
+
+      <p>
+        The UKF can naturally propagate sigma points through both nonlinear relative dynamics and nonlinear sensor models.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.47 Camera-Based Relative Navigation</h3>
+
+      <p>
+        A camera measurement may depend on relative position through
+      </p>
+
+      <p>
+        \[
+        \boxed{ u = f_x \frac{x}{z} + c_x }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ v = f_y \frac{y}{z} + c_y. }
+        \]
+      </p>
+
+      <p>
+        These are strongly nonlinear when range changes significantly.
+      </p>
+
+      <p>
+        The UKF simply transforms each sigma point:
+      </p>
+
+      <p>
+        \[
+        \boxed{ (x_i,y_i,z_i) \rightarrow (u_i,v_i). }
+        \]
+      </p>
+
+      <p>
+        No analytical camera Jacobian is required.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.48 LiDAR-Based RPO</h3>
+
+      <p>
+        LiDAR can provide
+      </p>
+
+      <ul>
+
+        <li>
+          range,
+        </li>
+
+        <li>
+          bearing,
+        </li>
+
+        <li>
+          relative position,
+        </li>
+
+        <li>
+          point-cloud-derived pose.
+        </li>
+
+      </ul>
+
+      <p>
+        For pure range,
+      </p>
+
+      <p>
+        \[
+        \rho = \|r_{rel}\|.
+        \]
+      </p>
+
+      <p>
+        For relative pose, the measurement function may be much more complicated.
+      </p>
+
+      <p>
+        The UKF is useful because
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Complex Nonlinear Measurement} \rightarrow \text{Direct Sigma-Point Transformation}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.49 Multi-Sensor UKF</h3>
+
+      <p>
+        Different sensors may update the same UKF.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS} + \text{Camera} + \text{LiDAR} + \text{IMU} \rightarrow \text{UKF}. }
+        \]
+      </p>
+
+      <p>
+        Each sensor has its own measurement function
+      </p>
+
+      <p>
+        \[
+        h_j(x)
+        \]
+      </p>
+
+      <p>
+        and measurement covariance
+      </p>
+
+      <p>
+        \[
+        R_j.
+        \]
+      </p>
+
+      <p>
+        When sensor <code>j</code> produces a measurement, sigma points are mapped through its corresponding
+      </p>
+
+      <p>
+        \[
+        h_j.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.50 Multi-Rate Sensors</h3>
+
+      <p>
+        Different sensors may operate at different rates.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        f_{IMU} \gg f_{camera}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        f_{camera} \neq f_{GNSS}.
+        \]
+      </p>
+
+      <p>
+        The UKF can
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Predict at High Rate} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Update Whenever a Measurement Arrives}. }
+        \]
+      </p>
+
+      <p>
+        This is similar to EKF and ESKF operation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.51 Sensor Dropout</h3>
+
+      <p>
+        If a measurement sensor becomes unavailable,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Prediction Continues} }
+        \]
+      </p>
+
+      <p>
+        but no correction occurs.
+      </p>
+
+      <p>
+        Covariance generally grows.
+      </p>
+
+      <p>
+        When measurements return,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Update} \rightarrow \text{Reduced State Uncertainty}. }
+        \]
+      </p>
+
+      <p>
+        The UKF therefore naturally handles temporary sensor dropout, provided the model remains sufficiently valid.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.52 Innovation Gating</h3>
+
+      <p>
+        The innovation is
+      </p>
+
+      <p>
+        \[
+        y=z-\hat z.
+        \]
+      </p>
+
+      <p>
+        The innovation covariance is
+      </p>
+
+      <p>
+        \[
+        S.
+        \]
+      </p>
+
+      <p>
+        A normalized statistic is
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS = y^TS^{-1}y. }
+        \]
+      </p>
+
+      <p>
+        If the value is too large, the measurement may be inconsistent with the predicted state.
+      </p>
+
+      <p>
+        Possible causes include
+      </p>
+
+      <ul>
+
+        <li>
+          sensor outlier,
+        </li>
+
+        <li>
+          incorrect association,
+        </li>
+
+        <li>
+          timing error,
+        </li>
+
+        <li>
+          wrong frame,
+        </li>
+
+        <li>
+          model mismatch,
+        </li>
+
+        <li>
+          filter divergence.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.53 Measurement Timing</h3>
+
+      <p>
+        As with all navigation filters, timestamp consistency is critical.
+      </p>
+
+      <p>
+        A sigma-point cloud propagated to
+      </p>
+
+      <p>
+        \[
+        t_k
+        \]
+      </p>
+
+      <p>
+        must be compared with a measurement belonging to
+      </p>
+
+      <p>
+        \[
+        t_k.
+        \]
+      </p>
+
+      <p>
+        Otherwise,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Correct Measurement} + \text{Wrong State Time} = \text{Incorrect Innovation}. }
+        \]
+      </p>
+
+      <p>
+        This becomes particularly important during high-rate motion or spacecraft slews.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.54 Numerical Stability</h3>
+
+      <p>
+        The UKF repeatedly performs matrix square-root operations.
+      </p>
+
+      <p>
+        Therefore
+      </p>
+
+      <p>
+        \[
+        P
+        \]
+      </p>
+
+      <p>
+        must remain symmetric and positive semidefinite.
+      </p>
+
+      <p>
+        In practice, numerical errors may cause
+      </p>
+
+      <p>
+        \[
+        P\neq P^T.
+        \]
+      </p>
+
+      <p>
+        A common numerical cleanup is
+      </p>
+
+      <p>
+        \[
+        \boxed{ P \leftarrow \frac12 ( P+P^T ). }
+        \]
+      </p>
+
+      <p>
+        Small positive diagonal regularization may also be used when justified.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.55 Cholesky Failure</h3>
+
+      <p>
+        Sigma-point generation often requires
+      </p>
+
+      <p>
+        \[
+        \operatorname{chol}(P).
+        \]
+      </p>
+
+      <p>
+        Cholesky decomposition fails if
+      </p>
+
+      <p>
+        \[
+        P
+        \]
+      </p>
+
+      <p>
+        is not positive definite.
+      </p>
+
+      <p>
+        This may indicate
+      </p>
+
+      <ul>
+
+        <li>
+          numerical instability,
+        </li>
+
+        <li>
+          poor covariance update,
+        </li>
+
+        <li>
+          incorrect weights,
+        </li>
+
+        <li>
+          badly scaled states,
+        </li>
+
+        <li>
+          inconsistent <code>Q</code>,
+        </li>
+
+        <li>
+          excessive roundoff,
+        </li>
+
+        <li>
+          coding error.
+        </li>
+
+      </ul>
+
+      <p>
+        A Cholesky failure should not simply be hidden.
+      </p>
+
+      <p>
+        It is often evidence of an estimator problem.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.56 Square-Root UKF</h3>
+
+      <p>
+        A <strong>Square-Root UKF</strong> propagates a square-root covariance factor directly.
+      </p>
+
+      <p>
+        Instead of storing
+      </p>
+
+      <p>
+        \[
+        P,
+        \]
+      </p>
+
+      <p>
+        maintain
+      </p>
+
+      <p>
+        \[
+        S
+        \]
+      </p>
+
+      <p>
+        such that
+      </p>
+
+      <p>
+        \[
+        \boxed{ P = SS^T. }
+        \]
+      </p>
+
+      <p>
+        Advantages can include
+      </p>
+
+      <ul>
+
+        <li>
+          improved numerical stability,
+        </li>
+
+        <li>
+          better preservation of positive definiteness,
+        </li>
+
+        <li>
+          sometimes improved computational efficiency.
+        </li>
+
+      </ul>
+
+      <p>
+        This can be attractive for flight-software implementations.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.57 State Scaling</h3>
+
+      <p>
+        Suppose a state contains quantities with very different magnitudes:
+      </p>
+
+      <p>
+        \[
+        r\sim10^6\text{ m},
+        \]
+      </p>
+
+      <p>
+        \[
+        v\sim10^3\text{ m/s},
+        \]
+      </p>
+
+      <p>
+        \[
+        b_g\sim10^{-5}\text{ rad/s}.
+        \]
+      </p>
+
+      <p>
+        Poor scaling can create numerical conditioning problems.
+      </p>
+
+      <p>
+        Therefore state normalization or careful covariance scaling may be important.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.58 Process Noise Tuning</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        Q
+        \]
+      </p>
+
+      <p>
+        is too small,
+      </p>
+
+      <p>
+        the UKF trusts the model too strongly.
+      </p>
+
+      <p>
+        Consequences include
+      </p>
+
+      <ul>
+
+        <li>
+          slow adaptation,
+        </li>
+
+        <li>
+          underestimated uncertainty,
+        </li>
+
+        <li>
+          large NIS,
+        </li>
+
+        <li>
+          possible divergence.
+        </li>
+
+      </ul>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        Q
+        \]
+      </p>
+
+      <p>
+        is too large,
+      </p>
+
+      <p>
+        the state prediction becomes overly uncertain.
+      </p>
+
+      <p>
+        Consequences include
+      </p>
+
+      <ul>
+
+        <li>
+          noisy estimates,
+        </li>
+
+        <li>
+          excessive measurement sensitivity,
+        </li>
+
+        <li>
+          unnecessarily large covariance.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.59 Measurement Noise Tuning</h3>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        is too small,
+      </p>
+
+      <p>
+        the filter trusts measurements excessively.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        R
+        \]
+      </p>
+
+      <p>
+        is too large,
+      </p>
+
+      <p>
+        the filter underuses useful measurement information.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ Q/R \text{ tuning still matters in the UKF exactly as it does in the EKF}. }
+        \]
+      </p>
+
+      <p>
+        The absence of Jacobians does not remove the need for realistic stochastic modeling.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.60 Initialization</h3>
+
+      <p>
+        The UKF requires
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x_0 }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_0. }
+        \]
+      </p>
+
+      <p>
+        These define the first sigma-point cloud.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        P_0
+        \]
+      </p>
+
+      <p>
+        is too small, sigma points are too tightly concentrated.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        P_0
+        \]
+      </p>
+
+      <p>
+        is unrealistically large, sigma points may enter physically invalid regions.
+      </p>
+
+      <p>
+        Therefore initialization directly affects the geometry of sigma-point propagation.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.61 Physical Constraints</h3>
+
+      <p>
+        Some states have constraints.
+      </p>
+
+      <p>
+        Examples include
+      </p>
+
+      <ul>
+
+        <li>
+          positive range,
+        </li>
+
+        <li>
+          positive mass,
+        </li>
+
+        <li>
+          quaternion norm,
+        </li>
+
+        <li>
+          actuator bounds,
+        </li>
+
+        <li>
+          orbital geometry,
+        </li>
+
+        <li>
+          bounded biases.
+        </li>
+
+      </ul>
+
+      <p>
+        Sigma points can potentially move into physically impossible regions.
+      </p>
+
+      <p>
+        For constrained problems, special strategies may be required.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.62 UKF and Non-Gaussian Uncertainty</h3>
+
+      <p>
+        Although the sigma points can capture nonlinear transformation better than first-order linearization, the standard UKF still ultimately represents the state primarily through
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Mean} + \text{Covariance}. }
+        \]
+      </p>
+
+      <p>
+        Therefore it does not fully represent arbitrary multimodal distributions.
+      </p>
+
+      <p>
+        For strongly multimodal problems, particle filters or Gaussian-mixture methods may be more appropriate.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.63 UKF vs Particle Filter</h3>
+
+      <p>
+        A particle filter may use
+      </p>
+
+      <p>
+        \[
+        N_p
+        \]
+      </p>
+
+      <p>
+        random weighted particles.
+      </p>
+
+      <p>
+        The UKF uses a deterministic set of
+      </p>
+
+      <p>
+        \[
+        2n+1
+        \]
+      </p>
+
+      <p>
+        sigma points.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UKF} \rightarrow \text{Efficient Gaussian Approximation} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Particle Filter} \rightarrow \text{General Distribution Representation}. }
+        \]
+      </p>
+
+      <p>
+        Particle filters are generally more flexible but much more computationally expensive.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.64 UKF vs ESKF</h3>
+
+      <p>
+        The ESKF and UKF address different aspects of nonlinear estimation.
+      </p>
+
+      <p>
+        The ESKF focuses on
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal State} + \text{Small Local Error State}. }
+        \]
+      </p>
+
+      <p>
+        The UKF focuses on
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Uncertainty Propagation Without Jacobians}. }
+        \]
+      </p>
+
+      <p>
+        These concepts are not mutually exclusive.
+      </p>
+
+      <p>
+        One can construct an <strong>error-state UKF</strong>.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.65 UKF vs MEKF</h3>
+
+      <p>
+        The MEKF specifically handles quaternion attitude geometry using multiplicative attitude errors.
+      </p>
+
+      <p>
+        A standard UKF does not automatically solve quaternion-manifold issues.
+      </p>
+
+      <p>
+        Therefore for attitude estimation one may use
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Multiplicative UKF} }
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Quaternion Error-State UKF}. }
+        \]
+      </p>
+
+      <p>
+        The UKF handles nonlinear uncertainty propagation, while the multiplicative formulation handles attitude geometry.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.66 When UKF Is Attractive</h3>
+
+      <p>
+        The UKF is particularly attractive when
+      </p>
+
+      <ul>
+
+        <li>
+          dynamics are strongly nonlinear,
+        </li>
+
+        <li>
+          measurements are strongly nonlinear,
+        </li>
+
+        <li>
+          Jacobians are difficult,
+        </li>
+
+        <li>
+          Jacobians are expensive to maintain,
+        </li>
+
+        <li>
+          nonlinear uncertainty propagation matters,
+        </li>
+
+        <li>
+          computational resources are sufficient,
+        </li>
+
+        <li>
+          Gaussian mean/covariance representation remains reasonable.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.67 When EKF May Still Be Better</h3>
+
+      <p>
+        The EKF may remain preferable when
+      </p>
+
+      <ul>
+
+        <li>
+          dynamics are only mildly nonlinear,
+        </li>
+
+        <li>
+          accurate analytical Jacobians are available,
+        </li>
+
+        <li>
+          computational resources are limited,
+        </li>
+
+        <li>
+          state dimension is large,
+        </li>
+
+        <li>
+          flight heritage favors EKF,
+        </li>
+
+        <li>
+          deterministic execution cost is critical.
+        </li>
+
+      </ul>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UKF} \neq \text{Automatic Replacement for EKF}. }
+        \]
+      </p>
+
+      <p>
+        Estimator selection should depend on mission requirements.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.68 Computational Scaling</h3>
+
+      <p>
+        With
+      </p>
+
+      <p>
+        \[
+        n
+        \]
+      </p>
+
+      <p>
+        states, the standard UKF evaluates the process model approximately
+      </p>
+
+      <p>
+        \[
+        2n+1
+        \]
+      </p>
+
+      <p>
+        times per prediction.
+      </p>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        n=20,
+        \]
+      </p>
+
+      <p>
+        this becomes
+      </p>
+
+      <p>
+        \[
+        41
+        \]
+      </p>
+
+      <p>
+        model evaluations per update.
+      </p>
+
+      <p>
+        If each propagation includes expensive orbital dynamics, the computational load can become significant.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.69 Parallelism</h3>
+
+      <p>
+        Sigma-point propagation is naturally parallelizable because each
+      </p>
+
+      <p>
+        \[
+        \chi_i
+        \]
+      </p>
+
+      <p>
+        can be propagated independently.
+      </p>
+
+      <p>
+        Thus
+      </p>
+
+      <p>
+        \[
+        \boxed{ \chi_0,\chi_1,\dots,\chi_{2n} }
+        \]
+      </p>
+
+      <p>
+        may be evaluated simultaneously on suitable hardware.
+      </p>
+
+      <p>
+        This can partly offset UKF computational cost.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.70 Simulink / Software Architecture</h3>
+
+      <p>
+        A clean UKF software architecture can contain
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Current Mean + Covariance}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Sigma-Point Generator}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nonlinear Dynamics for Each Sigma Point}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predicted Mean + Covariance}}
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Measurement Model for Each Sigma Point}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Predicted Measurement}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Innovation Covariance + Cross Covariance}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Kalman Gain}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Posterior State + Covariance}}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.71 Recommended Software Blocks</h3>
+
+      <p>
+        A modular implementation may separate
+      </p>
+
+      <ul>
+
+        <li>
+          sigma-point generation,
+        </li>
+
+        <li>
+          process model,
+        </li>
+
+        <li>
+          mean reconstruction,
+        </li>
+
+        <li>
+          covariance reconstruction,
+        </li>
+
+        <li>
+          measurement transformation,
+        </li>
+
+        <li>
+          innovation calculation,
+        </li>
+
+        <li>
+          cross covariance,
+        </li>
+
+        <li>
+          Kalman gain,
+        </li>
+
+        <li>
+          state update,
+        </li>
+
+        <li>
+          covariance update,
+        </li>
+
+        <li>
+          gating,
+        </li>
+
+        <li>
+          diagnostics.
+        </li>
+
+      </ul>
+
+      <p>
+        This makes verification much easier.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.72 Verification Strategy</h3>
+
+      <p>
+        The UKF should be verified incrementally.
+      </p>
+
+      <h4>4.2.10.72.1 Identity Transform Test</h4>
+
+      <p>
+        Set
+      </p>
+
+      <p>
+        \[
+        f(x)=x.
+        \]
+      </p>
+
+      <p>
+        Verify that reconstructed mean and covariance equal the original values.
+      </p>
+
+      <h4>4.2.10.72.2 Linear-System Test</h4>
+
+      <p>
+        Use a linear system.
+      </p>
+
+      <p>
+        The UKF should reproduce standard Kalman-filter behavior.
+      </p>
+
+      <h4>4.2.10.72.3 Scalar Nonlinearity Test</h4>
+
+      <p>
+        Use a simple nonlinear function such as
+      </p>
+
+      <p>
+        \[
+        y=x^2.
+        \]
+      </p>
+
+      <p>
+        Compare unscented transformation with Monte Carlo simulation.
+      </p>
+
+      <h4>4.2.10.72.4 Zero-Noise Test</h4>
+
+      <p>
+        Remove process and measurement noise.
+      </p>
+
+      <p>
+        Verify convergence.
+      </p>
+
+      <h4>4.2.10.72.5 Initial Error Test</h4>
+
+      <p>
+        Introduce known state offsets.
+      </p>
+
+      <h4>4.2.10.72.6 Measurement Dropout Test</h4>
+
+      <p>
+        Disable measurements and observe covariance growth.
+      </p>
+
+      <h4>4.2.10.72.7 Outlier Test</h4>
+
+      <p>
+        Inject false measurements and verify gating.
+      </p>
+
+      <h4>4.2.10.72.8 Strong-Nonlinearity Test</h4>
+
+      <p>
+        Compare EKF and UKF under increasingly nonlinear conditions.
+      </p>
+
+      <h4>4.2.10.72.9 Parameter-Sensitivity Test</h4>
+
+      <p>
+        Vary
+      </p>
+
+      <p>
+        \[
+        \alpha,\beta,\kappa.
+        \]
+      </p>
+
+      <h4>4.2.10.72.10 Numerical-Stability Test</h4>
+
+      <p>
+        Monitor positive definiteness of
+      </p>
+
+      <p>
+        \[
+        P.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.73 Comparison with Monte Carlo Propagation</h3>
+
+      <p>
+        A useful verification approach is to generate many random states from
+      </p>
+
+      <p>
+        \[
+        \mathcal N( \hat x,P )
+        \]
+      </p>
+
+      <p>
+        and propagate them through
+      </p>
+
+      <p>
+        \[
+        f(x).
+        \]
+      </p>
+
+      <p>
+        Then compare Monte Carlo statistics against the UKF predicted
+      </p>
+
+      <p>
+        \[
+        \hat x^-
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        P^-.
+        \]
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Monte Carlo Distribution} \leftrightarrow \text{Unscented Approximation}. }
+        \]
+      </p>
+
+      <p>
+        This provides a direct test of the unscented transform.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.74 NIS</h3>
+
+      <p>
+        The normalized innovation squared remains
+      </p>
+
+      <p>
+        \[
+        \boxed{ NIS_k = y_k^T S_k^{-1} y_k. }
+        \]
+      </p>
+
+      <p>
+        It is useful for
+      </p>
+
+      <ul>
+
+        <li>
+          filter tuning,
+        </li>
+
+        <li>
+          measurement gating,
+        </li>
+
+        <li>
+          fault detection,
+        </li>
+
+        <li>
+          statistical consistency analysis.
+        </li>
+
+      </ul>
+
+      <p>
+        UKF consistency should not be judged only by state RMSE.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.75 NEES</h3>
+
+      <p>
+        When truth is available,
+      </p>
+
+      <p>
+        \[
+        e_k = x_{\text{true},k} - \hat x_k
+        \]
+      </p>
+
+      <p>
+        or the appropriate manifold error can be formed.
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ NEES_k = e_k^T P_k^{-1} e_k. }
+        \]
+      </p>
+
+      <p>
+        NEES compares actual state error against predicted estimator uncertainty.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.76 Monte Carlo Validation</h3>
+
+      <p>
+        Randomize
+      </p>
+
+      <ul>
+
+        <li>
+          initial state,
+        </li>
+
+        <li>
+          initial covariance realization,
+        </li>
+
+        <li>
+          process disturbances,
+        </li>
+
+        <li>
+          measurement noise,
+        </li>
+
+        <li>
+          sensor bias,
+        </li>
+
+        <li>
+          timing errors,
+        </li>
+
+        <li>
+          sensor dropout,
+        </li>
+
+        <li>
+          state-model parameters,
+        </li>
+
+        <li>
+          actuator disturbances,
+        </li>
+
+        <li>
+          measurement geometry.
+        </li>
+
+      </ul>
+
+      <p>
+        Evaluate
+      </p>
+
+      <p>
+        \[
+        \boxed{RMSE}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{NIS}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{NEES}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Convergence Time}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Maximum Error}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Divergence Rate}}
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Computation Time}}.
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.77 UKF for RPO Mission Phases</h3>
+
+      <h4>Far Range</h4>
+
+      <p>
+        Relative GNSS may dominate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative GNSS} \rightarrow \text{UKF Update}. }
+        \]
+      </p>
+
+      <h4>Mid Range</h4>
+
+      <p>
+        Fuse
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative GNSS} + \text{Camera}. }
+        \]
+      </p>
+
+      <h4>Close Range</h4>
+
+      <p>
+        Fuse
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR}. }
+        \]
+      </p>
+
+      <h4>Capture</h4>
+
+      <p>
+        Use high-precision
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Relative Position} + \text{Velocity} + \text{Attitude} + \text{Angular Rate}. }
+        \]
+      </p>
+
+      <p>
+        The UKF can maintain continuity as the measurement functions change across phases.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.78 Sensor Handover</h3>
+
+      <p>
+        Suppose the navigation chain changes from
+      </p>
+
+      <p>
+        \[
+        \text{GNSS}
+        \]
+      </p>
+
+      <p>
+        to
+      </p>
+
+      <p>
+        \[
+        \text{Camera}
+        \]
+      </p>
+
+      <p>
+        to
+      </p>
+
+      <p>
+        \[
+        \text{LiDAR}.
+        \]
+      </p>
+
+      <p>
+        The posterior state and covariance from the previous measurement regime become the prior for the next.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior} \rightarrow \text{Next Prior}. }
+        \]
+      </p>
+
+      <p>
+        The filter should not normally be reset simply because the active sensor changes.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.79 Capture Readiness</h3>
+
+      <p>
+        The UKF supplies both
+      </p>
+
+      <p>
+        \[
+        \hat x
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        P.
+        \]
+      </p>
+
+      <p>
+        Therefore capture criteria may consider
+      </p>
+
+      <p>
+        \[
+        \|\hat r_{rel}\|
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \|\hat v_{rel}\|
+        \]
+      </p>
+
+      <p>
+        together with uncertainty.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Capture Readiness} = \text{Estimated Relative State} + \text{State Confidence}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.80 Relationship to Guidance and Control</h3>
+
+      <p>
+        The UKF feeds estimated state to guidance and control:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensors} \rightarrow \text{UKF} \rightarrow \hat x \rightarrow \text{Guidance} \rightarrow \text{Control}. }
+        \]
+      </p>
+
+      <p>
+        Therefore UKF characteristics influence
+      </p>
+
+      <ul>
+
+        <li>
+          guidance accuracy,
+        </li>
+
+        <li>
+          thrust timing,
+        </li>
+
+        <li>
+          attitude commands,
+        </li>
+
+        <li>
+          collision avoidance,
+        </li>
+
+        <li>
+          capture criteria,
+        </li>
+
+        <li>
+          actuator behavior.
+        </li>
+
+      </ul>
+
+      <p>
+        Estimator performance must ultimately be evaluated in the closed GNC loop.
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.81 Common UKF Implementation Errors</h3>
+
+      <p>
+        Typical mistakes include:
+      </p>
+
+      <ul>
+
+        <li>
+          wrong sigma-point scaling,
+        </li>
+
+        <li>
+          incorrect mean weights,
+        </li>
+
+        <li>
+          incorrect covariance weights,
+        </li>
+
+        <li>
+          forgetting the special first covariance weight,
+        </li>
+
+        <li>
+          poor Cholesky implementation,
+        </li>
+
+        <li>
+          asymmetric covariance,
+        </li>
+
+        <li>
+          covariance losing positive definiteness,
+        </li>
+
+        <li>
+          wrong state dimensions,
+        </li>
+
+        <li>
+          adding <code>Q</code> twice,
+        </li>
+
+        <li>
+          adding <code>R</code> twice,
+        </li>
+
+        <li>
+          mixing predicted and corrected sigma points,
+        </li>
+
+        <li>
+          incorrect cross covariance,
+        </li>
+
+        <li>
+          ordinary averaging of wrapped angles,
+        </li>
+
+        <li>
+          naïve averaging of quaternions,
+        </li>
+
+        <li>
+          ignoring quaternion sign ambiguity,
+        </li>
+
+        <li>
+          using incompatible frame definitions,
+        </li>
+
+        <li>
+          incorrect state scaling,
+        </li>
+
+        <li>
+          unrealistic <code>P_0</code>,
+        </li>
+
+        <li>
+          unrealistic <code>Q</code>,
+        </li>
+
+        <li>
+          unrealistic <code>R</code>,
+        </li>
+
+        <li>
+          using stale measurements,
+        </li>
+
+        <li>
+          failing to reject invalid sensor data.
+        </li>
+
+      </ul>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.82 Key Equations at a Glance</h3>
+
+      <h4>Scaling</h4>
+
+      <p>
+        \[
+        \boxed{ \lambda = \alpha^2(n+\kappa)-n. }
+        \]
+      </p>
+
+      <h4>Center Sigma Point</h4>
+
+      <p>
+        \[
+        \boxed{ \chi_0=\hat x. }
+        \]
+      </p>
+
+      <h4>Sigma Points</h4>
+
+      <p>
+        \[
+        \boxed{ \chi_i = \hat x + \left[ \sqrt{(n+\lambda)P} \right]_i }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \chi_{i+n} = \hat x - \left[ \sqrt{(n+\lambda)P} \right]_i. }
+        \]
+      </p>
+
+      <h4>Mean Weights</h4>
+
+      <p>
+        \[
+        \boxed{ W_0^{(m)} = \frac{\lambda}{n+\lambda} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ W_i^{(m)} = \frac{1}{2(n+\lambda)}. }
+        \]
+      </p>
+
+      <h4>Covariance Weight</h4>
+
+      <p>
+        \[
+        \boxed{ W_0^{(c)} = \frac{\lambda}{n+\lambda} + 1-\alpha^2+\beta. }
+        \]
+      </p>
+
+      <h4>Sigma-Point Propagation</h4>
+
+      <p>
+        \[
+        \boxed{ \chi_i^- = f(\chi_i^+). }
+        \]
+      </p>
+
+      <h4>Predicted Mean</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x^- = \sum_i W_i^{(m)} \chi_i^-. }
+        \]
+      </p>
+
+      <h4>Predicted Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ P^- = \sum_i W_i^{(c)} ( \chi_i^--\hat x^- ) ( \chi_i^--\hat x^- )^T + Q. }
+        \]
+      </p>
+
+      <h4>Measurement Sigma Points</h4>
+
+      <p>
+        \[
+        \boxed{ \zeta_i = h(\chi_i^-). }
+        \]
+      </p>
+
+      <h4>Predicted Measurement</h4>
+
+      <p>
+        \[
+        \boxed{ \hat z = \sum_i W_i^{(m)} \zeta_i. }
+        \]
+      </p>
+
+      <h4>Innovation Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ S = \sum_i W_i^{(c)} ( \zeta_i-\hat z ) ( \zeta_i-\hat z )^T + R. }
+        \]
+      </p>
+
+      <h4>Cross Covariance</h4>
+
+      <p>
+        \[
+        \boxed{ P_{xz} = \sum_i W_i^{(c)} ( \chi_i^--\hat x^- ) ( \zeta_i-\hat z )^T. }
+        \]
+      </p>
+
+      <h4>Kalman Gain</h4>
+
+      <p>
+        \[
+        \boxed{ K = P_{xz}S^{-1}. }
+        \]
+      </p>
+
+      <h4>State Update</h4>
+
+      <p>
+        \[
+        \boxed{ \hat x^+ = \hat x^- + K( z-\hat z ). }
+        \]
+      </p>
+
+      <h4>Covariance Update</h4>
+
+      <p>
+        \[
+        \boxed{ P^+ = P^- - KSK^T. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.83 UKF in One Diagram</h3>
+
+      <p>
+        The complete UKF concept can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Prior Mean + Covariance} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Generate Sigma Points} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate Through Nonlinear Dynamics} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Reconstruct Predicted Mean + Covariance} }
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Transform Sigma Points Through Measurement Model} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Predicted Measurement} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Innovation + Innovation Covariance} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Cross Covariance} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Kalman Gain} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Posterior State + Covariance}. }
+        \]
+      </p>
+
+      <p>
+        The central philosophy is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Do Not Linearize the Nonlinear Function; Propagate a Carefully Chosen Representation of the Uncertainty Through It}. }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3>4.2.10.84 Key Takeaways</h3>
+
+      <p>
+        The Unscented Kalman Filter should be understood through the following points:
+      </p>
+
+      <ul>
+
+        <li>
+          The UKF is a <strong>nonlinear Bayesian recursive estimator</strong>.
+        </li>
+
+        <li>
+          It avoids explicit analytical Jacobians.
+        </li>
+
+        <li>
+          It represents the state probability distribution using deterministic <strong>sigma points</strong>.
+        </li>
+
+        <li>
+          A standard UKF uses
+        </li>
+
+      </ul>
+
+      <p>
+        \[
+          2n+1
+        \]
+      </p>
+
+      <p>
+        sigma points.
+      </p>
+
+      <ul>
+
+        <li>
+          Sigma points are chosen to reproduce the current mean and covariance.
+        </li>
+
+        <li>
+          The nonlinear process model is evaluated independently for every sigma point.
+        </li>
+
+        <li>
+          The predicted mean is reconstructed using weighted sigma points.
+        </li>
+
+        <li>
+          The predicted covariance is reconstructed from the spread of propagated sigma points.
+        </li>
+
+        <li>
+          The measurement model is also evaluated for every sigma point.
+        </li>
+
+        <li>
+          Measurement covariance and state-measurement cross covariance are reconstructed statistically.
+        </li>
+
+        <li>
+          The Kalman gain is then obtained from
+        </li>
+
+      </ul>
+
+      <p>
+        \[
+          P_{xz}S^{-1}.
+        \]
+      </p>
+
+      <ul>
+
+        <li>
+          The UKF still requires realistic <code>Q</code>, <code>R</code>, and <code>P_0</code>.
+        </li>
+
+        <li>
+          The parameters
+        </li>
+
+      </ul>
+
+      <p>
+        \[
+          \alpha,\beta,\kappa
+        \]
+      </p>
+
+      <p>
+        control sigma-point scaling and weights.
+      </p>
+
+      <ul>
+
+        <li>
+          The UKF can provide better nonlinear uncertainty propagation than a first-order EKF in many applications.
+        </li>
+
+        <li>
+          It is generally more computationally expensive than the EKF.
+        </li>
+
+        <li>
+          It is not automatically superior for every mission.
+        </li>
+
+        <li>
+          It still approximates the state distribution primarily by mean and covariance.
+        </li>
+
+        <li>
+          Angular states require special averaging.
+        </li>
+
+        <li>
+          Quaternion states require manifold-aware or multiplicative treatment.
+        </li>
+
+        <li>
+          Cholesky decomposition and covariance positive definiteness are important implementation issues.
+        </li>
+
+        <li>
+          Square-root UKF formulations can improve numerical robustness.
+        </li>
+
+        <li>
+          The UKF naturally supports nonlinear camera, LiDAR, bearing, and range measurement models.
+        </li>
+
+        <li>
+          It is well suited to nonlinear RPO navigation.
+        </li>
+
+        <li>
+          Multi-rate and asynchronous sensor fusion can be handled naturally.
+        </li>
+
+        <li>
+          Sensor dropout should produce covariance growth.
+        </li>
+
+        <li>
+          Innovation gating using NIS should still be used.
+        </li>
+
+        <li>
+          NEES and Monte Carlo testing remain essential for verification.
+        </li>
+
+        <li>
+          UKF tuning should include not only <code>Q</code> and <code>R</code> but also sigma-point scaling.
+        </li>
+
+        <li>
+          The UKF is attractive when nonlinearities are strong and Jacobians are difficult or unreliable.
+        </li>
+
+      </ul>
+
+      <p>
+        The most important concept is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{UKF} = \text{Sigma Points} + \text{Nonlinear Propagation} + \text{Statistical Reconstruction of Mean and Covariance}. }
+        \]
+      </p>
+
+      <p>
+        Or physically:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Instead of asking how the nonlinear function behaves infinitesimally at one point, ask where representative possibilities around the current estimate actually move.} }
+        \]
+      </p>
+
+    </section>
+
+
+    <section class="notes-section-card">
+
+<h3 class="next-title">Next: 4.2.11 Information and Federated Filters</h3>
+
+      <p>
+        The Kalman-family filters developed so far have largely represented uncertainty using the covariance form
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat x,\qquad P. }
+        \]
+      </p>
+
+      <p>
+        An equivalent representation can instead use the <strong>information matrix</strong>
+      </p>
+
+      <p>
+        \[
+        \boxed{ Y=P^{-1} }
+        \]
+      </p>
+
+      <p>
+        and <strong>information vector</strong>
+      </p>
+
+      <p>
+        \[
+        \boxed{ y=Y\hat x. }
+        \]
+      </p>
+
+      <p>
+        This representation can be particularly useful when independent information from several sensors or local estimators must be combined.
+      </p>
+
+      <p>
+        For independent information sources,
+      </p>
+
+      <p>
+        \[
+        \boxed{ Y_{\text{combined}} = Y_1+Y_2+\cdots }
+        \]
+      </p>
+
+      <p>
+        under the appropriate assumptions.
+      </p>
+
+      <p>
+        This creates a natural bridge toward <strong>distributed and federated navigation architectures</strong>.
+      </p>
+
+      <p>
+        The next section should therefore develop <strong>4.2.11 Information and Federated Filters</strong>, including:
+      </p>
+
+      <ul>
+
+        <li>
+          information-form Kalman filtering,
+        </li>
+
+        <li>
+          information vectors and information matrices,
+        </li>
+
+        <li>
+          relationship between covariance and information forms,
+        </li>
+
+        <li>
+          prediction and measurement update in information space,
+        </li>
+
+        <li>
+          why measurement information is naturally additive,
+        </li>
+
+        <li>
+          decentralized estimation,
+        </li>
+
+        <li>
+          local filters,
+        </li>
+
+        <li>
+          master filters,
+        </li>
+
+        <li>
+          federated filter architecture,
+        </li>
+
+        <li>
+          information sharing,
+        </li>
+
+        <li>
+          covariance and information distribution,
+        </li>
+
+        <li>
+          no-reset and reset federated structures,
+        </li>
+
+        <li>
+          sensor isolation,
+        </li>
+
+        <li>
+          fault detection,
+        </li>
+
+        <li>
+          redundancy,
+        </li>
+
+        <li>
+          graceful degradation,
+        </li>
+
+        <li>
+          distributed spacecraft navigation,
+        </li>
+
+        <li>
+          multi-sensor RPO architecture,
+        </li>
+
+        <li>
+          GNSS / IMU / optical / LiDAR local filters,
+        </li>
+
+        <li>
+          correlation problems between local filters,
+        </li>
+
+        <li>
+          double-counting information,
+        </li>
+
+        <li>
+          covariance intersection where correlation is unknown,
+        </li>
+
+        <li>
+          implementation and verification of federated spacecraft-navigation systems.
+        </li>
+
+      </ul>
+
+      <a href="information-and-federated-filters.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.11 Information and Federated Filters</h3>
+
+          <p>
+            Information-form Kalman filtering, information vectors and
+            information matrices, decentralized estimation, local and master
+            filters, federated architectures, information sharing, fault
+            isolation, redundancy, covariance intersection, and distributed
+            spacecraft navigation.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Information and Federated Filters &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+
+    </section>
+
+  </main>
+
+
+
+  <!-- ========================================================= -->
+  <!-- FOOTER                                                     -->
+  <!-- ========================================================= -->
+
+  <footer class="site-footer">
+
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+
+  </footer>
+
+
+</body>
+
+</html>
