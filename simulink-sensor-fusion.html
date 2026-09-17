@@ -1,0 +1,2896 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.29 Simulink Implementation of Sensor Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="notes-hero">
+    <h1>Simulink Implementation of Sensor Fusion</h1>
+
+    <p class="notes-tagline">
+      Truth dynamics, realistic sensor-model blocks, structured measurement buses, estimator prediction and correction,
+      multi-rate and asynchronous scheduling, timing and latency, validity and innovation gating, state and covariance outputs,
+      logging, numerical safeguards, mode logic, fault injection, closed-loop GNC integration, and verification.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.2.29 Simulink Implementation of Sensor Fusion</h2>
+      <p>
+        Sensor-fusion theory becomes practically useful only when it can be implemented as an executable estimation system. In MATLAB/Simulink, this means going beyond individual equations for a complementary filter, observer, Kalman filter, EKF, MEKF, UKF, or other estimator. A realistic model must represent the complete flow of information from the physical system to the sensors, through the estimator, and finally to the guidance and control algorithms.
+      </p>
+      <p>
+        A useful high-level architecture is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Truth Dynamics} \rightarrow \text{Sensor Models} \rightarrow \text{Measurement Processing} \rightarrow \text{Estimator} \rightarrow \text{Navigation Solution} \rightarrow \text{GNC} }
+        \]
+      </p>
+      <p>
+        The Simulink implementation should therefore reproduce not only the estimator mathematics but also the conditions under which the estimator will operate: different sensor rates, measurement delays, noise and bias, asynchronous measurements, invalid data, initialization errors, coordinate transformations, actuator inputs, and closed-loop feedback.
+      </p>
+      <p>
+        The purpose of the Simulink model is ultimately to answer a practical question:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Can the estimator reliably reconstruct the required spacecraft state under realistic operating conditions?} }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.1 Overall Simulink Sensor-Fusion Architecture</h3>
+      <p>
+        A well-structured sensor-fusion simulation should separate the <strong>physical truth model</strong> from the <strong>onboard estimator</strong>.
+      </p>
+      <p>
+        This distinction is fundamental.
+      </p>
+      <p>
+        The truth model represents what the spacecraft is actually doing:
+      </p>
+      <p>
+        \[
+        \mathbf{x}_{true}
+        \]
+      </p>
+      <p>
+        whereas the estimator produces only its best estimate:
+      </p>
+      <p>
+        \[
+        \hat{\mathbf{x}}
+        \]
+      </p>
+      <p>
+        based on the information that would actually be available onboard.
+      </p>
+      <p>
+        A representative architecture is
+      </p>
+      <p>
+        \[
+        \boxed{\text{Truth Dynamics}} \rightarrow \boxed{\mathbf{x}_{true}}
+        \]
+      </p>
+      <p>
+        followed by
+      </p>
+      <p>
+        \[
+        \boxed{\mathbf{x}_{true}} \rightarrow \boxed{\text{Sensor Models}} \rightarrow \boxed{\mathbf{z}}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{\mathbf{z},\mathbf{u}} \rightarrow \boxed{\text{Estimator}} \rightarrow \boxed{\hat{\mathbf{x}}}
+        \]
+      </p>
+      <p>
+        The estimated state may then be supplied to guidance and control:
+      </p>
+      <p>
+        \[
+        \boxed{\hat{\mathbf{x}}} \rightarrow \boxed{\text{Guidance}} \rightarrow \boxed{\text{Controller}} \rightarrow \boxed{\mathbf{u}}
+        \]
+      </p>
+      <p>
+        and the resulting control action is applied back to the truth dynamics.
+      </p>
+      <p>
+        This creates a complete closed-loop GNC simulation.
+      </p>
+      <p>
+        The estimator should <strong>not</strong> have direct access to the truth state. Truth signals are retained only for simulation, verification, error calculation, and plotting.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.2 Truth Dynamics</h3>
+      <p>
+        The truth-dynamics subsystem represents the simulated physical spacecraft or vehicle.
+      </p>
+      <p>
+        For a general nonlinear system,
+      </p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf{x}}_{true} = f_{true} ( \mathbf{x}_{true}, \mathbf{u}_{actual}, \mathbf{d}, \mathbf{p}_{true} ) }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <ul>
+        <li><code>\mathbf{x}_{true}</code> is the true state,</li>
+        <li><code>\mathbf{u}_{actual}</code> is the actual actuator input,</li>
+        <li><code>\mathbf{d}</code> represents disturbances,</li>
+        <li><code>\mathbf{p}_{true}</code> represents the true physical parameters.</li>
+      </ul>
+      <p>
+        Depending on the application, the state can include
+      </p>
+      <p>
+        \[
+        \mathbf{x}_{true} = \begin{bmatrix} \mathbf r & \mathbf v & \mathbf q & \boldsymbol{\omega} & \mathbf b_g & \mathbf b_a & \cdots \end{bmatrix}^{T}.
+        \]
+      </p>
+      <p>
+        For spacecraft simulation, truth dynamics may include translational orbital dynamics, relative dynamics, rigid-body rotational dynamics, environmental disturbances, actuator dynamics, and other relevant physical effects.
+      </p>
+      <p>
+        An important verification principle is that the truth model should generally be <strong>more complete than the estimator model</strong>.
+      </p>
+      <p>
+        If exactly the same equations, parameters, and assumptions are used in both places, the simulation can become unrealistically favorable.
+      </p>
+      <p>
+        For example, the truth model might use
+      </p>
+      <p>
+        \[
+        J_{true}
+        \]
+      </p>
+      <p>
+        while the estimator assumes
+      </p>
+      <p>
+        \[
+        J_{est}=J_{nom}.
+        \]
+      </p>
+      <p>
+        The difference
+      </p>
+      <p>
+        \[
+        \Delta J = J_{true}-J_{nom}
+        \]
+      </p>
+      <p>
+        then creates realistic model mismatch.
+      </p>
+      <p>
+        Similarly, truth dynamics may contain disturbances that the estimator does not know exactly.
+      </p>
+      <p>
+        This allows robustness to be evaluated rather than merely verifying identical mathematical models against each other.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.3 Truth State Bus</h3>
+      <p>
+        A spacecraft model may contain many truth quantities. Passing each as an individual Simulink signal quickly becomes difficult to manage.
+      </p>
+      <p>
+        A structured truth bus is therefore useful.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        <strong>TruthBus</strong>
+      </p>
+      <p>
+        may contain
+      </p>
+      <p>
+        \[
+        \mathbf r_{true}, \quad \mathbf v_{true}, \quad \mathbf q_{true}, \quad \boldsymbol{\omega}_{true}, \quad \mathbf a_{true}, \quad \mathbf b_{g,true}, \quad \mathbf b_{a,true}, \quad \mathbf F_{true}, \quad \mathbf T_{true}.
+        \]
+      </p>
+      <p>
+        This creates a clean interface between the physical model and sensor models.
+      </p>
+      <p>
+        However, the entire truth bus should not be connected to the estimator.
+      </p>
+      <p>
+        Instead,
+      </p>
+      <p>
+        \[
+        \boxed{\text{TruthBus}} \rightarrow \boxed{\text{Sensor Models}}
+        \]
+      </p>
+      <p>
+        while only simulated sensor outputs are passed onward.
+      </p>
+      <p>
+        This preserves the distinction between <strong>simulation truth</strong> and <strong>flight-available information</strong>.
+      </p>
+      <p><strong>Why this matters:</strong> the TruthBus is an architectural boundary, not merely a convenience for cleaner wiring. It makes it possible to expose rich internal truth data to sensor models and verification blocks while preventing those same signals from leaking into the estimator or controller. That separation is essential if the Simulink model is intended to represent the information actually available in flight.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.4 Sensor-Model Layer</h3>
+      <p>
+        The next layer converts physical truth into realistic measurements.
+      </p>
+      <p>
+        A generic sensor model is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h(\mathbf x_{true,k}) + \mathbf b_k + \mathbf v_k }
+        \]
+      </p>
+      <p>
+        with possible additional effects such as scale factor, misalignment, quantization, saturation, latency, dropout, and finite bandwidth.
+      </p>
+      <p>
+        A more complete representation may be written as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = \mathcal Q \left[ \mathbf S \mathbf M h(\mathbf x_{true,k-\tau}) + \mathbf b_k + \mathbf v_k \right] }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <ul>
+        <li><code>\mathbf M</code> represents axis misalignment,</li>
+        <li><code>\mathbf S</code> represents scale-factor errors,</li>
+        <li><code>\mathbf b_k</code> is sensor bias,</li>
+        <li><code>\mathbf v_k</code> is measurement noise,</li>
+        <li><code>\tau</code> represents latency,</li>
+        <li><code>\mathcal Q(\cdot)</code> represents quantization.</li>
+      </ul>
+      <p>
+        A realistic sensor subsystem should therefore reproduce the <strong>measurement available to flight software</strong>, not simply output a selected component of the truth state.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.5 IMU Sensor Blocks</h3>
+      <p>
+        An IMU subsystem can contain separate gyroscope and accelerometer models.
+      </p>
+      <p>
+        A gyroscope can be represented as
+      </p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\omega}_m = (\mathbf I+\mathbf S_g) \mathbf M_g \boldsymbol{\omega}_{true} + \mathbf b_g + \mathbf n_g }
+        \]
+      </p>
+      <p>
+        with bias dynamics such as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf b_{g,k+1} = \mathbf b_{g,k} + \mathbf w_{bg,k}. }
+        \]
+      </p>
+      <p>
+        An accelerometer model can similarly be written as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf f_m = (\mathbf I+\mathbf S_a) \mathbf M_a \mathbf f_{true} + \mathbf b_a + \mathbf n_a. }
+        \]
+      </p>
+      <p>
+        In Simulink, these effects can be implemented as separate blocks so they can be enabled, disabled, and varied independently.
+      </p>
+      <p>
+        This is particularly useful for Monte Carlo testing.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.6 GNSS Measurement Block</h3>
+      <p>
+        A simplified GNSS subsystem might provide
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z_{GNSS} = \begin{bmatrix} \mathbf r_{GNSS}\\ \mathbf v_{GNSS} \end{bmatrix} }
+        \]
+      </p>
+      <p>
+        with
+      </p>
+      <p>
+        \[
+        \mathbf r_{GNSS} = \mathbf r_{true} + \mathbf n_r
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \mathbf v_{GNSS} = \mathbf v_{true} + \mathbf n_v.
+        \]
+      </p>
+      <p>
+        A more realistic model may include update rate, latency, outages, geometry-dependent performance, invalid-fix conditions, clock-related effects, or raw measurements such as pseudorange and Doppler.
+      </p>
+      <p>
+        The required level of fidelity depends strongly on whether the estimator is loosely or tightly coupled.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.7 Camera and Vision Measurement Blocks</h3>
+      <p>
+        A camera should normally not be simulated as directly providing the exact truth position unless that is genuinely the intended processed measurement interface.
+      </p>
+      <p>
+        Depending on the navigation architecture, the camera model may output quantities such as
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Bearing}, \quad \text{Line of Sight}, \quad \text{Feature Coordinates}, \quad \text{Relative Pose} }
+        \]
+      </p>
+      <p>
+        with appropriate uncertainty.
+      </p>
+      <p>
+        For a pinhole-camera representation,
+      </p>
+      <p>
+        \[
+        u=f_x\frac{X_C}{Z_C}+c_x,
+        \]
+      </p>
+      <p>
+        \[
+        v=f_y\frac{Y_C}{Z_C}+c_y.
+        \]
+      </p>
+      <p>
+        Thus the simulated measurement is generated from geometry rather than simply copying the true state.
+      </p>
+      <p>
+        The model can additionally represent field-of-view constraints:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Target Outside FOV} \Rightarrow \text{Measurement Invalid}. }
+        \]
+      </p>
+      <p>
+        This becomes important when validating sensor fusion during dynamic manoeuvres.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.8 LiDAR or Range-Sensor Blocks</h3>
+      <p>
+        A simple range measurement may be represented by
+      </p>
+      <p>
+        \[
+        \boxed{ \rho_m = \|\mathbf r_{rel}\| + n_\rho. }
+        \]
+      </p>
+      <p>
+        More sophisticated LiDAR processing may provide range, bearing, point-cloud-derived geometry, or relative pose.
+      </p>
+      <p>
+        The Simulink sensor subsystem should also represent operational limitations such as minimum and maximum range, field of view, update frequency, measurement quality, and temporary loss of target.
+      </p>
+      <p>
+        For general RPO simulations, this enables the estimator to transition between different navigation sensors as geometry and range change, without assuming any mission-specific implementation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.9 Measurement Bus</h3>
+      <p>
+        Once individual sensors have been simulated, their outputs should normally be organized into a measurement interface.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        <strong>MeasurementBus</strong>
+      </p>
+      <p>
+        may contain:
+      </p>
+      <p>
+        \[
+        \{ \text{gyro}, \text{accelerometer}, \text{GNSS}, \text{star tracker}, \text{Sun sensor}, \text{magnetometer}, \text{camera}, \text{LiDAR} \}.
+        \]
+      </p>
+      <p>
+        But measurement values alone are not sufficient.
+      </p>
+      <p>
+        Each measurement should ideally travel with metadata such as
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Value} + \text{Timestamp} + \text{Valid Flag} + \text{Status} + \text{Quality Information} }
+        \]
+      </p>
+      <p>
+        because the estimator must know not merely <em>what</em> was measured, but also <strong>when it was measured and whether it should be trusted</strong>.
+      </p>
+      <p><strong>Implementation interpretation:</strong> a measurement bus is most useful when it behaves like a flight-software data contract. Every sensor packet should carry enough context for the estimator to decide whether the data are current, valid, correctly framed, and trustworthy. This prevents a numerical value from being treated as usable information simply because it exists on a signal line.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.10 Measurement Preprocessing</h3>
+      <p>
+        Raw measurements may require preprocessing before estimator use.
+      </p>
+      <p>
+        A useful Simulink chain is
+      </p>
+      <p>
+        \[
+        \boxed{\text{Raw Sensor}} \rightarrow \boxed{\text{Calibration}} \rightarrow \boxed{\text{Frame Transformation}} \rightarrow \boxed{\text{Validity Check}} \rightarrow \boxed{\text{Estimator Measurement}}.
+        \]
+      </p>
+      <p>
+        Possible preprocessing includes bias calibration, unit conversion, coordinate transformation, normalization, timestamp handling, outlier detection, saturation detection, and quality checks.
+      </p>
+      <p>
+        For example, a vector measurement may require
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z^{B} = \mathbf C_{S}^{B}\mathbf z^{S} }
+        \]
+      </p>
+      <p>
+        to transform it from the sensor frame <code>S</code> into the body frame <code>B</code>.
+      </p>
+      <p>
+        Frame mistakes are particularly dangerous because the resulting signals can remain numerically reasonable while being physically incorrect.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.11 Estimator Subsystem</h3>
+      <p>
+        The estimator should normally be implemented as a clearly isolated subsystem.
+      </p>
+      <p>
+        Its inputs may include
+      </p>
+      <p>
+        \[
+        \mathbf u_k, \quad \mathbf z_k, \quad \text{validity flags}, \quad \Delta t, \quad \text{mode information}.
+        \]
+      </p>
+      <p>
+        Its outputs may include
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}_k, \quad \mathbf P_k, \quad \mathbf r_k, \quad \mathbf S_k, \quad \text{health flags}.
+        \]
+      </p>
+      <p>
+        The internal estimator architecture should reflect the fundamental recursive structure
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Prediction} \rightarrow \text{Measurement Update} \rightarrow \text{Corrected State} }
+        \]
+      </p>
+      <p>
+        rather than combining all calculations into one opaque block.
+      </p>
+      <p>
+        This makes the implementation easier to verify and debug.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.12 Prediction Subsystem</h3>
+      <p>
+        For a discrete estimator,
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k}^{-} = f_d ( \hat{\mathbf x}_{k-1}^{+}, \mathbf u_{k-1} ) }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k}^{-}
+        \]
+      </p>
+      <p>
+        is the predicted state.
+      </p>
+      <p>
+        For a linear model,
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k}^{-} = \mathbf F_{k-1} \hat{\mathbf x}_{k-1}^{+} + \mathbf G_{k-1}\mathbf u_{k-1}. }
+        \]
+      </p>
+      <p>
+        For a Kalman-type estimator, covariance is propagated simultaneously:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{-} = \mathbf F_{k-1} \mathbf P_{k-1}^{+} \mathbf F_{k-1}^{T} + \mathbf Q_{k-1}. }
+        \]
+      </p>
+      <p>
+        Prediction normally executes at the estimator's navigation propagation rate.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.13 Measurement-Prediction Subsystem</h3>
+      <p>
+        The estimator must predict what each sensor should measure.
+      </p>
+      <p>
+        For a nonlinear sensor,
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}_k = h(\hat{\mathbf x}_k^{-}). }
+        \]
+      </p>
+      <p>
+        The innovation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_k = \mathbf z_k - \hat{\mathbf z}_k. }
+        \]
+      </p>
+      <p>
+        For a linear measurement model,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_k = \mathbf z_k - \mathbf H_k\hat{\mathbf x}_k^{-}. }
+        \]
+      </p>
+      <p>
+        The innovation is one of the most important diagnostic signals in the entire estimator.
+      </p>
+      <p>
+        It connects the predicted physical state to the actual sensor information.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.14 Measurement Update Subsystem</h3>
+      <p>
+        For a linear Kalman filter,
+      </p>
+      <p>
+        \[
+        \mathbf S_k = \mathbf H_k \mathbf P_k^{-} \mathbf H_k^T + \mathbf R_k,
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf K_k = \mathbf P_k^{-} \mathbf H_k^T \mathbf S_k^{-1} }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{+} = \hat{\mathbf x}_k^{-} + \mathbf K_k\mathbf r_k. }
+        \]
+      </p>
+      <p>
+        The covariance is then corrected.
+      </p>
+      <p>
+        For example, the Joseph form is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{+} = (\mathbf I-\mathbf K_k\mathbf H_k) \mathbf P_k^{-} (\mathbf I-\mathbf K_k\mathbf H_k)^T + \mathbf K_k\mathbf R_k\mathbf K_k^T. }
+        \]
+      </p>
+      <p>
+        This form is often attractive for implementation because it better preserves covariance symmetry and positive-semidefinite behavior under finite numerical precision.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.15 Prediction and Update Scheduling</h3>
+      <p>
+        One of the most important practical differences between textbook equations and a Simulink implementation is <strong>scheduling</strong>.
+      </p>
+      <p>
+        Sensors rarely arrive simultaneously.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        f_{IMU}=100\text{ Hz},
+        \]
+      </p>
+      <p>
+        \[
+        f_{GNSS}=10\text{ Hz},
+        \]
+      </p>
+      <p>
+        \[
+        f_{camera}=5\text{ Hz}.
+        \]
+      </p>
+      <p>
+        The estimator should therefore not execute every measurement correction at every simulation step.
+      </p>
+      <p>
+        Instead,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Every Estimator Step} \rightarrow \text{Predict} }
+        \]
+      </p>
+      <p>
+        while
+      </p>
+      <p>
+        \[
+        \boxed{ \text{New Valid Sensor Measurement} \rightarrow \text{Update}. }
+        \]
+      </p>
+      <p>
+        This separation is essential.
+      </p>
+      <p><strong>Why scheduling matters:</strong> prediction and correction are logically different tasks. Prediction advances the estimate using the process model, whereas measurement correction should occur only when new information is actually available. If Simulink executes correction blocks at the wrong rate, the filter may effectively reuse stale measurements and become unrealistically confident.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.16 Multi-Rate Sensor Processing</h3>
+      <p>
+        Suppose the navigation propagation interval is
+      </p>
+      <p>
+        \[
+        T_{nav}=0.01\text{ s}.
+        \]
+      </p>
+      <p>
+        The estimator predicts every <code>0.01</code> s.
+      </p>
+      <p>
+        A GNSS measurement may arrive every
+      </p>
+      <p>
+        \[
+        T_{GNSS}=0.1\text{ s},
+        \]
+      </p>
+      <p>
+        while a camera may update every
+      </p>
+      <p>
+        \[
+        T_{cam}=0.2\text{ s}.
+        \]
+      </p>
+      <p>
+        The execution may therefore resemble
+      </p>
+      <p>
+        \[
+        \begin{array}{c|c|c|c} t & \text{Predict} & \text{GNSS Update} & \text{Camera Update}\\ \hline 0.00 & \checkmark & \checkmark & \checkmark\\ 0.01 & \checkmark & &\\ 0.02 & \checkmark & &\\ \vdots & \vdots & &\\ 0.10 & \checkmark & \checkmark &\\ 0.20 & \checkmark & \checkmark & \checkmark \end{array}
+        \]
+      </p>
+      <p>
+        In Simulink, this can be represented using triggered subsystems, enabled subsystems, function-call subsystems, rate transitions, or carefully controlled execution logic.
+      </p>
+      <p>
+        The architecture should reproduce the intended flight-software timing rather than relying accidentally on Simulink block execution order.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.17 Asynchronous Measurements</h3>
+      <p>
+        Different sensors may not be integer multiples of one common update period.
+      </p>
+      <p>
+        A measurement may arrive at time
+      </p>
+      <p>
+        \[
+        t_m
+        \]
+      </p>
+      <p>
+        between estimator cycles.
+      </p>
+      <p>
+        The implementation must decide how to process that measurement.
+      </p>
+      <p>
+        Possible strategies include buffering it until the next navigation cycle, propagating to the measurement timestamp, performing an asynchronous update, or using delayed-measurement handling.
+      </p>
+      <p>
+        The essential principle is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Value Without Correct Time} \neq \text{Correct Measurement Information}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.18 Sample Time Management</h3>
+      <p>
+        Sample times should be explicitly designed.
+      </p>
+      <p>
+        A typical model might contain
+      </p>
+      <p>
+        \[
+        T_{plant}, \quad T_{IMU}, \quad T_{nav}, \quad T_{GNSS}, \quad T_{vision}, \quad T_{control}.
+        \]
+      </p>
+      <p>
+        These are not necessarily equal.
+      </p>
+      <p>
+        The model therefore needs a deliberate relationship between continuous dynamics and discrete algorithms.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Continuous/High-Rate Truth} \rightarrow \text{Sampled Sensors} \rightarrow \text{Discrete Estimator} \rightarrow \text{Discrete Controller}. }
+        \]
+      </p>
+      <p>
+        A common implementation mistake is allowing inherited sample times to determine estimator behavior unintentionally.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.19 Rate Transition Blocks</h3>
+      <p>
+        Signals crossing between rates may require explicit rate-transition handling.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        100\text{ Hz IMU} \rightarrow 50\text{ Hz estimator}
+        \]
+      </p>
+      <p>
+        or
+      </p>
+      <p>
+        \[
+        10\text{ Hz estimator output} \rightarrow 100\text{ Hz controller}
+        \]
+      </p>
+      <p>
+        creates a rate boundary.
+      </p>
+      <p>
+        Rate-transition logic helps control data transfer and deterministic execution.
+      </p>
+      <p>
+        This becomes increasingly important when moving from desktop simulation toward generated code, real-time execution, SIL, PIL, and HIL.
+      </p>
+      <p><strong>Practical effect:</strong> rate transitions are not only a Simulink bookkeeping issue. They define how data are held, transferred, and synchronized across tasks. When the model later moves toward generated code or real-time execution, those decisions directly affect determinism, latency, and whether downstream blocks receive coherent samples.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.20 Initialization</h3>
+      <p>
+        Estimator initialization is a major part of implementation.
+      </p>
+      <p>
+        At simulation start,
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}_0
+        \]
+      </p>
+      <p>
+        must be assigned.
+      </p>
+      <p>
+        For covariance-based estimators,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P_0 = E[ (\mathbf x_0-\hat{\mathbf x}_0) (\mathbf x_0-\hat{\mathbf x}_0)^T ]. }
+        \]
+      </p>
+      <p>
+        The initial covariance should represent realistic uncertainty.
+      </p>
+      <p>
+        An unrealistically small <code>\mathbf P_0</code> tells the estimator that its initial estimate is highly reliable even when it is not.
+      </p>
+      <p>
+        Conversely, excessively large uncertainty may produce aggressive initial corrections.
+      </p>
+      <p>
+        Initialization tests should therefore include deliberate state-estimation errors:
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}_0 \neq \mathbf x_{true,0}.
+        \]
+      </p>
+      <p>
+        The filter should demonstrate appropriate convergence.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.21 Attitude Initialization</h3>
+      <p>
+        Attitude requires special treatment because quaternions must satisfy
+      </p>
+      <p>
+        \[
+        \boxed{ \|\mathbf q\|=1. }
+        \]
+      </p>
+      <p>
+        The initial quaternion should therefore be normalized.
+      </p>
+      <p>
+        For error-state or multiplicative filters, the nominal quaternion and attitude-error state must also be initialized consistently.
+      </p>
+      <p>
+        An attitude initialization error should be introduced as a physical rotation, rather than by arbitrarily perturbing individual quaternion elements.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.22 State Storage and Memory</h3>
+      <p>
+        Recursive filters require previous state information.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k-1}^{+} \rightarrow \hat{\mathbf x}_{k}^{-}.
+        \]
+      </p>
+      <p>
+        Simulink can store these values using Unit Delay, Delay, Memory, Discrete State-Space blocks, MATLAB Function persistent states, or subsystem states.
+      </p>
+      <p>
+        Care is required to avoid algebraic loops.
+      </p>
+      <p>
+        The estimator is inherently recursive, so the model must explicitly preserve the distinction between
+      </p>
+      <p>
+        \[
+        k-1
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        k.
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.23 MATLAB Function Blocks</h3>
+      <p>
+        MATLAB Function blocks can be useful for implementing estimator mathematics that becomes cumbersome with elementary Simulink blocks.
+      </p>
+      <p>
+        For example, one block might implement
+      </p>
+      <p>
+        \[
+        [\hat{\mathbf x}^{-},\mathbf P^{-}] = \text{Predict} ( \hat{\mathbf x}^{+}, \mathbf P^{+}, \mathbf u, \Delta t )
+        \]
+      </p>
+      <p>
+        while another performs
+      </p>
+      <p>
+        \[
+        [\hat{\mathbf x}^{+},\mathbf P^{+}] = \text{Update} ( \hat{\mathbf x}^{-}, \mathbf P^{-}, \mathbf z ).
+        \]
+      </p>
+      <p>
+        However, using one enormous MATLAB Function block for the entire navigation system can make debugging difficult.
+      </p>
+      <p>
+        A better engineering structure is usually modular:
+      </p>
+      <p>
+        \[
+        \boxed{\text{Propagation}}
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Sensor-Specific Measurement Model}}
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Innovation}}
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Validation}}
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Correction}}.
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.24 Sensor-Specific Update Subsystems</h3>
+      <p>
+        For a multi-sensor estimator, separate measurement-update subsystems can be useful.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{\text{GNSS Update}}
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Star-Tracker Update}}
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Magnetometer Update}}
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Camera Update}}
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{LiDAR Update}}.
+        \]
+      </p>
+      <p>
+        Each subsystem can contain its own
+      </p>
+      <p>
+        \[
+        h_i(\mathbf x), \quad \mathbf H_i, \quad \mathbf R_i, \quad \mathbf r_i, \quad \text{validation logic}.
+        \]
+      </p>
+      <p>
+        This architecture improves modularity and makes sensor dropout easier to test.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.25 Measurement Validity Logic</h3>
+      <p>
+        A sensor measurement should not automatically trigger an estimator update simply because a numerical value exists.
+      </p>
+      <p>
+        A validity signal should accompany it.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{New Measurement} \land \text{Sensor Healthy} \land \text{Measurement Valid} } \Rightarrow \boxed{\text{Perform Update}}.
+        \]
+      </p>
+      <p>
+        Otherwise,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Prediction Only}}.
+        \]
+      </p>
+      <p>
+        Validity checks may include sensor status, field of view, saturation, measurement age, geometry, signal quality, and residual consistency.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.26 Innovation Gating</h3>
+      <p>
+        For a Kalman-type estimator, innovation covariance is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf S_k = \mathbf H_k\mathbf P_k^{-}\mathbf H_k^T+\mathbf R_k. }
+        \]
+      </p>
+      <p>
+        A normalized innovation statistic is
+      </p>
+      <p>
+        \[
+        \boxed{ \gamma_k = \mathbf r_k^T \mathbf S_k^{-1} \mathbf r_k. }
+        \]
+      </p>
+      <p>
+        The measurement may be accepted if
+      </p>
+      <p>
+        \[
+        \gamma_k \le \gamma_{max}
+        \]
+      </p>
+      <p>
+        and rejected otherwise.
+      </p>
+      <p>
+        Thus,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Measurement} \rightarrow \text{Residual} \rightarrow \text{Gate} \rightarrow \begin{cases} \text{Update}\\ \text{Reject} \end{cases} }
+        \]
+      </p>
+      <p>
+        can be implemented directly in Simulink.
+      </p>
+      <p>
+        This provides an important bridge between sensor fusion and FDIR.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.27 Handling Sensor Dropout</h3>
+      <p>
+        Sensor dropout should be explicitly represented.
+      </p>
+      <p>
+        Suppose the camera becomes unavailable.
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \text{cameraValid}=0.
+        \]
+      </p>
+      <p>
+        The estimator should skip the camera update while continuing propagation and any other available sensor updates.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Loss} \not\Rightarrow \text{Estimator Stops}. }
+        \]
+      </p>
+      <p>
+        Instead,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Loss} \Rightarrow \text{Reduced Measurement Information}. }
+        \]
+      </p>
+      <p>
+        The resulting growth in estimation uncertainty is itself an important quantity to monitor.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.28 Measurement Latency</h3>
+      <p>
+        A sensor measurement generated at
+      </p>
+      <p>
+        \[
+        t_m
+        \]
+      </p>
+      <p>
+        may reach the estimator at
+      </p>
+      <p>
+        \[
+        t_m+\tau.
+        \]
+      </p>
+      <p>
+        A delay block can reproduce this effect in simulation, but the estimator must also process the timestamp correctly.
+      </p>
+      <p>
+        If a delayed measurement is compared with the current prediction,
+      </p>
+      <p>
+        \[
+        \mathbf z(t-\tau) - h[\hat{\mathbf x}(t)],
+        \]
+      </p>
+      <p>
+        the resulting innovation contains timing mismatch.
+      </p>
+      <p>
+        Therefore, latency should not be treated merely as an arbitrary signal delay. It is part of the estimator's temporal architecture.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.29 Out-of-Sequence Measurements</h3>
+      <p>
+        In complex systems, measurements may occasionally arrive in a different order from their acquisition times.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        t_{z_1}<t_{z_2}
+        \]
+      </p>
+      <p>
+        but
+      </p>
+      <p>
+        \[
+        t_{arrival,z_1}>t_{arrival,z_2}.
+        \]
+      </p>
+      <p>
+        The estimator must define what happens in this case.
+      </p>
+      <p>
+        Possible approaches include rejection, buffering and reordering, state-history correction, or repropagation.
+      </p>
+      <p>
+        The appropriate approach depends on estimator architecture and computational constraints.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.30 Coordinate Frames</h3>
+      <p>
+        Every signal should have an explicitly defined coordinate frame.
+      </p>
+      <p>
+        Common frames include inertial, orbital/local, body, sensor, camera, navigation, and target-relative frames.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \mathbf v^B = \mathbf C_I^B\mathbf v^I.
+        \]
+      </p>
+      <p>
+        A measurement model and estimator must use consistent frame definitions.
+      </p>
+      <p>
+        A useful Simulink naming convention is therefore not merely
+      </p>
+      <p>
+        <code>velocity</code>
+      </p>
+      <p>
+        but something like
+      </p>
+      <p>
+        <code>velocity_I</code>
+      </p>
+      <p>
+        or
+      </p>
+      <p>
+        <code>omega_B</code>.
+      </p>
+      <p>
+        Frame information should be visible from the signal/interface definition rather than remembered informally.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.31 Units</h3>
+      <p>
+        The same principle applies to units.
+      </p>
+      <p>
+        Signals should use a consistent convention such as SI units:
+      </p>
+      <p>
+        \[
+        m,\quad m/s,\quad rad,\quad rad/s,\quad N,\quad N\,m.
+        \]
+      </p>
+      <p>
+        Mixing degrees and radians is a common source of estimator failure.
+      </p>
+      <p>
+        A robust implementation makes units explicit in signal names, bus definitions, documentation, or Simulink signal properties.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.32 Quaternion Handling</h3>
+      <p>
+        Quaternion-based estimators require careful implementation.
+      </p>
+      <p>
+        After numerical propagation or correction,
+      </p>
+      <p>
+        \[
+        \mathbf q
+        \]
+      </p>
+      <p>
+        may deviate slightly from unit norm.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf q \leftarrow \frac{\mathbf q}{\|\mathbf q\|} }
+        \]
+      </p>
+      <p>
+        may be required.
+      </p>
+      <p>
+        However, normalization should not be used to hide incorrect quaternion dynamics.
+      </p>
+      <p>
+        The implementation must also maintain one consistent convention for quaternion order, multiplication, direction of rotation, frame interpretation, and attitude-error definition.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.33 Covariance Outputs</h3>
+      <p>
+        For Kalman-family estimators, the state estimate alone is not sufficient.
+      </p>
+      <p>
+        The estimator should expose
+      </p>
+      <p>
+        \[
+        \boxed{\mathbf P}
+        \]
+      </p>
+      <p>
+        or at least important diagonal terms.
+      </p>
+      <p>
+        For state <code>x_i</code>,
+      </p>
+      <p>
+        \[
+        \boxed{ \sigma_i = \sqrt{P_{ii}}. }
+        \]
+      </p>
+      <p>
+        This enables plots of
+      </p>
+      <p>
+        \[
+        e_i = x_{true,i}-\hat{x}_i
+        \]
+      </p>
+      <p>
+        against uncertainty bounds such as
+      </p>
+      <p>
+        \[
+        \pm3\sigma_i.
+        \]
+      </p>
+      <p>
+        These plots are extremely valuable for determining whether the estimator is internally consistent.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.34 Covariance Symmetry</h3>
+      <p>
+        Numerical calculations can cause
+      </p>
+      <p>
+        \[
+        \mathbf P \neq \mathbf P^T
+        \]
+      </p>
+      <p>
+        by a small amount.
+      </p>
+      <p>
+        A common numerical safeguard is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P \leftarrow \frac12(\mathbf P+\mathbf P^T). }
+        \]
+      </p>
+      <p>
+        The covariance should also remain positive semidefinite.
+      </p>
+      <p>
+        Unexpected negative diagonal elements or strongly negative eigenvalues indicate a serious implementation or numerical problem.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.35 Avoid Explicit Matrix Inversion</h3>
+      <p>
+        Expressions such as
+      </p>
+      <p>
+        \[
+        \mathbf K = \mathbf P^{-}\mathbf H^T \mathbf S^{-1}
+        \]
+      </p>
+      <p>
+        are mathematically convenient, but explicit matrix inversion is generally undesirable in numerical implementation.
+      </p>
+      <p>
+        Instead of explicitly computing
+      </p>
+      <p>
+        \[
+        \mathbf S^{-1},
+        \]
+      </p>
+      <p>
+        the implementation should solve the corresponding linear system using numerically appropriate methods.
+      </p>
+      <p>
+        This improves numerical stability and computational behavior.
+      </p>
+      <p><strong>Numerical reason:</strong> forming an explicit inverse introduces unnecessary computation and can amplify roundoff error, especially when the innovation covariance is poorly conditioned. Solving the associated linear system preserves the same mathematics while using numerical methods that are generally more stable and better suited to implementation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.36 Navigation Output Bus</h3>
+      <p>
+        The estimator should expose a clean navigation interface to the rest of the GNC system.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        <strong>NavBus</strong>
+      </p>
+      <p>
+        may contain
+      </p>
+      <p>
+        \[
+        \hat{\mathbf r}, \quad \hat{\mathbf v}, \quad \hat{\mathbf q}, \quad \hat{\boldsymbol{\omega}}, \quad \hat{\mathbf b}_g, \quad \hat{\mathbf b}_a,
+        \]
+      </p>
+      <p>
+        together with
+      </p>
+      <p>
+        \[
+        \text{NavValid}, \quad \text{NavMode}, \quad \text{timestamp}, \quad \text{quality}.
+        \]
+      </p>
+      <p>
+        This prevents guidance and control algorithms from depending on internal estimator implementation details.
+      </p>
+      <p><strong>Interface principle:</strong> the navigation output bus should expose what downstream GNC functions need without exposing how the estimator is internally implemented. That makes it possible to replace an EKF with another estimator architecture while keeping guidance and control interfaces unchanged, provided the output contract remains the same.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.37 Truth Must Not Enter the Navigation Bus</h3>
+      <p>
+        This deserves explicit emphasis.
+      </p>
+      <p>
+        The navigation bus should contain
+      </p>
+      <p>
+        \[
+        \boxed{\hat{\mathbf x}}
+        \]
+      </p>
+      <p>
+        rather than
+      </p>
+      <p>
+        \[
+        \boxed{\mathbf x_{true}}.
+        \]
+      </p>
+      <p>
+        Truth may be used for
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Verification} + \text{Plotting} + \text{Performance Evaluation} }
+        \]
+      </p>
+      <p>
+        but not as a hidden input to operational GNC algorithms.
+      </p>
+      <p>
+        Otherwise the simulation no longer represents closed-loop navigation performance.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.38 Closed-Loop GNC Integration</h3>
+      <p>
+        Once the estimator is connected to guidance and control, the architecture becomes
+      </p>
+      <p>
+        \[
+        \boxed{\text{Truth Dynamics}} \rightarrow \boxed{\text{Sensors}} \rightarrow \boxed{\text{Estimator}} \rightarrow \boxed{\text{Guidance}} \rightarrow \boxed{\text{Control}} \rightarrow \boxed{\text{Actuators}} \rightarrow \boxed{\text{Truth Dynamics}}.
+        \]
+      </p>
+      <p>
+        This is fundamentally different from testing an estimator offline.
+      </p>
+      <p>
+        Estimator errors now influence control commands.
+      </p>
+      <p>
+        Control commands influence the physical trajectory.
+      </p>
+      <p>
+        The changed trajectory then changes future sensor measurements.
+      </p>
+      <p>
+        Thus navigation and control become dynamically coupled.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.39 Estimated State vs True State in the Controller</h3>
+      <p>
+        During early controller development, a controller may be tested using truth:
+      </p>
+      <p>
+        \[
+        \mathbf u = g(\mathbf x_{true}).
+        \]
+      </p>
+      <p>
+        This is useful for isolating control-law performance.
+      </p>
+      <p>
+        But integrated GNC testing should eventually use
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf u = g(\hat{\mathbf x}). }
+        \]
+      </p>
+      <p>
+        The difference between these two cases reveals how navigation error affects closed-loop control performance.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.40 Actuator Commands as Estimator Inputs</h3>
+      <p>
+        Some estimators require knowledge of commanded or applied control.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k+1}^{-} = f_d( \hat{\mathbf x}_k^{+}, \mathbf u_k ).
+        \]
+      </p>
+      <p>
+        But care is required in deciding whether <code>\mathbf u_k</code> represents <strong>commanded input</strong> or <strong>actual applied input</strong>.
+      </p>
+      <p>
+        For a real actuator,
+      </p>
+      <p>
+        \[
+        \mathbf u_{actual} \neq \mathbf u_{cmd}
+        \]
+      </p>
+      <p>
+        because of saturation, delay, quantization, deadband, misalignment, or actuator uncertainty.
+      </p>
+      <p>
+        This distinction can become important in high-fidelity simulation.
+      </p>
+      <p><strong>Implementation consequence:</strong> if the estimator assumes the commanded actuation was perfectly achieved while the truth model applies actuator limits or delays, the estimator will accumulate model error. High-fidelity models should therefore define explicitly which actuation quantity is observable or reconstructable onboard and use that quantity consistently in the estimator dynamics.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.41 Mode-Dependent Navigation</h3>
+      <p>
+        A spacecraft may not use the same sensors throughout every mission phase.
+      </p>
+      <p>
+        A general proximity-operations example could be
+      </p>
+      <p>
+        \[
+        \boxed{\text{Long Range}} \rightarrow \boxed{\text{Intermediate Range}} \rightarrow \boxed{\text{Close Approach}} \rightarrow \boxed{\text{Capture/Terminal Phase}}.
+        \]
+      </p>
+      <p>
+        Sensor availability and quality can change with range and geometry.
+      </p>
+      <p>
+        The Simulink model should therefore permit sensor updates to be enabled or disabled according to navigation mode.
+      </p>
+      <p>
+        Importantly, mode switching should affect the <strong>available measurements</strong>, not artificially force the estimated state toward truth.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.42 Estimator Mode Logic</h3>
+      <p>
+        A navigation system may include states such as
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Initialize} \rightarrow \text{Acquire} \rightarrow \text{Navigate} \rightarrow \text{Degraded} \rightarrow \text{Reacquire} }.
+        \]
+      </p>
+      <p>
+        Stateflow can be useful for implementing such logic.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>no valid absolute measurement → propagate only,</li>
+        <li>measurement reacquired → validate,</li>
+        <li>innovation acceptable → resume update,</li>
+        <li>repeated rejection → declare degraded navigation,</li>
+        <li>sufficient valid updates → restore nominal mode.</li>
+      </ul>
+      <p>
+        This separates estimation mathematics from supervisory logic.
+      </p>
+      <p><strong>Architectural separation:</strong> estimator mode logic should decide which measurements and configurations are permitted, while the estimator mathematics should continue to perform propagation and correction consistently. Keeping supervisory logic separate from the numerical filter makes mode transitions easier to verify and prevents hidden changes in the estimator equations.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.43 Logging Architecture</h3>
+      <p>
+        A sensor-fusion model should be designed for analysis from the beginning.
+      </p>
+      <p>
+        Important logged quantities include
+      </p>
+      <p>
+        \[
+        \mathbf x_{true}, \quad \hat{\mathbf x}, \quad \mathbf P, \quad \mathbf z, \quad \hat{\mathbf z}, \quad \mathbf r, \quad \mathbf S, \quad \mathbf K,
+        \]
+      </p>
+      <p>
+        as well as validity flags, sensor timestamps, navigation mode, update events, controller commands, and actuator outputs.
+      </p>
+      <p>
+        Without these signals, diagnosing an estimator failure becomes unnecessarily difficult.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.44 State-Error Logging</h3>
+      <p>
+        The basic estimation error is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf e_k = \mathbf x_{true,k} - \hat{\mathbf x}_k. }
+        \]
+      </p>
+      <p>
+        For position,
+      </p>
+      <p>
+        \[
+        \mathbf e_r = \mathbf r_{true} - \hat{\mathbf r}.
+        \]
+      </p>
+      <p>
+        For velocity,
+      </p>
+      <p>
+        \[
+        \mathbf e_v = \mathbf v_{true} - \hat{\mathbf v}.
+        \]
+      </p>
+      <p>
+        For attitude, direct quaternion subtraction is usually not the most meaningful metric.
+      </p>
+      <p>
+        Instead, form an attitude-error quaternion and obtain a physical angular error.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.45 Innovation Logging</h3>
+      <p>
+        Innovation should be logged for each sensor:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_i = \mathbf z_i - h_i(\hat{\mathbf x}^{-}). }
+        \]
+      </p>
+      <p>
+        A well-performing estimator should generally produce innovations that are statistically compatible with the assumed measurement model.
+      </p>
+      <p>
+        Persistent non-zero innovation can indicate bias, model error, frame error, calibration error, or an incorrectly estimated state.
+      </p>
+      <p>
+        Large intermittent innovations may indicate outliers, timing errors, dropouts, or geometry problems.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.46 Update-Event Logging</h3>
+      <p>
+        It is useful to log a binary signal for every measurement update:
+      </p>
+      <p>
+        \[
+        u_i(k) = \begin{cases} 1,&\text{sensor }i\text{ used}\\ 0,&\text{sensor }i\text{ not used}. \end{cases}
+        \]
+      </p>
+      <p>
+        Similarly, a rejection flag can be logged.
+      </p>
+      <p>
+        This makes it possible to distinguish
+      </p>
+      <p>
+        \[
+        \boxed{\text{Sensor Produced Measurement}}
+        \]
+      </p>
+      <p>
+        from
+      </p>
+      <p>
+        \[
+        \boxed{\text{Estimator Actually Used Measurement}}.
+        \]
+      </p>
+      <p>
+        That distinction is crucial when diagnosing multi-sensor systems.
+      </p>
+      <p><strong>Diagnostic value:</strong> update-event logging makes filter behavior explainable. A large state change may be caused by a valid correction, a rejected measurement followed by propagation, or a sensor becoming available again. Without explicit update and rejection flags, these cases can look identical in the state history.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.47 Data Inspector and Post-Processing</h3>
+      <p>
+        Simulink Data Inspector is useful for comparing runs and inspecting synchronized signals.
+      </p>
+      <p>
+        MATLAB post-processing can then calculate quantitative metrics such as
+      </p>
+      <p>
+        \[
+        RMSE = \sqrt{ \frac{1}{N} \sum_{k=1}^{N} e_k^2 }.
+        \]
+      </p>
+      <p>
+        Other metrics may include maximum error, steady-state error, convergence time, innovation statistics, percentage of rejected measurements, navigation availability, covariance consistency, and closed-loop mission performance.
+      </p>
+      <p>
+        A good simulation therefore produces both plots and quantitative results.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.48 Estimator Verification in Open Loop</h3>
+      <p>
+        Before connecting the estimator to the controller, it should be tested independently.
+      </p>
+      <p>
+        A useful architecture is
+      </p>
+      <p>
+        \[
+        \boxed{\text{Prescribed Truth Trajectory}} \rightarrow \boxed{\text{Sensor Simulation}} \rightarrow \boxed{\text{Estimator}}.
+        \]
+      </p>
+      <p>
+        This allows estimator errors to be studied without controller behavior changing the trajectory.
+      </p>
+      <p>
+        Tests should include initialization errors, measurement noise, sensor bias, parameter errors, dropout, latency, outliers, and manoeuvres.
+      </p>
+      <p>
+        Only after satisfactory estimator behavior should the complete closed loop be emphasized.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.49 Closed-Loop Verification</h3>
+      <p>
+        The next stage is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Plant} \rightarrow \text{Sensors} \rightarrow \text{Estimator} \rightarrow \text{Controller} \rightarrow \text{Plant}. }
+        \]
+      </p>
+      <p>
+        This reveals effects that cannot be seen in estimator-only testing.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \text{Navigation Noise} \rightarrow \text{Control Command Variation}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \text{Navigation Bias} \rightarrow \text{Steady Control Error}.
+        \]
+      </p>
+      <p>
+        Closed-loop verification should therefore examine both estimation performance and mission/control performance.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.50 Solver Selection</h3>
+      <p>
+        Solver configuration matters because the model may contain continuous spacecraft dynamics together with discrete sensor and estimator algorithms.
+      </p>
+      <p>
+        The simulation may therefore contain
+      </p>
+      <p>
+        \[
+        \boxed{\text{Continuous Plant}} + \boxed{\text{Discrete Sensors}} + \boxed{\text{Discrete Estimator}}.
+        \]
+      </p>
+      <p>
+        During algorithm development, a variable-step solver may be convenient for continuous truth dynamics.
+      </p>
+      <p>
+        For real-time or HIL-oriented development, a fixed-step architecture is generally more representative.
+      </p>
+      <p>
+        The important requirement is that solver behavior must not accidentally alter the intended sensor or estimator timing.
+      </p>
+      <p><strong>Key implementation point:</strong> solver selection should preserve the intended discrete timing of the estimator even when the physical plant is continuous. A numerically accurate plant solution is not enough if sensor sampling or estimator updates occur at unintended times.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.51 Fixed-Step Implementation</h3>
+      <p>
+        A fixed-step model uses a base simulation interval
+      </p>
+      <p>
+        \[
+        T_s.
+        \]
+      </p>
+      <p>
+        Other tasks may execute at integer multiples:
+      </p>
+      <p>
+        \[
+        T_{IMU}=N_1T_s,
+        \]
+      </p>
+      <p>
+        \[
+        T_{nav}=N_2T_s,
+        \]
+      </p>
+      <p>
+        \[
+        T_{GNSS}=N_3T_s.
+        \]
+      </p>
+      <p>
+        This produces deterministic scheduling and is particularly important as the model moves toward real-time implementation.
+      </p>
+      <p>
+        The selected base step must be sufficiently small to represent the fastest required dynamics and task.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.52 Numerical Precision</h3>
+      <p>
+        Desktop simulations commonly use double precision.
+      </p>
+      <p>
+        Flight processors may use different numerical representations.
+      </p>
+      <p>
+        Estimator implementation should therefore eventually consider numerical conditioning, single-precision behavior where relevant, matrix factorization, covariance symmetry, quaternion normalization, very small/large covariance values, and division by poorly conditioned quantities.
+      </p>
+      <p>
+        An algorithm that works mathematically may still fail numerically.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.53 Algebraic Loops</h3>
+      <p>
+        Sensor-fusion models can accidentally create algebraic loops when the current estimator output is used immediately to construct an input that is required to calculate that same output.
+      </p>
+      <p>
+        Recursive estimation should maintain a clear temporal structure:
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k-1}^{+} \rightarrow \hat{\mathbf x}_{k}^{-} \rightarrow \hat{\mathbf x}_{k}^{+}. }
+        \]
+      </p>
+      <p>
+        Explicit delays or states should be used where required.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.54 Parameter Management</h3>
+      <p>
+        Estimator parameters should not be scattered through individual blocks as unexplained numerical constants.
+      </p>
+      <p>
+        Useful parameter groups include
+      </p>
+      <p>
+        \[
+        \mathbf Q, \quad \mathbf R, \quad \mathbf P_0, \quad \mathbf x_0,
+        \]
+      </p>
+      <p>
+        sensor update rates, sensor biases, noise parameters, frame transformations, gating thresholds, physical constants, and model parameters.
+      </p>
+      <p>
+        These can be organized through initialization scripts, structures, data dictionaries, or parameter objects.
+      </p>
+      <p>
+        A structured parameter architecture improves traceability and repeatability.
+      </p>
+      <p><strong>Engineering benefit:</strong> centralized parameter management ensures that tuning values, sensor characteristics, and model constants are traceable and reproducible. It also prevents two visually identical Simulink runs from using different hidden block parameters.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.55 Configuration Separation</h3>
+      <p>
+        It is useful to separate
+      </p>
+      <p>
+        \[
+        \boxed{\text{Algorithm}}
+        \]
+      </p>
+      <p>
+        from
+      </p>
+      <p>
+        \[
+        \boxed{\text{Configuration}}.
+        \]
+      </p>
+      <p>
+        The estimator subsystem should define how estimation works.
+      </p>
+      <p>
+        Configuration should define which sensors are enabled, their noise levels, sample rates, initial conditions, model parameters, and test scenario.
+      </p>
+      <p>
+        This allows the same estimator implementation to be tested under many conditions without manually editing the model.
+      </p>
+      <p><strong>Why separation helps:</strong> keeping configuration outside the algorithm allows one verified estimator implementation to be reused across nominal, degraded, and verification cases without editing its internal equations. This reduces configuration drift and makes regression testing significantly more reliable.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.56 Variant Subsystems</h3>
+      <p>
+        Variant subsystems can be useful when comparing estimator architectures.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Complementary Filter} \;|\; \text{Observer} \;|\; \text{EKF} \;|\; \text{MEKF} \;|\; \text{UKF} }.
+        \]
+      </p>
+      <p>
+        All variants can share the same truth dynamics and sensor models.
+      </p>
+      <p>
+        This makes comparisons more meaningful because the estimators experience identical simulated conditions.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.57 Reusable Sensor Interfaces</h3>
+      <p>
+        Sensor blocks should ideally expose standardized interfaces.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Output} = \{ \mathbf z, t, valid, status \}. }
+        \]
+      </p>
+      <p>
+        This makes it easier to replace a simulated sensor with recorded data, a higher-fidelity sensor model, or eventually a hardware interface without redesigning the estimator.
+      </p>
+      <p>
+        This is one of the major advantages of a well-designed Simulink architecture.
+      </p>
+      <p><strong>Long-term advantage:</strong> a standardized sensor interface decouples sensor simulation from estimation logic. A simulated sensor, recorded dataset, or hardware-fed measurement can then use the same estimator input contract, which is especially valuable when progressing from desktop simulation toward SIL and HIL.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.58 Recorded-Data Replay</h3>
+      <p>
+        An estimator should eventually be testable using recorded measurements rather than only simulated measurements.
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \boxed{\text{Simulated Sensor Bus}}
+        \]
+      </p>
+      <p>
+        can be replaced with
+      </p>
+      <p>
+        \[
+        \boxed{\text{Recorded Sensor Bus}}
+        \]
+      </p>
+      <p>
+        while preserving the same estimator interface.
+      </p>
+      <p>
+        This supports regression testing and provides a natural bridge toward SIL/HIL and flight-data analysis.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.59 Fault Injection</h3>
+      <p>
+        The simulation should permit deliberate fault injection.
+      </p>
+      <p>
+        Examples include
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Bias Step}, \text{Noise Increase}, \text{Dropout}, \text{Stuck Measurement}, \text{Outlier}, \text{Latency}, \text{Misalignment} }.
+        \]
+      </p>
+      <p>
+        A fault-injection layer should ideally sit within or immediately after the sensor model rather than modifying estimator internals.
+      </p>
+      <p>
+        This preserves architectural realism.
+      </p>
+      <p><strong>Verification interpretation:</strong> injecting faults at the sensor boundary tests the complete estimator response to realistic bad information. Altering internal estimator variables would test the algorithm differently and could bypass the same validation, gating, and health-monitoring logic that must protect the real system.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.60 Verification Against Analytical Cases</h3>
+      <p>
+        Before testing complex nonlinear scenarios, individual estimator blocks should be verified using cases for which the expected behavior is known.
+      </p>
+      <p>
+        For a simple linear system,
+      </p>
+      <p>
+        \[
+        \mathbf x_{k+1} = \mathbf F\mathbf x_k
+        \]
+      </p>
+      <p>
+        can be compared against direct MATLAB calculations.
+      </p>
+      <p>
+        Likewise, one prediction/update cycle can be calculated manually and compared with the Simulink output.
+      </p>
+      <p>
+        This helps identify implementation errors before complexity is added.
+      </p>
+      <p><strong>Why start simple:</strong> analytical or hand-computable cases isolate implementation correctness from model complexity. If one prediction or update step disagrees with an independent calculation, the discrepancy can be traced before nonlinear dynamics, asynchronous timing, and multiple sensors obscure the source.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.61 MATLAB vs Simulink Cross-Verification</h3>
+      <p>
+        A particularly useful verification approach is to implement the same filter in both MATLAB and Simulink.
+      </p>
+      <p>
+        Using identical
+      </p>
+      <p>
+        \[
+        \mathbf x_0,\mathbf P_0,\mathbf Q,\mathbf R,\mathbf z_k
+        \]
+      </p>
+      <p>
+        should produce equivalent results within expected numerical tolerance.
+      </p>
+      <p>
+        If they differ, possible causes include sample-time errors, block execution order, initialization, state-storage errors, indexing differences, or inconsistent equations.
+      </p>
+      <p><strong>Cross-verification value:</strong> MATLAB and Simulink provide two independent execution paths for the same mathematics. Agreement between them does not prove the estimator is physically correct, but disagreement is a strong indicator of implementation, timing, indexing, initialization, or state-management errors.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.62 Testing Sensor Rates Individually</h3>
+      <p>
+        Multi-rate systems should be built incrementally.
+      </p>
+      <p>
+        First test one sensor.
+      </p>
+      <p>
+        Then add another.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Propagation Only}}
+        \]
+      </p>
+      <p>
+        then
+      </p>
+      <p>
+        \[
+        \boxed{\text{Propagation + GNSS}}
+        \]
+      </p>
+      <p>
+        then
+      </p>
+      <p>
+        \[
+        \boxed{\text{Propagation + GNSS + IMU}}
+        \]
+      </p>
+      <p>
+        then additional measurements.
+      </p>
+      <p>
+        This makes it much easier to identify which interface or update introduces instability.
+      </p>
+      <p><strong>Recommended interpretation:</strong> incremental sensor integration turns a difficult system-level debugging problem into a sequence of smaller verification problems. Each newly added sensor should demonstrate the expected innovation, correction direction, covariance effect, and update timing before another sensor is introduced.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.63 Testing with Noise Disabled</h3>
+      <p>
+        Before adding stochastic effects, test deterministic behavior.
+      </p>
+      <p>
+        Set
+      </p>
+      <p>
+        \[
+        \mathbf Q=0, \qquad \mathbf R=0
+        \]
+      </p>
+      <p>
+        where appropriate for the particular verification case, and remove simulated sensor errors.
+      </p>
+      <p>
+        The estimator should then reproduce the expected deterministic behavior.
+      </p>
+      <p>
+        Noise should be introduced only after the fundamental implementation is verified.
+      </p>
+      <p><strong>What this test reveals:</strong> deterministic testing removes random variation so that sign errors, frame mistakes, incorrect state ordering, and scheduling problems are easier to see. Noise-free agreement should therefore be treated as a prerequisite, not as evidence of final performance.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.64 Testing with Known Bias</h3>
+      <p>
+        After deterministic verification, introduce a known bias:
+      </p>
+      <p>
+        \[
+        b=b_{test}.
+        \]
+      </p>
+      <p>
+        If bias is included in the estimator state, verify that
+      </p>
+      <p>
+        \[
+        \hat b \rightarrow b_{test}
+        \]
+      </p>
+      <p>
+        under observable conditions.
+      </p>
+      <p>
+        This is a powerful way to test augmented-state estimators.
+      </p>
+      <p><strong>Observability matters:</strong> a bias state will converge only if the available measurements and motion provide information that distinguishes that bias from other state errors. Failure of \(\hat b\) to approach the injected bias is therefore not automatically a tuning problem; it may reveal weak observability or an incorrect measurement model.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.65 Testing Dropout</h3>
+      <p>
+        Temporarily set
+      </p>
+      <p>
+        \[
+        valid_i=0.
+        \]
+      </p>
+      <p>
+        Then examine whether the estimator continues prediction, uncertainty grows appropriately, other sensors continue updating, and reacquisition occurs without unacceptable transient behavior.
+      </p>
+      <p>
+        Dropout testing should be performed for each important measurement source.
+      </p>
+      <p><strong>What to inspect:</strong> during dropout, the state estimate may remain smooth while its uncertainty grows. That covariance growth is expected when information is lost. The important questions are whether prediction continues correctly, other sensors still contribute, navigation validity reflects the loss of information, and reacquisition occurs without an artificial reset.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.66 Testing Timing Errors</h3>
+      <p>
+        Deliberately introduce sensor delay:
+      </p>
+      <p>
+        \[
+        \tau>0.
+        \]
+      </p>
+      <p>
+        Compare correct timestamp handling with an implementation that ignores the delay.
+      </p>
+      <p>
+        The difference demonstrates why synchronization is part of navigation design rather than merely a software detail.
+      </p>
+      <p><strong>Why the comparison is useful:</strong> running the same scenario once with timestamp-correct processing and once with delay ignored separates timing architecture errors from ordinary sensor noise. This is an effective way to quantify how much estimation error comes from latency handling itself.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.67 Testing Frame Errors</h3>
+      <p>
+        A deliberate small frame misalignment can be injected:
+      </p>
+      <p>
+        \[
+        \mathbf C_{S}^{B,true} \neq \mathbf C_{S}^{B,est}.
+        \]
+      </p>
+      <p>
+        This can reveal whether residuals, bias states, or navigation errors respond as expected.
+      </p>
+      <p>
+        It also provides a useful test for sensor calibration sensitivity.
+      </p>
+      <p><strong>Interpretation:</strong> a small frame error can masquerade as sensor bias or state error because the measured vector remains numerically plausible. Injecting known misalignment is therefore a useful way to confirm that frame transformations, residuals, and calibration states are behaving physically.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.68 Testing Initial Covariance</h3>
+      <p>
+        Several initial covariance cases should be evaluated:
+      </p>
+      <p>
+        \[
+        \mathbf P_0^{small}, \quad \mathbf P_0^{nominal}, \quad \mathbf P_0^{large}.
+        \]
+      </p>
+      <p>
+        The purpose is to determine whether the estimator remains stable and whether its convergence behavior is consistent with its assumed initial confidence.
+      </p>
+      <p><strong>What the sweep demonstrates:</strong> changing \(\mathbf P_0\) should alter convergence behavior and early Kalman gains without changing the underlying truth. This makes the test useful for identifying overconfident initialization, excessive early correction, or covariance values that do not reflect the assumed initial-state uncertainty.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.69 Testing Process Noise</h3>
+      <p>
+        Process noise represents uncertainty in the state evolution.
+      </p>
+      <p>
+        If
+      </p>
+      <p>
+        \[
+        \mathbf Q
+        \]
+      </p>
+      <p>
+        is too small, the estimator may become overconfident in its model.
+      </p>
+      <p>
+        If it is too large, covariance may grow excessively and measurements may dominate.
+      </p>
+      <p>
+        Simulink allows systematic sweeps of these parameters while observing both estimation error and covariance consistency.
+      </p>
+      <p><strong>Interpretation:</strong> process noise controls how rapidly the estimator admits that its model may be wrong. The objective is not simply to obtain a small error trace, but to obtain an estimate whose actual error is statistically compatible with its reported covariance.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.70 Testing Measurement Noise</h3>
+      <p>
+        Similarly, increasing
+      </p>
+      <p>
+        \[
+        \mathbf R
+        \]
+      </p>
+      <p>
+        reduces the assumed confidence in the corresponding measurement.
+      </p>
+      <p>
+        For a Kalman filter,
+      </p>
+      <p>
+        \[
+        \mathbf R\uparrow \Rightarrow \mathbf K\downarrow
+        \]
+      </p>
+      <p>
+        in the broad intuitive sense that noisier measurements generally receive less corrective influence.
+      </p>
+      <p>
+        This behavior can be demonstrated directly in simulation.
+      </p>
+      <p><strong>Interpretation:</strong> measurement noise controls how strongly the estimator trusts a measurement relative to its prediction. Sweeping \(\mathbf R\) should therefore change both the gain and the innovation statistics in a physically understandable direction.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.71 Navigation Availability</h3>
+      <p>
+        The estimator should output not only a numerical state but also whether that state is operationally usable.
+      </p>
+      <p>
+        A navigation-valid signal may depend on sensor availability, convergence, covariance limits, estimator mode, residual behavior, and time since last valid update.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ NavValid = f( \text{Estimator Health}, \mathbf P, \text{Sensor Status}, \text{Mode} ). }
+        \]
+      </p>
+      <p>
+        Guidance and control can then respond appropriately to degraded navigation.
+      </p>
+      <p><strong>Operational meaning:</strong> a navigation solution can exist numerically while still being unsuitable for guidance or control. A separate validity signal allows downstream GNC logic to distinguish between an available estimate and an estimate that satisfies uncertainty, freshness, and health requirements.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.72 Interface with Guidance</h3>
+      <p>
+        Guidance generally should not need to know whether the state came from an EKF, observer, or UKF.
+      </p>
+      <p>
+        It should receive a standardized navigation solution.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Navigation}} \rightarrow \{ \hat{\mathbf r}, \hat{\mathbf v}, \hat{\mathbf q}, \hat{\boldsymbol\omega} \} \rightarrow \boxed{\text{Guidance}}.
+        \]
+      </p>
+      <p>
+        This decouples navigation development from guidance development.
+      </p>
+      <p><strong>Design objective:</strong> guidance should consume a stable navigation interface rather than estimator-specific internals. This decoupling allows the navigation algorithm to evolve without forcing changes throughout the guidance layer.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.73 Interface with Control</h3>
+      <p>
+        Similarly, the controller operates on estimated states and reference commands.
+      </p>
+      <p>
+        For attitude control,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf e_q = \mathbf q_{ref} \otimes \hat{\mathbf q}^{-1} }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \mathbf e_\omega = \boldsymbol{\omega}_{ref} - \hat{\boldsymbol{\omega}}.
+        \]
+      </p>
+      <p>
+        For translation,
+      </p>
+      <p>
+        \[
+        \mathbf e_r = \mathbf r_{ref} - \hat{\mathbf r},
+        \]
+      </p>
+      <p>
+        \[
+        \mathbf e_v = \mathbf v_{ref} - \hat{\mathbf v}.
+        \]
+      </p>
+      <p>
+        Navigation quality therefore directly affects control quality.
+      </p>
+      <p><strong>Closed-loop implication:</strong> because the controller acts on estimated rather than true states, navigation error directly becomes control error. This is why estimator verification must ultimately include closed-loop testing rather than stopping at estimator-only plots.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.74 Sensor Fusion During General RPO</h3>
+      <p>
+        For a general rendezvous or proximity-operation scenario, the relative navigation state may be
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{rel} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol{\omega}_{rel} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Different measurements may become useful at different ranges.
+      </p>
+      <p>
+        The Simulink architecture should therefore permit measurements such as relative GNSS, bearing/vision information, range information, LiDAR-derived measurements, or relative pose to enter the same navigation framework according to availability and validity.
+      </p>
+      <p>
+        The key architectural idea is general:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Relative Dynamics} + \text{Available Relative Measurements} \rightarrow \text{Relative-State Estimate}. }
+        \]
+      </p>
+      <p>
+        No particular mission-specific sensor sequence is required by this concept.
+      </p>
+      <p><strong>General RPO interpretation:</strong> relative-navigation sensors constrain different parts of the relative state with different accuracy and availability as geometry changes. A useful Simulink implementation therefore treats sensor availability and validity as dynamic information and fuses whichever measurements are appropriate without assuming a mission-specific sensor sequence.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.75 Complete Simulink Execution Cycle</h3>
+      <p>
+        The entire estimator execution can now be summarized.
+      </p>
+      <h4>Step 1 — Propagate truth</h4>
+      <p>
+        \[
+        \mathbf x_{true,k} \rightarrow \mathbf x_{true,k+1}.
+        \]
+      </p>
+      <h4>Step 2 — Generate sensor measurements</h4>
+      <p>
+        \[
+        \mathbf x_{true} \rightarrow \mathbf z_i.
+        \]
+      </p>
+      <h4>Step 3 — Apply sensor effects</h4>
+      <p>
+        \[
+        \mathbf z_i \rightarrow \text{noise, bias, latency, dropout, quantization}.
+        \]
+      </p>
+      <h4>Step 4 — Build measurement interfaces</h4>
+      <p>
+        \[
+        \boxed{ \mathbf z_i, t_i, valid_i, status_i }.
+        \]
+      </p>
+      <h4>Step 5 — Predict estimator state</h4>
+      <p>
+        \[
+        \hat{\mathbf x}_{k}^{+} \rightarrow \hat{\mathbf x}_{k+1}^{-}.
+        \]
+      </p>
+      <h4>Step 6 — Propagate uncertainty</h4>
+      <p>
+        \[
+        \mathbf P_k^{+} \rightarrow \mathbf P_{k+1}^{-}.
+        \]
+      </p>
+      <h4>Step 7 — Check for new valid measurements</h4>
+      <p>
+        \[
+        new_i\land valid_i.
+        \]
+      </p>
+      <h4>Step 8 — Predict corresponding measurement</h4>
+      <p>
+        \[
+        \hat{\mathbf z}_i = h_i(\hat{\mathbf x}^{-}).
+        \]
+      </p>
+      <h4>Step 9 — Calculate innovation</h4>
+      <p>
+        \[
+        \mathbf r_i = \mathbf z_i-\hat{\mathbf z}_i.
+        \]
+      </p>
+      <h4>Step 10 — Validate or gate innovation</h4>
+      <p>
+        \[
+        \mathbf r_i \rightarrow \text{Accept/Reject}.
+        \]
+      </p>
+      <h4>Step 11 — Correct state and covariance</h4>
+      <p>
+        \[
+        \hat{\mathbf x}^{-},\mathbf P^{-} \rightarrow \hat{\mathbf x}^{+},\mathbf P^{+}.
+        \]
+      </p>
+      <h4>Step 12 — Generate navigation output</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+}, \mathbf P^{+}, NavValid }.
+        \]
+      </p>
+      <h4>Step 13 — Send navigation solution to GNC</h4>
+      <p>
+        \[
+        \boxed{\text{Navigation}} \rightarrow \boxed{\text{Guidance}} \rightarrow \boxed{\text{Control}}.
+        \]
+      </p>
+      <h4>Step 14 — Apply actuator response to truth dynamics</h4>
+      <p>
+        \[
+        \mathbf u_{cmd} \rightarrow \mathbf u_{actual} \rightarrow \text{Truth Dynamics}.
+        \]
+      </p>
+      <h4>Step 15 — Log verification signals</h4>
+      <p>
+        \[
+        \mathbf x_{true}, \hat{\mathbf x}, \mathbf P, \mathbf r_i, \mathbf z_i, \mathbf u.
+        \]
+      </p>
+      <p>
+        Then the cycle repeats.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.76 Recommended Top-Level Simulink Organization</h3>
+      <p>
+        A clean top-level model can therefore contain the following major subsystems:
+      </p>
+      <p>
+        \[
+        \boxed{\text{1. Truth Dynamics}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{2. Sensor Models}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{3. Measurement Interface / Bus}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{4. Sensor Fusion / Navigation Estimator}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{5. Navigation Output Bus}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{6. Guidance}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{7. Control}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{8. Actuator Dynamics}}
+        \]
+      </p>
+      <p>
+        with a parallel branch
+      </p>
+      <p>
+        \[
+        \boxed{\text{Logging and Verification}}.
+        \]
+      </p>
+      <p>
+        Inside the estimator subsystem:
+      </p>
+      <p>
+        \[
+        \boxed{\text{Initialization}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Prediction}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Measurement Scheduling}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Sensor-Specific Updates}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{State/Covariance Management}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Navigation Health}}.
+        \]
+      </p>
+      <p>
+        This organization keeps the estimator modular and allows each layer to be verified independently.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.77 Common Simulink Implementation Mistakes</h3>
+      <p>
+        Several mistakes can produce a model that appears to work while not representing a valid sensor-fusion system.
+      </p>
+      <p>
+        The most important include:
+      </p>
+      <ul>
+        <li>feeding truth states directly into navigation or control,</li>
+        <li>giving the estimator information unavailable onboard,</li>
+        <li>updating every sensor at the simulation base rate regardless of its actual sample rate,</li>
+        <li>confusing measurement generation time with measurement arrival time,</li>
+        <li>ignoring sensor validity and dropout,</li>
+        <li>mixing coordinate frames,</li>
+        <li>mixing degrees and radians,</li>
+        <li>inconsistent quaternion conventions,</li>
+        <li>incorrect state ordering between subsystems,</li>
+        <li>using unrealistic zero-latency measurements,</li>
+        <li>resetting covariance unintentionally,</li>
+        <li>using incorrect <code>\mathbf Q</code>, <code>\mathbf R</code>, or <code>\mathbf P_0</code> dimensions,</li>
+        <li>failing to preserve covariance symmetry,</li>
+        <li>explicitly inverting poorly conditioned matrices,</li>
+        <li>creating hidden algebraic loops,</li>
+        <li>using identical truth and estimator models with no model uncertainty,</li>
+        <li>allowing controller access to truth during integrated GNC verification,</li>
+        <li>logging only the final estimated state and not innovations, covariance, measurement flags, and update events.</li>
+      </ul>
+      <p>
+        A model should therefore be considered verified only after its <strong>information flow, timing, frames, units, estimator mathematics, and closed-loop behavior</strong> have all been checked.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.78 Practical Development Sequence</h3>
+      <p>
+        A sensible development progression is:
+      </p>
+      <p>
+        \[
+        \boxed{\text{Verify Truth Dynamics}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Verify Individual Sensor Models}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Verify Estimator Prediction}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Verify One Measurement Update}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Add Multi-Rate Scheduling}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Add Additional Sensors}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Add Noise and Bias}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Add Dropout, Delay, and Faults}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Perform Closed-Loop GNC Testing}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Perform Monte Carlo Verification}}.
+        \]
+      </p>
+      <p>
+        This incremental approach is much safer than constructing a complete multi-sensor nonlinear closed-loop estimator at once and attempting to debug everything simultaneously.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.29.79 Key Takeaways</h3>
+      <p>
+        A Simulink sensor-fusion model is not simply a graphical implementation of filter equations. It is an executable representation of the complete <strong>navigation information chain</strong>.
+      </p>
+      <p>
+        The most important architecture is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Truth Dynamics} \rightarrow \text{Sensor Models} \rightarrow \text{Measurements} \rightarrow \text{Estimator} \rightarrow \text{Navigation Solution} \rightarrow \text{GNC} }.
+        \]
+      </p>
+      <p>
+        Truth and estimated states must remain strictly separated.
+      </p>
+      <p>
+        Sensor models should reproduce realistic measurement characteristics including noise, bias, update rate, latency, validity, dropout, frame transformations, and other relevant imperfections.
+      </p>
+      <p>
+        Prediction and measurement correction should be separated so that multi-rate and asynchronous sensors can be handled correctly.
+      </p>
+      <p>
+        Measurement buses should contain not only measurement values but also timestamps, validity and status information.
+      </p>
+      <p>
+        The estimator should expose both the estimated state and, where applicable, covariance and diagnostic quantities.
+      </p>
+      <p>
+        For covariance-based filters,
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} + \mathbf P + \text{Innovations} }
+        \]
+      </p>
+      <p>
+        together provide much more information than the state estimate alone.
+      </p>
+      <p>
+        Logging should include truth, estimates, errors, measurements, predicted measurements, innovations, covariance, sensor-validity flags, update events, and GNC outputs.
+      </p>
+      <p>
+        Finally, the estimator should progress through increasingly realistic verification:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Deterministic} \rightarrow \text{Noisy} \rightarrow \text{Multi-Rate} \rightarrow \text{Faulted} \rightarrow \text{Closed Loop} \rightarrow \text{Monte Carlo} }.
+        \]
+      </p>
+      <p>
+        This provides the natural transition to <strong>4.2.30 Monte Carlo Verification of Sensor Fusion</strong>, where individual deterministic tests are expanded into statistical verification across sensor errors, initialization uncertainty, timing variations, model uncertainty, dropouts, estimator consistency, and mission-level performance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.2.30 Monte Carlo Verification of Sensor Fusion</h2>
+
+      <p>
+        The Simulink implementation has now established the complete executable navigation chain: truth dynamics,
+        realistic sensor models, measurement interfaces, estimator prediction and correction, multi-rate scheduling,
+        validity logic, logging, navigation outputs, closed-loop GNC interfaces, fault injection, and deterministic verification.
+      </p>
+
+      <p>
+        The next section expands these deterministic and case-by-case checks into statistical verification across many runs,
+        where sensor errors, initialization uncertainty, timing variation, dynamic uncertainty, dropouts, and estimator
+        consistency are assessed as distributions rather than as a single trajectory.
+      </p>
+
+      <a href="sensor-fusion-monte-carlo.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2.30 Monte Carlo Verification of Sensor Fusion</h3>
+          <p>
+            Statistical variation of sensor bias, noise, misalignment, initialization error, timing, dropouts,
+            dynamic uncertainty, navigation errors, covariance consistency, success criteria, confidence intervals,
+            NIS, NEES, and mission-level verification.
+          </p>
+          <p class="sensor-link-arrow">
+            Continue to Sensor-Fusion Monte Carlo Verification &rarr;
+          </p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, and spacecraft navigation.
+    </p>
+  </footer>
+
+</body>
+</html>
