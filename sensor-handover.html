@@ -1,0 +1,6261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.2.25 Sensor Handover and Mode-Dependent Fusion | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [["\\(", "\\)"], ["$", "$"]],
+        displayMath: [["\\[", "\\]"], ["$$", "$$"]],
+        processEscapes: true
+      },
+      chtml: { scale: 1.0 }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .equation-box {
+      margin: 1.35rem 0;
+      padding: 1.15rem 1.35rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+      overflow-x: auto;
+      text-align: center;
+    }
+    .equation-box mjx-container[display="true"] { margin: 0 !important; }
+    .concept-note {
+      margin: 1.4rem 0 0;
+      padding: 1.1rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+    }
+    .concept-note h4 { margin-top: 0; margin-bottom: .45rem; }
+    .concept-note p { margin-bottom: 0; }
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: .9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Sensor Handover and Mode-Dependent Fusion</h1>
+    <p class="notes-tagline">
+      Far-range, mid-range, close-range, and terminal navigation modes; overlapping sensors, sensor validity, covariance transition, estimator handover, smooth switching, observability, FDIR interaction, degraded navigation, and mission-phase-dependent fusion logic.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+
+    <section class="notes-section-card">
+      <h2>4.2.25 Sensor Handover and Mode-Dependent Fusion</h2>
+      <p>
+        Sensor handover and mode-dependent fusion deal with a practical reality of spacecraft navigation: <strong>one sensor combination is rarely optimal across the entire mission or across all separation ranges</strong>.
+      </p>
+      <p>
+        As operating conditions change, different sensors may become:
+      </p>
+      <ul>
+        <li>more accurate,</li>
+        <li>less accurate,</li>
+        <li>newly available,</li>
+        <li>temporarily unavailable,</li>
+        <li>geometrically weak,</li>
+        <li>saturated,</li>
+        <li>outside field of view,</li>
+        <li>unsuitable for the current range,</li>
+        <li>computationally too expensive for continuous use.</li>
+      </ul>
+      <p>
+        Therefore, a robust navigation architecture should not assume that one fixed fusion configuration is used from beginning to end.
+      </p>
+      <p>
+        Instead, the estimator should adapt its <strong>measurement set, weighting, validity logic, and operating mode</strong> to the current navigation conditions.
+      </p>
+      <p>
+        The central idea is
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Mission Phase} + \text{Sensor Availability} + \text{Sensor Quality} + \text{Navigation Uncertainty} \rightarrow \text{Appropriate Fusion Mode} }
+        \]
+      </div>
+      <p>
+        For general spacecraft rendezvous and proximity operations, this may include modes such as:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Far Range} \rightarrow \text{Mid Range} \rightarrow \text{Close Range} \rightarrow \text{Very Close / Capture-Preparation Range} }
+        \]
+      </div>
+      <p>
+        The exact mission terminology and transition ranges depend on the system design.
+      </p>
+      <p>
+        The important principle is not the particular range boundary, but that <strong>sensor usefulness and navigation requirements change with operating condition</strong>.
+      </p>
+      <div class="concept-note">
+        <h4>Core idea</h4>
+        <p>A handover is best understood as a controlled change in the information feeding one continuous state estimate. The navigation state should represent the spacecraft, while the sensor set supplying information to that state may evolve with range, geometry, quality, and health.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.1 Why Sensor Handover Is Necessary</h3>
+      <p>
+        Different sensors have different operating envelopes.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>GNSS may be effective for long-range cooperative relative navigation.</li>
+        <li>Camera bearing measurements may become useful once the target is detectable.</li>
+        <li>Detailed optical pose estimation may become available at shorter distance.</li>
+        <li>LiDAR may become increasingly valuable as reliable returns and dense geometry become available.</li>
+        <li>IMU propagation may remain useful continuously between external updates.</li>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Best Sensor at One Range} \neq \text{Best Sensor at Every Range}. }
+        \]
+      </div>
+      <p>
+        Sensor handover allows the navigation system to exploit whichever information sources are currently most useful.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.2 Sensor Handover Is Not Simply Turning One Sensor Off and Another On</h3>
+      <p>
+        A naive handover would be
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor A OFF} \rightarrow \text{Sensor B ON}. }
+        \]
+      </div>
+      <p>
+        This can be problematic.
+      </p>
+      <p>
+        If sensor B contains:
+      </p>
+      <ul>
+        <li>a different bias,</li>
+        <li>a different reference frame,</li>
+        <li>a different latency,</li>
+        <li>a different covariance,</li>
+        <li>a slightly different pose estimate,</li>
+      </ul>
+      <p>
+        the navigation state may jump suddenly.
+      </p>
+      <p>
+        A better architecture is usually:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor A} \rightarrow \text{A+B Overlap} \rightarrow \text{Sensor B Dominant}. }
+        \]
+      </div>
+      <p>
+        This allows the estimator to compare the sensors before the transition is completed.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.3 Handover as an Information Transition</h3>
+      <p>
+        Sensor handover should be thought of as an <strong>information transition</strong>, not merely a hardware switch.
+      </p>
+      <p>
+        During handover, the estimator changes the relative amount of information contributed by each sensor.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf \Lambda_{total} = \mathbf \Lambda_A + \mathbf \Lambda_B + \cdots }
+        \]
+      </div>
+      <p>
+        where
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf \Lambda
+        \]
+      </div>
+      <p>
+        represents information contribution.
+      </p>
+      <p>
+        As sensor A becomes less useful and sensor B becomes more useful,
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf \Lambda_A \downarrow
+        \]
+      </div>
+      <p>
+        while
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf \Lambda_B \uparrow.
+        \]
+      </div>
+      <p>
+        The fused navigation state should remain physically continuous.
+      </p>
+      <div class="concept-note">
+        <h4>Why this viewpoint matters</h4>
+        <p>Thinking in terms of information avoids the common mistake of treating handover as state replacement. The physical state does not change when a sensor becomes primary; only the measurement information available to estimate that state changes.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.4 Mode-Dependent Fusion</h3>
+      <p>
+        Mode-dependent fusion means that the estimator changes behavior according to the current operational mode.
+      </p>
+      <p>
+        A mode can determine:
+      </p>
+      <ul>
+        <li>which sensors are enabled,</li>
+        <li>which measurements are accepted,</li>
+        <li>expected measurement covariance,</li>
+        <li>process-noise tuning,</li>
+        <li>measurement-update rates,</li>
+        <li>validity thresholds,</li>
+        <li>outlier gates,</li>
+        <li>state composition,</li>
+        <li>navigation requirements.</li>
+      </ul>
+      <p>
+        Thus the same filter architecture may behave differently in different operating conditions.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.5 Navigation Modes</h3>
+      <p>
+        A general navigation system may contain modes such as:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_1=\text{Far Range} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ M_2=\text{Mid Range} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ M_3=\text{Close Range} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ M_4=\text{Very Close / Terminal Relative Navigation}. }
+        \]
+      </div>
+      <p>
+        These are conceptual categories.
+      </p>
+      <p>
+        Actual missions may use different names or more detailed subdivisions.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.6 Far-Range Navigation Mode</h3>
+      <p>
+        At far range, detailed target geometry may not yet be visible.
+      </p>
+      <p>
+        Useful sensors may include:
+      </p>
+      <ul>
+        <li>absolute GNSS,</li>
+        <li>relative GNSS,</li>
+        <li>inter-spacecraft communication,</li>
+        <li>RF ranging,</li>
+        <li>coarse optical bearing.</li>
+      </ul>
+      <p>
+        The state estimate may focus mainly on:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf r_{rel}, \qquad \mathbf v_{rel}. }
+        \]
+      </div>
+      <p>
+        Relative attitude may not yet be required or observable.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.7 Mid-Range Navigation Mode</h3>
+      <p>
+        As separation decreases, the target may become clearly visible.
+      </p>
+      <p>
+        Camera measurements may begin contributing:
+      </p>
+      <ul>
+        <li>line of sight,</li>
+        <li>centroid,</li>
+        <li>silhouette,</li>
+        <li>coarse features.</li>
+      </ul>
+      <p>
+        LiDAR may begin producing useful range information depending on sensor capability.
+      </p>
+      <p>
+        The estimator may therefore use:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{GNSS / Ranging} + \text{Camera Bearing} + \text{IMU}. }
+        \]
+      </div>
+      <p>
+        This increases geometric observability.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.8 Close-Range Navigation Mode</h3>
+      <p>
+        At closer range, sensors may provide detailed target geometry.
+      </p>
+      <p>
+        The navigation system may use:
+      </p>
+      <ul>
+        <li>camera features,</li>
+        <li>optical pose,</li>
+        <li>LiDAR point clouds,</li>
+        <li>direct range,</li>
+        <li>relative attitude measurements.</li>
+      </ul>
+      <p>
+        The state may expand to:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol\omega_{rel} \end{bmatrix}. }
+        \]
+      </div>
+      <p>
+        Pose estimation becomes increasingly important.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.9 Very-Close or Terminal Navigation Mode</h3>
+      <p>
+        At very short separation, navigation requirements may become much tighter.
+      </p>
+      <p>
+        The estimator may rely strongly on:
+      </p>
+      <ul>
+        <li>precise relative pose,</li>
+        <li>low-latency sensing,</li>
+        <li>high-quality range,</li>
+        <li>close-range optical geometry.</li>
+      </ul>
+      <p>
+        At this stage, even small errors in:
+      </p>
+      <ul>
+        <li>sensor alignment,</li>
+        <li>lever arms,</li>
+        <li>timing,</li>
+        <li>target geometry</li>
+      </ul>
+      <p>
+        can become significant.
+      </p>
+      <p>
+        Therefore calibration and latency modeling become increasingly important.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.10 Mission Phase Is Not the Same as Range Alone</h3>
+      <p>
+        Range is often used to define navigation phases, but it should not be the only condition.
+      </p>
+      <p>
+        Two cases with the same range may have very different:
+      </p>
+      <ul>
+        <li>target visibility,</li>
+        <li>illumination,</li>
+        <li>pointing,</li>
+        <li>relative velocity,</li>
+        <li>sensor quality,</li>
+        <li>covariance.</li>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Mode} \neq f(\rho)\text{ only}. }
+        \]
+      </div>
+      <p>
+        A more realistic mode decision may depend on
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M = f( \rho, \mathbf P, \text{sensor validity}, \text{geometry}, \text{quality} ). }
+        \]
+      </div>
+      <div class="concept-note">
+        <h4>Range is only one variable</h4>
+        <p>A reliable transition decision should combine operating geometry and estimator quality. Two encounters at the same separation can have very different visibility, covariance, sensor quality, relative rate, and observability.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.11 Sensor Validity</h3>
+      <p>
+        Each sensor should provide a validity state.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{GNSS\_VALID} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{CAM\_VALID} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{LIDAR\_VALID} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{RANGE\_VALID}. }
+        \]
+      </div>
+      <p>
+        Validity should represent whether the measurement can reasonably be used for navigation.
+      </p>
+      <p>
+        It should not merely indicate that hardware is powered.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.12 Sensor Validity Criteria</h3>
+      <p>
+        Validity may depend on:
+      </p>
+      <ul>
+        <li>hardware health,</li>
+        <li>timestamp freshness,</li>
+        <li>field of view,</li>
+        <li>range limits,</li>
+        <li>signal quality,</li>
+        <li>feature count,</li>
+        <li>point-cloud density,</li>
+        <li>innovation statistics,</li>
+        <li>covariance,</li>
+        <li>geometry.</li>
+      </ul>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Hardware Available} \neq \text{Navigation Measurement Valid}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.13 Measurement Validity Versus Sensor Validity</h3>
+      <p>
+        These should be distinguished.
+      </p>
+      <p>
+        A sensor may be healthy overall while one particular measurement is invalid.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>one camera frame may be blurred,</li>
+        <li>one LiDAR scan may contain insufficient points,</li>
+        <li>one GNSS update may be corrupted.</li>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor Valid} \not\Rightarrow \text{Every Measurement Valid}. }
+        \]
+      </div>
+      <p>
+        Measurement-level validation should still be performed.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.14 Sensor Quality</h3>
+      <p>
+        Validity is often binary:
+      </p>
+      <div class="equation-box">
+        \[
+        0 \quad\text{or}\quad 1.
+        \]
+      </div>
+      <p>
+        Quality is often continuous.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ 0 \le Q_s \le 1 }
+        \]
+      </div>
+      <p>
+        may represent a normalized sensor-quality metric.
+      </p>
+      <p>
+        Two measurements can both be valid but have different uncertainty.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.15 Quality-Dependent Covariance</h3>
+      <p>
+        Measurement covariance may depend on quality:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf R = \mathbf R(Q_s). }
+        \]
+      </div>
+      <p>
+        For poor-quality measurements:
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf R \uparrow
+        \]
+      </div>
+      <p>
+        and therefore their Kalman gain contribution decreases.
+      </p>
+      <p>
+        This permits a smooth reduction in influence rather than an immediate hard rejection.
+      </p>
+      <div class="concept-note">
+        <h4>Covariance is the bridge between quality and fusion weight</h4>
+        <p>In a Kalman-type estimator, changing measurement covariance changes how much information a measurement contributes. This is generally more defensible than introducing arbitrary hand-tuned sensor weights.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.16 Hard Switching Versus Soft Switching</h3>
+      <p>
+        A hard switch is
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ w_A = 1, \qquad w_B = 0 }
+        \]
+      </div>
+      <p>
+        followed immediately by
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ w_A = 0, \qquad w_B = 1. }
+        \]
+      </div>
+      <p>
+        A soft transition allows
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ 0 \le w_A,w_B \le 1. }
+        \]
+      </div>
+      <p>
+        The weights change gradually according to sensor quality and uncertainty.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.17 Why Hard Switching Can Be Dangerous</h3>
+      <p>
+        Hard switching can cause:
+      </p>
+      <ul>
+        <li>state discontinuity,</li>
+        <li>covariance discontinuity,</li>
+        <li>transient control response,</li>
+        <li>estimator inconsistency.</li>
+      </ul>
+      <p>
+        Suppose two sensors estimate position as
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\mathbf r}_A
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\mathbf r}_B.
+        \]
+      </div>
+      <p>
+        If
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\mathbf r}_A \neq \hat{\mathbf r}_B,
+        \]
+      </div>
+      <p>
+        blind replacement creates an instantaneous state jump.
+      </p>
+      <p>
+        The physical spacecraft did not jump; only the navigation source changed.
+      </p>
+      <div class="concept-note">
+        <h4>The state should not jump just because the source changed</h4>
+        <p>A discontinuity at handover often indicates inconsistent frames, timing, bias, or covariance rather than a real physical change. A well-designed overlap region helps identify these mismatches before one sensor becomes dominant.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.18 Fused Transition</h3>
+      <p>
+        A continuous fusion architecture instead retains one navigation state.
+      </p>
+      <p>
+        Sensor A and sensor B both update this common state.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{One State Estimate} + \text{Changing Measurement Contributions}. }
+        \]
+      </div>
+      <p>
+        This generally avoids artificial state discontinuities.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.19 Overlapping Sensor Regions</h3>
+      <p>
+        An overlap region exists where two or more sensors are simultaneously usable.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho_{A,min} < \rho < \rho_{A,max} }
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho_{B,min} < \rho < \rho_{B,max}. }
+        \]
+      </div>
+      <p>
+        If these ranges overlap, both sensors can be compared before handover.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.20 Why Overlap Is Valuable</h3>
+      <p>
+        Overlap enables:
+      </p>
+      <ul>
+        <li>cross-validation,</li>
+        <li>calibration checks,</li>
+        <li>covariance comparison,</li>
+        <li>bias detection,</li>
+        <li>smoother transitions.</li>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor Overlap} \rightarrow \text{Reduced Handover Risk}. }
+        \]
+      </div>
+      <p>
+        Without overlap, the estimator must trust the new sensor immediately when the previous one disappears.
+      </p>
+      <div class="concept-note">
+        <h4>Overlap is both a transition and a diagnostic opportunity</h4>
+        <p>When two sensor families are simultaneously valid, the system can compare their innovations, detect relative bias, verify calibration, and confirm that the new source is statistically consistent before relying on it.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.21 Cross-Sensor Innovation</h3>
+      <p>
+        Suppose sensor A and sensor B independently estimate the same quantity.
+      </p>
+      <p>
+        A simple discrepancy is
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf d = \hat{\mathbf x}_A - \hat{\mathbf x}_B. }
+        \]
+      </div>
+      <p>
+        But raw difference alone is not enough.
+      </p>
+      <p>
+        The uncertainty of both estimates must also be considered.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.22 Statistical Cross-Check</h3>
+      <p>
+        If the estimates are independent,
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_d = \mathbf P_A + \mathbf P_B. }
+        \]
+      </div>
+      <p>
+        Then define
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ D^2 = \mathbf d^T \mathbf S_d^{-1} \mathbf d. }
+        \]
+      </div>
+      <p>
+        This provides a statistically meaningful agreement test.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.23 Sensor Bias During Handover</h3>
+      <p>
+        Two sensors may both be individually stable but differ by a constant bias.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\rho}_A = \rho+b_A
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\rho}_B = \rho+b_B.
+        \]
+      </div>
+      <p>
+        Then:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \hat{\rho}_A-\hat{\rho}_B = b_A-b_B. }
+        \]
+      </div>
+      <p>
+        A handover region can reveal this difference before full reliance on sensor B.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.24 Frame Consistency During Handover</h3>
+      <p>
+        Different sensors may report measurements in different frames.
+      </p>
+      <p>
+        Examples include:
+      </p>
+      <ul>
+        <li>inertial,</li>
+        <li>LVLH,</li>
+        <li>body,</li>
+        <li>camera,</li>
+        <li>LiDAR frame.</li>
+      </ul>
+      <p>
+        Before comparing measurements,
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{All Quantities Must Be Expressed in Consistent Frames}. }
+        \]
+      </div>
+      <p>
+        Otherwise an apparent handover bias may simply be a frame transformation error.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.25 Timestamp Consistency During Handover</h3>
+      <p>
+        Sensors may have different processing delays.
+      </p>
+      <p>
+        Suppose sensor A measurement is from time
+      </p>
+      <div class="equation-box">
+        \[
+        t_A
+        \]
+      </div>
+      <p>
+        and sensor B measurement from
+      </p>
+      <div class="equation-box">
+        \[
+        t_B.
+        \]
+      </div>
+      <p>
+        Directly comparing them without propagation can produce a false discrepancy.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Cross-Sensor Comparison} \rightarrow \text{Common Epoch}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.26 Covariance Continuity</h3>
+      <p>
+        A state handover should not produce an arbitrary covariance reset.
+      </p>
+      <p>
+        If the estimator is already maintaining covariance
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf P^-,
+        \]
+      </div>
+      <p>
+        a new sensor measurement should reduce uncertainty according to the normal Bayesian update.
+      </p>
+      <p>
+        It should not replace covariance with an unrelated value unless explicit reinitialization is intended.
+      </p>
+      <div class="concept-note">
+        <h4>State continuity is not enough</h4>
+        <p>A visually smooth handover can still be wrong if covariance becomes unrealistically small or loses important correlations. State and uncertainty must remain jointly consistent.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.27 Covariance Update Through New Sensor</h3>
+      <p>
+        For measurement matrix
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf H
+        \]
+      </div>
+      <p>
+        and measurement covariance
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf R,
+        \]
+      </div>
+      <p>
+        the Kalman gain is
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf K = \mathbf P^- \mathbf H^T ( \mathbf H\mathbf P^-\mathbf H^T+\mathbf R )^{-1}. }
+        \]
+      </div>
+      <p>
+        Then:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P^+ = (\mathbf I-\mathbf K\mathbf H)\mathbf P^-. }
+        \]
+      </div>
+      <p>
+        Thus the new sensor naturally changes uncertainty through the filter equations.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.28 Covariance Collapse During Handover</h3>
+      <p>
+        If the newly introduced sensor is assigned unrealistically small
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf R,
+        \]
+      </div>
+      <p>
+        then
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf K
+        \]
+      </div>
+      <p>
+        may become too large.
+      </p>
+      <p>
+        The filter may rapidly become overconfident.
+      </p>
+      <p>
+        This can produce:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor Handover} \rightarrow \text{Artificial Covariance Collapse}. }
+        \]
+      </div>
+      <p>
+        Therefore initial weighting of a newly activated sensor should be realistic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.29 Sensor Warm-Up</h3>
+      <p>
+        Some sensors should not be considered fully valid immediately after activation.
+      </p>
+      <p>
+        Possible reasons include:
+      </p>
+      <ul>
+        <li>thermal stabilization,</li>
+        <li>target acquisition,</li>
+        <li>GNSS reacquisition,</li>
+        <li>feature tracker initialization,</li>
+        <li>LiDAR registration convergence.</li>
+      </ul>
+      <p>
+        A sensor may therefore pass through states such as:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{OFF} \rightarrow \text{INITIALIZING} \rightarrow \text{VALID}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.30 Sensor Confidence Ramp</h3>
+      <p>
+        Instead of instantly assigning full confidence, measurement covariance may initially be inflated:
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf R_{start} > \mathbf R_{nominal}.
+        \]
+      </div>
+      <p>
+        As consistency is demonstrated,
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf R \rightarrow \mathbf R_{nominal}.
+        \]
+      </div>
+      <p>
+        This creates a controlled confidence ramp.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.31 Hysteresis in Mode Switching</h3>
+      <p>
+        Suppose the switch from mode A to mode B occurs at
+      </p>
+      <div class="equation-box">
+        \[
+        \rho<\rho_{AB}.
+        \]
+      </div>
+      <p>
+        If the spacecraft moves back and forth near that boundary, mode switching may oscillate.
+      </p>
+      <p>
+        To prevent this, use different entry and exit thresholds.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho<\rho_{enter} \Rightarrow M_B }
+        \]
+      </div>
+      <p>
+        but return only when
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho>\rho_{exit} }
+        \]
+      </div>
+      <p>
+        with
+      </p>
+      <div class="equation-box">
+        \[
+        \rho_{exit}>\rho_{enter}.
+        \]
+      </div>
+      <p>
+        This is hysteresis.
+      </p>
+      <div class="concept-note">
+        <h4>Hysteresis prevents chatter</h4>
+        <p>Separate entry and exit thresholds keep small measurement noise near a boundary from repeatedly switching the estimator between two configurations.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.32 Why Hysteresis Is Important</h3>
+      <p>
+        Without hysteresis, small measurement noise can produce repeated mode transitions:
+      </p>
+      <div class="equation-box">
+        \[
+        A\rightarrow B\rightarrow A\rightarrow B.
+        \]
+      </div>
+      <p>
+        This can cause:
+      </p>
+      <ul>
+        <li>sensor toggling,</li>
+        <li>unstable covariance,</li>
+        <li>repeated initialization,</li>
+        <li>software complexity.</li>
+      </ul>
+      <p>
+        Hysteresis creates mode stability.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.33 Dwell Time</h3>
+      <p>
+        Another way to prevent rapid switching is requiring a condition to remain true for a minimum duration.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ C(t)=1 \quad \forall t\in[t_0,t_0+T_d] }
+        \]
+      </div>
+      <p>
+        before mode transition.
+      </p>
+      <p>
+        Here
+      </p>
+      <div class="equation-box">
+        \[
+        T_d
+        \]
+      </div>
+      <p>
+        is dwell time.
+      </p>
+      <p>
+        This prevents a single noisy measurement from triggering a mode change.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.34 Combined Hysteresis and Dwell</h3>
+      <p>
+        A robust transition can require both:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Threshold Condition} + \text{Hysteresis} + \text{Dwell Time}. }
+        \]
+      </div>
+      <p>
+        This substantially reduces unwanted mode chatter.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.35 Mode Transition Guards</h3>
+      <p>
+        A transition from mode \(M_i\) to \(M_j\) should require explicit guard conditions.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ G_{ij} = C_1 \land C_2 \land C_3. }
+        \]
+      </div>
+      <p>
+        Possible conditions include:
+      </p>
+      <ul>
+        <li>range threshold,</li>
+        <li>covariance threshold,</li>
+        <li>sensor validity,</li>
+        <li>measurement quality,</li>
+        <li>acceptable relative rate.</li>
+      </ul>
+      <div class="concept-note">
+        <h4>Transitions should be earned, not assumed</h4>
+        <p>A mode change is more robust when it requires several independent conditions such as acceptable range, valid sensor status, bounded covariance, and suitable relative rate.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.36 Example Transition Guard</h3>
+      <p>
+        A general transition from mid-range to close-range sensing might require
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho<\rho_{close} }
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{LIDAR\_VALID}=1 }
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \sigma_r<\sigma_{r,max}. }
+        \]
+      </div>
+      <p>
+        Only when all conditions are met does the mode change.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.37 Navigation Mode State Machine</h3>
+      <p>
+        Mode management can be implemented as a state machine:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_1 \rightarrow M_2 \rightarrow M_3 \rightarrow M_4. }
+        \]
+      </div>
+      <p>
+        Transitions depend on guards.
+      </p>
+      <p>
+        The estimator itself can remain continuous while the allowed measurement set changes.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.38 Mode State Versus Estimator State</h3>
+      <p>
+        These are different concepts.
+      </p>
+      <p>
+        The estimator state is
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x }
+        \]
+      </div>
+      <p>
+        containing quantities such as position, velocity, attitude, and biases.
+      </p>
+      <p>
+        The navigation mode is
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M. }
+        \]
+      </div>
+      <p>
+        It determines which algorithms or measurements are currently active.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.39 Mode-Dependent Measurement Set</h3>
+      <p>
+        Let the complete sensor set be
+      </p>
+      <div class="equation-box">
+        \[
+        \mathcal S.
+        \]
+      </div>
+      <p>
+        Mode \(M_i\) may enable only subset
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathcal S_i \subseteq \mathcal S. }
+        \]
+      </div>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \mathcal S_{far} = \{ GNSS, RF \}
+        \]
+      </div>
+      <p>
+        while
+      </p>
+      <div class="equation-box">
+        \[
+        \mathcal S_{close} = \{ Camera, LiDAR, IMU \}.
+        \]
+      </div>
+      <p>
+        The exact set depends on mission architecture.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.40 Mode-Dependent Measurement Covariance</h3>
+      <p>
+        A sensor's covariance may also change with mode.
+      </p>
+      <p>
+        For example, camera measurement uncertainty may depend strongly on target range.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf R_C = \mathbf R_C(M,\rho,Q_C). }
+        \]
+      </div>
+      <p>
+        The same sensor need not use one fixed covariance in all modes.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.41 Mode-Dependent Process Noise</h3>
+      <p>
+        Process noise
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf Q
+        \]
+      </div>
+      <p>
+        may also vary.
+      </p>
+      <p>
+        During quiet coast:
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf Q_{coast}
+        \]
+      </div>
+      <p>
+        may be small.
+      </p>
+      <p>
+        During active maneuvering:
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf Q_{maneuver} > \mathbf Q_{coast}
+        \]
+      </div>
+      <p>
+        for acceleration-related states.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf Q = \mathbf Q(M). }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.42 Why Process Noise May Change During Maneuvers</h3>
+      <p>
+        During maneuvering, uncertainty can increase due to:
+      </p>
+      <ul>
+        <li>thruster magnitude uncertainty,</li>
+        <li>direction error,</li>
+        <li>timing error,</li>
+        <li>unmodeled dynamics,</li>
+        <li>structural vibration.</li>
+      </ul>
+      <p>
+        The estimator should not necessarily use the same propagation confidence as during quiescent flight.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.43 State Augmentation by Mode</h3>
+      <p>
+        Some advanced architectures may activate additional states only when needed.
+      </p>
+      <p>
+        For example, close-range mode might introduce:
+      </p>
+      <ul>
+        <li>camera alignment,</li>
+        <li>LiDAR bias,</li>
+        <li>relative attitude states.</li>
+      </ul>
+      <p>
+        However, dynamic state augmentation must be handled carefully because covariance must also be expanded consistently.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.44 Fixed-State Alternative</h3>
+      <p>
+        An alternative is to maintain one full state vector in all modes.
+      </p>
+      <p>
+        Some states may simply become weakly observable when their corresponding sensors are unavailable.
+      </p>
+      <p>
+        This simplifies software but may increase computational load.
+      </p>
+      <p>
+        There is no universal choice.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.45 Sensor Enabling Versus Measurement Acceptance</h3>
+      <p>
+        A sensor may be enabled but its measurements still rejected.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \texttt{CAM\_ENABLED}=1
+        \]
+      </div>
+      <p>
+        while
+      </p>
+      <div class="equation-box">
+        \[
+        \texttt{CAM\_MEAS\_ACCEPTED}=0.
+        \]
+      </div>
+      <p>
+        This distinction is useful because acquisition can remain active even when current data is not trustworthy.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.46 Measurement Gating During Handover</h3>
+      <p>
+        Newly introduced sensors should still pass innovation gating.
+      </p>
+      <p>
+        For innovation
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf r
+        \]
+      </div>
+      <p>
+        and covariance
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf S,
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathrm{NIS} = \mathbf r^T \mathbf S^{-1} \mathbf r. }
+        \]
+      </div>
+      <p>
+        A sensor should not bypass statistical validation simply because the state machine expects it to become active.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.47 Gate Tightness During Initial Acquisition</h3>
+      <p>
+        Immediately after acquisition, predicted state uncertainty may be relatively large.
+      </p>
+      <p>
+        Therefore the expected innovation covariance may also be large.
+      </p>
+      <p>
+        A gate based on
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf S
+        \]
+      </div>
+      <p>
+        naturally accounts for this.
+      </p>
+      <p>
+        Fixed residual thresholds are generally less meaningful than normalized statistical thresholds.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.48 Sensor Confirmation Before Handover</h3>
+      <p>
+        A new sensor may be required to pass
+      </p>
+      <div class="equation-box">
+        \[
+        N_c
+        \]
+      </div>
+      <p>
+        consecutive validation checks before becoming fully trusted.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Valid}_{k-N_c+1:k} \Rightarrow \text{Enable Full Fusion}. }
+        \]
+      </div>
+      <p>
+        This avoids switching based on one fortunate measurement.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.49 Consecutive-Failure Logic</h3>
+      <p>
+        Similarly, a sensor need not be disabled after one rejected measurement.
+      </p>
+      <p>
+        A logic may require
+      </p>
+      <div class="equation-box">
+        \[
+        N_f
+        \]
+      </div>
+      <p>
+        consecutive or repeated failures.
+      </p>
+      <p>
+        This distinguishes:
+      </p>
+      <ul>
+        <li>isolated outlier,</li>
+        <li>persistent sensor degradation.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.50 Confidence Counter</h3>
+      <p>
+        One practical mechanism is a confidence score
+      </p>
+      <div class="equation-box">
+        \[
+        c_s.
+        \]
+      </div>
+      <p>
+        For valid measurements:
+      </p>
+      <div class="equation-box">
+        \[
+        c_s\leftarrow c_s+1.
+        \]
+      </div>
+      <p>
+        For invalid measurements:
+      </p>
+      <div class="equation-box">
+        \[
+        c_s\leftarrow c_s-1.
+        \]
+      </div>
+      <p>
+        Sensor activation or isolation can depend on threshold values of \(c_s\).
+      </p>
+      <p>
+        This provides persistence without requiring a complex probabilistic health model.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.51 Probabilistic Sensor Health</h3>
+      <p>
+        A more advanced system may maintain
+      </p>
+      <div class="equation-box">
+        \[
+        P(H_s|\mathcal Z)
+        \]
+      </div>
+      <p>
+        where
+      </p>
+      <div class="equation-box">
+        \[
+        H_s
+        \]
+      </div>
+      <p>
+        represents sensor health.
+      </p>
+      <p>
+        Then fusion weight can depend on the probability that the sensor is healthy.
+      </p>
+      <p>
+        This creates a probabilistic alternative to binary validity logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.52 Handover and FDIR</h3>
+      <p>
+        Sensor handover interacts strongly with Fault Detection, Isolation and Recovery.
+      </p>
+      <p>
+        Suppose sensor A is degrading.
+      </p>
+      <p>
+        The system may:
+      </p>
+      <ol>
+        <li>detect inconsistent measurements,</li>
+        <li>reduce sensor A weight,</li>
+        <li>increase reliance on sensor B,</li>
+        <li>isolate sensor A if evidence persists.</li>
+      </ol>
+      <p>
+        Thus handover can form part of fault recovery.
+      </p>
+      <div class="concept-note">
+        <h4>Handover can also be a recovery mechanism</h4>
+        <p>Nominal handover is planned, while fault-driven handover is reactive. The estimator should support both without confusing an expected mission transition with a sensor fault response.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.53 Planned Versus Fault-Driven Handover</h3>
+      <p>
+        Two different situations exist.
+      </p>
+      <h4>Planned handover</h4>
+      <p>
+        Occurs because operating conditions change normally.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \text{Long Range} \rightarrow \text{Close Range}.
+        \]
+      </div>
+      <h4>Fault-driven handover</h4>
+      <p>
+        Occurs because the active sensor becomes unreliable.
+      </p>
+      <p>
+        These transitions should not necessarily use identical logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.54 Planned Handover</h3>
+      <p>
+        A planned handover can use predictable conditions such as:
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>mission phase,</li>
+        <li>sensor geometry.</li>
+      </ul>
+      <p>
+        This permits:
+      </p>
+      <ul>
+        <li>sensor pre-activation,</li>
+        <li>warm-up,</li>
+        <li>overlap,</li>
+        <li>cross-validation.</li>
+      </ul>
+      <p>
+        Therefore planned handovers can be relatively smooth.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.55 Fault-Driven Handover</h3>
+      <p>
+        A fault-driven handover may occur suddenly.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor A Fault} \rightarrow \text{Immediate Reliance on Sensor B}. }
+        \]
+      </div>
+      <p>
+        There may be little or no overlap.
+      </p>
+      <p>
+        The estimator must therefore preserve conservative covariance and possibly enter degraded navigation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.56 Degraded Navigation Mode</h3>
+      <p>
+        If the preferred sensor suite is unavailable, the system may enter
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_{degraded}. }
+        \]
+      </div>
+      <p>
+        In this mode:
+      </p>
+      <ul>
+        <li>fewer measurements are available,</li>
+        <li>covariance grows faster,</li>
+        <li>tighter validity monitoring may be required,</li>
+        <li>guidance constraints may become more conservative.</li>
+      </ul>
+      <p>
+        The exact downstream response depends on mission design.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.57 Covariance as a Mode Trigger</h3>
+      <p>
+        Navigation mode can depend directly on uncertainty.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \sigma_r < \sigma_{req} }
+        \]
+      </div>
+      <p>
+        may be required before entering a more demanding close-range mode.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Estimated Range Alone} \neq \text{Enough for Mode Transition}. }
+        \]
+      </div>
+      <p>
+        The estimator must also know the range accurately enough.
+      </p>
+      <div class="concept-note">
+        <h4>Knowing the range is not the same as knowing it well</h4>
+        <p>A spacecraft may satisfy a geometric range threshold while the uncertainty in that range is still too large for the next phase. Mode readiness should therefore depend on covariance as well as the estimated state.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.58 Position-Covariance Trigger</h3>
+      <p>
+        Suppose
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf P_r
+        \]
+      </div>
+      <p>
+        is relative-position covariance.
+      </p>
+      <p>
+        A condition may be
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \lambda_{\max}(\mathbf P_r) < P_{max}. }
+        \]
+      </div>
+      <p>
+        This ensures uncertainty is bounded in every principal position direction.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.59 Velocity-Covariance Trigger</h3>
+      <p>
+        Similarly:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \lambda_{\max}(\mathbf P_v) < V_{max}. }
+        \]
+      </div>
+      <p>
+        This can prevent transition into a mode requiring precise relative-velocity knowledge when velocity remains uncertain.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.60 Attitude-Covariance Trigger</h3>
+      <p>
+        For close-range pose operation:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \sigma_{\theta} < \sigma_{\theta,max} }
+        \]
+      </div>
+      <p>
+        may be required.
+      </p>
+      <p>
+        Thus relative-attitude knowledge can become part of mode-entry logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.61 Sensor Geometry as a Mode Trigger</h3>
+      <p>
+        A sensor may be technically available but geometrically poor.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>camera sees nearly symmetric target geometry,</li>
+        <li>LiDAR sees only a flat surface,</li>
+        <li>GNSS geometry is weak.</li>
+      </ul>
+      <p>
+        Therefore mode logic may include observability or geometry metrics.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.62 Geometry Quality Metric</h3>
+      <p>
+        Suppose information matrix is
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf\Lambda = \mathbf H^T \mathbf R^{-1} \mathbf H.
+        \]
+      </div>
+      <p>
+        Small eigenvalues indicate weakly constrained directions.
+      </p>
+      <p>
+        A geometry metric may use
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \lambda_{\min}(\mathbf\Lambda). }
+        \]
+      </div>
+      <p>
+        This can help decide whether a sensor is suitable for the next navigation phase.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.63 Observability-Based Mode Switching</h3>
+      <p>
+        A more advanced transition may require
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathcal O > \mathcal O_{min} }
+        \]
+      </div>
+      <p>
+        where
+      </p>
+      <div class="equation-box">
+        \[
+        \mathcal O
+        \]
+      </div>
+      <p>
+        represents an observability metric.
+      </p>
+      <p>
+        This prevents switching to a measurement configuration that cannot adequately estimate required states.
+      </p>
+      <div class="concept-note">
+        <h4>Information geometry matters</h4>
+        <p>A sensor can be valid and low-noise yet still provide weak information about one or more required state directions. Observability metrics help prevent switching into a configuration that cannot support the required states.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.64 Mode-Dependent Navigation Requirements</h3>
+      <p>
+        Different modes may have different accuracy requirements.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \sigma_{r,far} > \sigma_{r,mid} > \sigma_{r,close}.
+        \]
+      </div>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Navigation Requirement} = f(M). }
+        \]
+      </div>
+      <p>
+        A solution valid in far-range mode may not be valid for close-range operations.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.65 Navigation Validity by Mode</h3>
+      <p>
+        Define
+      </p>
+      <div class="equation-box">
+        \[
+        \texttt{NAV\_VALID}.
+        \]
+      </div>
+      <p>
+        Its threshold may depend on mode.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{NAV\_VALID} = 1 }
+        \]
+      </div>
+      <p>
+        only if
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf P
+        \]
+      </div>
+      <p>
+        satisfies the uncertainty limits required for the current mode.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.66 Mode-Dependent Innovation Thresholds</h3>
+      <p>
+        Measurement statistics may also differ between modes.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>camera pose uncertainty may shrink with range,</li>
+        <li>LiDAR registration quality may improve at close range.</li>
+      </ul>
+      <p>
+        Therefore the statistical model should reflect the current operating condition rather than use arbitrary constant limits.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.67 Mode Transition and Navigation Reset</h3>
+      <p>
+        A mode transition should normally not reset the entire estimator.
+      </p>
+      <p>
+        If the state estimate is already valid, the preferred approach is usually:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Continue State} + \text{Change Measurement Configuration}. }
+        \]
+      </div>
+      <p>
+        Full reinitialization should be reserved for cases where continuity cannot be maintained.
+      </p>
+      <div class="concept-note">
+        <h4>Mode change is not filter restart</h4>
+        <p>Unless the current estimate is invalid, retaining the existing state and changing only the active measurement configuration usually preserves accumulated information and avoids unnecessary transients.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.68 Why Reinitializing at Every Mode Change Is Risky</h3>
+      <p>
+        Frequent reset can cause:
+      </p>
+      <ul>
+        <li>loss of accumulated calibration,</li>
+        <li>covariance discontinuity,</li>
+        <li>transient errors,</li>
+        <li>loss of correlation information.</li>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Mode Change} \neq \text{Estimator Restart}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.69 Partial Reinitialization</h3>
+      <p>
+        Sometimes only part of the estimator must be initialized.
+      </p>
+      <p>
+        For example, when optical pose becomes available, relative attitude may be initialized while position and velocity continue from the existing filter.
+      </p>
+      <p>
+        This can be safer than restarting the entire state.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.70 Sensor Handover and State Correlation</h3>
+      <p>
+        Suppose sensor B pose is derived using sensor A information.
+      </p>
+      <p>
+        Then the two measurements are correlated.
+      </p>
+      <p>
+        Fusing both as independent during overlap can double-count information.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Overlap} \neq \text{Automatic Independence}. }
+        \]
+      </div>
+      <p>
+        Cross-correlation must be understood.
+      </p>
+      <div class="concept-note">
+        <h4>Overlap does not imply independence</h4>
+        <p>If two estimates share underlying measurements or common processing, treating them as independent can double-count information and make covariance too optimistic.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.71 Independent Sensor Cross-Validation</h3>
+      <p>
+        Cross-validation is strongest when two measurements have sufficiently independent failure modes.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>camera bearing,</li>
+        <li>LiDAR range,</li>
+      </ul>
+      <p>
+        can provide valuable independent geometric checks.
+      </p>
+      <p>
+        Two outputs derived from the same camera image do not provide the same level of redundancy.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.72 Handover and Redundancy</h3>
+      <p>
+        Sensor overlap naturally introduces redundancy.
+      </p>
+      <p>
+        For a period,
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor A} + \text{Sensor B} }
+        \]
+      </div>
+      <p>
+        may both observe the same state.
+      </p>
+      <p>
+        This redundancy can support:
+      </p>
+      <ul>
+        <li>validation,</li>
+        <li>fault isolation,</li>
+        <li>graceful degradation.</li>
+      </ul>
+      <p>
+        This connects directly to the next topic on multi-sensor redundancy.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.73 Multiple Simultaneous Sensors</h3>
+      <p>
+        A mode does not have to contain only one dominant sensor.
+      </p>
+      <p>
+        A close-range mode may use:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} + \text{IMU} + \text{Other Valid Measurements}. }
+        \]
+      </div>
+      <p>
+        Sensor handover can therefore mean changing the <strong>composition of the fusion set</strong>, not merely replacing one sensor with another.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.74 Sensor Priority</h3>
+      <p>
+        Some architectures assign sensor priority.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ Priority_A > Priority_B. }
+        \]
+      </div>
+      <p>
+        However, fixed priority can be inferior to uncertainty-based fusion.
+      </p>
+      <p>
+        A lower-priority sensor may actually be more informative under certain geometry or quality conditions.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.75 Covariance-Based Sensor Dominance</h3>
+      <p>
+        In Kalman-type fusion, dominance emerges naturally from uncertainty.
+      </p>
+      <p>
+        If
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf R_A < \mathbf R_B
+        \]
+      </div>
+      <p>
+        in relevant directions, sensor A contributes more strongly.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor Dominance} \approx \text{Information Dominance}. }
+        \]
+      </div>
+      <p>
+        This is preferable to arbitrary software priority when valid covariance models exist.
+      </p>
+      <div class="concept-note">
+        <h4>Dominance should emerge from information quality</h4>
+        <p>When measurement models and covariances are realistic, the estimator naturally gives greater influence to the sensor that contributes more useful information in the currently observable directions.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.76 Mode-Dependent Sensor Weighting</h3>
+      <p>
+        Let a measurement covariance be
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf R_s(M).
+        \]
+      </div>
+      <p>
+        Then the same sensor can be trusted differently in different modes.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf R_{camera,far} > \mathbf R_{camera,close} }
+        \]
+      </div>
+      <p>
+        for pose-related quantities if target image resolution improves at shorter range.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.77 Range-Dependent Weighting</h3>
+      <p>
+        A smooth covariance model may use
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf R_s = \mathbf R_s(\rho). }
+        \]
+      </div>
+      <p>
+        This allows the estimator to adjust measurement weighting continuously as separation changes.
+      </p>
+      <p>
+        It can reduce the need for abrupt mode-specific weight changes.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.78 Quality-Dependent Weighting</h3>
+      <p>
+        Similarly:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf R_s = \mathbf R_s(Q_s). }
+        \]
+      </div>
+      <p>
+        A valid but low-quality sensor can remain in the fusion architecture while contributing less information.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.79 Combined Weighting Model</h3>
+      <p>
+        More generally:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf R_s = \mathbf R_s( \rho, Q_s, M, \text{geometry} ). }
+        \]
+      </div>
+      <p>
+        This allows the measurement model to reflect actual operating conditions.
+      </p>
+      <p>
+        However, such adaptive covariance requires careful calibration.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.80 Avoiding Arbitrary Weighting</h3>
+      <p>
+        Measurement covariance should not be changed simply to obtain a visually smoother trajectory.
+      </p>
+      <p>
+        The covariance should represent expected measurement uncertainty.
+      </p>
+      <p>
+        Otherwise:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Smooth Output} \not\Rightarrow \text{Statistically Correct Estimator}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.81 Handover and Innovation Monitoring</h3>
+      <p>
+        During a handover, innovation statistics should be monitored closely.
+      </p>
+      <p>
+        For sensor A:
+      </p>
+      <div class="equation-box">
+        \[
+        \mathrm{NIS}_A
+        \]
+      </div>
+      <p>
+        and sensor B:
+      </p>
+      <div class="equation-box">
+        \[
+        \mathrm{NIS}_B.
+        \]
+      </div>
+      <p>
+        If sensor B consistently disagrees while sensor A remains consistent, handover should be delayed.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.82 Handover Readiness</h3>
+      <p>
+        A sensor can be declared ready when:
+      </p>
+      <ul>
+        <li>it is valid,</li>
+        <li>its measurement quality is adequate,</li>
+        <li>its innovations are statistically consistent,</li>
+        <li>geometry is acceptable,</li>
+        <li>covariance requirements are met.</li>
+      </ul>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor Ready} = \text{Available} + \text{Consistent} + \text{Informative}. }
+        \]
+      </div>
+      <div class="concept-note">
+        <h4>Availability is only the first check</h4>
+        <p>A sensor is truly ready for handover only when it is producing valid, informative, statistically consistent measurements with acceptable geometry and uncertainty.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.83 Handover Completion Criteria</h3>
+      <p>
+        Transition completion may require:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{NEW\_SENSOR\_VALID}=1 }
+        \]
+      </div>
+      <p>
+        for a minimum duration, plus
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathrm{NIS}<\gamma }
+        \]
+      </div>
+      <p>
+        and suitable covariance.
+      </p>
+      <p>
+        Only then may the previous sensor be removed from the active set.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.84 Sensor Removal</h3>
+      <p>
+        A previous sensor should not necessarily be disabled immediately after the new one becomes dominant.
+      </p>
+      <p>
+        It may remain active for:
+      </p>
+      <ul>
+        <li>monitoring,</li>
+        <li>redundancy,</li>
+        <li>cross-checking.</li>
+      </ul>
+      <p>
+        A distinction can be made between:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Primary Measurement Source} }
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Monitoring Source}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.85 Sensor Standby Mode</h3>
+      <p>
+        A sensor may operate in standby.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{OFF} \rightarrow \text{STANDBY} \rightarrow \text{ACTIVE}. }
+        \]
+      </div>
+      <p>
+        Standby can reduce power while allowing faster reactivation than a complete shutdown.
+      </p>
+      <p>
+        This can be useful for fault recovery or mode reversal.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.86 Reverse Handover</h3>
+      <p>
+        Mission conditions may reverse.
+      </p>
+      <p>
+        For example, separation may increase again.
+      </p>
+      <p>
+        Therefore handover logic should support:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_j \rightarrow M_i }
+        \]
+      </div>
+      <p>
+        when appropriate.
+      </p>
+      <p>
+        Reverse transitions should use their own thresholds and validity checks.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.87 Mode Hysteresis for Reverse Transitions</h3>
+      <p>
+        If transition into close-range mode occurs at
+      </p>
+      <div class="equation-box">
+        \[
+        \rho<\rho_{in},
+        \]
+      </div>
+      <p>
+        return to mid-range mode may occur only at
+      </p>
+      <div class="equation-box">
+        \[
+        \rho>\rho_{out}
+        \]
+      </div>
+      <p>
+        where
+      </p>
+      <div class="equation-box">
+        \[
+        \rho_{out}>\rho_{in}.
+        \]
+      </div>
+      <p>
+        This prevents repeated mode reversal near a boundary.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.88 Sensor Loss During Transition</h3>
+      <p>
+        A newly introduced sensor may fail while the previous sensor is still active.
+      </p>
+      <p>
+        The system should be able to abort handover and remain in the previous mode.
+      </p>
+      <p>
+        Thus transition itself can have states such as:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{PREPARE} \rightarrow \text{VALIDATE} \rightarrow \text{COMMIT}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.89 Transaction-Like Handover</h3>
+      <p>
+        A useful conceptual model is:
+      </p>
+      <ol>
+        <li>prepare new sensor,</li>
+        <li>validate it,</li>
+        <li>compare against current solution,</li>
+        <li>gradually increase influence,</li>
+        <li>commit transition.</li>
+      </ol>
+      <p>
+        If any validation step fails, return to the previous stable mode.
+      </p>
+      <p>
+        This avoids incomplete handovers.
+      </p>
+      <div class="concept-note">
+        <h4>Prepare–validate–commit</h4>
+        <p>This structure is useful because it gives the system a stable rollback point. If acquisition or validation fails, the previous mode remains intact instead of leaving the navigation system in a partially transitioned configuration.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.90 Sensor Handover State Machine</h3>
+      <p>
+        A detailed handover may contain states:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{INACTIVE} \rightarrow \text{ACQUIRING} \rightarrow \text{VALIDATING} \rightarrow \text{FUSING} \rightarrow \text{PRIMARY}. }
+        \]
+      </div>
+      <p>
+        This is separate from the spacecraft mission-mode state machine.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.91 Mode Management Architecture</h3>
+      <p>
+        A navigation system may therefore contain two interacting logic layers:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Mission / Navigation Mode Manager} }
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor Health / Handover Manager}. }
+        \]
+      </div>
+      <p>
+        The first decides what capability is needed.
+      </p>
+      <p>
+        The second decides which sensors can safely provide it.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.92 Estimator Configuration Manager</h3>
+      <p>
+        A configuration manager may determine:
+      </p>
+      <ul>
+        <li>active sensors,</li>
+        <li>covariance models,</li>
+        <li>filter gains indirectly through <code>R</code>,</li>
+        <li>process noise,</li>
+        <li>validity thresholds,</li>
+        <li>output requirements.</li>
+      </ul>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M \rightarrow \mathcal C_{estimator}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.93 Configuration Consistency</h3>
+      <p>
+        Mode transition should be deterministic and traceable.
+      </p>
+      <p>
+        For each mode, define clearly:
+      </p>
+      <ul>
+        <li>enabled measurements,</li>
+        <li>measurement frames,</li>
+        <li>covariance models,</li>
+        <li>expected update rates,</li>
+        <li>thresholds,</li>
+        <li>validity criteria.</li>
+      </ul>
+      <p>
+        This reduces software ambiguity.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.94 Mode-Dependent Measurement Frames</h3>
+      <p>
+        Different sensors may naturally produce different frames.
+      </p>
+      <p>
+        Mode configuration should explicitly define how measurements map into the estimator state frame.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf z^{sensor} \rightarrow \mathbf z^{navigation}. }
+        \]
+      </div>
+      <p>
+        Frame transformations should not be hidden inside undocumented handover logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.95 Mode-Dependent Lever Arms</h3>
+      <p>
+        At close range, sensor lever arms may become more significant.
+      </p>
+      <p>
+        Therefore a sensor enabled only in close-range mode may require more detailed geometric modeling than sensors used at long range.
+      </p>
+      <p>
+        The measurement model should include the appropriate lever arm from the moment the sensor is activated.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.96 Mode-Dependent Latency</h3>
+      <p>
+        Different navigation modes may use sensors with very different processing delays.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>GNSS state update,</li>
+        <li>camera pose estimate,</li>
+        <li>LiDAR point-cloud registration.</li>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \Delta t_s = \Delta t_s(M) }
+        \]
+      </div>
+      <p>
+        in practice because active sensor set changes with mode.
+      </p>
+      <p>
+        The estimator must still apply each measurement at its true epoch.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.97 Delayed Measurements During Handover</h3>
+      <p>
+        A sensor may become active but deliver measurements that correspond to earlier times.
+      </p>
+      <p>
+        If the filter simply applies them at arrival time, the handover can appear biased.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{New Sensor Activation} \not\Rightarrow \text{Zero Latency}. }
+        \]
+      </div>
+      <p>
+        Time alignment is part of handover validation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.98 Handover and Out-of-Sequence Updates</h3>
+      <p>
+        If a delayed measurement belongs to time
+      </p>
+      <div class="equation-box">
+        \[
+        t_m<t_k,
+        \]
+      </div>
+      <p>
+        the estimator may require:
+      </p>
+      <ol>
+        <li>historical state storage,</li>
+        <li>update at \(t_m\),</li>
+        <li>repropagation to \(t_k\).</li>
+      </ol>
+      <p>
+        This becomes especially relevant when newly activated vision or LiDAR processing has significant latency.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.99 Handover and Filter Consistency</h3>
+      <p>
+        A handover should not be judged only by continuity of the state estimate.
+      </p>
+      <p>
+        Covariance consistency must also be maintained.
+      </p>
+      <p>
+        Therefore evaluate:
+      </p>
+      <ul>
+        <li>NIS,</li>
+        <li>NEES in simulation,</li>
+        <li>\(3\sigma\) coverage,</li>
+        <li>innovation mean.</li>
+      </ul>
+      <p>
+        A smooth-looking handover can still be statistically inconsistent.
+      </p>
+      <div class="concept-note">
+        <h4>Smooth does not automatically mean correct</h4>
+        <p>A handover may look visually continuous while the covariance is inconsistent. Statistical checks such as NIS and NEES are therefore essential during verification.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.100 Handover Error Metric</h3>
+      <p>
+        Define pre-handover state estimate
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\mathbf x}^{-}
+        \]
+      </div>
+      <p>
+        and post-handover state
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\mathbf x}^{+}.
+        \]
+      </div>
+      <p>
+        A handover jump can be measured as
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \Delta\mathbf x_{HO} = \hat{\mathbf x}^{+} - \hat{\mathbf x}^{-}. }
+        \]
+      </div>
+      <p>
+        For attitude, use a multiplicative rotation error rather than direct quaternion subtraction.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.101 Position Handover Jump</h3>
+      <p>
+        For position:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \Delta\mathbf r_{HO} = \hat{\mathbf r}^{+} - \hat{\mathbf r}^{-}. }
+        \]
+      </div>
+      <p>
+        A large jump may indicate:
+      </p>
+      <ul>
+        <li>sensor bias,</li>
+        <li>frame mismatch,</li>
+        <li>timing mismatch,</li>
+        <li>covariance inconsistency.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.102 Velocity Handover Jump</h3>
+      <p>
+        Similarly:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \Delta\mathbf v_{HO} = \hat{\mathbf v}^{+} - \hat{\mathbf v}^{-}. }
+        \]
+      </div>
+      <p>
+        Velocity jumps can strongly affect guidance and control because they change predicted closing motion immediately.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.103 Attitude Handover Jump</h3>
+      <p>
+        Define quaternion difference:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf q_{HO} = \mathbf q^{+} \otimes (\mathbf q^{-})^{-1}. }
+        \]
+      </div>
+      <p>
+        Then:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \Delta\theta_{HO} = 2\cos^{-1}(|\delta q_{0,HO}|). }
+        \]
+      </div>
+      <p>
+        This measures attitude discontinuity across handover.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.104 Covariance Jump Metric</h3>
+      <p>
+        One can also monitor
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \Delta\mathbf P = \mathbf P^{+} - \mathbf P^{-}. }
+        \]
+      </div>
+      <p>
+        A sudden large decrease in uncertainty should be justified by genuine new information.
+      </p>
+      <p>
+        Otherwise it may indicate overconfident tuning.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.105 Handover Transient</h3>
+      <p>
+        Even if no instantaneous jump occurs, the new sensor may produce a transient correction over several updates.
+      </p>
+      <p>
+        Therefore handover performance should include:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ T_{settle}. }
+        \]
+      </div>
+      <p>
+        This is the time required for state error and covariance to settle after sensor transition.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.106 Overshoot During Handover</h3>
+      <p>
+        The state estimate may temporarily move past the true state after introducing a strongly weighted sensor.
+      </p>
+      <p>
+        A useful metric is maximum transient error:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ e_{max,HO}. }
+        \]
+      </div>
+      <p>
+        This should be tested under realistic sensor biases and initialization errors.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.107 Handover Failure</h3>
+      <p>
+        A handover can be considered unsuccessful if:
+      </p>
+      <ul>
+        <li>new sensor cannot maintain lock,</li>
+        <li>innovations remain inconsistent,</li>
+        <li>state uncertainty increases excessively,</li>
+        <li>navigation validity is lost.</li>
+      </ul>
+      <p>
+        The system should then return to a safe supported mode if possible.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.108 Handover Abort</h3>
+      <p>
+        A handover process may therefore include
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{HANDOVER\_ABORT}. }
+        \]
+      </div>
+      <p>
+        This means the new sensor is not yet acceptable and the estimator remains with the previous valid configuration.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.109 Fallback Navigation Mode</h3>
+      <p>
+        If both old and new sensors are unavailable, enter a fallback mode.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{External Sensors Lost} \rightarrow \text{Propagation-Only / Degraded Mode}. }
+        \]
+      </div>
+      <p>
+        Covariance should grow appropriately.
+      </p>
+      <div class="concept-note">
+        <h4>Fallback should be explicit</h4>
+        <p>A degraded mode should deliberately represent reduced sensing capability, larger uncertainty, and tighter downstream permissions rather than pretending that nominal navigation quality still exists.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.110 Mode-Dependent Guidance Interface</h3>
+      <p>
+        Guidance should ideally receive a consistent state interface regardless of navigation mode.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \hat{\mathbf r}_{rel}, \hat{\mathbf v}_{rel}, \hat{\mathbf q}_{rel}, \mathbf P. }
+        \]
+      </div>
+      <p>
+        Guidance should not need to know whether the current measurement came from GNSS, camera, or LiDAR.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.111 Navigation Mode Flag</h3>
+      <p>
+        The estimator may publish
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{NAV\_MODE}. }
+        \]
+      </div>
+      <p>
+        Possible values might represent:
+      </p>
+      <ul>
+        <li>FAR,</li>
+        <li>MID,</li>
+        <li>CLOSE,</li>
+        <li>DEGRADED.</li>
+      </ul>
+      <p>
+        This tells downstream software how the solution is currently being generated.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.112 Sensor Contribution Flags</h3>
+      <p>
+        The estimator may also publish
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{GNSS\_USED}, \texttt{CAM\_USED}, \texttt{LIDAR\_USED}. }
+        \]
+      </div>
+      <p>
+        This distinguishes sensor availability from actual participation in the update.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.113 Navigation Quality Output</h3>
+      <p>
+        A downstream interface may include:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \{ \hat{\mathbf x}, \mathbf P, \texttt{NAV\_VALID}, \texttt{NAV\_MODE}, \texttt{SENSOR\_STATUS} \}. }
+        \]
+      </div>
+      <p>
+        This allows guidance and autonomy logic to make uncertainty-aware decisions.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.114 Mode Transition Logging</h3>
+      <p>
+        Every transition should be logged with:
+      </p>
+      <ul>
+        <li>previous mode,</li>
+        <li>new mode,</li>
+        <li>timestamp,</li>
+        <li>trigger condition,</li>
+        <li>sensor status,</li>
+        <li>covariance.</li>
+      </ul>
+      <p>
+        This is extremely useful for:
+      </p>
+      <ul>
+        <li>debugging,</li>
+        <li>verification,</li>
+        <li>post-flight analysis.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.115 Handover Verification</h3>
+      <p>
+        Testing should verify:
+      </p>
+      <ul>
+        <li>state continuity,</li>
+        <li>covariance continuity,</li>
+        <li>innovation consistency,</li>
+        <li>correct sensor activation,</li>
+        <li>correct sensor deactivation,</li>
+        <li>hysteresis,</li>
+        <li>dwell time,</li>
+        <li>fallback behavior.</li>
+      </ul>
+      <p>
+        Mode logic should be tested independently from nominal filter equations.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.116 Deterministic Handover Testing</h3>
+      <p>
+        Begin with deterministic simulations.
+      </p>
+      <p>
+        Use:
+      </p>
+      <ul>
+        <li>fixed initial state,</li>
+        <li>fixed sensor timing,</li>
+        <li>no random noise.</li>
+      </ul>
+      <p>
+        This allows checking the logic itself.
+      </p>
+      <p>
+        Only after the deterministic sequence is correct should random uncertainty be introduced.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.117 Monte Carlo Handover Testing</h3>
+      <p>
+        Randomize:
+      </p>
+      <ul>
+        <li>sensor noise,</li>
+        <li>sensor bias,</li>
+        <li>timing delay,</li>
+        <li>activation range,</li>
+        <li>dropout,</li>
+        <li>alignment error,</li>
+        <li>initial covariance.</li>
+      </ul>
+      <p>
+        Then evaluate transition performance statistically.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.118 Monte Carlo Handover Metrics</h3>
+      <p>
+        Useful metrics include:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \Delta r_{HO}, \quad \Delta v_{HO}, \quad \Delta\theta_{HO}, \quad T_{settle}, \quad e_{max,HO}. }
+        \]
+      </div>
+      <p>
+        Also record:
+      </p>
+      <ul>
+        <li>successful handover rate,</li>
+        <li>aborted handovers,</li>
+        <li>invalid-navigation duration.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.119 Sensor Availability Monte Carlo</h3>
+      <p>
+        Randomize sensor availability windows.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>camera acquisition delayed,</li>
+        <li>LiDAR unavailable temporarily,</li>
+        <li>GNSS lost earlier than expected.</li>
+      </ul>
+      <p>
+        This tests whether the mode logic depends too strongly on one nominal sequence.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.120 Threshold Sensitivity</h3>
+      <p>
+        Transition thresholds such as
+      </p>
+      <div class="equation-box">
+        \[
+        \rho_{switch}
+        \]
+      </div>
+      <p>
+        should be varied.
+      </p>
+      <p>
+        Evaluate whether small threshold changes produce large changes in estimator performance.
+      </p>
+      <p>
+        A very sensitive mode architecture may be difficult to operate robustly.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.121 Dwell-Time Sensitivity</h3>
+      <p>
+        Similarly vary
+      </p>
+      <div class="equation-box">
+        \[
+        T_d.
+        \]
+      </div>
+      <p>
+        If \(T_d\) is too small:
+      </p>
+      <ul>
+        <li>chatter may occur.</li>
+      </ul>
+      <p>
+        If too large:
+      </p>
+      <ul>
+        <li>useful sensor transitions may be delayed.</li>
+      </ul>
+      <p>
+        Therefore dwell time should be chosen based on sensor update rate and transition dynamics.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.122 Hysteresis Sensitivity</h3>
+      <p>
+        Let hysteresis width be
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \Delta\rho_H = \rho_{exit} - \rho_{enter}. }
+        \]
+      </div>
+      <p>
+        A very small width may not suppress chatter.
+      </p>
+      <p>
+        A very large width may delay legitimate reverse transitions.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.123 Measurement-Quality Threshold Testing</h3>
+      <p>
+        Sensor activation may depend on quality threshold
+      </p>
+      <div class="equation-box">
+        \[
+        Q_s>Q_{min}.
+        \]
+      </div>
+      <p>
+        Vary \(Q_{min}\) to evaluate the tradeoff between:
+      </p>
+      <ul>
+        <li>early sensor use,</li>
+        <li>measurement reliability.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.124 Innovation-Gate Sensitivity</h3>
+      <p>
+        Similarly, vary gate threshold
+      </p>
+      <div class="equation-box">
+        \[
+        \gamma.
+        \]
+      </div>
+      <p>
+        A very tight gate can reject valid new sensor measurements.
+      </p>
+      <p>
+        A very loose gate can allow poor measurements to influence the handover.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.125 Mode-Transition Latency</h3>
+      <p>
+        A transition decision itself may be delayed by:
+      </p>
+      <ul>
+        <li>sensor processing,</li>
+        <li>software scheduling,</li>
+        <li>validity confirmation.</li>
+      </ul>
+      <p>
+        Define
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ T_{transition}. }
+        \]
+      </div>
+      <p>
+        This is the time between the physical condition becoming suitable and the new mode becoming operational.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.126 Pre-Activation</h3>
+      <p>
+        To reduce transition latency, sensors can be activated before they are strictly required.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho<\rho_{pre} \Rightarrow \text{Start Sensor Acquisition} }
+        \]
+      </div>
+      <p>
+        with
+      </p>
+      <div class="equation-box">
+        \[
+        \rho_{pre} > \rho_{switch}.
+        \]
+      </div>
+      <p>
+        This allows acquisition and validation before the actual handover point.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.127 Pre-Activation Region</h3>
+      <p>
+        The sequence becomes:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Inactive} \rightarrow \text{Pre-Activated} \rightarrow \text{Validated} \rightarrow \text{Primary}. }
+        \]
+      </div>
+      <p>
+        This is particularly useful for sensors requiring acquisition time.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.128 Sensor Resource Constraints</h3>
+      <p>
+        Sensors consume:
+      </p>
+      <ul>
+        <li>power,</li>
+        <li>computation,</li>
+        <li>communication bandwidth.</li>
+      </ul>
+      <p>
+        Therefore all sensors may not be active continuously.
+      </p>
+      <p>
+        Mode-dependent activation can reduce resource use.
+      </p>
+      <p>
+        However, resource optimization should not compromise navigation robustness.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.129 Computational Load by Mode</h3>
+      <p>
+        Far-range mode may require relatively simple measurements.
+      </p>
+      <p>
+        Close-range vision and LiDAR processing may require significantly more computation.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ C_{compute} = C_{compute}(M). }
+        \]
+      </div>
+      <p>
+        Navigation software scheduling should account for this.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.130 Processing Deadline</h3>
+      <p>
+        A sensor measurement is useful only if processed before its latency becomes operationally unacceptable.
+      </p>
+      <p>
+        Therefore each sensor can have a processing deadline
+      </p>
+      <div class="equation-box">
+        \[
+        T_{max,s}.
+        \]
+      </div>
+      <p>
+        If
+      </p>
+      <div class="equation-box">
+        \[
+        T_{processing}>T_{max,s},
+        \]
+      </div>
+      <p>
+        the measurement may be too stale even if numerically accurate.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.131 Sensor Priority Under Resource Limitation</h3>
+      <p>
+        When processing resources are limited, the system may prioritize measurements based on:
+      </p>
+      <ul>
+        <li>expected information gain,</li>
+        <li>freshness,</li>
+        <li>mission phase,</li>
+        <li>validity.</li>
+      </ul>
+      <p>
+        This differs from fixed sensor priority.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.132 Information-Gain-Based Scheduling</h3>
+      <p>
+        One advanced criterion is expected covariance reduction.
+      </p>
+      <p>
+        If sensor <code>s</code> is expected to produce posterior covariance
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf P_s^+,
+        \]
+      </div>
+      <p>
+        one can compare
+      </p>
+      <div class="equation-box">
+        \[
+        \operatorname{tr}(\mathbf P^-) - \operatorname{tr}(\mathbf P_s^+).
+        \]
+      </div>
+      <p>
+        Larger reduction means more expected information gain.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.133 Mode-Dependent Sensor Scheduling</h3>
+      <p>
+        Sensor activation can therefore be interpreted as scheduling.
+      </p>
+      <p>
+        The system decides:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Which Measurement Is Most Useful Now?} }
+        \]
+      </div>
+      <p>
+        subject to:
+      </p>
+      <ul>
+        <li>sensor availability,</li>
+        <li>power,</li>
+        <li>processing capacity,</li>
+        <li>geometry.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.134 Transition and Sensor Fault</h3>
+      <p>
+        Suppose a newly activated sensor immediately fails validation.
+      </p>
+      <p>
+        The estimator should not force transition because a mode schedule says it should.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Mission Phase Request} \neq \text{Automatic Sensor Acceptance}. }
+        \]
+      </div>
+      <p>
+        Sensor health must override nominal scheduling.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.135 Mission Mode and Navigation Mode</h3>
+      <p>
+        These may differ.
+      </p>
+      <p>
+        A spacecraft mission mode might indicate operational intent.
+      </p>
+      <p>
+        Navigation mode indicates which estimator configuration is currently valid.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_{mission} \neq M_{nav} }
+        \]
+      </div>
+      <p>
+        although they interact.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.136 Navigation Mode Must Reflect Actual Capability</h3>
+      <p>
+        Suppose the mission requests close-range operation but LiDAR is unavailable.
+      </p>
+      <p>
+        The navigation system should not claim full close-range capability if required uncertainty cannot be achieved.
+      </p>
+      <p>
+        Instead:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Requested Mode} \neq \text{Achieved Navigation Capability}. }
+        \]
+      </div>
+      <p>
+        This distinction is important for autonomy.
+      </p>
+      <div class="concept-note">
+        <h4>Requested capability and achieved capability are different</h4>
+        <p>Mission logic can request a navigation mode, but the estimator should only declare that mode active when the actual sensor set and uncertainty satisfy its requirements.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.137 Requested and Active Mode</h3>
+      <p>
+        Define
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_{request} }
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_{active}. }
+        \]
+      </div>
+      <p>
+        A transition occurs only when entry conditions are satisfied.
+      </p>
+      <p>
+        This prevents software from declaring a navigation mode before the estimator is actually ready.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.138 Mode Readiness Flag</h3>
+      <p>
+        A useful signal is
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{MODE\_READY}. }
+        \]
+      </div>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \texttt{MODE\_READY}=1
+        \]
+      </div>
+      <p>
+        only if required sensors and covariance conditions are satisfied.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.139 Transition Permission</h3>
+      <p>
+        The navigation system may publish
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{TRANSITION\_PERMITTED}. }
+        \]
+      </div>
+      <p>
+        This indicates whether downstream autonomy can proceed into the next operation phase based on navigation quality.
+      </p>
+      <p>
+        This is a general architecture concept and does not imply a particular mission implementation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.140 Sensor Handover and Safety</h3>
+      <p>
+        Sensor handover is safety relevant because poor handover can produce:
+      </p>
+      <ul>
+        <li>incorrect relative state,</li>
+        <li>loss of observability,</li>
+        <li>underestimated covariance.</li>
+      </ul>
+      <p>
+        A transition should therefore be conservative when sensor information is uncertain.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.141 Safety Margin During Handover</h3>
+      <p>
+        Requirements may temporarily include an additional uncertainty margin.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \sigma_{allowed,transition} < \sigma_{allowed,steady} }
+        \]
+      </div>
+      <p>
+        if the system requires extra conservatism during transition.
+      </p>
+      <p>
+        The exact policy is mission dependent.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.142 Handover and Relative Velocity</h3>
+      <p>
+        A sensor transition is more sensitive when relative velocity is high.
+      </p>
+      <p>
+        Timing error
+      </p>
+      <div class="equation-box">
+        \[
+        \Delta t
+        \]
+      </div>
+      <p>
+        produces approximate position mismatch
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf r \approx \mathbf v_{rel}\Delta t. }
+        \]
+      </div>
+      <p>
+        Therefore high-speed transitions may require tighter synchronization.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.143 Handover and Angular Rate</h3>
+      <p>
+        Similarly,
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\boldsymbol\theta \approx \boldsymbol\omega_{rel}\Delta t. }
+        \]
+      </div>
+      <p>
+        High angular rate increases sensitivity to delayed vision or LiDAR pose measurements.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.144 Handover During Maneuvering</h3>
+      <p>
+        Sensor transitions during active maneuvering can be more difficult because:
+      </p>
+      <ul>
+        <li>state changes quickly,</li>
+        <li>process uncertainty increases,</li>
+        <li>measurement delays matter more,</li>
+        <li>vibration may affect sensors.</li>
+      </ul>
+      <p>
+        Therefore transition criteria may be more conservative during dynamic motion.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.145 Handover During Quiet Motion</h3>
+      <p>
+        A sensor transition during low relative rate or coast conditions may be easier to validate.
+      </p>
+      <p>
+        Residuals are less contaminated by timing and dynamic-model errors.
+      </p>
+      <p>
+        When operationally possible, this can provide a cleaner transition.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.146 Mode-Dependent Outlier Logic</h3>
+      <p>
+        Different sensors have different failure modes.
+      </p>
+      <p>
+        Therefore outlier logic may change by active sensor set.
+      </p>
+      <p>
+        Examples:
+      </p>
+      <ul>
+        <li>GNSS quality indicators,</li>
+        <li>camera reprojection errors,</li>
+        <li>LiDAR registration residuals.</li>
+      </ul>
+      <p>
+        There is no universal single outlier test for every measurement.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.147 Mode-Dependent Fault Isolation</h3>
+      <p>
+        Fault isolation also depends on redundancy.
+      </p>
+      <p>
+        With multiple sensors active, disagreement can help isolate one sensor.
+      </p>
+      <p>
+        With only one sensor active, distinguishing sensor fault from model error is harder.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Fault Isolation Capability} = f(\text{Sensor Redundancy}). }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.148 Transition to Degraded Mode</h3>
+      <p>
+        If one sensor fails and no equivalent replacement is available:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_{nominal} \rightarrow M_{degraded}. }
+        \]
+      </div>
+      <p>
+        The state estimator may still operate, but uncertainty limits and downstream permissions should reflect reduced capability.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.149 Recovery From Degraded Mode</h3>
+      <p>
+        When a sensor returns:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_{degraded} \rightarrow \text{Reacquisition} \rightarrow \text{Validation} \rightarrow M_{nominal}. }
+        \]
+      </div>
+      <p>
+        The system should not immediately declare nominal capability after the first recovered measurement.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.150 Sensor Recovery Dwell</h3>
+      <p>
+        Require the sensor to remain healthy for
+      </p>
+      <div class="equation-box">
+        \[
+        T_{recover}
+        \]
+      </div>
+      <p>
+        before restoring full confidence.
+      </p>
+      <p>
+        This reduces repeated degraded/nominal oscillation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.151 Handover and State Validity</h3>
+      <p>
+        State components may have different validity.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>position may be valid,</li>
+        <li>relative attitude may not yet be valid.</li>
+      </ul>
+      <p>
+        Therefore a single global navigation-valid flag may sometimes be insufficient.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.152 Component-Level Validity</h3>
+      <p>
+        Possible flags include:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{POS\_VALID} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{VEL\_VALID} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{ATT\_VALID} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{POSE\_VALID}. }
+        \]
+      </div>
+      <p>
+        Different modes may require different combinations.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.153 Required Validity Set</h3>
+      <p>
+        Suppose close-range mode requires position and attitude.
+      </p>
+      <p>
+        Then entry condition may be
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \texttt{POS\_VALID} \land \texttt{ATT\_VALID}. }
+        \]
+      </div>
+      <p>
+        A far-range mode may require only position and velocity validity.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.154 Sensor Handover and Observability Loss</h3>
+      <p>
+        Removing one sensor can make some states weakly observable.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{LiDAR Removed} \rightarrow \text{Reduced Range Observability} }
+        \]
+      </div>
+      <p>
+        in some vision configurations.
+      </p>
+      <p>
+        The covariance should reflect this immediately over subsequent propagation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.155 Observability Before Sensor Removal</h3>
+      <p>
+        A previous sensor should ideally remain active until the new sensor set provides sufficient observability.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Remove Old Sensor} \Rightarrow \text{Required States Observable From Remaining Set}. }
+        \]
+      </div>
+      <p>
+        This is stronger than simply checking that the new sensor is producing data.
+      </p>
+      <div class="concept-note">
+        <h4>Do not remove information too early</h4>
+        <p>The previous sensor should remain available until the remaining sensor set can independently support all state components required by the new mode.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.156 Mode Transition and Bias Observability</h3>
+      <p>
+        Some sensor biases may only be observable when multiple sensors overlap.
+      </p>
+      <p>
+        For example, camera-LiDAR alignment or range bias may be easier to identify during simultaneous operation.
+      </p>
+      <p>
+        Removing one sensor too early can stop calibration convergence.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.157 Calibration Freeze</h3>
+      <p>
+        When a calibration state becomes unobservable after handover, the estimator may:
+      </p>
+      <ul>
+        <li>freeze its estimate,</li>
+        <li>continue propagating it with small process noise,</li>
+        <li>remove it from active estimation.</li>
+      </ul>
+      <p>
+        The correct strategy depends on the calibration parameter.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.158 Handover and Filter Architecture</h3>
+      <p>
+        Handover can be implemented within:
+      </p>
+      <ul>
+        <li>one EKF,</li>
+        <li>one ESKF,</li>
+        <li>one UKF,</li>
+        <li>federated filters,</li>
+        <li>multiple local filters with master fusion.</li>
+      </ul>
+      <p>
+        The high-level handover principles remain similar.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.159 Single-Filter Architecture</h3>
+      <p>
+        One central estimator receives all sensor measurements.
+      </p>
+      <p>
+        Advantages:
+      </p>
+      <ul>
+        <li>shared covariance,</li>
+        <li>straightforward cross-state correction,</li>
+        <li>continuous state.</li>
+      </ul>
+      <p>
+        Disadvantages:
+      </p>
+      <ul>
+        <li>larger complexity,</li>
+        <li>possible single-point software dependence.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.160 Federated Architecture</h3>
+      <p>
+        Separate local filters process different sensor groups.
+      </p>
+      <p>
+        Their outputs are combined at a master level.
+      </p>
+      <p>
+        Sensor handover may then mean changing:
+      </p>
+      <ul>
+        <li>local filter availability,</li>
+        <li>master fusion weights.</li>
+      </ul>
+      <p>
+        This can provide modularity and fault isolation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.161 Federated Handover</h3>
+      <p>
+        Suppose local filters produce
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\mathbf x}_1,\mathbf P_1
+        \]
+      </div>
+      <p>
+        and
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\mathbf x}_2,\mathbf P_2.
+        \]
+      </div>
+      <p>
+        A master fusion algorithm can gradually reduce reliance on filter 1 while increasing reliance on filter 2.
+      </p>
+      <p>
+        Correlation must still be considered.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.162 Covariance Intersection for Unknown Correlation</h3>
+      <p>
+        If correlation between two estimates is unknown, naive covariance fusion can be overconfident.
+      </p>
+      <p>
+        Covariance Intersection provides a conservative alternative.
+      </p>
+      <p>
+        For weight
+      </p>
+      <div class="equation-box">
+        \[
+        0\le\omega\le1,
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P^{-1} = \omega\mathbf P_1^{-1} + (1-\omega)\mathbf P_2^{-1}. }
+        \]
+      </div>
+      <p>
+        The fused estimate is formed consistently in information space.
+      </p>
+      <div class="concept-note">
+        <h4>Why a conservative fusion method may be needed</h4>
+        <p>When two estimates share unknown common information, ordinary covariance fusion can be overconfident. Covariance Intersection is useful because it does not require the unknown cross-correlation to be known explicitly.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.163 Why Unknown Correlation Matters</h3>
+      <p>
+        If two estimates share common measurements, their errors are correlated.
+      </p>
+      <p>
+        Ignoring this can count the same information twice.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Two Estimates} \neq \text{Two Independent Estimates}. }
+        \]
+      </div>
+      <p>
+        This is especially important during sensor overlap and federated handover.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.164 Smooth Switching Through Covariance Inflation</h3>
+      <p>
+        A sensor being phased out can be given gradually larger covariance:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf R_A \uparrow. }
+        \]
+      </div>
+      <p>
+        A sensor being phased in can move from conservative covariance toward nominal:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf R_B \downarrow. }
+        \]
+      </div>
+      <p>
+        This produces a smooth change in Kalman gains.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.165 Covariance Inflation Must Be Physically Justified</h3>
+      <p>
+        Artificially inflating covariance only to force a desired switch can reduce estimator interpretability.
+      </p>
+      <p>
+        Prefer covariance changes based on:
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>geometry,</li>
+        <li>measured quality,</li>
+        <li>validated sensor performance.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.166 Smooth Weighting Function</h3>
+      <p>
+        A continuous range-dependent weight might use a sigmoid function:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ w(\rho) = \frac{1}{ 1+ e^{-k(\rho-\rho_0)} }. }
+        \]
+      </div>
+      <p>
+        This creates a smooth transition around
+      </p>
+      <div class="equation-box">
+        \[
+        \rho_0.
+        \]
+      </div>
+      <p>
+        Such weighting should still be tied to actual sensor performance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.167 Complementary Weighting</h3>
+      <p>
+        For two sensors:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ w_A+w_B=1. }
+        \]
+      </div>
+      <p>
+        Then:
+      </p>
+      <div class="equation-box">
+        \[
+        w_A\rightarrow0
+        \]
+      </div>
+      <p>
+        while
+      </p>
+      <div class="equation-box">
+        \[
+        w_B\rightarrow1.
+        \]
+      </div>
+      <p>
+        In probabilistic filtering, equivalent behavior may emerge through changing covariance rather than explicit weights.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.168 Handover Based on Information Ratio</h3>
+      <p>
+        Define
+      </p>
+      <div class="equation-box">
+        \[
+        \eta = \frac{ I_B }{ I_A+I_B }.
+        \]
+      </div>
+      <p>
+        When
+      </p>
+      <div class="equation-box">
+        \[
+        \eta
+        \]
+      </div>
+      <p>
+        increases, sensor B is providing more relative information.
+      </p>
+      <p>
+        This can provide a more principled handover metric than range alone.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.169 Information Metric</h3>
+      <p>
+        A simple scalar information measure could be
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ I_s = \operatorname{tr} ( \mathbf H_s^T \mathbf R_s^{-1} \mathbf H_s ). }
+        \]
+      </div>
+      <p>
+        Other metrics may use:
+      </p>
+      <ul>
+        <li>determinant,</li>
+        <li>minimum eigenvalue,</li>
+        <li>expected covariance reduction.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.170 Mode-Dependent Sensor Geometry</h3>
+      <p>
+        Sensor geometry itself changes with spacecraft state.
+      </p>
+      <p>
+        Therefore the sensor considered dominant at one target orientation may not remain dominant at another orientation even at the same range.
+      </p>
+      <p>
+        This is another limitation of range-only handover rules.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.171 Event-Driven Handover</h3>
+      <p>
+        Some transitions are triggered by events rather than continuous thresholds.
+      </p>
+      <p>
+        Examples:
+      </p>
+      <ul>
+        <li>target detected,</li>
+        <li>first valid LiDAR lock,</li>
+        <li>GNSS loss,</li>
+        <li>image tracker convergence.</li>
+      </ul>
+      <p>
+        Then:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Event} \rightarrow \text{Mode Transition Candidate}. }
+        \]
+      </div>
+      <p>
+        The candidate should still pass validation.
+      </p>
+      <div class="concept-note">
+        <h4>Events can trigger readiness, not automatic commitment</h4>
+        <p>Target detection or first LiDAR lock can indicate that a transition is possible, but statistical and covariance checks should still determine whether the new configuration is actually ready.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.172 Mode Transition Priority</h3>
+      <p>
+        Several transition conditions may occur at once.
+      </p>
+      <p>
+        A priority hierarchy may be required.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Safety / Fault Transition} > \text{Nominal Phase Transition}. }
+        \]
+      </div>
+      <p>
+        Fault responses should typically override ordinary mission progression.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.173 Sensor Handover Race Conditions</h3>
+      <p>
+        Software must prevent inconsistent simultaneous commands such as:
+      </p>
+      <ul>
+        <li>enabling and disabling same sensor,</li>
+        <li>two competing mode transitions,</li>
+        <li>sensor health logic and mission logic issuing conflicting requests.</li>
+      </ul>
+      <p>
+        A deterministic transition manager helps prevent such race conditions.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.174 Atomic Mode Update</h3>
+      <p>
+        A software mode transition should ideally update related parameters consistently in one logical operation:
+      </p>
+      <ul>
+        <li>active sensor set,</li>
+        <li>covariance model,</li>
+        <li>thresholds,</li>
+        <li>output flags.</li>
+      </ul>
+      <p>
+        Partial configuration changes can create transient inconsistencies.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.175 Mode Transition Verification in SIL</h3>
+      <p>
+        Software-in-the-loop testing should verify:
+      </p>
+      <ul>
+        <li>all transition guards,</li>
+        <li>sensor validity handling,</li>
+        <li>hysteresis,</li>
+        <li>dwell timers,</li>
+        <li>covariance changes,</li>
+        <li>fallback logic.</li>
+      </ul>
+      <p>
+        The purpose is to validate logic independently of hardware effects.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.176 Mode Transition Verification in HIL</h3>
+      <p>
+        Hardware-in-the-loop testing can additionally expose:
+      </p>
+      <ul>
+        <li>real sensor latency,</li>
+        <li>timestamp jitter,</li>
+        <li>communication delay,</li>
+        <li>acquisition time,</li>
+        <li>processor load.</li>
+      </ul>
+      <p>
+        These factors can significantly change handover behavior compared with ideal simulation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.177 Fault Injection Testing</h3>
+      <p>
+        Inject failures such as:
+      </p>
+      <ul>
+        <li>camera blackout,</li>
+        <li>LiDAR dropout,</li>
+        <li>GNSS loss,</li>
+        <li>frozen measurement,</li>
+        <li>biased measurement,</li>
+        <li>delayed packet.</li>
+      </ul>
+      <p>
+        Verify that handover logic detects and responds appropriately.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.178 Timing Jitter Testing</h3>
+      <p>
+        Sensor timestamps may contain jitter.
+      </p>
+      <p>
+        Model:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ t_k^{meas} = t_k + \delta t_k. }
+        \]
+      </div>
+      <p>
+        Vary
+      </p>
+      <div class="equation-box">
+        \[
+        \delta t_k
+        \]
+      </div>
+      <p>
+        during transitions to test robustness.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.179 Packet-Loss Testing</h3>
+      <p>
+        Communication or processing may lose measurement packets.
+      </p>
+      <p>
+        The estimator should tolerate intermittent updates without unnecessary mode switching.
+      </p>
+      <p>
+        One missed measurement should not normally force immediate handover.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.180 Burst Dropout Testing</h3>
+      <p>
+        A more difficult case is a burst of missed measurements.
+      </p>
+      <p>
+        Define dropout duration
+      </p>
+      <div class="equation-box">
+        \[
+        T_{drop}.
+        \]
+      </div>
+      <p>
+        Evaluate:
+      </p>
+      <ul>
+        <li>covariance growth,</li>
+        <li>validity,</li>
+        <li>mode transition,</li>
+        <li>recovery.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.181 False Sensor-Recovery Testing</h3>
+      <p>
+        Inject a brief return of apparently valid data followed by another dropout.
+      </p>
+      <p>
+        This tests whether recovery logic has sufficient dwell and persistence.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.182 False Mode Trigger Testing</h3>
+      <p>
+        Introduce noisy range measurements near a transition boundary.
+      </p>
+      <p>
+        Without hysteresis, this may generate repeated switching.
+      </p>
+      <p>
+        The test validates that mode logic rejects noisy threshold crossings.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.183 Transition Boundary Monte Carlo</h3>
+      <p>
+        Randomize:
+      </p>
+      <div class="equation-box">
+        \[
+        \rho_0
+        \]
+      </div>
+      <p>
+        around the nominal switch region.
+      </p>
+      <p>
+        Also randomize measurement noise and covariance.
+      </p>
+      <p>
+        Evaluate:
+      </p>
+      <ul>
+        <li>which mode becomes active,</li>
+        <li>transition timing,</li>
+        <li>state continuity.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.184 Bias Mismatch Testing</h3>
+      <p>
+        During overlap, inject sensor biases
+      </p>
+      <div class="equation-box">
+        \[
+        b_A, \qquad b_B.
+        \]
+      </div>
+      <p>
+        Evaluate whether the handover creates:
+      </p>
+      <ul>
+        <li>state jump,</li>
+        <li>innovation inconsistency,</li>
+        <li>bias detection.</li>
+      </ul>
+      <p>
+        This is important because real sensors rarely agree perfectly.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.185 Frame-Misalignment Testing</h3>
+      <p>
+        Inject small sensor alignment errors:
+      </p>
+      <div class="equation-box">
+        \[
+        \delta\boldsymbol\alpha_A, \qquad \delta\boldsymbol\alpha_B.
+        \]
+      </div>
+      <p>
+        Then assess transition error.
+      </p>
+      <p>
+        Frame errors often appear most clearly during cross-sensor overlap.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.186 Handover Performance Envelope</h3>
+      <p>
+        A useful output is a handover performance envelope showing error versus:
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>relative velocity,</li>
+        <li>sensor noise,</li>
+        <li>sensor bias,</li>
+        <li>latency,</li>
+        <li>alignment.</li>
+      </ul>
+      <p>
+        This identifies the conditions under which the transition remains reliable.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.187 Transition Success Probability</h3>
+      <p>
+        Across Monte Carlo runs:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ P_{success} = \frac{ N_{successful} }{ N_{total} }. }
+        \]
+      </div>
+      <p>
+        A successful transition should have clearly defined criteria.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>navigation remains valid,</li>
+        <li>transient error stays bounded,</li>
+        <li>new sensor becomes stable.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.188 Transition Failure Categories</h3>
+      <p>
+        Failures should be categorized.
+      </p>
+      <p>
+        Examples:
+      </p>
+      <ul>
+        <li>acquisition failure,</li>
+        <li>validation failure,</li>
+        <li>excessive jump,</li>
+        <li>covariance inconsistency,</li>
+        <li>sensor dropout,</li>
+        <li>mode chatter.</li>
+      </ul>
+      <p>
+        This makes debugging much more useful than one global failure count.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.189 Handover Recovery Time</h3>
+      <p>
+        Define
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ T_{recover} }
+        \]
+      </div>
+      <p>
+        as the time from transition initiation until navigation error and covariance return to acceptable steady behavior.
+      </p>
+      <p>
+        This is especially useful for comparing alternative handover strategies.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.190 Navigation Continuity Metric</h3>
+      <p>
+        Define valid-navigation fraction during transition:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ C_{nav} = \frac{ T_{valid} }{ T_{transition-window} }. }
+        \]
+      </div>
+      <p>
+        A transition with good final accuracy but long invalid periods may still be undesirable.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.191 State Continuity Metric</h3>
+      <p>
+        For state component \(x_i\),
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ J_i = | x_i(t^+)-x_i(t^-) |. }
+        \]
+      </div>
+      <p>
+        For vector position:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ J_r = \| \mathbf r(t^+)-\mathbf r(t^-) \|. }
+        \]
+      </div>
+      <p>
+        These quantify discontinuity.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.192 Covariance Consistency Metric</h3>
+      <p>
+        Compare actual error with \(3\sigma\) bounds during handover.
+      </p>
+      <p>
+        For component <code>i</code>,
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ |e_i| \le 3\sqrt{P_{ii}} }
+        \]
+      </div>
+      <p>
+        should occur with appropriate statistical frequency over many runs.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.193 Handover NIS Monitoring</h3>
+      <p>
+        Track NIS separately before, during, and after transition.
+      </p>
+      <p>
+        A sudden persistent NIS increase after activating the new sensor can indicate:
+      </p>
+      <ul>
+        <li>bad covariance,</li>
+        <li>calibration error,</li>
+        <li>timing mismatch.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.194 Handover NEES Monitoring</h3>
+      <p>
+        In simulation, track
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathrm{NEES} = \delta\mathbf x^T \mathbf P^{-1} \delta\mathbf x. }
+        \]
+      </div>
+      <p>
+        This reveals whether covariance remains credible through the transition.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.195 Innovation Mean During Handover</h3>
+      <p>
+        A correctly modeled sensor should have approximately zero-mean innovation.
+      </p>
+      <p>
+        Persistent mean:
+      </p>
+      <div class="equation-box">
+        \[
+        E[\mathbf r]\neq0
+        \]
+      </div>
+      <p>
+        may indicate a sensor bias or frame mismatch.
+      </p>
+      <p>
+        Overlap regions are particularly useful for identifying this before full handover.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.196 Mode-Dependent Logging</h3>
+      <p>
+        Record:
+      </p>
+      <ul>
+        <li>mode,</li>
+        <li>active sensors,</li>
+        <li>validity flags,</li>
+        <li>measurement quality,</li>
+        <li>covariance,</li>
+        <li>NIS,</li>
+        <li>transition reason.</li>
+      </ul>
+      <p>
+        This allows reconstruction of exactly why each transition occurred.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.197 Handover Debugging</h3>
+      <p>
+        When a handover performs badly, useful questions include:
+      </p>
+      <ol>
+        <li>Did the new sensor become valid too early?</li>
+        <li>Was its covariance too optimistic?</li>
+        <li>Were timestamps aligned?</li>
+        <li>Were frames consistent?</li>
+        <li>Was sensor bias present?</li>
+        <li>Was geometry poor?</li>
+        <li>Did covariance collapse?</li>
+        <li>Did hysteresis fail?</li>
+      </ol>
+      <p>
+        This systematic approach is more useful than tuning gains blindly.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.198 Design Philosophy</h3>
+      <p>
+        A robust handover system should prefer
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Measured Readiness} }
+        \]
+      </div>
+      <p>
+        over
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Assumed Readiness}. }
+        \]
+      </div>
+      <p>
+        A mission-phase schedule may request a transition, but actual sensor and estimator quality should determine whether the transition is accepted.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.199 Practical Sensor-Handover Workflow</h3>
+      <p>
+        A practical sequence is:
+      </p>
+      <ol>
+        <li>identify approaching transition condition,</li>
+        <li>pre-activate next sensor,</li>
+        <li>acquire target or measurement,</li>
+        <li>validate sensor health,</li>
+        <li>validate measurement quality,</li>
+        <li>confirm frame and timing consistency,</li>
+        <li>begin overlap,</li>
+        <li>compare innovations,</li>
+        <li>confirm covariance behavior,</li>
+        <li>gradually increase sensor influence,</li>
+        <li>confirm required observability,</li>
+        <li>declare new mode active,</li>
+        <li>retain old sensor temporarily for monitoring if useful,</li>
+        <li>disable or demote old sensor,</li>
+        <li>continue monitoring for regression.</li>
+      </ol>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.200 Example General Transition Sequence</h3>
+      <p>
+        A generic sequence can be expressed as
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \begin{array}{c} \text{Current Mode}\\ \downarrow\\ \text{Transition Condition Approaches}\\ \downarrow\\ \text{Activate New Sensor}\\ \downarrow\\ \text{Validate New Sensor}\\ \downarrow\\ \text{Overlap Measurements}\\ \downarrow\\ \text{Cross-Check}\\ \downarrow\\ \text{Increase New-Sensor Weight}\\ \downarrow\\ \text{Verify Covariance and Validity}\\ \downarrow\\ \text{Commit New Mode} \end{array} }
+        \]
+      </div>
+      <p>
+        This structure is applicable to many multi-sensor navigation systems.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.201 Why Sensor Handover Is a Navigation Problem, Not Only a Software Problem</h3>
+      <p>
+        The transition depends on:
+      </p>
+      <ul>
+        <li>sensor physics,</li>
+        <li>measurement geometry,</li>
+        <li>covariance,</li>
+        <li>observability,</li>
+        <li>state dynamics.</li>
+      </ul>
+      <p>
+        Therefore handover cannot be designed only as software logic.
+      </p>
+      <p>
+        It must be consistent with the navigation-estimation model.
+      </p>
+      <div class="concept-note">
+        <h4>The switching logic is part of estimation design</h4>
+        <p>Handover thresholds, dwell logic, covariance models, sensor geometry, and observability all affect state quality. The problem therefore spans sensor physics, estimation theory, and software architecture.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.202 Relationship to Guidance and Autonomy</h3>
+      <p>
+        Navigation mode determines the quality of the state supplied to guidance.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Navigation Mode} \rightarrow \text{Available Guidance Capability}. }
+        \]
+      </div>
+      <p>
+        Guidance or autonomy may need to wait until a required navigation mode is valid.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.203 Guidance Should Use Validity, Not Sensor Identity</h3>
+      <p>
+        Guidance should ideally not contain logic such as:
+      </p>
+      <blockquote>Use LiDAR position directly.</blockquote>
+      <p>
+        Instead, it should receive the fused relative state and validity.
+      </p>
+      <p>
+        This maintains architectural separation between:
+      </p>
+      <ul>
+        <li>sensing,</li>
+        <li>estimation,</li>
+        <li>guidance.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.204 Navigation Readiness for Phase Transition</h3>
+      <p>
+        A general readiness condition can be written
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ R_{nav} = C_P \land C_V \land C_S \land C_O }
+        \]
+      </div>
+      <p>
+        where:
+      </p>
+      <ul>
+        <li>\(C_P\): position uncertainty acceptable,</li>
+        <li>\(C_V\): velocity uncertainty acceptable,</li>
+        <li>\(C_S\): required sensors valid,</li>
+        <li>\(C_O\): observability acceptable.</li>
+      </ul>
+      <p>
+        Only when
+      </p>
+      <div class="equation-box">
+        \[
+        R_{nav}=1
+        \]
+      </div>
+      <p>
+        should the navigation system declare itself ready.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.205 Range Is Not Enough</h3>
+      <p>
+        A spacecraft may physically reach a transition range while navigation uncertainty remains too high.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho<\rho_{transition} }
+        \]
+      </div>
+      <p>
+        should not automatically imply
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_{next}. }
+        \]
+      </div>
+      <p>
+        Navigation quality must also satisfy requirements.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.206 Sensor Quality Is Not Enough Either</h3>
+      <p>
+        A sensor may produce high-quality measurements while the overall state remains poorly initialized.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Good Measurement} \neq \text{Immediately Good Navigation State}. }
+        \]
+      </div>
+      <p>
+        The estimator may need several updates to converge.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.207 Convergence Before Handover Completion</h3>
+      <p>
+        Require covariance or state change to stabilize.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \|\mathbf P_k-\mathbf P_{k-1}\| < \epsilon_P }
+        \]
+      </div>
+      <p>
+        over a suitable interval.
+      </p>
+      <p>
+        This can supplement measurement-validity checks.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.208 Sensor Handover and Initialization</h3>
+      <p>
+        A newly introduced sensor may require internal initialization before its measurements are meaningful.
+      </p>
+      <p>
+        Examples:
+      </p>
+      <ul>
+        <li>pose tracker initialization,</li>
+        <li>point-cloud registration seed,</li>
+        <li>feature map initialization.</li>
+      </ul>
+      <p>
+        This sensor-side initialization is separate from estimator initialization.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.209 Initial Pose Guess</h3>
+      <p>
+        Vision or LiDAR registration often requires an initial pose guess.
+      </p>
+      <p>
+        The current navigation filter can provide this prediction.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Existing Navigation Estimate} \rightarrow \text{New Sensor Acquisition Aid}. }
+        \]
+      </div>
+      <p>
+        This reduces handover difficulty.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.210 Navigation-Assisted Sensor Acquisition</h3>
+      <p>
+        The estimator may predict:
+      </p>
+      <ul>
+        <li>target image location,</li>
+        <li>expected LiDAR range,</li>
+        <li>approximate relative orientation.</li>
+      </ul>
+      <p>
+        The sensor processor can use these predictions to narrow its search.
+      </p>
+      <p>
+        This creates a feedback interaction between estimation and sensing.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.211 Sensor-Assisted Navigation Transition</h3>
+      <p>
+        Once the new sensor obtains a reliable solution, it improves the navigation estimate.
+      </p>
+      <p>
+        Thus the interaction becomes
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Navigation Prediction} \rightarrow \text{Sensor Acquisition} \rightarrow \text{Better Measurement} \rightarrow \text{Improved Navigation}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.212 Handover and Active Perception</h3>
+      <p>
+        A spacecraft may intentionally change pointing or trajectory to improve a new sensor's geometry before handover.
+      </p>
+      <p>
+        This is an example of active perception.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Prepare Geometry} \rightarrow \text{Acquire Sensor} \rightarrow \text{Complete Handover}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.213 Sensor Handover and Target Visibility</h3>
+      <p>
+        For optical sensors, handover may depend on whether the target is visible.
+      </p>
+      <p>
+        Visibility can depend on:
+      </p>
+      <ul>
+        <li>field of view,</li>
+        <li>target orientation,</li>
+        <li>illumination,</li>
+        <li>occlusion.</li>
+      </ul>
+      <p>
+        Therefore target visibility should be checked explicitly.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.214 Sensor Handover and Range Limits</h3>
+      <p>
+        For LiDAR or other range sensors:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho_{min} < \rho < \rho_{max} }
+        \]
+      </div>
+      <p>
+        may be required.
+      </p>
+      <p>
+        Entering the numerical range alone does not guarantee adequate return quality, so signal quality must also be checked.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.215 Sensor Handover and Saturation</h3>
+      <p>
+        At very close range, some sensors can saturate or fall below minimum operating distance.
+      </p>
+      <p>
+        Thus a sensor may be useful only over a finite interval:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho_{min,s} < \rho < \rho_{max,s}. }
+        \]
+      </div>
+      <p>
+        This creates the need for later handover as well as initial activation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.216 Multi-Stage Sensor Chain</h3>
+      <p>
+        A mission may use a sequence such as
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ S_1 \rightarrow S_2 \rightarrow S_3 \rightarrow S_4. }
+        \]
+      </div>
+      <p>
+        Each sensor's operating region overlaps with the next.
+      </p>
+      <p>
+        A well-designed chain avoids coverage gaps.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.217 Coverage Gap</h3>
+      <p>
+        A coverage gap occurs if
+      </p>
+      <div class="equation-box">
+        \[
+        \rho_{min,A} > \rho_{max,B}
+        \]
+      </div>
+      <p>
+        for neighboring sensors.
+      </p>
+      <p>
+        Then there exists a separation region where neither sensor performs adequately.
+      </p>
+      <p>
+        This is a system-level navigation design problem.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.218 Coverage Overlap Margin</h3>
+      <p>
+        It is preferable to have
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho_{min,A} < \rho_{max,B} }
+        \]
+      </div>
+      <p>
+        with sufficient overlap.
+      </p>
+      <p>
+        The overlap should be large enough to accommodate:
+      </p>
+      <ul>
+        <li>sensor uncertainty,</li>
+        <li>activation latency,</li>
+        <li>target geometry variation.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.219 Sensor Operating Envelope</h3>
+      <p>
+        Each sensor can be characterized by an envelope:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathcal E_s = \{ \rho, \text{FOV}, Q, \text{illumination}, \text{geometry} \}. }
+        \]
+      </div>
+      <p>
+        Handover logic should respect this multidimensional operating envelope.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.220 Mode Envelope</h3>
+      <p>
+        Similarly, navigation mode validity exists over a region
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathcal M_i }
+        \]
+      </div>
+      <p>
+        of the system operating space.
+      </p>
+      <p>
+        A mode is valid only where its active sensor combination satisfies required navigation performance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.221 Mode Envelope Overlap</h3>
+      <p>
+        Good architecture may deliberately design
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathcal M_i \cap \mathcal M_{i+1} \neq \emptyset. }
+        \]
+      </div>
+      <p>
+        This creates a region in which either mode can maintain valid navigation.
+      </p>
+      <p>
+        That overlap enables graceful transition.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.222 Mode Envelope Validation</h3>
+      <p>
+        Simulation should map where each mode remains valid across:
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>relative velocity,</li>
+        <li>lighting,</li>
+        <li>geometry,</li>
+        <li>sensor noise.</li>
+      </ul>
+      <p>
+        This produces a more useful design picture than one nominal transition range.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.223 Sensor-Handover Map</h3>
+      <p>
+        A sensor-handover map can visualize:
+      </p>
+      <ul>
+        <li>sensor availability,</li>
+        <li>sensor quality,</li>
+        <li>active mode,</li>
+        <li>covariance,</li>
+        <li>transition boundaries.</li>
+      </ul>
+      <p>
+        This helps identify:
+      </p>
+      <ul>
+        <li>gaps,</li>
+        <li>excessive overlap,</li>
+        <li>weak regions.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.224 Handover and Mission Robustness</h3>
+      <p>
+        A robust mission should not depend on one exact sensor transition point.
+      </p>
+      <p>
+        If transition is required at precisely one range with no tolerance, small uncertainty can cause failure.
+      </p>
+      <p>
+        Therefore handover regions should have margin.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.225 Transition Margin</h3>
+      <p>
+        Define a transition window
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho_{low} < \rho < \rho_{high}. }
+        \]
+      </div>
+      <p>
+        Within this window, both configurations should ideally be valid.
+      </p>
+      <p>
+        The exact transition can then depend on sensor quality rather than a single hard range.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.226 Sensor-Handover Optimization</h3>
+      <p>
+        The transition point can be selected to optimize criteria such as:
+      </p>
+      <ul>
+        <li>minimum covariance,</li>
+        <li>maximum observability,</li>
+        <li>minimum processing cost,</li>
+        <li>maximum robustness.</li>
+      </ul>
+      <p>
+        One may define an objective:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ J_{HO} = w_1J_{accuracy} + w_2J_{robustness} + w_3J_{resources}. }
+        \]
+      </div>
+      <p>
+        This is an advanced design approach.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.227 Accuracy-Based Transition</h3>
+      <p>
+        One simple strategy is to compare expected sensor uncertainties.
+      </p>
+      <p>
+        Switch when
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \sigma_B < \sigma_A. }
+        \]
+      </div>
+      <p>
+        But this ignores:
+      </p>
+      <ul>
+        <li>observability,</li>
+        <li>bias,</li>
+        <li>latency,</li>
+        <li>redundancy.</li>
+      </ul>
+      <p>
+        Therefore accuracy alone may not define the best transition.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.228 Information-Based Transition</h3>
+      <p>
+        A better criterion may compare information:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ I_B>I_A. }
+        \]
+      </div>
+      <p>
+        This includes both measurement uncertainty and state sensitivity.
+      </p>
+      <p>
+        Even this should be combined with sensor validity and continuity considerations.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.229 Risk-Aware Transition</h3>
+      <p>
+        A safety-oriented system may transition only if:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ P(\text{navigation failure}|M_{next}) < P_{max}. }
+        \]
+      </div>
+      <p>
+        This requires probabilistic modeling and may be too complex for many implementations, but it illustrates the principle that handover is a decision under uncertainty.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.230 Rule-Based Transition</h3>
+      <p>
+        Many flight systems use deterministic rules because they are:
+      </p>
+      <ul>
+        <li>transparent,</li>
+        <li>testable,</li>
+        <li>certifiable.</li>
+      </ul>
+      <p>
+        A rule may be:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho<\rho_0 \land Q_L>Q_{min} \land \mathrm{NIS}_L<\gamma. }
+        \]
+      </div>
+      <p>
+        This is often easier to verify than complex learned switching logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.231 Hybrid Transition Logic</h3>
+      <p>
+        A practical architecture may combine:
+      </p>
+      <ul>
+        <li>deterministic state-machine rules,</li>
+        <li>statistical measurement validation,</li>
+        <li>covariance-based weighting.</li>
+      </ul>
+      <p>
+        This gives
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Hybrid Handover} = \text{Discrete Mode Logic} + \text{Continuous Probabilistic Fusion}. }
+        \]
+      </div>
+      <p>
+        This is often a useful engineering compromise.
+      </p>
+      <div class="concept-note">
+        <h4>A practical architecture</h4>
+        <p>Discrete mode logic is useful for transparent and testable behavior, while probabilistic fusion handles continuous uncertainty. Combining the two often gives a good balance between determinism and statistical consistency.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.232 Continuous Estimator, Discrete Mode Manager</h3>
+      <p>
+        The estimator can remain continuous:
+      </p>
+      <div class="equation-box">
+        \[
+        \hat{\mathbf x}(t), \mathbf P(t)
+        \]
+      </div>
+      <p>
+        while the mode manager changes discretely:
+      </p>
+      <div class="equation-box">
+        \[
+        M_i \rightarrow M_j.
+        \]
+      </div>
+      <p>
+        This structure is naturally described as a hybrid dynamical system.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.233 Hybrid-System Interpretation</h3>
+      <p>
+        The system contains:
+      </p>
+      <ul>
+        <li>continuous state:</li>
+      <p>
+        ``\(math \mathbf x, \)``
+      </p>
+        <li>discrete mode:</li>
+      <p>
+        ``<code>math M. </code>``
+      </p>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Navigation System} = \text{Continuous Estimation} + \text{Discrete Logic}. }
+        \]
+      </div>
+      <p>
+        Mode transition errors can therefore arise even when the estimator equations are correct.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.234 Mode Chatter as a Hybrid-System Problem</h3>
+      <p>
+        Repeated switching near a threshold is a classic hybrid-system phenomenon.
+      </p>
+      <p>
+        Hysteresis and dwell time are specifically introduced to avoid this.
+      </p>
+      <p>
+        Thus these are not merely software conveniences; they are stability features of the mode logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.235 Navigation-Mode Stability</h3>
+      <p>
+        A good mode system should satisfy:
+      </p>
+      <ul>
+        <li>no unnecessary chatter,</li>
+        <li>deterministic transitions,</li>
+        <li>recoverable faults,</li>
+        <li>bounded transient error.</li>
+      </ul>
+      <p>
+        This is analogous to stability requirements in continuous estimation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.236 Sensor-Handover Fault Tree</h3>
+      <p>
+        A useful engineering exercise is to consider causes of handover failure:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Handover Failure} }
+        \]
+      </div>
+      <p>
+        may result from:
+      </p>
+      <ul>
+        <li>sensor acquisition failure,</li>
+        <li>invalid measurement,</li>
+        <li>timing mismatch,</li>
+        <li>calibration error,</li>
+        <li>mode logic error,</li>
+        <li>covariance mis-modeling.</li>
+      </ul>
+      <p>
+        Fault-tree thinking helps ensure all failure sources are tested.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.237 Common-Cause Failures</h3>
+      <p>
+        Two sensors may fail simultaneously due to common conditions.
+      </p>
+      <p>
+        Examples:
+      </p>
+      <ul>
+        <li>shared power,</li>
+        <li>shared processor,</li>
+        <li>common pointing loss,</li>
+        <li>common timing source.</li>
+      </ul>
+      <p>
+        Therefore overlap does not automatically guarantee independent redundancy.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.238 Sensor Diversity</h3>
+      <p>
+        Redundancy is stronger when sensors use different physical principles.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} }
+        \]
+      </div>
+      <p>
+        provides greater failure-mode diversity than two identical cameras in some conditions.
+      </p>
+      <p>
+        This connects directly to multi-sensor redundancy.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.239 Mode-Dependent Redundancy</h3>
+      <p>
+        Some modes may have high redundancy.
+      </p>
+      <p>
+        Others may rely on one critical sensor.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Fault Tolerance} = f(M). }
+        \]
+      </div>
+      <p>
+        The navigation system should know when redundancy has decreased.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.240 Redundancy Status</h3>
+      <p>
+        A useful quantity may be
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ N_{independent} }
+        \]
+      </div>
+      <p>
+        representing the number of independent valid information sources for key state components.
+      </p>
+      <p>
+        This can contribute to navigation-health logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.241 Graceful Degradation</h3>
+      <p>
+        The objective of redundancy and handover is often graceful degradation.
+      </p>
+      <p>
+        Instead of
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Nominal} \rightarrow \text{Complete Failure}, }
+        \]
+      </div>
+      <p>
+        prefer
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Nominal} \rightarrow \text{Reduced Capability} \rightarrow \text{Recovery}. }
+        \]
+      </div>
+      <p>
+        This is a central design goal for robust navigation.
+      </p>
+      <div class="concept-note">
+        <h4>Robustness means preserving useful capability</h4>
+        <p>The purpose of redundancy and handover is not necessarily to maintain full nominal performance after every fault, but to preserve a valid, uncertainty-aware navigation solution whenever possible.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.242 Mode-Dependent Accuracy Reporting</h3>
+      <p>
+        Navigation output should include uncertainty rather than one fixed accuracy label.
+      </p>
+      <p>
+        For example:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \sigma_r(M), \quad \sigma_v(M), \quad \sigma_\theta(M). }
+        \]
+      </div>
+      <p>
+        This allows downstream systems to interpret the current mode quantitatively.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.243 Mode-Dependent Update Rate</h3>
+      <p>
+        Different modes may also have different effective navigation rates.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>IMU propagation at high rate,</li>
+        <li>camera updates at medium rate,</li>
+        <li>LiDAR pose at lower rate.</li>
+      </ul>
+      <p>
+        The output state can still be propagated continuously even when measurement updates are less frequent.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.244 High-Rate Common Output</h3>
+      <p>
+        A useful architecture is:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{High-Rate Propagation} + \text{Asynchronous Sensor Corrections} \rightarrow \text{Continuous Navigation Output}. }
+        \]
+      </div>
+      <p>
+        This means guidance sees one consistent output rate despite sensor handovers.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.245 Handover and Output Latency</h3>
+      <p>
+        Even if the navigation state is continuous, output latency may change with mode.
+      </p>
+      <p>
+        The system should track:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ T_{nav,out}. }
+        \]
+      </div>
+      <p>
+        A close-range mode relying on heavy vision processing may have different latency characteristics than a GNSS-dominant mode.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.246 Time-Tagged Navigation Output</h3>
+      <p>
+        One solution is to time-tag the navigation state:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \hat{\mathbf x}(t_k). }
+        \]
+      </div>
+      <p>
+        Downstream consumers then know the epoch to which the estimate applies.
+      </p>
+      <p>
+        This is especially important when measurement processing latency changes between modes.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.247 Predicted-to-Current Output</h3>
+      <p>
+        If the best corrected state corresponds to an earlier measurement epoch, the estimator may propagate it forward to current time before publication.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \hat{\mathbf x}(t_m) \rightarrow \text{Propagate} \rightarrow \hat{\mathbf x}(t_{now}). }
+        \]
+      </div>
+      <p>
+        This helps maintain low-latency guidance input.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.248 Sensor Handover Documentation</h3>
+      <p>
+        Each sensor transition should have documented:
+      </p>
+      <ul>
+        <li>entry criteria,</li>
+        <li>exit criteria,</li>
+        <li>validity checks,</li>
+        <li>covariance model,</li>
+        <li>fallback mode,</li>
+        <li>expected transient behavior.</li>
+      </ul>
+      <p>
+        This is important for verification and system integration.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.249 Mode Transition Table</h3>
+      <p>
+        A useful design artifact is a table containing:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ M_i \rightarrow M_j }
+        \]
+      </div>
+      <p>
+        with:
+      </p>
+      <ul>
+        <li>guard conditions,</li>
+        <li>actions,</li>
+        <li>failure response.</li>
+      </ul>
+      <p>
+        This makes mode logic explicit.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.250 Sensor-Use Matrix</h3>
+      <p>
+        Another useful artifact is a matrix showing active sensors by mode.
+      </p>
+      <p>
+        For example conceptually:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \begin{array}{c|cccc} & GNSS & Camera & LiDAR & IMU\\ \hline Far & 1 & 0/1 & 0 & 1\\ Mid & 1 & 1 & 0/1 & 1\\ Close & 0/1 & 1 & 1 & 1 \end{array} }
+        \]
+      </div>
+      <p>
+        The actual matrix is mission dependent.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.251 Requirement Matrix</h3>
+      <p>
+        For each mode, define required limits such as:
+      </p>
+      <div class="equation-box">
+        \[
+        \sigma_r^{max}, \qquad \sigma_v^{max}, \qquad \sigma_\theta^{max}.
+        \]
+      </div>
+      <p>
+        This allows mode readiness to be checked quantitatively.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.252 Sensor Performance Map</h3>
+      <p>
+        Sensor characterization should provide performance as a function of:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Range}, \text{Geometry}, \text{Quality}, \text{Environment}. }
+        \]
+      </div>
+      <p>
+        This data supports rational handover threshold selection.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.253 Why Datasheet Accuracy Alone Is Not Enough</h3>
+      <p>
+        Sensor datasheets may provide one nominal accuracy number.
+      </p>
+      <p>
+        Handover design requires more information:
+      </p>
+      <ul>
+        <li>range dependence,</li>
+        <li>update rate,</li>
+        <li>latency,</li>
+        <li>geometry dependence,</li>
+        <li>dropout probability.</li>
+      </ul>
+      <p>
+        Therefore system-level testing remains essential.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.254 Transition Design From Measured Data</h3>
+      <p>
+        A strong engineering process is:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensor Characterization} \rightarrow \text{Performance Models} \rightarrow \text{Transition Logic}. }
+        \]
+      </div>
+      <p>
+        This is better than selecting switch points arbitrarily.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.255 Sensor Handover and Adaptive Fusion</h3>
+      <p>
+        Handover logic naturally connects to adaptive fusion.
+      </p>
+      <p>
+        Instead of fixed
+      </p>
+      <div class="equation-box">
+        \[
+        \mathbf Q, \mathbf R,
+        \]
+      </div>
+      <p>
+        the estimator may modify them online according to:
+      </p>
+      <ul>
+        <li>sensor quality,</li>
+        <li>dynamics,</li>
+        <li>environment.</li>
+      </ul>
+      <p>
+        This becomes the subject of the later adaptive sensor fusion section.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.256 Difference Between Handover and Adaptive Fusion</h3>
+      <p>
+        Handover changes the <strong>active sensor configuration or mode</strong>.
+      </p>
+      <p>
+        Adaptive fusion changes <strong>estimator parameters continuously</strong>.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Handover} = \text{Discrete Configuration Change} }
+        \]
+      </div>
+      <p>
+        while
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Adaptive Fusion} = \text{Continuous Parameter Adjustment}. }
+        \]
+      </div>
+      <p>
+        They can operate together.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.257 Robust Mode-Dependent Fusion</h3>
+      <p>
+        A robust architecture may combine:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Mode Logic} + \text{Sensor Validity} + \text{Statistical Gating} + \text{Adaptive Covariance} + \text{FDIR}. }
+        \]
+      </div>
+      <p>
+        Each component addresses a different failure mechanism.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.258 Common Implementation Mistake: Switching on Range Only</h3>
+      <p>
+        One common mistake is:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho<\rho_0 \Rightarrow \text{Switch Sensor}. }
+        \]
+      </div>
+      <p>
+        This ignores:
+      </p>
+      <ul>
+        <li>whether the new sensor is valid,</li>
+        <li>whether its geometry is good,</li>
+        <li>whether its covariance is acceptable,</li>
+        <li>whether it has converged.</li>
+      </ul>
+      <p>
+        Range should normally be only one part of the transition logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.259 Common Implementation Mistake: Resetting State</h3>
+      <p>
+        Replacing the current state with a new sensor solution can introduce discontinuity.
+      </p>
+      <p>
+        Prefer:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Measurement Update} }
+        \]
+      </div>
+      <p>
+        over
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{State Replacement} }
+        \]
+      </div>
+      <p>
+        unless explicit reinitialization is required.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.260 Common Implementation Mistake: Ignoring Covariance</h3>
+      <p>
+        A new sensor may appear numerically close to the current estimate.
+      </p>
+      <p>
+        But if its covariance is unknown, the estimator cannot determine how strongly to trust it.
+      </p>
+      <p>
+        Thus handover without uncertainty modeling is incomplete.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.261 Common Implementation Mistake: No Overlap</h3>
+      <p>
+        Transitioning only after the previous sensor is lost creates a blind boundary.
+      </p>
+      <p>
+        Whenever possible:
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Activate New Sensor Before Old Sensor Becomes Unusable}. }
+        \]
+      </div>
+      <p>
+        This provides time for validation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.262 Common Implementation Mistake: No Hysteresis</h3>
+      <p>
+        Using one identical threshold for both forward and reverse transition can create mode chatter.
+      </p>
+      <p>
+        Always consider:
+      </p>
+      <ul>
+        <li>hysteresis,</li>
+        <li>persistence,</li>
+        <li>dwell.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.263 Common Implementation Mistake: Treating Availability as Accuracy</h3>
+      <p>
+        A sensor producing data is not necessarily accurate.
+      </p>
+      <p>
+        Validity should include measurement-quality checks.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.264 Common Implementation Mistake: Treating Quality as Independence</h3>
+      <p>
+        Two high-quality sensors may share the same bias source.
+      </p>
+      <p>
+        Their apparent agreement does not prove independence.
+      </p>
+      <p>
+        Cross-correlation matters.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.265 Common Implementation Mistake: Ignoring Processing Delay</h3>
+      <p>
+        A camera or LiDAR pose can be precise but old.
+      </p>
+      <p>
+        The estimator should use measurement epoch, not packet-arrival time.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.266 Common Implementation Mistake: No Recovery Logic</h3>
+      <p>
+        A robust architecture must specify what happens if the new sensor fails after handover.
+      </p>
+      <p>
+        Otherwise one successful nominal transition is not enough to establish reliability.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.267 Practical Flight-Software Sequence</h3>
+      <p>
+        A representative flight-software cycle may be:
+      </p>
+      <ol>
+        <li>propagate state,</li>
+        <li>propagate covariance,</li>
+        <li>read current navigation mode,</li>
+        <li>check sensor-health flags,</li>
+        <li>evaluate transition guards,</li>
+        <li>pre-activate required sensors,</li>
+        <li>process available measurements,</li>
+        <li>validate quality,</li>
+        <li>form innovations,</li>
+        <li>apply statistical gates,</li>
+        <li>perform measurement updates,</li>
+        <li>update confidence counters,</li>
+        <li>update mode readiness,</li>
+        <li>commit or abort pending transition,</li>
+        <li>update navigation validity,</li>
+        <li>publish state, covariance, mode, and health.</li>
+      </ol>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.268 Published Navigation Interface</h3>
+      <p>
+        A useful output may be
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \{ \hat{\mathbf x}, \mathbf P, M_{nav}, \texttt{NAV\_VALID}, \texttt{SENSOR\_HEALTH}, \texttt{MODE\_READY} \}. }
+        \]
+      </div>
+      <p>
+        This communicates both estimate and operating context.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.269 Practical Design Philosophy</h3>
+      <p>
+        A robust mode-dependent fusion system should:
+      </p>
+      <ol>
+        <li>define sensor operating envelopes,</li>
+        <li>define navigation modes explicitly,</li>
+        <li>avoid switching on range alone,</li>
+        <li>pre-activate new sensors,</li>
+        <li>use overlap regions,</li>
+        <li>validate new sensors statistically,</li>
+        <li>use hysteresis,</li>
+        <li>use dwell time where appropriate,</li>
+        <li>maintain one continuous navigation state where possible,</li>
+        <li>preserve covariance continuity,</li>
+        <li>model timing correctly,</li>
+        <li>maintain frame consistency,</li>
+        <li>use realistic measurement covariance,</li>
+        <li>avoid arbitrary sensor priority,</li>
+        <li>monitor observability,</li>
+        <li>support degraded modes,</li>
+        <li>include fallback logic,</li>
+        <li>test reverse transitions,</li>
+        <li>test fault-driven transitions,</li>
+        <li>validate transitions statistically.</li>
+      </ol>
+      <div class="concept-note">
+        <h4>Engineering principle</h4>
+        <p>Reliable handover comes from measured readiness, explicit transition logic, overlapping coverage, correct timing and frames, realistic covariance, observability checks, and tested fallback behavior—not from a single range threshold.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.25.270 Key Takeaways</h3>
+      <p>
+        <strong>1. No single sensor is usually optimal throughout an entire navigation scenario.</strong>
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Operating Condition Changes} \rightarrow \text{Sensor Usefulness Changes}. }
+        \]
+      </div>
+      <p>
+        <strong>2. Sensor handover should be treated as an information transition, not a simple hardware switch.</strong>
+      </p>
+      <p>
+        <strong>3. The preferred sequence is generally</strong>
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Old Sensor} \rightarrow \text{Overlap} \rightarrow \text{New Sensor Dominant}. }
+        \]
+      </div>
+      <p>
+        <strong>4. Sensor validity is different from hardware availability.</strong>
+      </p>
+      <p>
+        <strong>5. Measurement validity is different from sensor validity.</strong>
+      </p>
+      <p>
+        <strong>6. Range should not normally be the only handover criterion.</strong>
+      </p>
+      <p>
+        <strong>7. Covariance, geometry, and sensor quality matter.</strong>
+      </p>
+      <p>
+        <strong>8. Hysteresis prevents repeated switching near boundaries.</strong>
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \rho_{exit} > \rho_{enter}. }
+        \]
+      </div>
+      <p>
+        <strong>9. Dwell time prevents one transient condition from triggering mode change.</strong>
+      </p>
+      <p>
+        <strong>10. Newly activated sensors should be validated before full trust.</strong>
+      </p>
+      <p>
+        <strong>11. Sensor confidence can be increased gradually.</strong>
+      </p>
+      <p>
+        <strong>12. Hard state replacement can create artificial jumps.</strong>
+      </p>
+      <p>
+        <strong>13. A continuous fused state with changing sensor weighting is usually preferable.</strong>
+      </p>
+      <p>
+        <strong>14. Covariance should remain physically consistent through transitions.</strong>
+      </p>
+      <p>
+        <strong>15. Unrealistically small measurement covariance can cause covariance collapse.</strong>
+      </p>
+      <p>
+        <strong>16. Frames and timestamps must be aligned before cross-sensor comparison.</strong>
+      </p>
+      <p>
+        <strong>17. Sensor overlap enables cross-validation.</strong>
+      </p>
+      <p>
+        <strong>18. Overlap also improves fault isolation and calibration checks.</strong>
+      </p>
+      <p>
+        <strong>19. Planned handover and fault-driven handover are different problems.</strong>
+      </p>
+      <p>
+        <strong>20. A degraded mode can preserve useful navigation after sensor loss.</strong>
+      </p>
+      <p>
+        <strong>21. Removing a sensor can change observability.</strong>
+      </p>
+      <p>
+        <strong>22. Navigation mode and mission mode are not necessarily identical.</strong>
+      </p>
+      <p>
+        <strong>23. Requested mode and active mode should be distinguished.</strong>
+      </p>
+      <p>
+        <strong>24. Navigation readiness should be based on actual estimator capability.</strong>
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Readiness} = \text{Valid Sensors} + \text{Acceptable Covariance} + \text{Adequate Observability}. }
+        \]
+      </div>
+      <p>
+        <strong>25. Transition testing should include state jumps, covariance behavior, settling time, and recovery.</strong>
+      </p>
+      <p>
+        <strong>26. Monte Carlo tests should vary timing, noise, bias, dropout, alignment, and transition thresholds.</strong>
+      </p>
+      <p>
+        <strong>27. Handover logic should include fallback and abort paths.</strong>
+      </p>
+      <p>
+        <strong>28. Sensor processing latency is part of the handover problem.</strong>
+      </p>
+      <p>
+        <strong>29. Sensor handover and redundancy are closely connected.</strong>
+      </p>
+      <p>
+        <strong>30. Sensor handover and adaptive fusion are related but not identical.</strong>
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Handover} = \text{Discrete Configuration Change} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Adaptive Fusion} = \text{Continuous Estimator Adjustment}. }
+        \]
+      </div>
+      <p>
+        <strong>31. The central engineering principle is</strong>
+      </p>
+      <div class="equation-box">
+        \[
+        \boxed{ \begin{array}{c} \text{A navigation system should not switch sensors merely because a range boundary was crossed.}\\[4pt] \text{It should transition only when the new sensor set is valid, informative,}\\[4pt] \text{statistically consistent, and capable of supporting the required navigation state.}\\[4pt] \text{The state and covariance should remain continuous while the information sources evolve.} \end{array} }
+        \]
+      </div>
+      <p>
+        The natural next section is <strong>4.2.26 Redundancy and Multi-Sensor Fusion</strong>, where the focus shifts from transitioning between sensor sets to operating multiple redundant sensors simultaneously, including voting, weighted fusion, cross-checking, fault isolation, covariance-aware combination, and graceful degradation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.2.26 Redundancy and Multi-Sensor Fusion</h2>
+      <p>
+        After developing sensor handover, overlapping operating envelopes, validity logic, covariance continuity, hysteresis, dwell time, transition guards, observability, degraded modes, fault-driven switching, and verification of mode transitions, the next section focuses on how multiple redundant sensors can operate simultaneously while preserving consistency, fault tolerance, and graceful degradation.
+      </p>
+      <a href="sensor-redundancy.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2.26 Redundancy and Multi-Sensor Fusion</h3>
+          <p>
+            Multiple gyroscopes, star trackers, GNSS receivers, cameras, and redundant sensor channels; voting, weighted fusion, covariance-aware combination, fault isolation, cross-checking, sensor diversity, common-cause failures, and graceful degradation.
+          </p>
+          <p class="sensor-link-arrow">Continue to Redundancy and Multi-Sensor Fusion &rarr;</p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+  <footer class="site-footer">
+    <p>© 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics. Educational resource for spacecraft dynamics, orbital mechanics, guidance–navigation–control systems, sensor modelling, state estimation, and spacecraft sensor fusion.</p>
+  </footer>
+</body>
+</html>
