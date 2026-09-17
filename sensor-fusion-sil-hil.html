@@ -1,0 +1,2127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.31 SIL/HIL and Flight Validation | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="notes-hero">
+    <h1>SIL/HIL and Flight Validation</h1>
+
+    <p class="notes-tagline">
+      Software-in-the-loop, processor-in-the-loop, hardware-in-the-loop, sensor emulation, real interfaces, timing verification,
+      latency, communication protocols, recorded-data replay, fault injection, closed-loop GNC testing, flight-test validation,
+      estimator consistency, qualification, and traceable spacecraft navigation verification.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.2.31 SIL/HIL and Flight Validation</h2>
+      <p>
+        Developing a sensor-fusion algorithm in MATLAB or Simulink is only the beginning of the navigation-system development process. A filter may perform extremely well in an offline simulation while still failing when converted into software, executed at real-time rates, connected through actual communication interfaces, or supplied with real sensor data.
+      </p>
+      <p>
+        For this reason, spacecraft navigation algorithms normally progress through increasingly realistic verification environments.
+      </p>
+      <p>
+        A useful progression is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Model Simulation} \rightarrow \text{SIL} \rightarrow \text{PIL} \rightarrow \text{HIL} \rightarrow \text{Integrated System Testing} \rightarrow \text{Flight Validation} }
+        \]
+      </p>
+      <p>
+        Each stage removes some of the assumptions present in the previous stage.
+      </p>
+      <p>
+        During mathematical simulation, the estimator is mainly being tested as an algorithm. During SIL, the executable software implementation becomes part of the test. During PIL, the target processor becomes part of the test. During HIL, real-time hardware, communication interfaces, timing, sensor emulation, and other physical components enter the loop. Flight validation finally evaluates the navigation system using measurements obtained in the actual operating environment.
+      </p>
+      <p>
+        The central question therefore changes progressively from
+      </p>
+      <p>
+        \[
+\boxed{\text{Does the estimator mathematics work?}}
+        \]
+      </p>
+      <p>
+        to
+      </p>
+      <p>
+        \[
+\boxed{\text{Does the implemented navigation system work under realistic hardware and operational conditions?}}
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.1 Verification, Validation, and Qualification</h3>
+      <p>
+        These terms should be distinguished carefully.
+      </p>
+      <p>
+        <strong>Verification</strong> asks whether the system was implemented according to its specified design and requirements.
+      </p>
+      <p>
+        \[
+\boxed{\text{Verification: Did we build the system correctly?}}
+        \]
+      </p>
+      <p>
+        Examples include checking whether the implemented EKF equations match the reference algorithm, whether a sensor message is decoded correctly, whether the covariance matrix is propagated at the intended rate, or whether the estimator meets its execution-time requirement.
+      </p>
+      <p>
+        <strong>Validation</strong> asks whether the resulting system is suitable for the intended operational problem.
+      </p>
+      <p>
+        \[
+\boxed{\text{Validation: Did we build the correct system?}}
+        \]
+      </p>
+      <p>
+        For example, an estimator can be mathematically and computationally correct but still provide insufficient position accuracy for a particular navigation phase.
+      </p>
+      <p>
+        <strong>Qualification</strong> goes further and demonstrates that the hardware/software system can satisfy specified requirements under the required operational and environmental conditions.
+      </p>
+      <p>
+        These concepts overlap during navigation development, but they answer different engineering questions.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.2 Why Simulation Alone Is Not Enough</h3>
+      <p>
+        An ideal simulation often assumes perfect execution of the estimator equations. Real systems introduce additional effects:
+      </p>
+      <p>
+        \[
+\boxed{ \text{Real System} = \text{Algorithm} + \text{Software} + \text{Processor} + \text{Interfaces} + \text{Timing} + \text{Hardware} + \text{Environment} }
+        \]
+      </p>
+      <p>
+        Problems that may not appear in a desktop simulation include execution jitter, finite numerical precision, packet delays, dropped messages, incorrect byte ordering, timestamp errors, task overruns, asynchronous sensor arrival, processor loading, communication latency, driver behavior, initialization sequencing, hardware resets, clock drift, and corrupted data.
+      </p>
+      <p>
+        Consequently,
+      </p>
+      <p>
+        \[
+\boxed{\text{Successful Simulation} \not\Rightarrow \text{Successful Flight Implementation}}
+        \]
+      </p>
+      <p>
+        Simulation verifies an important part of the system, but not the complete implementation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.3 Validation Ladder for Sensor Fusion</h3>
+      <p>
+        A useful sensor-fusion validation ladder is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Algorithm Verification} \rightarrow \text{SIL} \rightarrow \text{PIL} \rightarrow \text{HIL} \rightarrow \text{Integrated Avionics Test} \rightarrow \text{Flight Validation} }
+        \]
+      </p>
+      <p>
+        At each stage, more of the real system replaces simulated components.
+      </p>
+      <p>
+        The objective is not simply to repeat the same test using more expensive equipment. Each stage should expose a different class of failure.
+      </p>
+      <p><strong>Engineering interpretation:</strong> The value of the ladder is progressive isolation. If a discrepancy first appears at PIL, the investigation can focus on processor, compiler, numerical, or scheduling effects instead of re-opening already verified estimator mathematics.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.4 Reference or Golden Model</h3>
+      <p>
+        Before SIL or HIL testing begins, a trusted reference implementation should normally exist.
+      </p>
+      <p>
+        This may be a MATLAB implementation, validated Simulink model, or another independently verified numerical model.
+      </p>
+      <p>
+        Let the reference navigation output be
+      </p>
+      <p>
+        \[
+\hat{\mathbf x}_{ref}(t)
+        \]
+      </p>
+      <p>
+        and the implementation under test produce
+      </p>
+      <p>
+        \[
+\hat{\mathbf x}_{test}(t).
+        \]
+      </p>
+      <p>
+        The implementation difference can then be evaluated as
+      </p>
+      <p>
+        \[
+\boxed{ \mathbf e_{impl}(t) = \hat{\mathbf x}_{test}(t) - \hat{\mathbf x}_{ref}(t) }
+        \]
+      </p>
+      <p>
+        within defined numerical tolerances.
+      </p>
+      <p>
+        The reference model provides a baseline against which later software and hardware implementations can be compared.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.5 Software-in-the-Loop — SIL</h3>
+      <p>
+        Software-in-the-loop testing evaluates the actual or representative navigation software while the surrounding spacecraft and sensor environment remains simulated.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Simulated Dynamics} \rightarrow \text{Simulated Sensors} \rightarrow \text{Flight-Like Navigation Software} \rightarrow \text{Navigation Output} }
+        \]
+      </p>
+      <p>
+        The important transition is that the estimator is no longer merely represented by convenient simulation blocks. Its software implementation is being exercised.
+      </p>
+      <p>
+        SIL can reveal errors introduced while translating mathematical equations into software.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.6 Objectives of SIL Testing</h3>
+      <p>
+        SIL should verify that the implemented software reproduces the intended estimator behavior.
+      </p>
+      <p>
+        Important checks include state propagation, covariance propagation, measurement prediction, innovation calculation, Kalman gain calculation, state correction, covariance correction, quaternion updates, normalization, measurement gating, sensor validity logic, mode switching, initialization, reset behavior, and navigation-health logic.
+      </p>
+      <p>
+        The SIL output should be compared with the reference model:
+      </p>
+      <p>
+        \[
+\boxed{ \hat{\mathbf x}_{SIL} \approx \hat{\mathbf x}_{reference} }
+        \]
+      </p>
+      <p>
+        and, where applicable,
+      </p>
+      <p>
+        \[
+\boxed{ \mathbf P_{SIL} \approx \mathbf P_{reference}. }
+        \]
+      </p>
+      <p>
+        Small numerical differences may be acceptable depending on numerical precision and implementation details, but unexplained divergence should be investigated.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.7 SIL Test Inputs</h3>
+      <p>
+        SIL should not be limited to nominal trajectories.
+      </p>
+      <p>
+        Inputs should include deterministic cases, noisy sensor data, biased measurements, initialization errors, sensor dropout, measurement latency, outliers, asynchronous measurements, invalid packets, mode transitions, sensor reacquisition, and dynamic manoeuvres.
+      </p>
+      <p>
+        The same Monte Carlo cases developed in Section 4.2.30 can also become SIL regression cases.
+      </p>
+      <p>
+        This provides continuity:
+      </p>
+      <p>
+        \[
+\boxed{ \text{Monte Carlo Simulation Cases} \rightarrow \text{SIL Regression Cases} }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.8 Automatically Generated Code</h3>
+      <p>
+        When Simulink code generation is used, SIL provides an important opportunity to compare model behavior against generated code.
+      </p>
+      <p>
+        The desired relationship is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Simulink Reference} \approx \text{Generated-Code SIL} }
+        \]
+      </p>
+      <p>
+        The comparison should cover more than final state estimates. Intermediate quantities such as innovations, covariance, gains, validity flags, estimator modes, and reset events should also be compared.
+      </p>
+      <p>
+        This helps isolate discrepancies before processor hardware is introduced.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Generated code should be treated as a new implementation artifact rather than assumed equivalent to the model. Equivalence testing is strongest when intermediate estimator quantities are compared at identical timestamps and update events.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.9 Numerical Precision in SIL</h3>
+      <p>
+        A desktop model may use double-precision arithmetic while flight software may use single precision or another constrained numerical representation.
+      </p>
+      <p>
+        Therefore tests should examine
+      </p>
+      <p>
+        \[
+\text{double precision} \quad\text{vs}\quad \text{flight implementation precision}.
+        \]
+      </p>
+      <p>
+        Quantities especially sensitive to numerical precision include covariance matrices, very small process-noise values, quaternion normalization, matrix factorization, innovation covariance, and nearly singular geometries.
+      </p>
+      <p>
+        An estimator that works in double precision should not automatically be assumed to behave identically under the flight numerical architecture.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.10 Processor-in-the-Loop — PIL</h3>
+      <p>
+        PIL introduces the target or representative processor.
+      </p>
+      <p>
+        The architecture becomes
+      </p>
+      <p>
+        \[
+\boxed{ \text{Host Simulation} \leftrightarrow \text{Target Processor Running Navigation Software} }
+        \]
+      </p>
+      <p>
+        The physical spacecraft and sensors may still be simulated, but the estimator executes on hardware representative of the onboard computer.
+      </p>
+      <p>
+        This allows verification of both numerical equivalence and computational performance.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.11 Why PIL Is Important</h3>
+      <p>
+        PIL can expose processor-specific effects that SIL cannot reproduce completely.
+      </p>
+      <p>
+        These include execution time, compiler behavior, optimization effects, processor architecture, floating-point implementation, memory limitations, task scheduling, and data representation.
+      </p>
+      <p>
+        The navigation software must not only produce the correct answer; it must produce it before its deadline.
+      </p>
+      <p>
+        If an estimator has an update period
+      </p>
+      <p>
+        \[
+T_{nav},
+        \]
+      </p>
+      <p>
+        its worst-case execution time should satisfy an appropriate timing margin such as
+      </p>
+      <p>
+        \[
+\boxed{ T_{exec,max}<T_{nav}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.12 Execution-Time Measurement</h3>
+      <p>
+        Average execution time alone is insufficient.
+      </p>
+      <p>
+        Important quantities include
+      </p>
+      <p>
+        \[
+T_{exec,min},\qquad T_{exec,mean},\qquad T_{exec,max}
+        \]
+      </p>
+      <p>
+        and preferably the distribution of execution times.
+      </p>
+      <p>
+        Worst-case behavior may occur during expensive measurement updates, simultaneous sensor arrivals, mode transitions, matrix operations, or fault-handling routines.
+      </p>
+      <p>
+        The processor load should therefore be examined under realistic worst-case conditions.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Timing should be assessed under representative peak workload, not only during a quiet nominal case. Simultaneous measurement updates, logging, fault logic, and matrix operations often create the longest execution paths.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.13 Real-Time Deadline Verification</h3>
+      <p>
+        Suppose the estimator executes at
+      </p>
+      <p>
+        \[
+f_{nav}=100\text{ Hz}.
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+T_{nav}=10\text{ ms}.
+        \]
+      </p>
+      <p>
+        If a navigation cycle occasionally requires 12 ms, the estimator may be mathematically correct but operationally unsuitable.
+      </p>
+      <p>
+        Thus,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Correct Numerical Output} + \text{Missed Deadline} = \text{Implementation Failure} }
+        \]
+      </p>
+      <p>
+        for a real-time task whose result is required within that deadline.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.14 Hardware-in-the-Loop — HIL</h3>
+      <p>
+        Hardware-in-the-loop testing introduces real hardware into a real-time simulated environment.
+      </p>
+      <p>
+        A general architecture is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Real-Time Dynamics Simulator} \rightarrow \text{Sensor Emulator / Interfaces} \rightarrow \text{Flight Computer} \rightarrow \text{Navigation Software} }
+        \]
+      </p>
+      <p>
+        with appropriate outputs returned to the simulation or other avionics.
+      </p>
+      <p>
+        HIL moves testing from primarily algorithm/software verification toward system-level behavior.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.15 What HIL Adds</h3>
+      <p>
+        HIL can introduce effects such as actual processors, interface boards, real communication protocols, hardware clocks, physical wiring, sensor emulators, real sensor electronics, actuator electronics, network traffic, operating-system scheduling, interrupt behavior, and realistic data latency.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+\boxed{ \text{HIL} = \text{Real Hardware} + \text{Real-Time Simulation} + \text{Real Interfaces} }
+        \]
+      </p>
+      <p>
+        at the appropriate level of system fidelity.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.16 Real-Time Simulation</h3>
+      <p>
+        For HIL, the simulated environment must normally execute in real time.
+      </p>
+      <p>
+        If the physical interval is
+      </p>
+      <p>
+        \[
+\Delta t=1\text{ ms},
+        \]
+      </p>
+      <p>
+        the simulator must complete the required computation and I/O within the corresponding real-time interval.
+      </p>
+      <p>
+        Unlike an offline simulation, it cannot simply slow down when computation becomes difficult.
+      </p>
+      <p>
+        This requirement makes computational determinism an important part of HIL architecture.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Real-time fidelity requires both correct equations and deterministic scheduling. A simulator that produces accurate states but misses its wall-clock deadlines can invalidate HIL timing, latency, and interface conclusions.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.17 Sensor Emulation</h3>
+      <p>
+        A sensor emulator attempts to reproduce what the flight computer would receive from a real sensor.
+      </p>
+      <p>
+        Instead of passing an ideal Simulink vector directly to the estimator, the chain becomes closer to
+      </p>
+      <p>
+        \[
+\boxed{ \text{Truth Simulation} \rightarrow \text{Sensor Physics/Errors} \rightarrow \text{Sensor Data Format} \rightarrow \text{Physical Interface} \rightarrow \text{Flight Computer} }
+        \]
+      </p>
+      <p>
+        The emulator may reproduce sensor update rates, quantization, message structure, timestamps, status words, noise, bias, latency, dropout, and fault conditions.
+      </p>
+      <p>
+        This tests substantially more than the estimator equation alone.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.18 Electrical-Level Sensor Emulation</h3>
+      <p>
+        Different HIL configurations can inject data at different levels.
+      </p>
+      <p>
+        A high-level emulator may transmit already formatted digital messages.
+      </p>
+      <p>
+        A deeper emulator may reproduce electrical or protocol-level behavior.
+      </p>
+      <p>
+        The choice depends on what is being verified.
+      </p>
+      <p>
+        If only estimator mathematics is being tested, high-level injection may be sufficient. If drivers, interfaces, synchronization, and avionics integration are being verified, lower-level emulation becomes more valuable.
+      </p>
+      <p><strong>Engineering interpretation:</strong> The injection level determines what is actually being verified. Injecting already-decoded values can validate estimator logic, but it bypasses physical interfaces, drivers, packet parsing, electrical behavior, and some timing effects.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.19 Real Sensors in the Loop</h3>
+      <p>
+        Some tests can use actual sensors rather than emulated measurements.
+      </p>
+      <p>
+        Examples can include an IMU mounted on a motion platform, a camera viewing a simulated target scene, a star tracker viewing an optical simulator, or a ranging sensor observing a representative target.
+      </p>
+      <p>
+        The architecture becomes
+      </p>
+      <p>
+        \[
+\boxed{ \text{Physical Stimulus} \rightarrow \text{Real Sensor} \rightarrow \text{Flight Interface} \rightarrow \text{Navigation Computer} }
+        \]
+      </p>
+      <p>
+        This validates sensor behavior and navigation processing together.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.20 IMU HIL Testing</h3>
+      <p>
+        For an IMU, a motion table can provide known angular motion or acceleration.
+      </p>
+      <p>
+        The sensor reports
+      </p>
+      <p>
+        \[
+\boldsymbol{\omega}_m,\qquad \mathbf f_m
+        \]
+      </p>
+      <p>
+        while the commanded table motion provides a reference.
+      </p>
+      <p>
+        Tests can examine scale factor, bias, axis alignment, latency, sampling, saturation, startup behavior, bias stability, and estimator bias convergence.
+      </p>
+      <p>
+        The objective is not simply to check whether the IMU produces data, but whether the complete navigation chain interprets those data correctly.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.21 Camera and Vision HIL</h3>
+      <p>
+        Vision-based navigation requires additional considerations because the measurement depends on scene geometry and image processing.
+      </p>
+      <p>
+        A test architecture can be
+      </p>
+      <p>
+        \[
+\boxed{ \text{Simulated Geometry} \rightarrow \text{Rendered Optical Scene} \rightarrow \text{Camera} \rightarrow \text{Vision Processing} \rightarrow \text{Estimator} }
+        \]
+      </p>
+      <p>
+        Tests should consider illumination, field of view, target visibility, image rate, image-processing latency, feature loss, false detections, blur, exposure, and geometry.
+      </p>
+      <p>
+        The navigation system should receive the same type of processed information expected during operation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.22 Range and LiDAR HIL</h3>
+      <p>
+        Range-based navigation can similarly be tested using physical targets, range simulators, synthetic measurement injection, or hardware emulators.
+      </p>
+      <p>
+        Relevant effects include minimum and maximum range, range resolution, update rate, field of view, target reflectivity, invalid returns, point-cloud processing latency, and target loss.
+      </p>
+      <p>
+        For navigation verification, the important output is not merely whether the sensor detects something but whether the resulting measurement produces the expected estimator correction.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.23 GNSS Hardware Testing</h3>
+      <p>
+        GNSS receiver testing can use a GNSS signal simulator to reproduce satellite signals corresponding to a prescribed trajectory.
+      </p>
+      <p>
+        This permits testing of receiver acquisition, tracking, navigation solutions, outages, geometry changes, Doppler behavior, timing, and navigation-software interfaces without requiring the vehicle to execute the actual trajectory.
+      </p>
+      <p>
+        For tightly coupled architectures, raw measurements such as pseudorange and Doppler can be particularly important.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Receiver-level testing is particularly valuable because it exercises acquisition, tracking, timing, message generation, and the navigation interface together. This is different from injecting an already-computed position and velocity solution.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.24 Communication Interfaces</h3>
+      <p>
+        Real navigation systems communicate through defined hardware interfaces and protocols.
+      </p>
+      <p>
+        Examples include CAN, UART, SPI, I²C, Ethernet, SpaceWire and other mission-specific buses.
+      </p>
+      <p>
+        Testing should verify message encoding, byte order, packet length, message identifiers, checksums or CRCs, timestamps, sequence counters, status fields, units, scaling, signed/unsigned interpretation, and error handling.
+      </p>
+      <p>
+        A correct estimator supplied with incorrectly decoded sensor data is still an incorrect navigation system.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.25 Interface Control Documents</h3>
+      <p>
+        Each navigation interface should have a clearly defined data contract.
+      </p>
+      <p>
+        An interface specification should describe quantities such as signal name, physical meaning, units, reference frame, data type, dimensions, scaling, valid range, update rate, timestamp convention, latency expectation, validity flags, and fault/status codes.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Measurement} = \{\mathbf z,\;t,\;frame,\;units,\;valid,\;status\}. }
+        \]
+      </p>
+      <p>
+        HIL provides an opportunity to verify that the actual implementation conforms to this interface definition.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.26 Timestamp Verification</h3>
+      <p>
+        Correct timestamps are fundamental to sensor fusion.
+      </p>
+      <p>
+        For a measurement
+      </p>
+      <p>
+        \[
+\mathbf z(t_m)
+        \]
+      </p>
+      <p>
+        the estimator must know that its physical acquisition time was <code>t_m</code>, even if it arrives later.
+      </p>
+      <p>
+        HIL testing should therefore distinguish
+      </p>
+      <p>
+        \[
+t_{measurement}, \qquad t_{arrival}, \qquad t_{processing}.
+        \]
+      </p>
+      <p>
+        These quantities are not interchangeable.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.27 End-to-End Latency</h3>
+      <p>
+        Total navigation latency may be decomposed approximately as
+      </p>
+      <p>
+        \[
+\boxed{ \tau_{total} = \tau_{sensor} + \tau_{processing} + \tau_{communication} + \tau_{queue} + \tau_{estimator} }
+        \]
+      </p>
+      <p>
+        and possibly additional downstream latency.
+      </p>
+      <p>
+        End-to-end latency should be measured rather than assumed.
+      </p>
+      <p>
+        For dynamic systems, even a highly accurate measurement can become harmful if it is applied at the wrong time.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.28 Timing Jitter</h3>
+      <p>
+        Latency may also vary.
+      </p>
+      <p>
+        If nominal delay is <code>\bar{\tau}</code>, actual delay may be
+      </p>
+      <p>
+        \[
+\tau_k=\bar{\tau}+\delta\tau_k.
+        \]
+      </p>
+      <p>
+        The variation
+      </p>
+      <p>
+        \[
+\delta\tau_k
+        \]
+      </p>
+      <p>
+        is timing jitter.
+      </p>
+      <p>
+        HIL testing should characterize both average latency and its variability because estimator performance may be sensitive to irregular measurement timing.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.29 Clock Synchronization</h3>
+      <p>
+        Different hardware components may maintain different clocks.
+      </p>
+      <p>
+        For two devices,
+      </p>
+      <p>
+        \[
+t_A \neq t_B
+        \]
+      </p>
+      <p>
+        unless synchronization is maintained.
+      </p>
+      <p>
+        Clock offset and drift can create apparent timing errors even when communication latency is small.
+      </p>
+      <p>
+        Navigation testing should therefore examine clock synchronization, timestamp origin, clock drift, rollover, reset behavior, and synchronization recovery.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.30 Asynchronous Sensor Arrival</h3>
+      <p>
+        Real sensors rarely deliver measurements simultaneously.
+      </p>
+      <p>
+        The navigation computer may receive IMU, GNSS, camera, LiDAR, star-tracker, or other measurements at independent times.
+      </p>
+      <p>
+        HIL should verify that
+      </p>
+      <p>
+        \[
+\boxed{ \text{New Valid Measurement} \Rightarrow \text{Correct Sensor-Specific Update} }
+        \]
+      </p>
+      <p>
+        without accidentally reusing old measurements.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Correct asynchronous fusion requires each update to use the state and covariance corresponding to the measurement epoch. Reusing stale data or applying a measurement at arrival time instead of measurement time can create systematic errors.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.31 Packet Loss</h3>
+      <p>
+        Communication systems may lose packets.
+      </p>
+      <p>
+        If measurement <code>k</code> is lost,
+      </p>
+      <p>
+        \[
+\mathbf z_k \rightarrow \varnothing.
+        \]
+      </p>
+      <p>
+        The estimator should normally continue propagation and process whatever other valid information remains available.
+      </p>
+      <p>
+        HIL tests should verify both isolated packet loss and burst loss.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Packet loss should be visible to navigation-health logic so that missing information is distinguished from a valid zero-valued measurement. The estimator should also avoid silently reusing an old sample as if it were new.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.32 Corrupted Data</h3>
+      <p>
+        Packets can also be corrupted.
+      </p>
+      <p>
+        Tests may deliberately introduce incorrect CRC, invalid length, impossible values, corrupted timestamps, invalid status fields, NaN/Inf values, or inconsistent sequence counters.
+      </p>
+      <p>
+        The desired architecture is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Corrupted Input} \rightarrow \text{Detection} \rightarrow \text{Rejection/Isolation} }
+        \]
+      </p>
+      <p>
+        rather than allowing bad information to silently enter the estimator.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.33 Sensor Dropout</h3>
+      <p>
+        Sensor dropout should be tested at the hardware/interface level as well as in simulation.
+      </p>
+      <p>
+        The navigation system should demonstrate graceful degradation:
+      </p>
+      <p>
+        \[
+\boxed{ \text{Sensor Loss} \rightarrow \text{Prediction / Remaining Sensors} \rightarrow \text{Increasing Uncertainty} }
+        \]
+      </p>
+      <p>
+        rather than an unexplained estimator failure.
+      </p>
+      <p>
+        Reacquisition should also be tested.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.34 Reacquisition</h3>
+      <p>
+        When a sensor becomes available again, its first measurement should not necessarily be accepted blindly.
+      </p>
+      <p>
+        A robust sequence may be
+      </p>
+      <p>
+        \[
+\boxed{ \text{Sensor Returns} \rightarrow \text{Health Check} \rightarrow \text{Measurement Validation} \rightarrow \text{Innovation Gate} \rightarrow \text{Update} }
+        \]
+      </p>
+      <p>
+        This is particularly important after long outages, during which estimator uncertainty and sensor conditions may have changed significantly.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.35 Fault Injection in HIL</h3>
+      <p>
+        HIL should support deliberate fault injection.
+      </p>
+      <p>
+        Useful faults include bias steps, increased noise, frozen output, saturation, delayed packets, dropped packets, corrupted packets, timestamp errors, frame errors, scale-factor errors, sensor resets, communication loss, and intermittent availability.
+      </p>
+      <p>
+        The objective is to evaluate the response of the complete navigation chain.
+      </p>
+      <p><strong>Engineering interpretation:</strong> A useful fault-injection campaign should define when the fault begins, its magnitude or duration, the expected detection mechanism, the allowed navigation disturbance, and the required recovery behavior.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.36 FDIR Interaction</h3>
+      <p>
+        Sensor fusion and Fault Detection, Isolation and Recovery are closely connected.
+      </p>
+      <p>
+        Estimator residuals can provide evidence of sensor inconsistency:
+      </p>
+      <p>
+        \[
+\mathbf r_k = \mathbf z_k-h(\hat{\mathbf x}_k^-).
+        \]
+      </p>
+      <p>
+        Large or persistent residuals may trigger monitoring logic.
+      </p>
+      <p>
+        The architecture can therefore include
+      </p>
+      <p>
+        \[
+\boxed{ \text{Sensor} \rightarrow \text{Estimator Residual} \rightarrow \text{FDIR} \rightarrow \text{Sensor Validity/Mode Logic} }
+        \]
+      </p>
+      <p>
+        HIL should verify this interaction, including false alarms and missed detections where relevant.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.37 Navigation Mode Transitions</h3>
+      <p>
+        Navigation systems may operate in several modes.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Initialization} \rightarrow \text{Acquisition} \rightarrow \text{Nominal Navigation} \rightarrow \text{Degraded Navigation} \rightarrow \text{Reacquisition} }
+        \]
+      </p>
+      <p>
+        HIL testing should verify both nominal transitions and unexpected transitions caused by faults or loss of measurements.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.38 Sensor Handover</h3>
+      <p>
+        Some missions use different sensor combinations as geometry, environment, or mission phase changes.
+      </p>
+      <p>
+        The important principle is general:
+      </p>
+      <p>
+        \[
+\boxed{ \text{Sensor Set A} \rightarrow \text{Overlap / Validation} \rightarrow \text{Sensor Set B} }
+        \]
+      </p>
+      <p>
+        Handover testing should verify continuity of the navigation solution, covariance behavior, residuals, timestamps, and validity logic.
+      </p>
+      <p>
+        There should not be an artificial state jump simply because the measurement source changes.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.39 RPO Navigation Validation</h3>
+      <p>
+        For general rendezvous and proximity operations, the navigation state may contain
+      </p>
+      <p>
+        \[
+\mathbf x_{rel} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol{\omega}_{rel} \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        Different sensors can constrain different components of this state depending on range, geometry, visibility, and operating conditions.
+      </p>
+      <p>
+        A general validation architecture therefore examines
+      </p>
+      <p>
+        \[
+\boxed{ \text{Relative Dynamics} + \text{Available Relative Measurements} \rightarrow \text{Relative Navigation Solution} }
+        \]
+      </p>
+      <p>
+        without assuming a particular spacecraft, sensor sequence, or mission architecture.
+      </p>
+      <p>
+        Tests should examine accuracy, continuity, sensor transitions, target loss, reacquisition, latency, relative-state observability, and navigation validity.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.40 Closed-Loop HIL</h3>
+      <p>
+        Eventually the estimator should be tested as part of the complete GNC loop.
+      </p>
+      <p>
+        \[
+\boxed{ \text{Real-Time Plant} \rightarrow \text{Sensors} \rightarrow \text{Navigation} \rightarrow \text{Guidance} \rightarrow \text{Control} \rightarrow \text{Actuation} \rightarrow \text{Plant} }
+        \]
+      </p>
+      <p>
+        This is critical because navigation errors now influence control actions.
+      </p>
+      <p>
+        A navigation disturbance may produce
+      </p>
+      <p>
+        \[
+\text{Navigation Error} \rightarrow \text{Control Error} \rightarrow \text{Trajectory Change} \rightarrow \text{New Measurements}.
+        \]
+      </p>
+      <p>
+        Thus the estimator can no longer be evaluated independently of the closed-loop system.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.41 Navigation-to-Guidance Interface</h3>
+      <p>
+        The navigation subsystem should provide a well-defined output interface such as
+      </p>
+      <p>
+        \[
+\boxed{ NavBus= \{ \hat{\mathbf x}, \mathbf P, timestamp, NavValid, NavMode, quality \}. }
+        \]
+      </p>
+      <p>
+        Guidance should consume this interface without requiring access to internal filter variables.
+      </p>
+      <p>
+        HIL should verify correct units, frames, timing, validity, and update rate across this boundary.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.42 Guidance-to-Control and Navigation-to-Control Interaction</h3>
+      <p>
+        Control may use navigation estimates directly.
+      </p>
+      <p>
+        For translation,
+      </p>
+      <p>
+        \[
+\mathbf e_r = \mathbf r_{ref}-\hat{\mathbf r},
+        \]
+      </p>
+      <p>
+        \[
+\mathbf e_v = \mathbf v_{ref}-\hat{\mathbf v}.
+        \]
+      </p>
+      <p>
+        For attitude,
+      </p>
+      <p>
+        \[
+\mathbf e_q = \mathbf q_{ref}\otimes\hat{\mathbf q}^{-1}.
+        \]
+      </p>
+      <p>
+        Therefore navigation bias, latency, noise, and dropout can propagate directly into actuator commands.
+      </p>
+      <p>
+        Integrated HIL testing should explicitly evaluate these effects.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.43 Actuator Feedback</h3>
+      <p>
+        Some navigation estimators use knowledge of applied control.
+      </p>
+      <p>
+        Therefore the distinction between
+      </p>
+      <p>
+        \[
+\mathbf u_{cmd}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+\mathbf u_{actual}
+        \]
+      </p>
+      <p>
+        remains important.
+      </p>
+      <p>
+        HIL can expose actuator delays, saturation, deadband, quantization, and command-interface behavior that may not have been represented fully in earlier simulation.
+      </p>
+      <p>
+        If actuator telemetry is available onboard, its use in the estimator should also be verified.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.44 Navigation Accuracy Requirements</h3>
+      <p>
+        Validation should always be linked to requirements.
+      </p>
+      <p>
+        Typical metrics include position error,
+      </p>
+      <p>
+        \[
+e_r=\|\mathbf r_{true}-\hat{\mathbf r}\|,
+        \]
+      </p>
+      <p>
+        velocity error,
+      </p>
+      <p>
+        \[
+e_v=\|\mathbf v_{true}-\hat{\mathbf v}\|,
+        \]
+      </p>
+      <p>
+        attitude error, angular-rate error, bias-estimation error, and relative-navigation errors.
+      </p>
+      <p>
+        A test should define pass/fail limits before the test rather than judging plots subjectively afterward.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.45 Navigation Availability</h3>
+      <p>
+        Accuracy alone is insufficient.
+      </p>
+      <p>
+        Navigation availability may be defined as the fraction of required operating time during which a valid navigation solution is available:
+      </p>
+      <p>
+        \[
+\boxed{ A_{nav} = \frac{T_{\text{valid navigation}}} {T_{\text{required operation}}}. }
+        \]
+      </p>
+      <p>
+        A system that is extremely accurate only intermittently may still be unsuitable.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.46 Navigation Continuity</h3>
+      <p>
+        Continuity concerns whether navigation remains available without unexpected interruption during an operation.
+      </p>
+      <p>
+        Testing should therefore monitor dropouts, estimator resets, invalid-state transitions, covariance excursions, sensor handovers, and processor faults.
+      </p>
+      <p>
+        This becomes particularly important during time-critical manoeuvres.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Continuity is a time-domain property. It is therefore evaluated by whether a valid solution remains available throughout a required operation, not simply by checking accuracy at isolated timestamps.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.47 Navigation Integrity</h3>
+      <p>
+        Navigation integrity concerns confidence that the provided solution is not misleading beyond acceptable limits without appropriate warning.
+      </p>
+      <p>
+        This introduces a distinction between
+      </p>
+      <p>
+        \[
+\boxed{\text{Estimate Accuracy}}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+\boxed{\text{Trustworthiness of the Reported Navigation Solution}}.
+        \]
+      </p>
+      <p>
+        Residual monitoring, covariance monitoring, sensor health, consistency checks, and validity logic all contribute to integrity assessment.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.48 Covariance Validation</h3>
+      <p>
+        When the estimator outputs covariance,
+      </p>
+      <p>
+        \[
+\mathbf P,
+        \]
+      </p>
+      <p>
+        HIL and flight-data analysis should compare actual estimation error with predicted uncertainty where truth or sufficiently accurate reference data are available.
+      </p>
+      <p>
+        For component <code>i</code>,
+      </p>
+      <p>
+        \[
+e_i=x_i-\hat{x}_i
+        \]
+      </p>
+      <p>
+        can be compared with
+      </p>
+      <p>
+        \[
+\pm3\sqrt{P_{ii}}.
+        \]
+      </p>
+      <p>
+        Repeated violations can indicate incorrect process noise, measurement noise, unmodelled errors, timing problems, or inconsistent estimator assumptions.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.49 Innovation Validation</h3>
+      <p>
+        Innovation should remain a central diagnostic:
+      </p>
+      <p>
+        \[
+\boxed{ \mathbf r_k = \mathbf z_k-h(\hat{\mathbf x}_k^-) }
+        \]
+      </p>
+      <p>
+        HIL should log innovations for every sensor.
+      </p>
+      <p>
+        Analysis should examine mean, variance, outliers, temporal correlation, gating events, and behavior around mode transitions or sensor faults.
+      </p>
+      <p>
+        A state estimate that appears smooth can still hide a badly inconsistent measurement model; innovations often reveal the problem.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.50 NIS During Hardware Testing</h3>
+      <p>
+        For innovation
+      </p>
+      <p>
+        \[
+\mathbf r_k
+        \]
+      </p>
+      <p>
+        and innovation covariance
+      </p>
+      <p>
+        \[
+\mathbf S_k,
+        \]
+      </p>
+      <p>
+        the normalized innovation squared is
+      </p>
+      <p>
+        \[
+\boxed{ NIS_k = \mathbf r_k^T\mathbf S_k^{-1}\mathbf r_k. }
+        \]
+      </p>
+      <p>
+        This can be used to evaluate whether innovations are statistically compatible with the uncertainty assumed by the estimator.
+      </p>
+      <p>
+        It also provides continuity with the Monte Carlo consistency analysis from Section 4.2.30.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.51 NEES When Reference Truth Is Available</h3>
+      <p>
+        When sufficiently accurate truth is available,
+      </p>
+      <p>
+        \[
+\tilde{\mathbf x} = \mathbf x_{true}-\hat{\mathbf x},
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+\boxed{ NEES = \tilde{\mathbf x}^{T} \mathbf P^{-1} \tilde{\mathbf x}. }
+        \]
+      </p>
+      <p>
+        This assesses whether actual state error is compatible with estimated covariance.
+      </p>
+      <p>
+        In hardware or flight testing, obtaining sufficiently accurate independent truth can itself be a major engineering challenge.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.52 Truth and Reference Systems</h3>
+      <p>
+        Ground testing can use high-accuracy reference instrumentation to establish truth.
+      </p>
+      <p>
+        Depending on the application, reference sources can include precision motion tables, optical tracking systems, metrology systems, external navigation systems, calibrated targets, or high-grade reference sensors.
+      </p>
+      <p>
+        The reference system should normally be more accurate than the system being validated.
+      </p>
+      <p>
+        Otherwise,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Measured Test Error} = \text{Navigation Error} + \text{Reference Error} }
+        \]
+      </p>
+      <p>
+        and the two contributions may be difficult to separate.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.53 Recorded-Data Replay</h3>
+      <p>
+        Recorded sensor data provide an important bridge between simulation and flight testing.
+      </p>
+      <p>
+        A common architecture is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Recorded Sensor Data} \rightarrow \text{Navigation Software} \rightarrow \text{Estimated State} }
+        \]
+      </p>
+      <p>
+        The same dataset can be replayed repeatedly after software changes.
+      </p>
+      <p>
+        This makes recorded data extremely valuable for regression testing.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.54 Deterministic Replay</h3>
+      <p>
+        For a fixed dataset and deterministic software configuration, repeated execution should ideally produce repeatable outputs within the expected numerical behavior.
+      </p>
+      <p>
+        If identical data generate different navigation solutions between runs, the cause should be understood.
+      </p>
+      <p>
+        Possible causes include nondeterministic scheduling, uninitialized memory, asynchronous execution, race conditions, or hidden state.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Deterministic replay is valuable because it turns a complex flight or HIL event into a repeatable software test. Once the same input sequence is preserved, algorithm changes can be compared against identical evidence.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.55 Regression Testing</h3>
+      <p>
+        Every corrected software defect should ideally become a regression test.
+      </p>
+      <p>
+        The philosophy is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Observed Failure} \rightarrow \text{Root Cause} \rightarrow \text{Correction} \rightarrow \text{Permanent Regression Case}. }
+        \]
+      </p>
+      <p>
+        A growing regression suite prevents previously solved problems from reappearing during later development.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.56 Requirement-Based Test Cases</h3>
+      <p>
+        Tests should map directly to requirements.
+      </p>
+      <p>
+        A useful structure is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Requirement} \rightarrow \text{Test Method} \rightarrow \text{Input} \rightarrow \text{Expected Result} \rightarrow \text{Pass/Fail Evidence}. }
+        \]
+      </p>
+      <p>
+        For example, a requirement on position accuracy should map to a defined scenario, truth source, evaluation interval, metric, and numerical acceptance limit.
+      </p>
+      <p>
+        This provides traceability.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.57 Test Coverage</h3>
+      <p>
+        Testing should cover more than nominal behavior.
+      </p>
+      <p>
+        Important categories include nominal cases, boundary conditions, worst-case conditions, initialization, degraded modes, sensor faults, communication faults, timing faults, processor loading, sensor handover, reset/recovery, and invalid inputs.
+      </p>
+      <p>
+        Coverage should address both functional behavior and numerical behavior.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.58 Boundary Testing</h3>
+      <p>
+        Parameters should be tested near operational limits.
+      </p>
+      <p>
+        Examples include minimum and maximum sensor range, field-of-view boundaries, maximum angular rate, maximum acceleration, maximum expected latency, minimum measurement quality, and covariance thresholds.
+      </p>
+      <p>
+        Many implementation failures occur near transitions rather than near nominal operating points.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.59 Stress Testing</h3>
+      <p>
+        Stress testing intentionally pushes the system beyond ordinary nominal loading.
+      </p>
+      <p>
+        Examples include unusually high sensor message rates, simultaneous measurements, heavy processor load, repeated packet corruption, long dropouts, rapid mode transitions, and extended operation.
+      </p>
+      <p>
+        The objective is to understand margins and failure behavior.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Stress tests are not intended to represent the most likely operating condition. They are used to identify margins, bottlenecks, queue growth, missed deadlines, and failure behavior before those effects appear unexpectedly in integrated testing.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.60 Long-Duration Testing</h3>
+      <p>
+        Some problems appear only after long execution periods.
+      </p>
+      <p>
+        Examples include clock drift, timer rollover, memory leakage, accumulated numerical error, slow covariance divergence, thermal effects, or bias evolution.
+      </p>
+      <p>
+        Long-duration HIL tests can therefore reveal failures that short functional tests cannot.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.61 Reset and Restart Testing</h3>
+      <p>
+        Navigation software should be tested through startup, reset, processor restart, sensor restart, and estimator reinitialization.
+      </p>
+      <p>
+        Questions include:
+      </p>
+      <p>
+        Does the estimator initialize safely? Are old measurements discarded? Are timestamps re-established? Is covariance initialized correctly? Does navigation validity remain false until sufficient information becomes available?
+      </p>
+      <p>
+        Reset behavior is part of the navigation architecture, not an exceptional afterthought.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.62 Parameter and Configuration Verification</h3>
+      <p>
+        The correct algorithm with the wrong configuration can still fail.
+      </p>
+      <p>
+        HIL should verify loaded values for
+      </p>
+      <p>
+        \[
+\mathbf Q,\quad \mathbf R,\quad \mathbf P_0,
+        \]
+      </p>
+      <p>
+        sensor calibration, frame transformations, sample rates, thresholds, and mode-dependent parameters.
+      </p>
+      <p>
+        Configuration identifiers and software versions should be recorded with every formal test.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.63 Software Version Control</h3>
+      <p>
+        Every verification result should be traceable to a specific software build and configuration.
+      </p>
+      <p>
+        A test record should identify the navigation-software version, model version, generated-code version where applicable, parameter set, hardware version, simulator version, test scenario, and test date.
+      </p>
+      <p>
+        Otherwise a successful test may not demonstrate the behavior of the final implementation.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Verification evidence is only valid for a known configuration. Software, calibration data, estimator tuning, hardware revision, and simulator configuration should therefore be treated as one controlled test baseline.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.64 Data Logging in SIL/PIL/HIL</h3>
+      <p>
+        The logging architecture should preserve enough information to reconstruct estimator behavior.
+      </p>
+      <p>
+        Important signals include
+      </p>
+      <p>
+        \[
+\mathbf z,\; \hat{\mathbf z},\; \mathbf r,\; \hat{\mathbf x},\; \mathbf P,\; \mathbf K
+        \]
+      </p>
+      <p>
+        together with timestamps, validity flags, update events, rejection events, navigation modes, sensor status, processor timing, controller outputs, and actuator commands.
+      </p>
+      <p>
+        Logging only the final navigation solution makes debugging unnecessarily difficult.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.65 Event Synchronization in Logs</h3>
+      <p>
+        Signals from different computers or sensors should be synchronized before comparison.
+      </p>
+      <p>
+        A position error computed from signals with different timestamps is not a valid position error.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Correct Analysis} = \text{Correct Data} + \text{Correct Time Alignment}. }
+        \]
+      </p>
+      <p>
+        Time synchronization should be treated as part of post-processing as well as real-time operation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.66 Automated Test Execution</h3>
+      <p>
+        Large navigation verification campaigns benefit strongly from automation.
+      </p>
+      <p>
+        A test framework can automatically configure the scenario, load software, initialize hardware, execute the test, record data, calculate metrics, compare requirements, generate plots, and produce a pass/fail report.
+      </p>
+      <p>
+        This improves repeatability and reduces manual errors.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.67 Automated Pass/Fail Criteria</h3>
+      <p>
+        Where possible, formal tests should use quantitative acceptance criteria.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+RMSE_r < r_{req},
+        \]
+      </p>
+      <p>
+        \[
+RMSE_v < v_{req},
+        \]
+      </p>
+      <p>
+        \[
+T_{exec,max}<T_{deadline},
+        \]
+      </p>
+      <p>
+        and defined navigation availability or consistency requirements.
+      </p>
+      <p>
+        Plots remain useful, but they should support rather than replace quantitative evaluation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.68 Monte Carlo HIL</h3>
+      <p>
+        Not every Monte Carlo run needs physical hardware, because HIL time is expensive.
+      </p>
+      <p>
+        However, selected uncertainty campaigns can be executed through HIL.
+      </p>
+      <p>
+        A practical approach is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Large Simulation Monte Carlo} \rightarrow \text{Selected SIL/PIL Campaign} \rightarrow \text{Focused HIL Cases}. }
+        \]
+      </p>
+      <p>
+        HIL cases should emphasize uncertainties and failures that depend on hardware, timing, interfaces, or real-time execution.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.69 Worst-Case Case Selection</h3>
+      <p>
+        Monte Carlo analysis can help identify difficult cases.
+      </p>
+      <p>
+        These cases can then be replayed through SIL or HIL.
+      </p>
+      <p>
+        Thus,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Monte Carlo Failure/Boundary Case} \rightarrow \text{Deterministic Replay} \rightarrow \text{HIL Verification}. }
+        \]
+      </p>
+      <p>
+        This is usually more informative than selecting HIL scenarios arbitrarily.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.70 Model Correlation</h3>
+      <p>
+        As testing progresses, simulation results should be compared against hardware measurements.
+      </p>
+      <p>
+        If the real sensor exhibits different noise, bias, latency, or dropout behavior from the sensor model, the simulation model should be reconsidered.
+      </p>
+      <p>
+        This creates a useful feedback loop:
+      </p>
+      <p>
+        \[
+\boxed{ \text{Simulation} \rightarrow \text{Hardware Test} \rightarrow \text{Model Correlation} \rightarrow \text{Improved Simulation}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> Correlation closes the loop between simulation and hardware evidence. Differences should be used to improve sensor, timing, and interface models rather than merely adjusting plots after the test.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.71 Flight Validation</h3>
+      <p>
+        Flight validation evaluates navigation performance using measurements collected in the actual operating environment.
+      </p>
+      <p>
+        The architecture becomes
+      </p>
+      <p>
+        \[
+\boxed{ \text{Real Vehicle} + \text{Real Dynamics} + \text{Real Sensors} + \text{Real Environment} + \text{Flight Software}. }
+        \]
+      </p>
+      <p>
+        This is the highest-fidelity environment, but it is also the least controllable and usually the most expensive.
+      </p>
+      <p>
+        Therefore flight testing should build upon evidence already obtained through simulation, SIL, PIL, and HIL.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.72 Why Flight Validation Is Still Necessary</h3>
+      <p>
+        Ground tests cannot reproduce every operational effect perfectly.
+      </p>
+      <p>
+        Flight can reveal unmodelled environmental disturbances, actual sensor behavior, structural effects, thermal effects, electromagnetic interactions, real communication behavior, unexpected geometry, and operational procedures.
+      </p>
+      <p>
+        Flight validation therefore provides evidence that the integrated navigation system behaves correctly in its intended environment.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.73 Flight-Test Instrumentation</h3>
+      <p>
+        Where possible, additional instrumentation should provide independent reference information.
+      </p>
+      <p>
+        The objective is to compare
+      </p>
+      <p>
+        \[
+\hat{\mathbf x}_{flight}
+        \]
+      </p>
+      <p>
+        with the best available independent reference
+      </p>
+      <p>
+        \[
+\mathbf x_{ref}.
+        \]
+      </p>
+      <p>
+        Reference quality must be quantified because it limits the accuracy of the validation itself.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.74 Flight-Data Time Synchronization</h3>
+      <p>
+        Flight data may originate from multiple clocks and recorders.
+      </p>
+      <p>
+        Before estimator performance is assessed, data must be aligned to a common time basis.
+      </p>
+      <p>
+        This may require clock-offset correction, drift correction, packet-time reconstruction, interpolation, or event-based synchronization.
+      </p>
+      <p>
+        Poor synchronization can falsely appear as navigation error.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.75 Flight-Data Reconstruction</h3>
+      <p>
+        Post-flight analysis should reconstruct the complete navigation timeline.
+      </p>
+      <p>
+        This includes sensor availability, estimator mode, measurements accepted and rejected, innovations, state estimates, covariance, navigation validity, guidance commands, control commands, actuator activity, and important mission events.
+      </p>
+      <p>
+        The purpose is to understand not merely <strong>what</strong> the final error was, but <strong>why</strong> the estimator behaved as it did.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.76 Comparison with Pre-Flight Prediction</h3>
+      <p>
+        Flight results should be compared against predicted performance envelopes from simulation and Monte Carlo analysis.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Flight Error Distribution} \quad\text{vs}\quad \text{Predicted Error Distribution}. }
+        \]
+      </p>
+      <p>
+        Significant disagreement may indicate unmodelled uncertainty, incorrect sensor characterization, timing differences, or estimator assumptions that were not representative of flight.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.77 Flight Residual Analysis</h3>
+      <p>
+        Sensor innovations should be examined using flight data.
+      </p>
+      <p>
+        Persistent innovation bias can reveal calibration error, frame misalignment, timing error, environmental effects, or model mismatch.
+      </p>
+      <p>
+        Thus flight residual analysis can be valuable even when a highly accurate independent truth solution is unavailable.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.78 Flight Covariance Consistency</h3>
+      <p>
+        If the estimator reports uncertainty, flight data should be used to determine whether that uncertainty was realistic.
+      </p>
+      <p>
+        When reference truth is sufficiently accurate,
+      </p>
+      <p>
+        \[
+|e_i|
+        \]
+      </p>
+      <p>
+        can be compared against
+      </p>
+      <p>
+        \[
+k\sqrt{P_{ii}}.
+        \]
+      </p>
+      <p>
+        When complete truth is unavailable, innovation-based consistency analysis can still provide useful information.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Flight covariance assessment is strongest when an independent truth source exists. Where full truth is unavailable, innovation behavior, cross-sensor comparisons, and known event responses can still reveal inconsistency.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.79 Anomaly Investigation</h3>
+      <p>
+        Any navigation anomaly should be reconstructed systematically.
+      </p>
+      <p>
+        A useful chain is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Observed Anomaly} \rightarrow \text{Timeline Reconstruction} \rightarrow \text{Sensor/Interface Examination} \rightarrow \text{Estimator Internal Analysis} \rightarrow \text{Root Cause} \rightarrow \text{Corrective Action}. }
+        \]
+      </p>
+      <p>
+        The corresponding case should then be reproduced in simulation or HIL whenever practical.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.80 Closing the Verification Loop</h3>
+      <p>
+        Flight observations should feed back into the engineering models.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Flight Data} \rightarrow \text{Updated Sensor Characterization} \rightarrow \text{Updated Simulation} \rightarrow \text{Regression Testing}. }
+        \]
+      </p>
+      <p>
+        Thus flight validation is not simply the end of the process; it improves the models used for subsequent development.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.81 Complete Sensor-Fusion Verification Flow</h3>
+      <p>
+        The complete development chain can now be summarized as
+      </p>
+      <p>
+        \[
+\boxed{\text{Mathematical Algorithm}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{MATLAB/Simulink Reference Model}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Monte Carlo Verification}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Software-in-the-Loop}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Processor-in-the-Loop}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Hardware-in-the-Loop}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Integrated Avionics / GNC Testing}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Flight Validation}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Model Correlation and Continued Regression}}
+        \]
+      </p>
+      <p>
+        Each stage should preserve traceability to the original navigation requirements.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.82 What Should Be Verified at Each Stage</h3>
+      <p>
+        The focus changes progressively.
+      </p>
+      <p>
+        <strong>Model-level testing</strong> establishes mathematical correctness, convergence, observability, sensor-model behavior, and expected estimator performance.
+      </p>
+      <p>
+        <strong>SIL</strong> establishes software equivalence, logic correctness, initialization, measurement handling, estimator modes, and numerical implementation.
+      </p>
+      <p>
+        <strong>PIL</strong> adds target-processor execution, timing, memory, numerical architecture, and computational margin.
+      </p>
+      <p>
+        <strong>HIL</strong> adds real-time behavior, hardware interfaces, clocks, communication, sensor emulation, packet faults, latency, and integrated avionics.
+      </p>
+      <p>
+        <strong>Flight validation</strong> adds the actual vehicle, environment, sensors, operational geometry, and mission execution.
+      </p>
+      <p>
+        No single stage completely replaces the others.
+      </p>
+      <p><strong>Engineering interpretation:</strong> The stages are complementary rather than interchangeable. Passing HIL does not remove the need for model-level statistical analysis, and passing simulation does not provide evidence for processor timing or physical interfaces.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.83 Common SIL/HIL Mistakes</h3>
+      <p>
+        Several mistakes can make sophisticated test facilities provide misleading confidence:
+      </p>
+      <ul>
+        <li>using truth signals that would not exist onboard;</li>
+        <li>testing only nominal trajectories;</li>
+        <li>ignoring measurement timestamps;</li>
+        <li>injecting measurements after the interface layer and therefore bypassing drivers that need verification;</li>
+        <li>assuming zero communication latency;</li>
+        <li>measuring only average processor execution time;</li>
+        <li>failing to test simultaneous sensor updates;</li>
+        <li>using different parameter sets between simulation and flight software;</li>
+        <li>not recording software/hardware versions;</li>
+        <li>comparing signals without time alignment;</li>
+        <li>testing sensor dropout but not reacquisition;</li>
+        <li>testing estimator output but not covariance and innovations;</li>
+        <li>failing to test resets and initialization;</li>
+        <li>using an inaccurate reference system as unquestioned truth;</li>
+        <li>changing multiple system elements simultaneously during debugging;</li>
+        <li>performing HIL without first establishing SIL equivalence;</li>
+        <li>relying on visual plots without numerical acceptance criteria.</li>
+      </ul>
+      <p>
+        A successful HIL run is meaningful only when the configuration, requirements, reference data, and pass/fail criteria are controlled.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.84 Recommended SIL/HIL Development Sequence</h3>
+      <p>
+        A practical progression is
+      </p>
+      <p>
+        \[
+\boxed{\text{Verify Reference Algorithm}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Verify Generated/Implemented Software in SIL}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Verify Numerical Equivalence}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Introduce Target Processor}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Verify Execution Time and Scheduling}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Introduce Real Communication Interfaces}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Introduce Sensor Emulation}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Inject Timing and Communication Faults}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Integrate Guidance and Control}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Execute Closed-Loop HIL}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Execute Requirement-Based Qualification Cases}}
+        \]
+      </p>
+      <p>
+        \[
+\downarrow
+        \]
+      </p>
+      <p>
+        \[
+\boxed{\text{Validate with Flight Data}}.
+        \]
+      </p>
+      <p>
+        This incremental progression makes failures much easier to isolate than attempting full-system HIL immediately.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.31.85 Key Takeaways</h3>
+      <p>
+        SIL, PIL, HIL, and flight validation are not merely increasingly sophisticated versions of the same simulation. Each introduces a new class of implementation reality.
+      </p>
+      <p>
+        The progression can be summarized as
+      </p>
+      <p>
+        \[
+\boxed{ \text{Algorithm} \rightarrow \text{Software} \rightarrow \text{Processor} \rightarrow \text{Hardware} \rightarrow \text{Integrated System} \rightarrow \text{Flight} }
+        \]
+      </p>
+      <p>
+        <strong>SIL</strong> verifies that the implemented software reproduces the intended sensor-fusion algorithm.
+      </p>
+      <p>
+        <strong>PIL</strong> verifies that the navigation software behaves correctly and within timing constraints on the target or representative processor.
+      </p>
+      <p>
+        <strong>HIL</strong> introduces real-time execution, hardware interfaces, sensor emulation or real sensors, communication protocols, latency, clocks, packet behavior, and integrated avionics.
+      </p>
+      <p>
+        <strong>Flight validation</strong> finally exposes the navigation system to actual vehicle dynamics, sensors, environment, geometry, and operational conditions.
+      </p>
+      <p>
+        Throughout the entire process, the same fundamental quantities remain important:
+      </p>
+      <p>
+        \[
+\boxed{ \hat{\mathbf x}, \quad \mathbf P, \quad \mathbf z, \quad \hat{\mathbf z}, \quad \mathbf r, \quad \text{timestamps}, \quad \text{validity}, \quad \text{mode}, \quad \text{health} }
+        \]
+      </p>
+      <p>
+        and the navigation system must be assessed not only for <strong>accuracy</strong>, but also for <strong>timing, availability, continuity, integrity, robustness, numerical stability, fault response, and closed-loop GNC performance</strong>.
+      </p>
+      <p>
+        Most importantly,
+      </p>
+      <p>
+        \[
+\boxed{ \text{A successful estimator is not merely one that produces a good state estimate in MATLAB.} }
+        \]
+      </p>
+      <p>
+        It is one whose mathematics, software implementation, processor execution, interfaces, timing, hardware interaction, uncertainty representation, failure response, and operational performance have all been demonstrated systematically.
+      </p>
+      <p>
+        That completes the transition from <strong>sensor-fusion algorithm development</strong> to <strong>validated spacecraft navigation implementation</strong> and provides the natural foundation for <strong>4.2.32 Complete Spacecraft Sensor-Fusion Architecture</strong>, where the individual sensor models, preprocessing, estimators, timing architecture, navigation modes, health monitoring, guidance/control interfaces, and validation framework can be assembled into one end-to-end architecture.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.2.32 Complete Spacecraft Sensor-Fusion Architecture</h2>
+
+      <p>
+        SIL, PIL, HIL, and flight validation have now connected estimator mathematics to executable software, target processors,
+        physical interfaces, realistic timing, sensor emulation, integrated GNC behavior, recorded data, and flight evidence.
+      </p>
+
+      <p>
+        The next section assembles these verified elements into one end-to-end spacecraft sensor-fusion architecture, combining
+        truth and vehicle dynamics, sensor models and preprocessing, timing, measurement validation, attitude and translational
+        estimation, relative navigation, health and mode management, covariance monitoring, guidance, control, and actuator interaction.
+      </p>
+
+      <a href="complete-spacecraft-sensor-fusion.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2.32 Complete Spacecraft Sensor-Fusion Architecture</h3>
+          <p>
+            End-to-end spacecraft navigation architecture combining truth dynamics, sensor models, timing, preprocessing,
+            measurement validation, attitude estimation, translational navigation, relative navigation, mode management,
+            covariance monitoring, guidance, control, and actuator interaction.
+          </p>
+          <p class="sensor-link-arrow">
+            Continue to Complete Sensor-Fusion Architecture &rarr;
+          </p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, and spacecraft navigation.
+    </p>
+  </footer>
+
+</body>
+</html>
