@@ -1,0 +1,4500 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.22 IMU/GNSS Sensor Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .concept-note {
+      margin: 1.5rem 0 0;
+      padding: 1.1rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+    }
+
+    .concept-note h4 {
+      margin-top: 0;
+      margin-bottom: 0.45rem;
+    }
+
+    .concept-note p {
+      margin-bottom: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <header class="notes-hero">
+
+    <h1>IMU/GNSS Sensor Fusion</h1>
+
+    <p class="notes-tagline">
+      Inertial navigation mechanisation, accelerometer and gyroscope integration,
+      GNSS position and velocity correction, IMU bias estimation, loose coupling,
+      tight coupling, GNSS outages, timing, lever arms, observability,
+      consistency, integrity, and spacecraft navigation.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.22 IMU/GNSS Sensor Fusion</h2>
+
+<p>
+        Spacecraft navigation requires knowledge not only of <strong>attitude</strong>, but also of <strong>position, velocity, and motion through space</strong>. An inertial measurement unit (IMU) can provide very high-rate information about spacecraft rotational motion and non-gravitational acceleration, but an inertial solution gradually drifts because sensor errors are integrated with time.
+      </p>
+
+      <p>
+        GNSS provides an external navigation reference. When GNSS measurements are available, they can be used to constrain the accumulated inertial-navigation errors.
+      </p>
+
+      <p>
+        The fundamental idea is therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-Rate IMU Propagation} + \text{GNSS Absolute Navigation Information} \rightarrow \text{Continuous Navigation Solution} }
+        \]
+      </p>
+
+      <p>
+        The two systems are complementary:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \text{high-rate, continuous, self-contained propagation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS} \rightarrow \text{long-term position/velocity reference} }
+        \]
+      </p>
+
+      <p>
+        A practical fusion system may estimate
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \mathbf b_a\\ \mathbf b_g \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li>\(\mathbf r\) = position,</li>
+        <li>\(\mathbf v\) = velocity,</li>
+        <li>\(\mathbf q\) = attitude quaternion,</li>
+        <li>\(\mathbf b_a\) = accelerometer bias,</li>
+        <li>\(\mathbf b_g\) = gyroscope bias.</li>
+      </ul>
+
+      <p>
+        More advanced estimators may additionally include clock errors, scale factors, sensor misalignment, GNSS receiver clock states, antenna lever arms, or other calibration parameters.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.1 What Does an IMU Measure?</h3>
+
+      <p>
+        An IMU normally contains at least two three-axis sensor groups:
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{IMU} = \text{3-axis accelerometer} + \text{3-axis gyroscope}}
+        \]
+      </p>
+
+      <p>
+        The gyroscopes measure angular rate, while the accelerometers measure <strong>specific force</strong>.
+      </p>
+
+      <p>
+        This distinction is fundamental.
+      </p>
+
+      <p>
+        The accelerometer does not directly measure inertial acceleration.
+      </p>
+
+      <p>
+        A simplified accelerometer measurement model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf f_m = \mathbf f^B+\mathbf b_a+\mathbf n_a }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li>\(\mathbf f_m\) is measured specific force,</li>
+        <li>\(\mathbf f^B\) is true specific force expressed in the body frame,</li>
+        <li>\(\mathbf b_a\) is accelerometer bias,</li>
+        <li>\(\mathbf n_a\) is measurement noise.</li>
+      </ul>
+
+      <p>
+        The gyro measurement can similarly be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m = \boldsymbol\omega^B+\mathbf b_g+\mathbf n_g }
+        \]
+      </p>
+
+      <p>
+        Thus both sensors contain useful motion information together with errors that must be estimated or modeled.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.2 Specific Force</h3>
+
+      <p>
+        Specific force is the non-gravitational acceleration experienced by the accelerometer proof mass.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf f = \mathbf a-\mathbf g }
+        \]
+      </p>
+
+      <p>
+        for a simple inertial-frame interpretation.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf a=\mathbf f+\mathbf g }
+        \]
+      </p>
+
+      <p>
+        after the specific-force measurement has been transformed into the appropriate navigation frame.
+      </p>
+
+      <p>
+        This is why accelerometer output cannot simply be integrated twice and called position.
+      </p>
+
+      <p>
+        The navigation algorithm must account for:
+      </p>
+
+      <ul>
+        <li>spacecraft attitude,</li>
+        <li>coordinate frames,</li>
+        <li>gravity,</li>
+        <li>sensor bias,</li>
+        <li>sensor scale factors,</li>
+        <li>numerical integration,</li>
+        <li>and, depending on the formulation, rotating-frame effects.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Why specific force is different from inertial acceleration</h4>
+        <p>An accelerometer senses non-gravitational force per unit mass. Gravity is therefore introduced through the navigation model rather than being read directly by the accelerometer.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.3 Why Attitude Is Required for Inertial Navigation</h3>
+
+      <p>
+        Accelerometers are mounted in the spacecraft body frame.
+      </p>
+
+      <p>
+        Suppose the accelerometer measures
+      </p>
+
+      <p>
+        \[
+        \mathbf f^B.
+        \]
+      </p>
+
+      <p>
+        Navigation position and velocity may instead be propagated in a navigation or inertial frame \(N\).
+      </p>
+
+      <p>
+        The measurement must therefore be transformed:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf f^N = \mathbf C_{NB}(\mathbf q)\mathbf f^B }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \mathbf C_{NB}
+        \]
+      </p>
+
+      <p>
+        is the direction cosine matrix determined from the estimated attitude.
+      </p>
+
+      <p>
+        Therefore an attitude error creates an acceleration-transformation error.
+      </p>
+
+      <p>
+        This gives an important coupling:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Error} \rightarrow \text{Acceleration Error} \rightarrow \text{Velocity Error} \rightarrow \text{Position Error} }
+        \]
+      </p>
+
+      <p>
+        Consequently, attitude estimation is not separate from translational inertial navigation. It directly affects it.
+      </p>
+
+      <div class="concept-note">
+        <h4>Attitude error becomes translation error</h4>
+        <p>A small attitude error rotates the measured specific-force vector into the wrong navigation direction. Once integrated, that projection error appears first in velocity and then in position.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.4 Inertial Navigation Mechanisation</h3>
+
+      <p>
+        The process of converting IMU measurements into navigation states is called <strong>inertial navigation mechanisation</strong>.
+      </p>
+
+      <p>
+        A simplified processing chain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Gyroscope}\\ \downarrow\\ \text{Attitude Propagation}\\ \downarrow\\ \mathbf C_{NB}\\ \\ \text{Accelerometer}\\ \downarrow\\ \text{Bias Correction}\\ \downarrow\\ \text{Frame Transformation}\\ \downarrow\\ \text{Gravity / Frame Corrections}\\ \downarrow\\ \dot{\mathbf v}\\ \downarrow\\ \mathbf v\\ \downarrow\\ \mathbf r \end{array} }
+        \]
+      </p>
+
+      <p>
+        The exact mechanisation equations depend strongly on the selected reference frame.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.5 Basic Position and Velocity Propagation</h3>
+
+      <p>
+        In a simple inertial frame,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf r}=\mathbf v }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf v} = \mathbf C_{IB}(\mathbf q) \left(\mathbf f_m-\hat{\mathbf b}_a\right) + \mathbf g^I }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li>\(\mathbf C_{IB}\) rotates body-frame specific force into the inertial frame,</li>
+        <li>\(\mathbf g^I\) is gravitational acceleration.</li>
+      </ul>
+
+      <p>
+        The attitude itself is propagated from gyro measurements:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf q} = \frac12 \mathbf\Omega \left( \boldsymbol\omega_m-\hat{\mathbf b}_g \right) \mathbf q }
+        \]
+      </p>
+
+      <p>
+        Thus the inertial navigation solution is fundamentally a coupled propagation of
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r,\quad \mathbf v,\quad \mathbf q. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.6 Why IMU Navigation Drifts</h3>
+
+      <p>
+        An IMU can operate without external signals, but its navigation solution is not absolutely bounded.
+      </p>
+
+      <p>
+        Consider a constant accelerometer bias
+      </p>
+
+      <p>
+        \[
+        \mathbf b_a.
+        \]
+      </p>
+
+      <p>
+        Ignoring other effects, velocity error approximately grows as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf v(t)\approx\mathbf b_a t }
+        \]
+      </p>
+
+      <p>
+        and position error approximately grows as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf r(t) \approx \frac12\mathbf b_a t^2. }
+        \]
+      </p>
+
+      <p>
+        This illustrates why even a small accelerometer bias eventually produces substantial navigation error.
+      </p>
+
+      <p>
+        Gyro bias creates an additional problem because it corrupts attitude, which then causes acceleration to be projected into the wrong direction.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why inertial drift is unavoidable without aiding</h4>
+        <p>Bias, noise, scale-factor error, and alignment error enter every propagation step. Because the navigation solution is obtained through integration, even small persistent sensor errors accumulate with time.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.7 Gyro Error Coupling Into Position</h3>
+
+      <p>
+        Suppose the attitude estimate contains a small error
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta.
+        \]
+      </p>
+
+      <p>
+        Then the body-to-navigation transformation is also slightly wrong.
+      </p>
+
+      <p>
+        A first-order specific-force transformation error has the approximate form
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf f^N \approx - [\hat{\mathbf f}^N\times] \delta\boldsymbol\theta.
+        \]
+      </p>
+
+      <p>
+        Therefore gyro errors can indirectly become translational-navigation errors:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Bias} \rightarrow \text{Attitude Drift} \rightarrow \text{Specific-Force Projection Error} \rightarrow \text{Velocity Drift} \rightarrow \text{Position Drift} }
+        \]
+      </p>
+
+      <p>
+        This coupling is one reason an integrated IMU/GNSS estimator often includes both gyro and accelerometer biases.
+      </p>
+
+      <div class="concept-note">
+        <h4>Gyro quality affects position indirectly</h4>
+        <p>Gyroscopes do not measure position, but gyro errors corrupt attitude. The resulting attitude error changes how accelerometer measurements are resolved into the navigation frame.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.8 Accelerometer Bias</h3>
+
+      <p>
+        A common accelerometer model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf f_m = \mathbf f + \mathbf b_a + \mathbf n_a. }
+        \]
+      </p>
+
+      <p>
+        Bias may be modeled as constant over short intervals:
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf b}_a=0,
+        \]
+      </p>
+
+      <p>
+        as a random walk:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf b}_a=\mathbf w_{ba}, }
+        \]
+      </p>
+
+      <p>
+        or using a first-order Gauss-Markov model:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf b}_a = -\frac{1}{\tau_a}\mathbf b_a+\mathbf w_{ba}. }
+        \]
+      </p>
+
+      <p>
+        The model should be selected from the physical sensor characteristics rather than simply chosen for mathematical convenience.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.9 Gyroscope Bias</h3>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf n_g. }
+        \]
+      </p>
+
+      <p>
+        A common bias model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf b}_g=\mathbf w_{bg}. }
+        \]
+      </p>
+
+      <p>
+        The GNSS does not directly measure gyro bias.
+      </p>
+
+      <p>
+        Instead, gyro bias becomes observable through its effect on attitude and, subsequently, on the predicted navigation trajectory.
+      </p>
+
+      <p>
+        This is an important principle:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Biases Are Often Estimated Through Their Effect on Other States} }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.10 Accelerometer Scale Factor and Misalignment</h3>
+
+      <p>
+        A more complete accelerometer model can be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf f_m = (\mathbf I+\mathbf S_a)\mathbf M_a\mathbf f + \mathbf b_a+\mathbf n_a }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li>\(\mathbf S_a\) represents scale-factor errors,</li>
+        <li>\(\mathbf M_a\) represents axis misalignment and cross-axis coupling.</li>
+      </ul>
+
+      <p>
+        Similarly, the gyro may have
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m = (\mathbf I+\mathbf S_g)\mathbf M_g\boldsymbol\omega + \mathbf b_g+\mathbf n_g. }
+        \]
+      </p>
+
+      <p>
+        High-accuracy navigation may require some of these errors to be calibrated before flight or estimated during operation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.11 What Does GNSS Contribute?</h3>
+
+      <p>
+        GNSS provides information referenced to an external navigation system rather than relying only on integration.
+      </p>
+
+      <p>
+        Depending on receiver architecture, GNSS may provide:
+      </p>
+
+      <ul>
+        <li>position,</li>
+        <li>velocity,</li>
+        <li>time,</li>
+        <li>pseudorange,</li>
+        <li>carrier phase,</li>
+        <li>Doppler,</li>
+        <li>satellite ephemeris information,</li>
+        <li>measurement quality indicators.</li>
+      </ul>
+
+      <p>
+        At the simplest level,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_{GNSS} = \begin{bmatrix} \mathbf r_{GNSS}\\ \mathbf v_{GNSS} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        These measurements periodically constrain the inertial solution.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.12 GNSS Position Measurement Model</h3>
+
+      <p>
+        For a loosely coupled architecture, GNSS position may be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_r = \mathbf r+\mathbf v_r }
+        \]
+      </p>
+
+      <p>
+        where \(\mathbf v_r\) is GNSS position measurement error.
+      </p>
+
+      <p>
+        The innovation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_r = \mathbf z_r-\hat{\mathbf r}^{-}. }
+        \]
+      </p>
+
+      <p>
+        If the propagated IMU solution has drifted away from the GNSS solution, this residual provides information for correcting the navigation state.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.13 GNSS Velocity Measurement Model</h3>
+
+      <p>
+        GNSS velocity can similarly be represented as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_v = \mathbf v+\mathbf v_v. }
+        \]
+      </p>
+
+      <p>
+        The innovation becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_v = \mathbf z_v-\hat{\mathbf v}^{-}. }
+        \]
+      </p>
+
+      <p>
+        Velocity measurements are especially useful because accelerometer bias directly drives velocity error.
+      </p>
+
+      <p>
+        Repeated GNSS velocity corrections can therefore provide information that helps estimate accelerometer bias.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.14 Why GNSS Corrects More Than Position</h3>
+
+      <p>
+        It may appear that a GNSS position update should correct only position.
+      </p>
+
+      <p>
+        In a Kalman filter, however, covariance contains cross-correlations between states.
+      </p>
+
+      <p>
+        Suppose the state contains
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf r,\; \delta\mathbf v,\; \delta\boldsymbol\theta,\; \delta\mathbf b_a,\; \delta\mathbf b_g.
+        \]
+      </p>
+
+      <p>
+        Then the covariance contains terms such as
+      </p>
+
+      <p>
+        \[
+        \mathbf P_{r,b_a}, \qquad \mathbf P_{v,b_a}, \qquad \mathbf P_{v,\theta}.
+        \]
+      </p>
+
+      <p>
+        Consequently,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Residual} \rightarrow \text{Position/Velocity Correction} + \text{Indirect Bias and Attitude Correction} }
+        \]
+      </p>
+
+      <p>
+        when those states are sufficiently correlated and observable.
+      </p>
+
+      <div class="concept-note">
+        <h4>Cross-covariance is what enables indirect correction</h4>
+        <p>A Kalman filter can correct states that are not directly measured when those states are statistically correlated with measured quantities. This is how GNSS residuals can help estimate IMU biases and attitude errors.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.15 Typical Error-State Navigation Vector</h3>
+
+      <p>
+        A common error-state vector is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \delta\boldsymbol\theta\\ \delta\mathbf b_a\\ \delta\mathbf b_g \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        which contains 15 states.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf x\in\mathbb R^{15}. }
+        \]
+      </p>
+
+      <p>
+        The nominal navigation state contains the full nonlinear quantities, while the filter covariance represents small errors around that nominal trajectory.
+      </p>
+
+      <p>
+        This is commonly called an <strong>error-state Kalman filter</strong> formulation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.16 Why an Error-State Filter Is Useful</h3>
+
+      <p>
+        Position and velocity errors can naturally be represented additively.
+      </p>
+
+      <p>
+        Attitude is different because rotations lie on a nonlinear manifold.
+      </p>
+
+      <p>
+        The error-state approach separates
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Nominal Navigation State}}
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{\text{Small Navigation Error State}}.
+        \]
+      </p>
+
+      <p>
+        The nominal quaternion remains a valid unit quaternion, while the filter estimates a three-component small-angle error
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta.
+        \]
+      </p>
+
+      <p>
+        After correction, that error is injected into the nominal state.
+      </p>
+
+      <p>
+        This avoids treating the four quaternion components as independent unconstrained states.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why the error-state architecture fits navigation</h4>
+        <p>Position and velocity can be corrected additively, while attitude is naturally corrected multiplicatively. The error-state formulation lets one covariance describe a locally linear error vector around a nonlinear nominal trajectory.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.17 Continuous Error-State Dynamics</h3>
+
+      <p>
+        A general linearized error model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf F\delta\mathbf x + \mathbf G\mathbf w }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li>\(\mathbf F\) is the error-state dynamics matrix,</li>
+        <li>\(\mathbf G\) maps process noise into the state,</li>
+        <li>\(\mathbf w\) represents IMU and bias-driving noise.</li>
+      </ul>
+
+      <p>
+        For the 15-state system,
+      </p>
+
+      <p>
+        \[
+        \mathbf F
+        \]
+      </p>
+
+      <p>
+        contains the coupling among position, velocity, attitude, accelerometer bias, and gyro bias.
+      </p>
+
+      <p>
+        Understanding these couplings is more important than merely memorizing the matrix.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.18 Position-Error Dynamics</h3>
+
+      <p>
+        Since
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf r}=\mathbf v,
+        \]
+      </p>
+
+      <p>
+        the position error approximately satisfies
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf r} = \delta\mathbf v. }
+        \]
+      </p>
+
+      <p>
+        Therefore any velocity error eventually becomes position error.
+      </p>
+
+      <p>
+        This is the first major integration relationship in inertial navigation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.19 Velocity-Error Dynamics</h3>
+
+      <p>
+        A simplified velocity-error equation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\mathbf v} \approx - [\hat{\mathbf f}^{N}\times] \delta\boldsymbol\theta - \mathbf C_{NB}\delta\mathbf b_a + \delta\mathbf g + \mathbf w_v. }
+        \]
+      </p>
+
+      <p>
+        This equation shows that velocity error can arise from:
+      </p>
+
+      <ul>
+        <li>attitude error,</li>
+        <li>accelerometer bias,</li>
+        <li>gravity-model error,</li>
+        <li>accelerometer noise,</li>
+        <li>other model uncertainties.</li>
+      </ul>
+
+      <p>
+        Thus translational navigation quality cannot be assessed from accelerometer noise alone.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.20 Attitude-Error Dynamics</h3>
+
+      <p>
+        A simplified attitude-error model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\boldsymbol\theta} \approx - [\hat{\boldsymbol\omega}\times]\delta\boldsymbol\theta - \delta\mathbf b_g - \mathbf n_g. }
+        \]
+      </p>
+
+      <p>
+        Therefore gyro bias drives attitude error.
+      </p>
+
+      <p>
+        That attitude error subsequently drives velocity error.
+      </p>
+
+      <p>
+        This creates the important chain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf b_g \rightarrow \delta\boldsymbol\theta \rightarrow \delta\mathbf v \rightarrow \delta\mathbf r. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.21 Covariance Propagation</h3>
+
+      <p>
+        For the continuous linearized error system,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf P} = \mathbf F\mathbf P + \mathbf P\mathbf F^T + \mathbf G\mathbf Q\mathbf G^T. }
+        \]
+      </p>
+
+      <p>
+        After discretization,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_{k+1}^{-} = \mathbf\Phi_k \mathbf P_k^{+} \mathbf\Phi_k^T + \mathbf Q_{d,k}. }
+        \]
+      </p>
+
+      <p>
+        The covariance represents how uncertain the propagated inertial solution has become.
+      </p>
+
+      <p>
+        Without external measurements, it should generally grow in the directions that are not sufficiently constrained.
+      </p>
+
+      <div class="concept-note">
+        <h4>Covariance is the estimator&#x27;s uncertainty model</h4>
+        <p>During propagation the filter should become less certain according to the process-noise model. External measurements reduce uncertainty only in directions that they actually observe.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.22 Multi-Rate IMU/GNSS Fusion</h3>
+
+      <p>
+        IMU and GNSS operate at very different rates.
+      </p>
+
+      <p>
+        An IMU may provide measurements at tens, hundreds, or thousands of hertz.
+      </p>
+
+      <p>
+        GNSS navigation measurements may arrive much more slowly.
+      </p>
+
+      <p>
+        Therefore the architecture is naturally
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \text{High-Rate Propagation} }
+        \]
+      </p>
+
+      <p>
+        with
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Arrival} \rightarrow \text{Measurement Correction}. }
+        \]
+      </p>
+
+      <p>
+        There may be many IMU propagation cycles between two GNSS updates.
+      </p>
+
+      <div class="concept-note">
+        <h4>High-rate propagation and low-rate correction are intentional</h4>
+        <p>The IMU preserves short-term continuity, while GNSS periodically constrains long-term drift. The different sensor rates are therefore a natural feature of the architecture rather than a problem to eliminate.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.23 Asynchronous Measurement Processing</h3>
+
+      <p>
+        The estimator should not require every sensor to provide data at the same instant.
+      </p>
+
+      <p>
+        Instead,
+      </p>
+
+      <p>
+        \[
+        t_{IMU,1},t_{IMU,2},\ldots
+        \]
+      </p>
+
+      <p>
+        define propagation events, while
+      </p>
+
+      <p>
+        \[
+        t_{GNSS,1},t_{GNSS,2},\ldots
+        \]
+      </p>
+
+      <p>
+        define correction events.
+      </p>
+
+      <p>
+        This gives
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagation Clock} \neq \text{Measurement-Update Clock}. }
+        \]
+      </p>
+
+      <p>
+        This event-driven architecture is common in practical navigation systems.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.24 Loosely Coupled IMU/GNSS Fusion</h3>
+
+      <p>
+        In a <strong>loosely coupled</strong> architecture, the GNSS receiver first computes its own navigation solution.
+      </p>
+
+      <p>
+        The fusion filter then receives quantities such as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z_{GNSS} = \begin{bmatrix} \mathbf r_{GNSS}\\ \mathbf v_{GNSS} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The architecture is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \begin{array}{ccccc} \text{GNSS Signals} &\rightarrow& \text{GNSS Receiver Solution} &\rightarrow& \mathbf r,\mathbf v \\ &&&&\downarrow\\ \text{IMU} &\rightarrow& \text{INS Propagation} &\rightarrow& \text{Fusion Filter} \end{array} }
+        \]
+      </p>
+
+      <p>
+        This is conceptually simple and modular.
+      </p>
+
+      <div class="concept-note">
+        <h4>What loose coupling means physically</h4>
+        <p>The GNSS receiver solves its own navigation problem first. The fusion filter then treats that receiver solution as an external measurement of position and velocity.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.25 Advantages of Loose Coupling</h3>
+
+      <p>
+        Loose coupling provides several practical advantages:
+      </p>
+
+      <ul>
+        <li>simpler interfaces,</li>
+        <li>clear separation between GNSS and inertial subsystems,</li>
+        <li>easier integration,</li>
+        <li>lower estimator complexity,</li>
+        <li>independent GNSS receiver operation,</li>
+        <li>straightforward position/velocity residuals.</li>
+      </ul>
+
+      <p>
+        For many applications, these advantages are significant.
+      </p>
+
+      <p>
+        The fusion filter does not need to process individual GNSS satellite observations.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.26 Limitation of Loose Coupling</h3>
+
+      <p>
+        The major limitation is that the GNSS receiver normally needs enough usable satellite measurements to produce its own navigation solution.
+      </p>
+
+      <p>
+        If the receiver cannot produce a valid position/velocity solution, the loosely coupled estimator loses its GNSS correction.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{No Valid GNSS Navigation Solution} \rightarrow \text{No Loose-Coupled GNSS Update}. }
+        \]
+      </p>
+
+      <p>
+        The IMU must then propagate the navigation state alone until GNSS returns.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.27 Tightly Coupled IMU/GNSS Fusion</h3>
+
+      <p>
+        In a tightly coupled architecture, the fusion filter processes lower-level GNSS measurements directly.
+      </p>
+
+      <p>
+        These may include
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Pseudorange} + \text{Doppler} + \text{Carrier Phase} }
+        \]
+      </p>
+
+      <p>
+        depending on the receiver and application.
+      </p>
+
+      <p>
+        The architecture becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{IMU}\\ \downarrow\\ \text{INS Propagation}\\ \downarrow\\ \text{Predicted Navigation State}\\ \downarrow\\ \text{Predict GNSS Observables}\\ \downarrow\\ \text{Compare With Raw GNSS Measurements}\\ \downarrow\\ \text{Filter Correction} \end{array} }
+        \]
+      </p>
+
+      <p>
+        This creates deeper integration between the inertial and GNSS systems.
+      </p>
+
+      <div class="concept-note">
+        <h4>What tight coupling changes</h4>
+        <p>Tight coupling moves GNSS processing deeper into the estimator. Rather than waiting for a complete GNSS solution, the filter predicts and compares individual GNSS observables.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.28 GNSS Pseudorange</h3>
+
+      <p>
+        For receiver position \(\mathbf r\) and satellite \(i\) at position \(\mathbf r_i\), the geometric range is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \rho_i = \|\mathbf r_i-\mathbf r\|. }
+        \]
+      </p>
+
+      <p>
+        A simplified pseudorange model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_i = \rho_i + c(\delta t_r-\delta t_i) + \varepsilon_i }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li>\(c\) is the speed of light,</li>
+        <li>\(\delta t_r\) is receiver clock error,</li>
+        <li>\(\delta t_i\) is satellite clock error,</li>
+        <li>\(\varepsilon_i\) contains other measurement errors.</li>
+      </ul>
+
+      <p>
+        In a tightly coupled filter, the inertial state predicts the expected pseudorange.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.29 Doppler and Range-Rate Information</h3>
+
+      <p>
+        GNSS Doppler provides information related to relative line-of-sight velocity between the receiver and satellite.
+      </p>
+
+      <p>
+        A simplified range-rate relation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\rho}_i = \mathbf u_i^T (\mathbf v_i-\mathbf v) }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \mathbf u_i = \frac{\mathbf r_i-\mathbf r} {\|\mathbf r_i-\mathbf r\|}
+        \]
+      </p>
+
+      <p>
+        is the line-of-sight unit vector.
+      </p>
+
+      <p>
+        Doppler measurements therefore strongly constrain receiver velocity and clock drift.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.30 Why Tight Coupling Can Be More Robust</h3>
+
+      <p>
+        A loosely coupled system depends on the GNSS receiver producing a complete navigation solution.
+      </p>
+
+      <p>
+        A tightly coupled estimator can potentially use individual valid measurements even when the complete standalone GNSS solution is unavailable.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Partial GNSS Measurement Availability} \rightarrow \text{Potentially Useful Navigation Information} }
+        \]
+      </p>
+
+      <p>
+        rather than automatically discarding all GNSS information.
+      </p>
+
+      <p>
+        This can improve robustness under limited measurement availability, provided the remaining geometry and observability are sufficient.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why tight coupling can retain partial information</h4>
+        <p>Individual pseudorange or Doppler measurements may still carry useful state information even when there are not enough observations for an independent receiver navigation solution.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.31 Deep or Ultra-Tight Coupling</h3>
+
+      <p>
+        An even deeper architecture allows inertial navigation information to assist GNSS receiver tracking loops.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{INS Prediction} \rightarrow \text{Aid GNSS Signal Tracking}. }
+        \]
+      </p>
+
+      <p>
+        This can improve signal tracking under demanding dynamics or weak-signal conditions, but it requires much tighter integration with receiver internals.
+      </p>
+
+      <p>
+        Therefore loose, tight, and deep coupling describe progressively deeper interaction between the inertial and GNSS subsystems.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.32 Loose Versus Tight Coupling</h3>
+
+      <p>
+        The distinction can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Loose Coupling} \rightarrow \text{Fuse GNSS Navigation Solutions} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Tight Coupling} \rightarrow \text{Fuse Individual GNSS Observables} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Deep Coupling} \rightarrow \text{Fusion Extends Into GNSS Tracking} }
+        \]
+      </p>
+
+      <p>
+        These are architectural choices rather than different physical navigation principles.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.33 GNSS Receiver Clock States</h3>
+
+      <p>
+        Raw GNSS processing often requires receiver clock states.
+      </p>
+
+      <p>
+        The estimator may therefore include
+      </p>
+
+      <p>
+        \[
+        \delta t_r
+        \]
+      </p>
+
+      <p>
+        and clock drift
+      </p>
+
+      <p>
+        \[
+        \delta\dot t_r.
+        \]
+      </p>
+
+      <p>
+        The state can then be expanded:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = [ \delta\mathbf r, \delta\mathbf v, \delta\boldsymbol\theta, \delta\mathbf b_a, \delta\mathbf b_g, \delta t_r, \delta\dot t_r ]^T. }
+        \]
+      </p>
+
+      <p>
+        These states are particularly important in tightly coupled architectures.
+      </p>
+
+      <div class="concept-note">
+        <h4>Clock states become part of navigation</h4>
+        <p>Raw GNSS measurements depend on receiver timing. In tightly coupled filters, clock bias and clock drift are therefore estimated alongside vehicle states.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.34 GNSS Antenna Lever Arm</h3>
+
+      <p>
+        The GNSS antenna phase center may not coincide with the spacecraft center of mass or IMU reference point.
+      </p>
+
+      <p>
+        Let the body-frame lever arm be
+      </p>
+
+      <p>
+        \[
+        \mathbf l_{BA}^{B}.
+        \]
+      </p>
+
+      <p>
+        Then antenna position is approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_A = \mathbf r_B + \mathbf C_{NB}\mathbf l_{BA}^{B}. }
+        \]
+      </p>
+
+      <p>
+        Therefore GNSS measures the motion of the antenna location, not automatically the exact point represented by the inertial navigation state.
+      </p>
+
+      <div class="concept-note">
+        <h4>Antenna position is not automatically the vehicle reference point</h4>
+        <p>GNSS measures the antenna phase center. If the estimator state is defined at the spacecraft center of mass or IMU, the lever arm must be modeled consistently.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.35 Rotational Contribution to Antenna Velocity</h3>
+
+      <p>
+        If the spacecraft rotates, the offset antenna has an additional velocity.
+      </p>
+
+      <p>
+        Approximately,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf v_A = \mathbf v_B + \mathbf C_{NB} \left( \boldsymbol\omega^B \times \mathbf l_{BA}^{B} \right). }
+        \]
+      </p>
+
+      <p>
+        This contribution may be small for some spacecraft but significant for:
+      </p>
+
+      <ul>
+        <li>large lever arms,</li>
+        <li>high angular rates,</li>
+        <li>precise velocity estimation.</li>
+      </ul>
+
+      <p>
+        Ignoring lever arms can therefore create systematic residuals.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.36 IMU Lever Arm</h3>
+
+      <p>
+        The IMU itself may also be displaced from the navigation reference point.
+      </p>
+
+      <p>
+        For a rotating rigid body, acceleration depends on location.
+      </p>
+
+      <p>
+        Terms can include
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\boldsymbol\omega}\times\mathbf l + \boldsymbol\omega\times (\boldsymbol\omega\times\mathbf l). }
+        \]
+      </p>
+
+      <p>
+        These are respectively related to tangential and centripetal acceleration.
+      </p>
+
+      <p>
+        Therefore precision inertial navigation requires clearly defined sensor reference points.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.37 Time Synchronization</h3>
+
+      <p>
+        IMU and GNSS measurements must correspond to the correct physical epochs.
+      </p>
+
+      <p>
+        Suppose a measurement has timing error
+      </p>
+
+      <p>
+        \[
+        \Delta t.
+        \]
+      </p>
+
+      <p>
+        Then approximately,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf r \approx \mathbf v\Delta t }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf v \approx \mathbf a\Delta t. }
+        \]
+      </p>
+
+      <p>
+        Timing errors can therefore appear as navigation errors.
+      </p>
+
+      <p>
+        High-rate motion makes accurate synchronization increasingly important.
+      </p>
+
+      <div class="concept-note">
+        <h4>Timing errors look like state errors</h4>
+        <p>A delayed measurement compares the current predicted state with information from an earlier physical state. During motion, this appears directly as position, velocity, and sometimes attitude residual.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.38 GNSS Measurement Latency</h3>
+
+      <p>
+        GNSS measurements may be received after the physical measurement epoch because of:
+      </p>
+
+      <ul>
+        <li>signal processing,</li>
+        <li>navigation solution computation,</li>
+        <li>communication,</li>
+        <li>software scheduling.</li>
+      </ul>
+
+      <p>
+        The estimator should ideally use the <strong>measurement timestamp</strong>, not merely the packet-arrival time.
+      </p>
+
+      <p>
+        Possible strategies include:
+      </p>
+
+      <ul>
+        <li>delayed-state update,</li>
+        <li>buffering and repropagation,</li>
+        <li>known-latency compensation,</li>
+        <li>state augmentation.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.39 Out-of-Sequence Measurements</h3>
+
+      <p>
+        Sometimes a GNSS measurement corresponding to an earlier time arrives after the estimator has already propagated beyond that epoch.
+      </p>
+
+      <p>
+        This creates an out-of-sequence measurement problem.
+      </p>
+
+      <p>
+        Simply applying the old measurement to the current state can introduce error.
+      </p>
+
+      <p>
+        A more consistent strategy is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Return to Measurement Epoch} \rightarrow \text{Apply Update} \rightarrow \text{Repropagate} }
+        \]
+      </p>
+
+      <p>
+        when computational architecture permits it.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.40 GNSS Outage</h3>
+
+      <p>
+        During GNSS outage,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Update}=0. }
+        \]
+      </p>
+
+      <p>
+        The estimator continues using IMU propagation:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \mathbf q \rightarrow \mathbf v \rightarrow \mathbf r. }
+        \]
+      </p>
+
+      <p>
+        But navigation uncertainty increases.
+      </p>
+
+      <p>
+        The rate of degradation depends on:
+      </p>
+
+      <ul>
+        <li>accelerometer bias,</li>
+        <li>gyro bias,</li>
+        <li>sensor noise,</li>
+        <li>outage duration,</li>
+        <li>spacecraft dynamics,</li>
+        <li>availability of other aiding measurements.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>GNSS outage changes uncertainty before it necessarily destroys navigation</h4>
+        <p>The inertial solution remains continuous during an outage, but the absence of external correction means position, velocity, and bias uncertainty generally grow with time.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.41 Covariance During GNSS Outage</h3>
+
+      <p>
+        A physically realistic filter should reflect the loss of external navigation information.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{GNSS Outage} \rightarrow \text{Increasing Navigation Covariance}. }
+        \]
+      </p>
+
+      <p>
+        Position, velocity, bias, and possibly attitude uncertainty can all increase.
+      </p>
+
+      <p>
+        If covariance remains unrealistically small during a long outage, the estimator is becoming overconfident.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.42 GNSS Reacquisition</h3>
+
+      <p>
+        When GNSS returns, the inertial solution may have accumulated significant error.
+      </p>
+
+      <p>
+        The first GNSS innovation may therefore be large:
+      </p>
+
+      <p>
+        \[
+        \mathbf r_k = \mathbf z_{GNSS,k} - h(\hat{\mathbf x}_k^-).
+        \]
+      </p>
+
+      <p>
+        The estimator should validate reacquired measurements before applying large corrections.
+      </p>
+
+      <p>
+        Possible considerations include:
+      </p>
+
+      <ul>
+        <li>innovation gating,</li>
+        <li>measurement-quality checks,</li>
+        <li>covariance consistency,</li>
+        <li>staged reacquisition,</li>
+        <li>reinitialization if errors exceed the local filter assumptions.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Reacquisition is a special operating condition</h4>
+        <p>After a long outage, the inertial estimate may be far from the returning GNSS measurement. Large residuals should therefore be checked for validity before being allowed to produce a large state correction.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.43 GNSS Innovation</h3>
+
+      <p>
+        For a generic GNSS measurement,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_k = \mathbf z_k-h(\hat{\mathbf x}_k^-) }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf S_k = \mathbf H_k\mathbf P_k^-\mathbf H_k^T+\mathbf R_k. }
+        \]
+      </p>
+
+      <p>
+        The innovation contains more information than simply the numerical difference between GNSS and INS.
+      </p>
+
+      <p>
+        It should be interpreted relative to its predicted uncertainty.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.44 Innovation Gating</h3>
+
+      <p>
+        A normalized innovation statistic is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathrm{NIS} = \mathbf r^T\mathbf S^{-1}\mathbf r. }
+        \]
+      </p>
+
+      <p>
+        A sufficiently large NIS can indicate:
+      </p>
+
+      <ul>
+        <li>GNSS outlier,</li>
+        <li>incorrect measurement covariance,</li>
+        <li>timing error,</li>
+        <li>filter divergence,</li>
+        <li>model mismatch,</li>
+        <li>bad satellite measurement.</li>
+      </ul>
+
+      <p>
+        Measurements should therefore be statistically validated rather than blindly fused.
+      </p>
+
+      <div class="concept-note">
+        <h4>NIS evaluates residual size relative to expected uncertainty</h4>
+        <p>A raw residual has no statistical meaning without scale. NIS normalizes the residual using the innovation covariance so that a large error in a very uncertain direction is treated differently from the same error in a highly certain direction.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.45 GNSS Measurement Covariance</h3>
+
+      <p>
+        GNSS measurement covariance is represented by
+      </p>
+
+      <p>
+        \[
+        \mathbf R_{GNSS}.
+        \]
+      </p>
+
+      <p>
+        It determines how much confidence the estimator places in GNSS information relative to its propagated uncertainty.
+      </p>
+
+      <p>
+        A smaller covariance generally causes a stronger correction.
+      </p>
+
+      <p>
+        A larger covariance causes a weaker correction.
+      </p>
+
+      <p>
+        But covariance should represent actual measurement uncertainty, not be adjusted merely to force the desired filter behaviour.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.46 IMU Process Noise</h3>
+
+      <p>
+        IMU uncertainty enters mainly through the process model.
+      </p>
+
+      <p>
+        The process-noise matrix may include:
+      </p>
+
+      <ul>
+        <li>accelerometer white noise,</li>
+        <li>gyro white noise,</li>
+        <li>accelerometer bias instability,</li>
+        <li>gyro bias instability.</li>
+      </ul>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf Q = f( \sigma_a, \sigma_g, \sigma_{ba}, \sigma_{bg} ). }
+        \]
+      </p>
+
+      <p>
+        The continuous-time noise specifications must be converted correctly into discrete-time process noise.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.47 Why <code>Q</code> and <code>R</code> Have Different Roles</h3>
+
+      <p>
+        The matrices should not be confused.
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf Q \rightarrow \text{Uncertainty Added During Propagation} }
+        \]
+      </p>
+
+      <p>
+        whereas
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf R \rightarrow \text{Uncertainty of a Measurement}. }
+        \]
+      </p>
+
+      <p>
+        IMU imperfections strongly influence \(\mathbf Q\).
+      </p>
+
+      <p>
+        GNSS measurement accuracy strongly influences \(\mathbf R\).
+      </p>
+
+      <p>
+        Together they determine how the filter balances propagation against correction.
+      </p>
+
+      <div class="concept-note">
+        <h4>Q and R should represent physics, not desired behaviour</h4>
+        <p>Process noise describes uncertainty introduced by propagation; measurement noise describes uncertainty in a sensor observation. Artificially changing either matrix only to force smoother estimates can make the covariance statistically misleading.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.48 Kalman Measurement Update</h3>
+
+      <p>
+        The Kalman gain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf K_k = \mathbf P_k^-\mathbf H_k^T \left( \mathbf H_k\mathbf P_k^-\mathbf H_k^T+\mathbf R_k \right)^{-1}. }
+        \]
+      </p>
+
+      <p>
+        The estimated error is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x}_k = \mathbf K_k\mathbf r_k. }
+        \]
+      </p>
+
+      <p>
+        This error is then injected into the nominal navigation state.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.49 Position and Velocity Error Injection</h3>
+
+      <p>
+        For position,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}^{+} = \hat{\mathbf r}^{-} + \delta\hat{\mathbf r}. }
+        \]
+      </p>
+
+      <p>
+        For velocity,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf v}^{+} = \hat{\mathbf v}^{-} + \delta\hat{\mathbf v}. }
+        \]
+      </p>
+
+      <p>
+        Bias corrections are similarly applied:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf b}_a^{+} = \hat{\mathbf b}_a^{-} + \delta\hat{\mathbf b}_a }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf b}_g^{+} = \hat{\mathbf b}_g^{-} + \delta\hat{\mathbf b}_g. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.50 Attitude Error Injection</h3>
+
+      <p>
+        For small attitude error,
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf q} \approx \begin{bmatrix} 1\\ \frac12\delta\hat{\boldsymbol\theta} \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} = \delta\hat{\mathbf q} \otimes \hat{\mathbf q}^{-} }
+        \]
+      </p>
+
+      <p>
+        for one convention.
+      </p>
+
+      <p>
+        The quaternion should subsequently satisfy
+      </p>
+
+      <p>
+        \[
+        \boxed{ \|\hat{\mathbf q}\|=1. }
+        \]
+      </p>
+
+      <p>
+        The multiplication order must remain consistent with the chosen attitude convention.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.51 Error-State Reset</h3>
+
+      <p>
+        After corrections have been injected,
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf r}\rightarrow0,
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf v}\rightarrow0,
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\boldsymbol\theta}\rightarrow0,
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf b}_a\rightarrow0,
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf b}_g\rightarrow0.
+        \]
+      </p>
+
+      <p>
+        The covariance must be transformed consistently with the reset, particularly for the attitude-error coordinates.
+      </p>
+
+      <div class="concept-note">
+        <h4>Reset changes the local error coordinates</h4>
+        <p>Once estimated errors are injected into the nominal state, the error origin moves. The covariance must remain consistent with that new local coordinate system.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.52 Joseph Covariance Update</h3>
+
+      <p>
+        A numerically robust covariance update is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^+ = (\mathbf I-\mathbf K\mathbf H) \mathbf P^- (\mathbf I-\mathbf K\mathbf H)^T + \mathbf K\mathbf R\mathbf K^T. }
+        \]
+      </p>
+
+      <p>
+        This Joseph form helps preserve covariance symmetry and positive semidefiniteness under finite-precision computation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.53 GNSS Availability Logic</h3>
+
+      <p>
+        A practical estimator should not assume GNSS is always valid.
+      </p>
+
+      <p>
+        A measurement may be rejected because of:
+      </p>
+
+      <ul>
+        <li>receiver status,</li>
+        <li>insufficient observations,</li>
+        <li>poor geometry,</li>
+        <li>invalid navigation solution,</li>
+        <li>signal-quality flags,</li>
+        <li>innovation failure,</li>
+        <li>unrealistic timestamp,</li>
+        <li>corrupted data.</li>
+      </ul>
+
+      <p>
+        A useful software interface is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \texttt{GNSS\_VALID}\in\{0,1\}. }
+        \]
+      </p>
+
+      <p>
+        Only validated measurements should enter the estimator.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.54 Satellite Geometry</h3>
+
+      <p>
+        GNSS navigation quality depends not only on measurement noise but also on satellite geometry.
+      </p>
+
+      <p>
+        Measurements from satellites with similar line-of-sight directions provide less independent geometric information.
+      </p>
+
+      <p>
+        Good geometry provides stronger constraints in multiple spatial directions.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Navigation Accuracy} \neq \text{Measurement Noise Alone}. }
+        \]
+      </p>
+
+      <p>
+        Geometry matters.
+      </p>
+
+      <div class="concept-note">
+        <h4>Geometry is part of measurement information</h4>
+        <p>Two measurements with the same noise level can contribute very different navigation information depending on their line-of-sight geometry.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.55 Dilution of Precision</h3>
+
+      <p>
+        GNSS geometry is often characterized using dilution-of-precision quantities such as:
+      </p>
+
+      <ul>
+        <li>GDOP,</li>
+        <li>PDOP,</li>
+        <li>HDOP,</li>
+        <li>VDOP,</li>
+        <li>TDOP.</li>
+      </ul>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Poor Geometry} \rightarrow \text{Larger Navigation Uncertainty}. }
+        \]
+      </p>
+
+      <p>
+        These metrics should not be interpreted as sensor noise themselves; they describe how measurement geometry amplifies measurement uncertainty into solution uncertainty.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.56 Spacecraft GNSS Considerations</h3>
+
+      <p>
+        GNSS use on spacecraft differs in several respects from ordinary terrestrial navigation.
+      </p>
+
+      <p>
+        The navigation design may need to consider:
+      </p>
+
+      <ul>
+        <li>spacecraft altitude,</li>
+        <li>antenna orientation,</li>
+        <li>antenna field of view,</li>
+        <li>received signal geometry,</li>
+        <li>spacecraft attitude,</li>
+        <li>receiver dynamics,</li>
+        <li>signal acquisition and tracking,</li>
+        <li>radiation environment,</li>
+        <li>oscillator behaviour,</li>
+        <li>antenna phase-center location.</li>
+      </ul>
+
+      <p>
+        Therefore GNSS performance should be evaluated for the actual orbital and spacecraft geometry rather than assumed from terrestrial receiver performance.
+      </p>
+
+      <div class="concept-note">
+        <h4>Spacecraft GNSS should be analyzed as a mission-specific sensing problem</h4>
+        <p>Signal visibility, antenna orientation, orbital geometry, receiver dynamics, and environment can differ substantially from common terrestrial assumptions.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.57 GNSS Antenna Visibility and Spacecraft Attitude</h3>
+
+      <p>
+        A GNSS antenna has a directional reception pattern.
+      </p>
+
+      <p>
+        As spacecraft attitude changes, satellite visibility and signal quality may also change.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Spacecraft Attitude} \rightarrow \text{Antenna Orientation} \rightarrow \text{GNSS Visibility / Quality}. }
+        \]
+      </p>
+
+      <p>
+        This creates another connection between attitude and translational navigation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.58 Multiple GNSS Antennas</h3>
+
+      <p>
+        A spacecraft may use multiple GNSS antennas for:
+      </p>
+
+      <ul>
+        <li>improved visibility,</li>
+        <li>redundancy,</li>
+        <li>attitude information,</li>
+        <li>baseline measurements.</li>
+      </ul>
+
+      <p>
+        With sufficiently separated antennas and suitable carrier-phase processing, GNSS can also contribute attitude information.
+      </p>
+
+      <p>
+        Thus GNSS need not be limited to position and velocity.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.59 GNSS-Based Attitude</h3>
+
+      <p>
+        Suppose two antennas define a known spacecraft baseline
+      </p>
+
+      <p>
+        \[
+        \mathbf b^B.
+        \]
+      </p>
+
+      <p>
+        If GNSS processing estimates that baseline in a navigation frame,
+      </p>
+
+      <p>
+        \[
+        \mathbf b^N,
+        \]
+      </p>
+
+      <p>
+        then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf b^N = \mathbf C_{NB}\mathbf b^B. }
+        \]
+      </p>
+
+      <p>
+        This provides attitude information.
+      </p>
+
+      <p>
+        A single baseline primarily constrains the direction of that baseline; multiple independent baselines can provide richer three-axis attitude information.
+      </p>
+
+      <div class="concept-note">
+        <h4>Multiple antennas can turn GNSS into an attitude sensor</h4>
+        <p>A known baseline provides directional information. With multiple suitable baselines, the GNSS subsystem can contribute to full three-axis attitude estimation as well as translation.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.60 Carrier-Phase Measurements</h3>
+
+      <p>
+        Carrier phase can provide much higher precision than code pseudorange, but it introduces integer ambiguity.
+      </p>
+
+      <p>
+        A simplified carrier-phase model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \Phi_i = \rho_i + c(\delta t_r-\delta t_i) + \lambda N_i + \varepsilon_{\Phi,i} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li>\(\lambda\) is carrier wavelength,</li>
+        <li>\(N_i\) is integer ambiguity.</li>
+      </ul>
+
+      <p>
+        Carrier-phase processing can support precise navigation, but ambiguity management increases estimator complexity.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.61 Doppler-Aided Velocity Estimation</h3>
+
+      <p>
+        Doppler measurements can provide precise velocity information.
+      </p>
+
+      <p>
+        This is particularly valuable for IMU fusion because velocity residuals strongly constrain accelerometer-driven drift.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Doppler} \rightarrow \text{Velocity Information} \rightarrow \text{Improved Accelerometer-Bias Estimation}. }
+        \]
+      </p>
+
+      <p>
+        The actual observability depends on geometry and motion.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.62 Navigation Frame Selection</h3>
+
+      <p>
+        The estimator must explicitly define the frame in which position and velocity are represented.
+      </p>
+
+      <p>
+        Possible frames include:
+      </p>
+
+      <ul>
+        <li>ECI,</li>
+        <li>ECEF,</li>
+        <li>local orbital frames,</li>
+        <li>other mission-defined navigation frames.</li>
+      </ul>
+
+      <p>
+        The equations change depending on this choice.
+      </p>
+
+      <p>
+        For example, an Earth-fixed frame requires rotating-frame terms that are absent from a purely inertial formulation.
+      </p>
+
+      <div class="concept-note">
+        <h4>Frame choice changes the mechanisation equations</h4>
+        <p>ECI, ECEF, and local orbital frames are all valid choices, but gravity, Earth-rotation terms, and measurement transformations must match the selected frame.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.63 ECI Navigation</h3>
+
+      <p>
+        In an Earth-centered inertial frame,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf r}^{I} = \mathbf v^{I} }
+        \]
+      </p>
+
+      <p>
+        and a simplified translational equation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf v}^{I} = \mathbf C_{IB}\mathbf f^B + \mathbf g^I + \mathbf a_{\text{other}}^I. }
+        \]
+      </p>
+
+      <p>
+        This formulation is conceptually natural for orbital dynamics.
+      </p>
+
+      <p>
+        GNSS measurements expressed in another frame must be transformed consistently before fusion.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.64 ECEF Navigation</h3>
+
+      <p>
+        In an Earth-fixed rotating frame, the navigation equations include Earth-rotation effects.
+      </p>
+
+      <p>
+        A representative form is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf v}^{E} = \mathbf C_{EB}\mathbf f^B + \mathbf g^E - 2\boldsymbol\omega_{IE}^E\times\mathbf v^E - \boldsymbol\omega_{IE}^E\times (\boldsymbol\omega_{IE}^E\times\mathbf r^E). }
+        \]
+      </p>
+
+      <p>
+        The additional terms represent Coriolis and centrifugal effects.
+      </p>
+
+      <p>
+        The exact mechanisation must match the definitions used for gravity and reference frames.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.65 Frame Consistency</h3>
+
+      <p>
+        Suppose GNSS position is expressed in ECEF but the inertial navigation state is represented in ECI.
+      </p>
+
+      <p>
+        Then one cannot form
+      </p>
+
+      <p>
+        \[
+        \mathbf r_{GNSS}^{E} - \hat{\mathbf r}^{I}.
+        \]
+      </p>
+
+      <p>
+        The states must first be transformed into a common frame.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Measurement Frame} = \text{Prediction Frame} }
+        \]
+      </p>
+
+      <p>
+        before innovation formation.
+      </p>
+
+      <p>
+        Frame mistakes can create errors far larger than sensor noise.
+      </p>
+
+      <div class="concept-note">
+        <h4>Frame inconsistency creates deterministic residuals</h4>
+        <p>An estimator cannot meaningfully subtract states expressed in different frames. Frame conversion must occur before innovation formation.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.66 Gravity Modelling</h3>
+
+      <p>
+        Accelerometers do not directly provide gravitational acceleration.
+      </p>
+
+      <p>
+        Gravity must be supplied by the navigation model.
+      </p>
+
+      <p>
+        At a simple level,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf g(\mathbf r) = -\frac{\mu}{r^3}\mathbf r. }
+        \]
+      </p>
+
+      <p>
+        More accurate models may include:
+      </p>
+
+      <ul>
+        <li>Earth oblateness,</li>
+        <li>higher-order gravity harmonics,</li>
+        <li>third-body effects,</li>
+        <li>other mission-relevant perturbations.</li>
+      </ul>
+
+      <p>
+        The required fidelity depends on the navigation objective and propagation duration.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.67 Gravity-Model Error</h3>
+
+      <p>
+        Suppose the estimator uses
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf g}
+        \]
+      </p>
+
+      <p>
+        while the true gravity is
+      </p>
+
+      <p>
+        \[
+        \mathbf g.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf g = \mathbf g-\hat{\mathbf g}. }
+        \]
+      </p>
+
+      <p>
+        This behaves as a model-driven acceleration error.
+      </p>
+
+      <p>
+        Over time it can produce velocity and position errors just as accelerometer error can.
+      </p>
+
+      <p>
+        Therefore improved sensor accuracy eventually makes environmental-model accuracy increasingly important.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.68 Navigation Observability</h3>
+
+      <p>
+        A state is useful to estimate only if available measurements contain information about it.
+      </p>
+
+      <p>
+        For IMU/GNSS fusion, observability depends on:
+      </p>
+
+      <ul>
+        <li>measurement type,</li>
+        <li>satellite geometry,</li>
+        <li>spacecraft motion,</li>
+        <li>sensor orientation,</li>
+        <li>state coupling,</li>
+        <li>duration of measurement availability.</li>
+      </ul>
+
+      <p>
+        Position and velocity may be strongly observable from GNSS, while some calibration parameters may require specific motion.
+      </p>
+
+      <div class="concept-note">
+        <h4>Observability is not the same as including a state</h4>
+        <p>A bias or calibration parameter may be present in the estimator but still fail to converge if the trajectory and measurements do not provide enough independent information about it.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.69 Accelerometer Bias Observability</h3>
+
+      <p>
+        Accelerometer bias influences velocity:
+      </p>
+
+      <p>
+        \[
+        \delta\dot{\mathbf v} \supset - \mathbf C_{NB}\delta\mathbf b_a.
+        \]
+      </p>
+
+      <p>
+        GNSS velocity and position measurements observe the resulting trajectory error.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Accelerometer Bias} \rightarrow \text{Velocity/Position Error} \rightarrow \text{GNSS Residual} }
+        \]
+      </p>
+
+      <p>
+        allows bias estimation.
+      </p>
+
+      <p>
+        But observability can vary between axes depending on geometry and motion.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.70 Gyro Bias Observability</h3>
+
+      <p>
+        Gyro bias first influences attitude:
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf b_g \rightarrow \delta\boldsymbol\theta.
+        \]
+      </p>
+
+      <p>
+        Attitude error then changes specific-force projection:
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta \rightarrow \delta\mathbf v.
+        \]
+      </p>
+
+      <p>
+        GNSS observes the resulting navigation discrepancy.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf b_g \rightarrow \delta\boldsymbol\theta \rightarrow \delta\mathbf v \rightarrow \delta\mathbf r \rightarrow \text{GNSS Residual}. }
+        \]
+      </p>
+
+      <p>
+        This indirect chain can make gyro-bias observability weaker than direct position or velocity observability.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.71 Motion and Observability</h3>
+
+      <p>
+        Motion can improve estimator calibration.
+      </p>
+
+      <p>
+        If the spacecraft experiences variation in:
+      </p>
+
+      <ul>
+        <li>orientation,</li>
+        <li>acceleration,</li>
+        <li>angular rate,</li>
+        <li>GNSS geometry,</li>
+      </ul>
+
+      <p>
+        the sensitivity of measurements to different error states changes.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Useful Excitation} \rightarrow \text{Improved Parameter Observability}. }
+        \]
+      </p>
+
+      <p>
+        A calibration state that is theoretically estimable may still converge poorly if the spacecraft trajectory provides insufficient excitation.
+      </p>
+
+      <div class="concept-note">
+        <h4>Useful motion can reveal calibration errors</h4>
+        <p>Changing attitude, acceleration, angular rate, or measurement geometry alters state sensitivity. That excitation can separate otherwise similar effects such as bias, scale factor, and misalignment.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.72 Navigation During Low Dynamic Motion</h3>
+
+      <p>
+        Low-dynamic operation can be challenging for calibration-state estimation.
+      </p>
+
+      <p>
+        If specific force and angular motion change very little, some combinations of:
+      </p>
+
+      <ul>
+        <li>bias,</li>
+        <li>misalignment,</li>
+        <li>scale factor,</li>
+      </ul>
+
+      <p>
+        may produce very similar measurement effects.
+      </p>
+
+      <p>
+        Therefore low dynamics can reduce observability even when sensor noise is small.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.73 Navigation During Manoeuvres</h3>
+
+      <p>
+        During manoeuvres:
+      </p>
+
+      <ul>
+        <li>accelerometer signals increase,</li>
+        <li>angular rates may increase,</li>
+        <li>attitude errors couple more strongly into velocity,</li>
+        <li>timing errors become more visible,</li>
+        <li>sensor scale-factor errors may become observable.</li>
+      </ul>
+
+      <p>
+        This can improve calibration observability.
+      </p>
+
+      <p>
+        At the same time, manoeuvres can stress:
+      </p>
+
+      <ul>
+        <li>sensor dynamic range,</li>
+        <li>GNSS tracking,</li>
+        <li>filter linearization,</li>
+        <li>synchronization.</li>
+      </ul>
+
+      <p>
+        So manoeuvres provide both useful excitation and a more demanding estimation environment.
+      </p>
+
+      <div class="concept-note">
+        <h4>Manoeuvres help and stress the estimator simultaneously</h4>
+        <p>Dynamic motion can improve calibration observability, but it also magnifies timing, saturation, tracking, and linearization problems.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.74 IMU Saturation</h3>
+
+      <p>
+        Every accelerometer and gyro has a finite measurement range.
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        |f_i|>f_{\max}
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        |\omega_i|>\omega_{\max},
+        \]
+      </p>
+
+      <p>
+        the measurement may saturate.
+      </p>
+
+      <p>
+        Once saturated, the true motion cannot be reconstructed merely by filtering the clipped measurement.
+      </p>
+
+      <p>
+        Therefore IMU range selection must consider the expected spacecraft dynamics and disturbances.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.75 IMU Quantization</h3>
+
+      <p>
+        Digital sensors have finite resolution.
+      </p>
+
+      <p>
+        A measurement can be represented approximately as
+      </p>
+
+      <p>
+        \[
+        z_q = \Delta_q \operatorname{round} \left( \frac{z}{\Delta_q} \right)
+        \]
+      </p>
+
+      <p>
+        where \(\Delta_q\) is the quantization step.
+      </p>
+
+      <p>
+        For very low dynamic motion, quantization can become important relative to the true signal.
+      </p>
+
+      <p>
+        This matters particularly when trying to resolve very small accelerations or angular rates.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.76 Accelerometer Noise Integration</h3>
+
+      <p>
+        Accelerometer white noise is integrated into velocity and position.
+      </p>
+
+      <p>
+        Very approximately,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_v\propto\sqrt{t} }
+        \]
+      </p>
+
+      <p>
+        for ideal integrated white acceleration noise.
+      </p>
+
+      <p>
+        Position uncertainty grows more strongly because velocity is integrated again.
+      </p>
+
+      <p>
+        Real inertial sensors also contain colored noise, bias instability, scale-factor errors, and temperature dependence.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.77 Gyro Noise Integration</h3>
+
+      <p>
+        Gyro noise causes attitude uncertainty.
+      </p>
+
+      <p>
+        That attitude uncertainty then affects acceleration transformation.
+      </p>
+
+      <p>
+        Thus gyro quality can influence translational navigation even if position itself is not measured by the gyro.
+      </p>
+
+      <p>
+        This is why IMU performance should be considered as an integrated navigation system rather than evaluating accelerometer and gyro specifications independently.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.78 Temperature Effects</h3>
+
+      <p>
+        IMU bias and scale factor can vary with temperature.
+      </p>
+
+      <p>
+        A simple bias model may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf b_a(T) = \mathbf b_{a,0} + \mathbf K_T(T-T_0). }
+        \]
+      </p>
+
+      <p>
+        Similar relationships can be used for gyroscopes.
+      </p>
+
+      <p>
+        Possible approaches include:
+      </p>
+
+      <ul>
+        <li>pre-flight thermal calibration,</li>
+        <li>onboard compensation,</li>
+        <li>temperature-dependent error models,</li>
+        <li>augmented estimation states.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.79 IMU Calibration</h3>
+
+      <p>
+        IMU calibration may address:
+      </p>
+
+      <ul>
+        <li>bias,</li>
+        <li>scale factor,</li>
+        <li>axis misalignment,</li>
+        <li>cross-axis sensitivity,</li>
+        <li>temperature dependence,</li>
+        <li>nonlinearity.</li>
+      </ul>
+
+      <p>
+        Calibration is not separate from navigation performance.
+      </p>
+
+      <p>
+        A systematic calibration error repeatedly enters every propagation step.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Small Persistent IMU Error} + \text{Repeated Integration} \rightarrow \text{Large Navigation Error}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Calibration errors repeat at every propagation step</h4>
+        <p>A fixed systematic IMU error is not a one-time offset. It continuously re-enters the navigation equations and is therefore repeatedly integrated.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.80 Sensor Alignment</h3>
+
+      <p>
+        The IMU has its own sensor frame.
+      </p>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \mathbf C_{BI}
+        \]
+      </p>
+
+      <p>
+        represent the calibrated rotation from IMU frame to spacecraft body frame.
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf f^B = \mathbf C_{BI}\mathbf f^{IMU}. }
+        \]
+      </p>
+
+      <p>
+        An alignment error causes specific force to be projected incorrectly.
+      </p>
+
+      <p>
+        For precision navigation, the physical mounting and software frame definition must agree.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.81 Navigation Initialization</h3>
+
+      <p>
+        The estimator requires initial values for
+      </p>
+
+      <p>
+        \[
+        \mathbf r_0,\quad \mathbf v_0,\quad \mathbf q_0,\quad \mathbf b_{a,0},\quad \mathbf b_{g,0}.
+        \]
+      </p>
+
+      <p>
+        GNSS may provide initial position and velocity.
+      </p>
+
+      <p>
+        Attitude may come from an attitude-determination system.
+      </p>
+
+      <p>
+        IMU biases may come from calibration or prior estimates.
+      </p>
+
+      <p>
+        Equally important is the initial covariance
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_0. }
+        \]
+      </p>
+
+      <p>
+        It should represent the actual uncertainty of those initial conditions.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.82 Initial Covariance</h3>
+
+      <p>
+        An unrealistically small initial covariance tells the filter that its initial estimate is already highly accurate.
+      </p>
+
+      <p>
+        This can cause the estimator to resist valid measurements.
+      </p>
+
+      <p>
+        An excessively large covariance can produce aggressive early corrections.
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_0 \rightarrow \text{Initial Confidence Model}. }
+        \]
+      </p>
+
+      <p>
+        Initialization is part of filter design, not merely a software startup step.
+      </p>
+
+      <div class="concept-note">
+        <h4>Initial covariance controls early filter trust</h4>
+        <p>The estimator uses P0 to decide how strongly it should trust its starting state relative to incoming measurements. Unrealistic P0 can create poor early transients even when the later filter model is correct.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.83 Navigation Convergence</h3>
+
+      <p>
+        Different states may converge at different rates.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        T_r \neq T_v \neq T_{b_a} \neq T_{b_g}.
+        \]
+      </p>
+
+      <p>
+        Position and velocity may converge quickly after GNSS becomes available, while some bias or calibration states may require longer observation and sufficient motion.
+      </p>
+
+      <p>
+        Therefore filter convergence should be assessed state by state.
+      </p>
+
+      <div class="concept-note">
+        <h4>Different states converge on different time scales</h4>
+        <p>Position and velocity may respond immediately to GNSS, while IMU biases and calibration states often require time and sufficient excitation before they become well estimated.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.84 Position Error</h3>
+
+      <p>
+        Define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf r = \mathbf r_{\text{true}} - \hat{\mathbf r}. }
+        \]
+      </p>
+
+      <p>
+        A scalar position error is
+      </p>
+
+      <p>
+        \[
+        \boxed{ e_r = \|\delta\mathbf r\|. }
+        \]
+      </p>
+
+      <p>
+        Useful performance measures include:
+      </p>
+
+      <ul>
+        <li>RMS error,</li>
+        <li>maximum error,</li>
+        <li>95th percentile,</li>
+        <li>99th percentile,</li>
+        <li>axis-specific error.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.85 Velocity Error</h3>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf v = \mathbf v_{\text{true}} - \hat{\mathbf v} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ e_v = \|\delta\mathbf v\|. }
+        \]
+      </p>
+
+      <p>
+        Velocity accuracy is especially important because it affects future propagated position and can be critical for guidance and control.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.86 Bias Estimation Error</h3>
+
+      <p>
+        Accelerometer-bias error is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tilde{\mathbf b}_a = \mathbf b_a-\hat{\mathbf b}_a. }
+        \]
+      </p>
+
+      <p>
+        Gyro-bias error is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tilde{\mathbf b}_g = \mathbf b_g-\hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <p>
+        A filter can temporarily show good position accuracy because GNSS repeatedly corrects it while still carrying poor bias estimates.
+      </p>
+
+      <p>
+        Bias performance should therefore be evaluated independently.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.87 Navigation Covariance</h3>
+
+      <p>
+        Position uncertainty may be represented by
+      </p>
+
+      <p>
+        \[
+        \mathbf P_r,
+        \]
+      </p>
+
+      <p>
+        velocity uncertainty by
+      </p>
+
+      <p>
+        \[
+        \mathbf P_v,
+        \]
+      </p>
+
+      <p>
+        and attitude uncertainty by
+      </p>
+
+      <p>
+        \[
+        \mathbf P_\theta.
+        \]
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{r_i} = \sqrt{P_{r,ii}}. }
+        \]
+      </p>
+
+      <p>
+        The estimated covariance should be compared with actual errors in simulation or test.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.88 Navigation NEES</h3>
+
+      <p>
+        For an error vector
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf x
+        \]
+      </p>
+
+      <p>
+        and covariance \(\mathbf P\),
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathrm{NEES} = \delta\mathbf x^T \mathbf P^{-1} \delta\mathbf x. }
+        \]
+      </p>
+
+      <p>
+        NEES helps evaluate whether the estimator covariance is statistically consistent with actual state errors.
+      </p>
+
+      <p>
+        A filter with low RMSE can still be inconsistent if it reports unrealistically small uncertainty.
+      </p>
+
+      <div class="concept-note">
+        <h4>NEES checks whether covariance matches actual state error</h4>
+        <p>Low navigation RMSE does not prove a filter is consistent. NEES tests whether the magnitude and direction of the true error agree with the uncertainty claimed by the estimator.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.89 GNSS NIS</h3>
+
+      <p>
+        For GNSS innovation \(\mathbf r\),
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathrm{NIS} = \mathbf r^T \mathbf S^{-1} \mathbf r. }
+        \]
+      </p>
+
+      <p>
+        NIS can be used for:
+      </p>
+
+      <ul>
+        <li>innovation consistency,</li>
+        <li>outlier rejection,</li>
+        <li>covariance tuning assessment,</li>
+        <li>fault detection.</li>
+      </ul>
+
+      <p>
+        It should be interpreted using the dimension of the measurement and an appropriate statistical threshold.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.90 \(3\sigma\) Consistency</h3>
+
+      <p>
+        A common visual validation plots actual error together with covariance bounds:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \pm3\sqrt{P_{ii}}. }
+        \]
+      </p>
+
+      <p>
+        If the model and covariance are statistically appropriate, most errors should remain within the expected bounds over repeated trials.
+      </p>
+
+      <p>
+        A single trajectory is insufficient to establish statistical consistency.
+      </p>
+
+      <div class="concept-note">
+        <h4>A 3σ plot is a coverage diagnostic, not a strict bound</h4>
+        <p>For Gaussian assumptions, most realizations should fall inside the expected envelope over repeated trials. Occasional excursions are not automatically failures.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.91 GNSS Outage Performance Metric</h3>
+
+      <p>
+        For an outage beginning at \(t_0\) and ending at \(t_1\), useful metrics include
+      </p>
+
+      <p>
+        \[
+        \boxed{ e_{r,\max}, \quad e_{v,\max}, \quad P_{r,\max}, \quad T_{\text{recover}}. }
+        \]
+      </p>
+
+      <p>
+        These describe:
+      </p>
+
+      <ul>
+        <li>maximum position drift,</li>
+        <li>maximum velocity drift,</li>
+        <li>uncertainty growth,</li>
+        <li>recovery after GNSS returns.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Outage testing should include recovery</h4>
+        <p>The important questions are not only how far the inertial solution drifts, but also how quickly and safely the estimator returns to nominal performance after GNSS is restored.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.92 Drift Rate During Outage</h3>
+
+      <p>
+        The navigation error can also be characterized as a function of outage duration:
+      </p>
+
+      <p>
+        \[
+        \boxed{ e_r=f(T_{\text{outage}}). }
+        \]
+      </p>
+
+      <p>
+        This relationship is useful because a requirement may specify the maximum time for which inertial navigation must remain usable without GNSS.
+      </p>
+
+      <p>
+        The relationship is generally nonlinear because multiple error mechanisms interact.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.93 GNSS Jump Testing</h3>
+
+      <p>
+        A GNSS solution can occasionally contain an abrupt erroneous jump.
+      </p>
+
+      <p>
+        Testing should inject
+      </p>
+
+      <p>
+        \[
+        \Delta\mathbf r_{GNSS}
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \Delta\mathbf v_{GNSS}
+        \]
+      </p>
+
+      <p>
+        and evaluate whether the estimator:
+      </p>
+
+      <ul>
+        <li>detects the abnormal innovation,</li>
+        <li>rejects or down-weights it,</li>
+        <li>avoids corrupting the inertial state,</li>
+        <li>recovers when valid measurements return.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.94 GNSS Bias Testing</h3>
+
+      <p>
+        A persistent GNSS bias is more difficult than a single outlier because each individual measurement may appear statistically plausible.
+      </p>
+
+      <p>
+        A biased measurement model is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf z = h(\mathbf x)+\mathbf b_{GNSS}+\mathbf v. }
+        \]
+      </p>
+
+      <p>
+        Persistent residual mean, comparison with independent sensors, or additional integrity monitoring may be needed to identify such faults.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.95 IMU Bias-Step Testing</h3>
+
+      <p>
+        A useful robustness test introduces an abrupt change:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf b_a \rightarrow \mathbf b_a+\Delta\mathbf b_a. }
+        \]
+      </p>
+
+      <p>
+        The test evaluates:
+      </p>
+
+      <ul>
+        <li>navigation transient,</li>
+        <li>GNSS innovation,</li>
+        <li>bias-estimator convergence,</li>
+        <li>position/velocity recovery.</li>
+      </ul>
+
+      <p>
+        A similar test can be performed for gyro bias.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.96 Timing-Offset Testing</h3>
+
+      <p>
+        Introduce an artificial IMU/GNSS timing offset
+      </p>
+
+      <p>
+        \[
+        \Delta t.
+        \]
+      </p>
+
+      <p>
+        Then evaluate:
+      </p>
+
+      <ul>
+        <li>innovation mean,</li>
+        <li>position error,</li>
+        <li>velocity error,</li>
+        <li>attitude coupling,</li>
+        <li>filter consistency.</li>
+      </ul>
+
+      <p>
+        Dynamic trajectories are particularly useful because timing errors become more observable when states are changing rapidly.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.97 Lever-Arm Error Testing</h3>
+
+      <p>
+        Suppose the assumed antenna lever arm differs from the true value by
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf l.
+        \]
+      </p>
+
+      <p>
+        During spacecraft rotation, this can create periodic position and velocity residuals.
+      </p>
+
+      <p>
+        Testing lever-arm uncertainty helps distinguish sensor noise from systematic geometric modelling error.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.98 Frame-Error Testing</h3>
+
+      <p>
+        Intentional frame errors are useful software-verification cases.
+      </p>
+
+      <p>
+        Examples include:
+      </p>
+
+      <ul>
+        <li>swapped axes,</li>
+        <li>incorrect sign,</li>
+        <li>transposed DCM,</li>
+        <li>ECI/ECEF mismatch,</li>
+        <li>wrong sensor-to-body rotation.</li>
+      </ul>
+
+      <p>
+        These errors often create large structured residuals.
+      </p>
+
+      <p>
+        They should be detected during simulation long before flight.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.99 Monte Carlo IMU/GNSS Testing</h3>
+
+      <p>
+        Monte Carlo testing should vary quantities such as:
+      </p>
+
+      <ul>
+        <li>initial position error,</li>
+        <li>initial velocity error,</li>
+        <li>initial attitude error,</li>
+        <li>accelerometer bias,</li>
+        <li>gyro bias,</li>
+        <li>sensor noise,</li>
+        <li>scale factors,</li>
+        <li>misalignment,</li>
+        <li>GNSS measurement noise,</li>
+        <li>GNSS outage duration,</li>
+        <li>timing offset,</li>
+        <li>antenna lever arm,</li>
+        <li>measurement availability.</li>
+      </ul>
+
+      <p>
+        This establishes statistical navigation performance rather than performance for one favorable trajectory.
+      </p>
+
+      <div class="concept-note">
+        <h4>Monte Carlo reveals statistical navigation behaviour</h4>
+        <p>A single run cannot establish percentile error, convergence probability, outage robustness, or covariance consistency. Randomized trials are needed to characterize those quantities.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.100 Monte Carlo Performance Measures</h3>
+
+      <p>
+        For run \(j\), record
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf r^{(j)}(t),
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf v^{(j)}(t),
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta^{(j)}(t).
+        \]
+      </p>
+
+      <p>
+        Then compute quantities such as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathrm{RMSE}, \quad P_{95}, \quad P_{99}, \quad e_{\max}, \quad P_{\mathrm{conv}}. }
+        \]
+      </p>
+
+      <p>
+        Consistency metrics such as NIS and NEES should also be examined.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.101 Navigation Integrity</h3>
+
+      <p>
+        Navigation accuracy and navigation integrity are not identical.
+      </p>
+
+      <p>
+        Accuracy asks:
+      </p>
+
+      <blockquote>How close is the estimate to the true state?</blockquote>
+
+      <p>
+        Integrity asks:
+      </p>
+
+      <blockquote>Can the system determine when its navigation solution should not be trusted?</blockquote>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Good Navigation} = \text{Accuracy} + \text{Credible Uncertainty} + \text{Fault Awareness}. }
+        \]
+      </p>
+
+      <p>
+        This distinction becomes particularly important when navigation feeds autonomous guidance and control.
+      </p>
+
+      <div class="concept-note">
+        <h4>Integrity is different from accuracy</h4>
+        <p>An estimator may be accurate most of the time yet still be unsafe if it cannot recognize when its solution has become unreliable. Integrity addresses that detection problem.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.102 Navigation Validity</h3>
+
+      <p>
+        A flight estimator may publish a validity flag:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \texttt{NAV\_VALID}\in\{0,1\}. }
+        \]
+      </p>
+
+      <p>
+        Validity may depend on:
+      </p>
+
+      <ul>
+        <li>covariance thresholds,</li>
+        <li>filter numerical health,</li>
+        <li>GNSS status,</li>
+        <li>IMU status,</li>
+        <li>observability,</li>
+        <li>innovation history,</li>
+        <li>time since last absolute update.</li>
+      </ul>
+
+      <p>
+        The estimator can continue running while \(NAV_VALID = 0\).
+      </p>
+
+      <div class="concept-note">
+        <h4>Running and valid are different states</h4>
+        <p>The navigation filter can continue to propagate internally while uncertainty or sensor health has degraded beyond operational limits. A validity flag communicates that distinction.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.103 Degraded Navigation Mode</h3>
+
+      <p>
+        During loss of GNSS, the system may enter a degraded navigation mode.
+      </p>
+
+      <p>
+        The estimator can still provide
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf r}, \quad \hat{\mathbf v}, \quad \hat{\mathbf q},
+        \]
+      </p>
+
+      <p>
+        but with increasing uncertainty.
+      </p>
+
+      <p>
+        Mission logic may then restrict operations according to that uncertainty.
+      </p>
+
+      <p>
+        Thus,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensor Loss} \neq \text{Immediate Loss of Navigation} }
+        \]
+      </p>
+
+      <p>
+        but it may eventually lead to navigation uncertainty exceeding operational limits.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.104 Navigation Availability</h3>
+
+      <p>
+        Navigation availability can be interpreted as the fraction of time for which the navigation solution satisfies required validity and performance conditions.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ A_{NAV} = \frac{T_{\text{valid navigation}}} {T_{\text{mission interval}}}. }
+        \]
+      </p>
+
+      <p>
+        Availability therefore depends on more than whether the software is running.
+      </p>
+
+      <p>
+        It depends on whether sufficient information exists to support the required navigation quality.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.105 Position and Velocity Requirements</h3>
+
+      <p>
+        A navigation requirement might be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ e_{r,95} < r_{\mathrm{req}} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ e_{v,95} < v_{\mathrm{req}}. }
+        \]
+      </p>
+
+      <p>
+        Alternatively RMS or \(3\sigma\) requirements may be specified.
+      </p>
+
+      <p>
+        The statistical definition must be explicit.
+      </p>
+
+      <p>
+        A requirement such as “position accuracy = 1 m” is incomplete unless it defines the probability, axis/frame, operating condition, and measurement availability assumptions.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.106 IMU/GNSS Fusion and Guidance</h3>
+
+      <p>
+        Guidance algorithms use the estimated state:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}, \quad \hat{\mathbf v}, \quad \hat{\mathbf q}. }
+        \]
+      </p>
+
+      <p>
+        Therefore navigation error becomes guidance input error.
+      </p>
+
+      <p>
+        A guidance algorithm cannot act on the unknown true state; it acts on the estimated state.
+      </p>
+
+      <p>
+        This gives the chain
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sensors} \rightarrow \text{Navigation} \rightarrow \text{Guidance} \rightarrow \text{Control}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Navigation is upstream of guidance</h4>
+        <p>Guidance and control do not receive the true spacecraft state. They act on the estimated state and are therefore directly affected by navigation bias, delay, and covariance.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.107 IMU/GNSS Fusion and Control</h3>
+
+      <p>
+        Control may use:
+      </p>
+
+      <ul>
+        <li>estimated attitude,</li>
+        <li>angular rate,</li>
+        <li>position,</li>
+        <li>velocity.</li>
+      </ul>
+
+      <p>
+        Noisy or delayed estimates can produce unnecessary control activity or degraded tracking.
+      </p>
+
+      <p>
+        Therefore estimator performance should eventually be tested in closed-loop simulation rather than only using standalone navigation metrics.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.108 Navigation During Propulsive Manoeuvres</h3>
+
+      <p>
+        Thruster operation produces non-gravitational acceleration.
+      </p>
+
+      <p>
+        The accelerometer can observe that motion, but several effects may become important:
+      </p>
+
+      <ul>
+        <li>vibration,</li>
+        <li>sensor saturation,</li>
+        <li>structural response,</li>
+        <li>thrust uncertainty,</li>
+        <li>plume-induced disturbances,</li>
+        <li>attitude motion.</li>
+      </ul>
+
+      <p>
+        The navigation process-noise model may therefore need to reflect increased uncertainty during propulsion events.
+      </p>
+
+      <div class="concept-note">
+        <h4>Propulsive events can change the navigation error model</h4>
+        <p>Thruster operation may increase vibration, structural excitation, and model uncertainty. Process-noise assumptions that work in coast may therefore be too optimistic during manoeuvres.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.109 Known Control Input Versus IMU Measurement</h3>
+
+      <p>
+        A spacecraft may know its commanded thrust.
+      </p>
+
+      <p>
+        However,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Commanded Acceleration} \neq \text{Measured Specific Force}. }
+        \]
+      </p>
+
+      <p>
+        The command depends on actuator models, while the accelerometer responds to actual spacecraft motion.
+      </p>
+
+      <p>
+        A navigation filter may use both, but their uncertainties and roles must be distinguished.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.110 GNSS and Other Aiding Sensors</h3>
+
+      <p>
+        Although this section focuses on IMU/GNSS fusion, the same inertial navigation framework can accept other measurements.
+      </p>
+
+      <p>
+        Examples include:
+      </p>
+
+      <ul>
+        <li>optical navigation,</li>
+        <li>altimetry,</li>
+        <li>ranging,</li>
+        <li>Doppler measurements,</li>
+        <li>inter-spacecraft measurements,</li>
+        <li>star-tracker attitude,</li>
+        <li>horizon sensing.</li>
+      </ul>
+
+      <p>
+        The generic architecture remains
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Inertial Propagation} + \text{External Measurements} \rightarrow \text{Bounded Navigation Error}. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.111 General Relative-Navigation Extension</h3>
+
+      <p>
+        For missions involving another spacecraft or object, the estimator may additionally represent relative states such as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf r_{rel}, \qquad \delta\mathbf v_{rel}. }
+        \]
+      </p>
+
+      <p>
+        Measurements may come from general relative-navigation sensors such as:
+      </p>
+
+      <ul>
+        <li>inter-spacecraft ranging,</li>
+        <li>optical line-of-sight sensing,</li>
+        <li>LiDAR,</li>
+        <li>relative GNSS where applicable.</li>
+      </ul>
+
+      <p>
+        The same estimation principles remain valid:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Propagate} \rightarrow \text{Predict Measurement} \rightarrow \text{Form Innovation} \rightarrow \text{Correct}. }
+        \]
+      </p>
+
+      <p>
+        This is a general navigation architecture; the detailed relative-navigation sensor-fusion problem belongs to the next dedicated section.
+      </p>
+
+      <div class="concept-note">
+        <h4>General relative-navigation extension</h4>
+        <p>The same estimator structure can support relative navigation by augmenting the state and changing the measurement models. The detailed RPO case is intentionally left for the next section.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.112 Flight-Software Processing Sequence</h3>
+
+      <p>
+        A representative IMU/GNSS estimator sequence is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Read IMU}\\ \downarrow\\ \text{Correct IMU Calibration}\\ \downarrow\\ \text{Propagate Attitude}\\ \downarrow\\ \text{Transform Specific Force}\\ \downarrow\\ \text{Propagate Velocity}\\ \downarrow\\ \text{Propagate Position}\\ \downarrow\\ \text{Propagate Covariance}\\ \downarrow\\ \text{Check GNSS Availability}\\ \downarrow\\ \text{Validate GNSS Measurement}\\ \downarrow\\ \text{Compute Innovation}\\ \downarrow\\ \text{Gate Measurement}\\ \downarrow\\ \text{Kalman Update}\\ \downarrow\\ \text{Inject Error State}\\ \downarrow\\ \text{Reset Error State}\\ \downarrow\\ \text{Publish Navigation Solution} \end{array} }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Processing order matters</h4>
+        <p>Each measurement update should use a state and covariance propagated to the correct measurement epoch. The sequence also ensures calibration, gating, injection, and reset are performed coherently.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.113 Published Navigation Solution</h3>
+
+      <p>
+        The estimator may publish
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}, \quad \hat{\mathbf v}, \quad \hat{\mathbf q}, \quad \hat{\mathbf b}_a, \quad \hat{\mathbf b}_g, \quad \mathbf P. }
+        \]
+      </p>
+
+      <p>
+        It may also publish health indicators such as
+      </p>
+
+      <p>
+        \[
+        \texttt{NAV\_VALID},
+        \]
+      </p>
+
+      <p>
+        \[
+        \texttt{IMU\_VALID},
+        \]
+      </p>
+
+      <p>
+        \[
+        \texttt{GNSS\_VALID}.
+        \]
+      </p>
+
+      <p>
+        Downstream GNC functions should use both the navigation state and its associated validity and uncertainty.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.114 Practical Design Philosophy</h3>
+
+      <p>
+        A robust IMU/GNSS navigation system should:
+      </p>
+
+      <ol>
+        <li>propagate attitude at IMU rate,</li>
+        <li>transform accelerometer measurements using the correct attitude,</li>
+        <li>model gravity consistently,</li>
+        <li>propagate velocity and position,</li>
+        <li>estimate accelerometer bias,</li>
+        <li>estimate gyro bias,</li>
+        <li>propagate realistic covariance,</li>
+        <li>process GNSS measurements at their true timestamps,</li>
+        <li>use appropriate loose or tight coupling,</li>
+        <li>model GNSS measurement uncertainty,</li>
+        <li>account for antenna and IMU lever arms where required,</li>
+        <li>maintain coordinate-frame consistency,</li>
+        <li>statistically validate measurements,</li>
+        <li>reject outliers,</li>
+        <li>increase uncertainty during GNSS outages,</li>
+        <li>recover correctly after GNSS reacquisition,</li>
+        <li>monitor estimator consistency,</li>
+        <li>publish navigation validity,</li>
+        <li>verify numerical stability,</li>
+        <li>validate performance statistically.</li>
+      </ol>
+
+      <div class="concept-note">
+        <h4>Design philosophy</h4>
+        <p>A robust implementation is defined as much by frame discipline, timing, validity, covariance realism, and recovery behaviour as by the Kalman equations themselves.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.22.115 Key Takeaways</h3>
+
+      <h4>1. IMU/GNSS fusion combines complementary navigation information.</h4>
+      <p>
+        \[
+        \boxed{ \text{High-Rate IMU Propagation} + \text{GNSS Reference} \rightarrow \text{Continuous Navigation} }
+        \]
+      </p>
+
+      <h4>2. An accelerometer measures specific force, not position and not directly inertial acceleration.</h4>
+      <p>
+        \[
+        \boxed{ \mathbf f_m = \mathbf f+\mathbf b_a+\mathbf n_a. }
+        \]
+      </p>
+
+      <h4>3. Gyroscopes propagate attitude.</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m = \boldsymbol\omega+\mathbf b_g+\mathbf n_g. }
+        \]
+      </p>
+
+      <h4>4. Attitude is required to transform accelerometer measurements into the navigation frame.</h4>
+      <p>
+        \[
+        \boxed{ \mathbf f^N = \mathbf C_{NB}\mathbf f^B. }
+        \]
+      </p>
+
+      <h4>5. IMU errors accumulate through integration.</h4>
+      <p>
+        \[
+        \boxed{ \text{Acceleration Error} \rightarrow \text{Velocity Error} \rightarrow \text{Position Error}. }
+        \]
+      </p>
+
+      <h4>6. Gyro error also affects translational navigation through attitude error.</h4>
+      <p>
+        \[
+        \boxed{ \text{Gyro Bias} \rightarrow \text{Attitude Error} \rightarrow \text{Acceleration Projection Error} \rightarrow \text{Navigation Error}. }
+        \]
+      </p>
+
+      <h4>7. GNSS bounds long-term inertial drift.</h4>
+      <p>
+        Position and velocity measurements repeatedly correct the propagated navigation solution.
+      </p>
+
+      <h4>8. GNSS updates can indirectly estimate IMU biases through state covariance and dynamic coupling.</h4>
+      <h4>9. A common error-state estimator contains 15 states.</h4>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = [ \delta\mathbf r, \delta\mathbf v, \delta\boldsymbol\theta, \delta\mathbf b_a, \delta\mathbf b_g ]^T. }
+        \]
+      </p>
+
+      <h4>10. Loose coupling uses GNSS position/velocity solutions.</h4>
+      <p>
+        \[
+        \boxed{ \text{Loose} \rightarrow \text{GNSS Navigation Solution}. }
+        \]
+      </p>
+
+      <h4>11. Tight coupling uses individual GNSS observables.</h4>
+      <p>
+        \[
+        \boxed{ \text{Tight} \rightarrow \text{Pseudorange/Doppler/Other GNSS Observables}. }
+        \]
+      </p>
+
+      <h4>12. Deep coupling extends inertial aiding into GNSS tracking functions.</h4>
+      <h4>13. GNSS outage does not immediately stop navigation.</h4>
+      <p>
+        The IMU continues propagation, but uncertainty grows.
+      </p>
+
+      <h4>14. Covariance must increase when external navigation information disappears.</h4>
+      <h4>15. Reacquisition must be validated before large corrections are accepted.</h4>
+      <h4>16. GNSS and IMU timestamps must refer to the correct physical epochs.</h4>
+      <p>
+        \[
+        \boxed{ \text{Timing Error} \rightarrow \text{Navigation Error}. }
+        \]
+      </p>
+
+      <h4>17. GNSS antenna and IMU lever arms can matter.</h4>
+      <h4>18. Coordinate frames must remain consistent throughout propagation and correction.</h4>
+      <h4>19. Sensor calibration errors are integrated repeatedly and can become significant navigation errors.</h4>
+      <h4>20. Position accuracy alone is not sufficient for evaluating an estimator.</h4>
+      <p>
+        Velocity, attitude, bias, covariance, NIS, NEES, convergence, outage drift, and recovery should also be evaluated.
+      </p>
+
+      <h4>21. Monte Carlo testing is necessary to establish statistical performance.</h4>
+      <h4>22. Navigation validity is different from merely having an estimator running.</h4>
+      <h4>23. The navigation solution ultimately feeds guidance and control.</h4>
+      <p>
+        \[
+        \boxed{ \text{Sensors} \rightarrow \text{State Estimation} \rightarrow \text{Guidance} \rightarrow \text{Control}. }
+        \]
+      </p>
+
+      <h4>24. The central engineering principle is</h4>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{The IMU carries the navigation state forward at high rate,}\\[4pt] \text{while GNSS repeatedly anchors the inertial solution}\\[4pt] \text{and allows accumulated position, velocity, attitude, and bias errors}\\[4pt] \text{to be constrained and estimated.} \end{array} }
+        \]
+      </p>
+
+      <p>
+        The natural next section is <strong>4.2.23 Relative Navigation Sensor Fusion for RPO</strong>, where the same propagation, measurement prediction, innovation, observability, covariance, and fault-management principles are applied generally to <strong>relative position, relative velocity, line-of-sight, range, range rate, relative attitude, and pose estimation</strong> using combinations of GNSS, inter-spacecraft measurements, cameras, LiDAR, and inertial sensors.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+      <h2>Next: 4.2.23 Relative Navigation Sensor Fusion for RPO</h2>
+
+      <p>
+        After developing inertial-navigation mechanisation, IMU error propagation,
+        GNSS position and velocity correction, loose and tight coupling,
+        timing, lever arms, observability, outage behaviour, consistency,
+        integrity, and Monte Carlo verification, the next section applies the
+        same estimation principles to general spacecraft relative navigation.
+      </p>
+
+      <a href="rpo-sensor-fusion.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.23 Relative Navigation Sensor Fusion for RPO</h3>
+
+          <p>
+            GNSS, inter-spacecraft navigation, camera, LiDAR, IMU,
+            line-of-sight, relative range, range rate, relative position,
+            velocity, attitude, and pose estimation for rendezvous,
+            proximity operations, and docking.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to RPO Sensor Fusion &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+    </section>
+
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+  </footer>
+
+</body>
+</html>
