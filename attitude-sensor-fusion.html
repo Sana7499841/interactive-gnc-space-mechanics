@@ -1,0 +1,5653 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.21 Attitude Sensor Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .concept-note {
+      margin: 1.5rem 0 0;
+      padding: 1.1rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+    }
+
+    .concept-note h4 {
+      margin-top: 0;
+      margin-bottom: 0.45rem;
+    }
+
+    .concept-note p {
+      margin-bottom: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <header class="notes-hero">
+
+    <h1>Attitude Sensor Fusion</h1>
+
+    <p class="notes-tagline">
+      Gyroscope, star tracker, Sun sensor, and magnetometer fusion;
+      quaternion attitude propagation, multiplicative attitude-error estimation,
+      vector measurements, gyro-bias estimation, safe-mode attitude determination,
+      fine-pointing navigation, sensor validity, observability, numerical robustness,
+      and Monte Carlo verification.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.21 Attitude Sensor Fusion</h2>
+
+<p>
+        Spacecraft attitude determination rarely relies on a single sensor. Different attitude sensors provide different kinds of information, operate at different update rates, have different noise characteristics, and remain useful under different mission conditions.
+      </p>
+
+      <p>
+        A practical attitude-estimation system therefore combines information from several sensors such as:
+      </p>
+
+      <ul>
+        <li>gyroscopes,</li>
+        <li>star trackers,</li>
+        <li>Sun sensors,</li>
+        <li>magnetometers,</li>
+        <li>and, where applicable, horizon sensors or optical navigation systems.</li>
+      </ul>
+
+      <p>
+        The purpose of attitude sensor fusion is to obtain a continuous estimate of spacecraft orientation and angular motion that is more accurate, more robust, and more available than the estimate produced by any individual sensor.
+      </p>
+
+      <p>
+        The fundamental idea is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-rate attitude propagation} + \text{absolute attitude/vector measurements} \rightarrow \text{continuous attitude estimate} }
+        \]
+      </p>
+
+      <p>
+        Gyroscopes are especially useful for short-term propagation because they provide high-rate angular-velocity information.
+      </p>
+
+      <p>
+        Absolute-reference sensors such as star trackers, Sun sensors, and magnetometers prevent the gyro-integrated attitude from drifting indefinitely.
+      </p>
+
+      <p>
+        Thus the architecture is conceptually
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Propagation} \rightarrow \text{Predicted Attitude} \rightarrow \text{Reference-Sensor Correction} }
+        \]
+      </p>
+
+      <p>
+        This section develops that idea in detail.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.1 What Is Spacecraft Attitude?</h3>
+
+      <p>
+        The attitude of a spacecraft describes the orientation of its body-fixed coordinate frame relative to a reference frame.
+      </p>
+
+      <p>
+        Typical reference frames include:
+      </p>
+
+      <ul>
+        <li>inertial frames,</li>
+        <li>Earth-centered inertial frames,</li>
+        <li>orbital frames such as LVLH,</li>
+        <li>target-relative frames.</li>
+      </ul>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \mathcal F_I
+        \]
+      </p>
+
+      <p>
+        denote an inertial reference frame and
+      </p>
+
+      <p>
+        \[
+        \mathcal F_B
+        \]
+      </p>
+
+      <p>
+        the spacecraft body frame.
+      </p>
+
+      <p>
+        The attitude defines the rotation between these frames.
+      </p>
+
+      <p>
+        It may be represented using:
+      </p>
+
+      <ul>
+        <li>Euler angles,</li>
+        <li>direction cosine matrices,</li>
+        <li>quaternions,</li>
+        <li>modified Rodrigues parameters.</li>
+      </ul>
+
+      <p>
+        For spacecraft estimation, quaternions are particularly common because they avoid singularities associated with Euler angles.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.2 Quaternion Attitude Representation</h3>
+
+      <p>
+        A quaternion can be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q = \begin{bmatrix} q_0\\ \mathbf q_v \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        q_0
+        \]
+      </p>
+
+      <p>
+        is the scalar component and
+      </p>
+
+      <p>
+        \[
+        \mathbf q_v = \begin{bmatrix} q_1\\ q_2\\ q_3 \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        is the vector component.
+      </p>
+
+      <p>
+        The unit-quaternion constraint is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q^T\mathbf q=1. }
+        \]
+      </p>
+
+      <p>
+        This constraint must be maintained during propagation and correction.
+      </p>
+
+      <p>
+        The quaternion represents the same physical attitude as
+      </p>
+
+      <p>
+        \[
+        -\mathbf q.
+        \]
+      </p>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q \equiv -\mathbf q. }
+        \]
+      </p>
+
+      <p>
+        This sign ambiguity must be considered when comparing quaternions.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why the unit constraint matters</h4>
+        <p>A quaternion has four numerical components but represents only three rotational degrees of freedom. The unit-norm constraint is therefore part of the physical definition of the attitude state, not an optional numerical detail.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.3 Why Quaternions Are Preferred</h3>
+
+      <p>
+        Quaternions are widely used in spacecraft attitude estimation because they:
+      </p>
+
+      <ul>
+        <li>avoid Euler-angle singularities,</li>
+        <li>support smooth large-angle rotation,</li>
+        <li>are computationally efficient,</li>
+        <li>integrate naturally with gyroscope measurements,</li>
+        <li>are convenient for multiplicative error formulations.</li>
+      </ul>
+
+      <p>
+        A three-angle parameterization may become singular at particular orientations.
+      </p>
+
+      <p>
+        Quaternions avoid that problem at the cost of introducing one redundant state constrained by
+      </p>
+
+      <p>
+        \[
+        \|\mathbf q\|=1.
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.4 Angular Velocity</h3>
+
+      <p>
+        Let spacecraft angular velocity be
+      </p>
+
+      <p>
+        \[
+        \boldsymbol\omega = \begin{bmatrix} \omega_x\\ \omega_y\\ \omega_z \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The gyroscope measures angular rate approximately as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf n_g }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <ul>
+        <li>\(\mathbf b_g\) is gyroscope bias,</li>
+        <li>\(\mathbf n_g\) is measurement noise.</li>
+      </ul>
+
+      <p>
+        The true angular rate used for propagation is therefore approximated by
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol\omega} = \boldsymbol\omega_m-\hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <p>
+        The quality of attitude propagation depends strongly on the quality of the bias estimate.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.5 Quaternion Kinematics</h3>
+
+      <p>
+        Quaternion attitude evolves according to angular velocity.
+      </p>
+
+      <p>
+        A common form is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf q} = \frac12 \mathbf\Omega(\boldsymbol\omega) \mathbf q }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \mathbf\Omega(\boldsymbol\omega) = \begin{bmatrix} 0 & -\omega_x & -\omega_y & -\omega_z\\ \omega_x & 0 & \omega_z & -\omega_y\\ \omega_y & -\omega_z & 0 & \omega_x\\ \omega_z & \omega_y & -\omega_x & 0 \end{bmatrix}
+        \]
+      </p>
+
+      <p>
+        for one common quaternion convention.
+      </p>
+
+      <p>
+        The exact matrix signs depend on the chosen convention, so the quaternion convention must remain consistent throughout:
+      </p>
+
+      <ul>
+        <li>kinematics,</li>
+        <li>direction cosine matrix,</li>
+        <li>measurement models,</li>
+        <li>attitude correction.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Convention must be fixed before implementation</h4>
+        <p>Quaternion kinematics are convention-dependent. The signs in the Omega matrix, the direction of the DCM, and the order of quaternion multiplication must all follow the same convention.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.6 Gyroscope-Based Attitude Propagation</h3>
+
+      <p>
+        At each time step, the gyro measurement is bias-corrected:
+      </p>
+
+      <p>
+        \[
+        \hat{\boldsymbol\omega}_k = \boldsymbol\omega_{m,k} - \hat{\mathbf b}_{g,k}.
+        \]
+      </p>
+
+      <p>
+        Then the attitude is propagated:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}_{k+1}^{-} = \Phi_q(\hat{\boldsymbol\omega}_k,\Delta t) \hat{\mathbf q}_{k}^{+}. }
+        \]
+      </p>
+
+      <p>
+        Here
+      </p>
+
+      <p>
+        \[
+        \Phi_q
+        \]
+      </p>
+
+      <p>
+        represents quaternion propagation over the time interval.
+      </p>
+
+      <p>
+        The superscripts
+      </p>
+
+      <p>
+        \[
+        -
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        +
+        \]
+      </p>
+
+      <p>
+        typically denote:
+      </p>
+
+      <ul>
+        <li>predicted state,</li>
+        <li>corrected state.</li>
+      </ul>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} \rightarrow \text{gyro propagation} \rightarrow \hat{\mathbf q}^{-}. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.7 First-Order Quaternion Propagation</h3>
+
+      <p>
+        For sufficiently small \(\Delta t\),
+      </p>
+
+      <p>
+        \[
+        \mathbf q_{k+1} \approx \left[ \mathbf I + \frac12 \mathbf\Omega(\boldsymbol\omega_k)\Delta t \right] \mathbf q_k.
+        \]
+      </p>
+
+      <p>
+        This is simple but may lose accuracy for:
+      </p>
+
+      <ul>
+        <li>large angular rates,</li>
+        <li>large sample intervals,</li>
+        <li>long propagation intervals.</li>
+      </ul>
+
+      <p>
+        More accurate implementations use:
+      </p>
+
+      <ul>
+        <li>quaternion exponential,</li>
+        <li>Rodrigues-type updates,</li>
+        <li>higher-order numerical integration.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.8 Quaternion Increment Form</h3>
+
+      <p>
+        Define the rotation increment
+      </p>
+
+      <p>
+        \[
+        \Delta\boldsymbol\theta = \boldsymbol\omega\Delta t.
+        \]
+      </p>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \Delta\theta = \|\Delta\boldsymbol\theta\|.
+        \]
+      </p>
+
+      <p>
+        Then the incremental quaternion may be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf q = \begin{bmatrix} \cos(\Delta\theta/2)\\ \mathbf u \sin(\Delta\theta/2) \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \mathbf u = \frac{\Delta\boldsymbol\theta}{\Delta\theta}.
+        \]
+      </p>
+
+      <p>
+        The propagated attitude becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_{k+1} = \delta\mathbf q \otimes \mathbf q_k }
+        \]
+      </p>
+
+      <p>
+        or the reverse multiplication order depending on convention.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.9 Why Gyro Propagation Drifts</h3>
+
+      <p>
+        Even if gyro noise is small, any persistent bias integrates into attitude error.
+      </p>
+
+      <p>
+        For approximately constant bias,
+      </p>
+
+      <p>
+        \[
+        \mathbf b_g,
+        \]
+      </p>
+
+      <p>
+        the accumulated angular error grows approximately as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta(t) \approx \mathbf b_g t. }
+        \]
+      </p>
+
+      <p>
+        Therefore a gyroscope can provide excellent short-term attitude propagation but cannot generally provide bounded long-term absolute attitude on its own.
+      </p>
+
+      <p>
+        This is why absolute-reference sensors are required.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why gyro-only attitude cannot remain bounded</h4>
+        <p>Gyro bias integrates approximately linearly into attitude error. Even a very small constant bias therefore becomes significant when absolute attitude references are absent for long periods.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.10 Gyroscope Bias State</h3>
+
+      <p>
+        A common attitude-estimator state contains
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf q\\ \mathbf b_g \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The gyro bias may be modeled as constant:
+      </p>
+
+      <p>
+        \[
+        \dot{\mathbf b}_g=0
+        \]
+      </p>
+
+      <p>
+        or as a random walk:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf b}_g = \mathbf w_b. }
+        \]
+      </p>
+
+      <p>
+        A first-order Gauss-Markov model may also be used:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \dot{\mathbf b}_g = -\frac1{\tau_b}\mathbf b_g + \mathbf w_b. }
+        \]
+      </p>
+
+      <p>
+        The appropriate model depends on the physical gyro characteristics.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.11 Why Bias Estimation Is Essential</h3>
+
+      <p>
+        Suppose the gyro bias is not estimated.
+      </p>
+
+      <p>
+        Then the propagated attitude continuously drifts.
+      </p>
+
+      <p>
+        Even when absolute sensors occasionally correct attitude, the error repeatedly grows between updates.
+      </p>
+
+      <p>
+        Estimating bias allows the filter to learn the systematic component of the gyro measurement.
+      </p>
+
+      <p>
+        The architecture becomes
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Absolute Attitude Residual} \rightarrow \text{Estimate Gyro Bias} \rightarrow \text{Improve Future Propagation}. }
+        \]
+      </p>
+
+      <p>
+        This is one of the most important benefits of attitude sensor fusion.
+      </p>
+
+      <div class="concept-note">
+        <h4>Bias estimation improves future propagation</h4>
+        <p>Absolute-reference sensors do more than correct the current attitude. Their residuals allow the estimator to infer gyro bias, which reduces the error accumulated during subsequent gyro-only propagation.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.12 Star Tracker Measurements</h3>
+
+      <p>
+        A star tracker observes stars and compares measured star patterns with a catalog.
+      </p>
+
+      <p>
+        Depending on the processing architecture, the star tracker may provide:
+      </p>
+
+      <ul>
+        <li>complete attitude quaternion,</li>
+        <li>direction cosine matrix,</li>
+        <li>star-vector measurements,</li>
+        <li>quality flags,</li>
+        <li>covariance estimates.</li>
+      </ul>
+
+      <p>
+        A quaternion measurement can be written as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_{ST} = \mathbf q \otimes \delta\mathbf q_{ST} }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q_{ST}
+        \]
+      </p>
+
+      <p>
+        represents measurement error.
+      </p>
+
+      <p>
+        Star trackers generally provide high-accuracy absolute attitude but at a lower update rate than gyroscopes.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.13 Role of the Star Tracker</h3>
+
+      <p>
+        A star tracker provides the long-term attitude reference that limits gyro drift.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} = \text{high-rate relative rotation information} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker} = \text{accurate absolute attitude reference}. }
+        \]
+      </p>
+
+      <p>
+        Combining both produces a continuously available attitude estimate with:
+      </p>
+
+      <ul>
+        <li>high rate,</li>
+        <li>low short-term noise,</li>
+        <li>bounded long-term error.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.14 Direct Quaternion Measurement Fusion</h3>
+
+      <p>
+        If the star tracker outputs an attitude quaternion
+      </p>
+
+      <p>
+        \[
+        \mathbf q_m,
+        \]
+      </p>
+
+      <p>
+        one should not simply compute
+      </p>
+
+      <p>
+        \[
+        \mathbf q_m-\hat{\mathbf q}.
+        \]
+      </p>
+
+      <p>
+        Instead define a relative quaternion:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf q = \mathbf q_m \otimes \hat{\mathbf q}^{-1}. }
+        \]
+      </p>
+
+      <p>
+        For small error,
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q \approx \begin{bmatrix} 1\\ \frac12\delta\boldsymbol\theta \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Then the residual can be represented using the three-dimensional error vector
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta. }
+        \]
+      </p>
+
+      <p>
+        This is the basis of the MEKF approach.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why quaternion subtraction is avoided</h4>
+        <p>Two quaternions live on the unit-quaternion manifold. A multiplicative relative quaternion respects that geometry and avoids treating four constrained quaternion components as independent Euclidean states.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.15 Why a Multiplicative Attitude Error Is Preferred</h3>
+
+      <p>
+        The quaternion itself has four components but only three rotational degrees of freedom.
+      </p>
+
+      <p>
+        A multiplicative error representation separates:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Nominal Quaternion} }
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Three-Dimensional Attitude Error}. }
+        \]
+      </p>
+
+      <p>
+        Instead of estimating four unconstrained quaternion corrections, the filter estimates
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta.
+        \]
+      </p>
+
+      <p>
+        The nominal quaternion is then corrected multiplicatively.
+      </p>
+
+      <p>
+        This naturally preserves the geometry of rotations.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.16 MEKF Attitude Error State</h3>
+
+      <p>
+        A typical error state is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = \begin{bmatrix} \delta\boldsymbol\theta\\ \delta\mathbf b_g \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        The covariance therefore has dimension
+      </p>
+
+      <p>
+        \[
+        6\times6
+        \]
+      </p>
+
+      <p>
+        for this simple case.
+      </p>
+
+      <p>
+        The full quaternion is propagated separately outside the linear covariance state.
+      </p>
+
+      <p>
+        This is one reason the MEKF is particularly common for spacecraft attitude determination.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.17 Attitude-Error Dynamics</h3>
+
+      <p>
+        For small errors, the attitude-error dynamics may be approximated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\dot{\boldsymbol\theta} = - [\hat{\boldsymbol\omega}\times] \delta\boldsymbol\theta - \delta\mathbf b_g - \mathbf n_g. }
+        \]
+      </p>
+
+      <p>
+        Here
+      </p>
+
+      <p>
+        \[
+        [\hat{\boldsymbol\omega}\times]
+        \]
+      </p>
+
+      <p>
+        is the skew-symmetric matrix.
+      </p>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        \mathbf a = \begin{bmatrix} a_x\\ a_y\\ a_z \end{bmatrix},
+        \]
+      </p>
+
+      <p>
+        \[
+        [\mathbf a\times] = \begin{bmatrix} 0 & -a_z & a_y\\ a_z & 0 & -a_x\\ -a_y & a_x & 0 \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        These linearized dynamics drive covariance propagation.
+      </p>
+
+      <div class="concept-note">
+        <h4>Meaning of the attitude-error dynamics</h4>
+        <p>The first term rotates the existing attitude-error vector with the estimated body rate, while bias error and gyro noise drive new attitude error. These dynamics explain how bias uncertainty couples directly into attitude covariance.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.18 Vector Measurements</h3>
+
+      <p>
+        Not all attitude sensors directly provide a quaternion.
+      </p>
+
+      <p>
+        Many sensors measure the direction of a known reference vector.
+      </p>
+
+      <p>
+        Suppose an inertial-frame reference vector is
+      </p>
+
+      <p>
+        \[
+        \mathbf v^I.
+        \]
+      </p>
+
+      <p>
+        The predicted body-frame observation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf v}^{B} = \mathbf C_{BI}(\hat{\mathbf q}) \mathbf v^I. }
+        \]
+      </p>
+
+      <p>
+        A sensor provides
+      </p>
+
+      <p>
+        \[
+        \mathbf v_m^B.
+        \]
+      </p>
+
+      <p>
+        The residual is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf v_m^B - \hat{\mathbf v}^{B}. }
+        \]
+      </p>
+
+      <p>
+        This formulation is used for sensors such as:
+      </p>
+
+      <ul>
+        <li>Sun sensors,</li>
+        <li>magnetometers,</li>
+        <li>some star-vector measurements.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.19 Sun Sensor Measurements</h3>
+
+      <p>
+        A Sun sensor measures the direction from the spacecraft toward the Sun in the body frame.
+      </p>
+
+      <p>
+        Let the inertial Sun vector be
+      </p>
+
+      <p>
+        \[
+        \mathbf s^I.
+        \]
+      </p>
+
+      <p>
+        The predicted body-frame Sun vector is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf s}^{B} = \mathbf C_{BI}(\hat{\mathbf q}) \mathbf s^I. }
+        \]
+      </p>
+
+      <p>
+        The sensor measurement is
+      </p>
+
+      <p>
+        \[
+        \mathbf s_m^B.
+        \]
+      </p>
+
+      <p>
+        Then the residual is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_s = \mathbf s_m^B - \hat{\mathbf s}^{B}. }
+        \]
+      </p>
+
+      <p>
+        This residual provides attitude information.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.20 What a Single Vector Can and Cannot Determine</h3>
+
+      <p>
+        A single vector constrains two rotational degrees of freedom.
+      </p>
+
+      <p>
+        Rotation about that same vector remains unobservable from the vector alone.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{One Reference Vector} \rightarrow \text{Incomplete 3-D Attitude Observability}. }
+        \]
+      </p>
+
+      <p>
+        For example, a Sun sensor alone cannot determine rotation about the Sun direction.
+      </p>
+
+      <p>
+        This is why multiple non-collinear references are useful.
+      </p>
+
+      <div class="concept-note">
+        <h4>Observability interpretation</h4>
+        <p>A vector measurement fixes the direction of one body axis relative to a known inertial direction, but rotation about that measured direction leaves the vector unchanged. That remaining rotational degree of freedom cannot be recovered from the vector alone.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.21 Two-Vector Attitude Determination</h3>
+
+      <p>
+        Suppose two known inertial vectors are available:
+      </p>
+
+      <p>
+        \[
+        \mathbf v_1^I, \qquad \mathbf v_2^I,
+        \]
+      </p>
+
+      <p>
+        with corresponding body measurements
+      </p>
+
+      <p>
+        \[
+        \mathbf v_1^B, \qquad \mathbf v_2^B.
+        \]
+      </p>
+
+      <p>
+        If the two reference directions are not collinear, full attitude can generally be determined.
+      </p>
+
+      <p>
+        Typical combinations include:
+      </p>
+
+      <ul>
+        <li>Sun sensor + magnetometer,</li>
+        <li>star vectors,</li>
+        <li>horizon vector + Sun vector.</li>
+      </ul>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Two Independent Vector References} \rightarrow \text{Full Attitude Information}. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.22 Magnetometer Measurements</h3>
+
+      <p>
+        A magnetometer measures the local geomagnetic field vector.
+      </p>
+
+      <p>
+        Let an Earth magnetic-field model provide
+      </p>
+
+      <p>
+        \[
+        \mathbf B^I.
+        \]
+      </p>
+
+      <p>
+        The predicted body-frame field is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf B}^{B} = \mathbf C_{BI}(\hat{\mathbf q}) \mathbf B^I. }
+        \]
+      </p>
+
+      <p>
+        The magnetometer provides
+      </p>
+
+      <p>
+        \[
+        \mathbf B_m^B.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_B = \mathbf B_m^B - \hat{\mathbf B}^{B}. }
+        \]
+      </p>
+
+      <p>
+        This residual contributes attitude information.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.23 Limitations of Magnetometer Attitude Information</h3>
+
+      <p>
+        Magnetometer measurements can be affected by:
+      </p>
+
+      <ul>
+        <li>spacecraft-generated magnetic fields,</li>
+        <li>current-carrying harnesses,</li>
+        <li>reaction-wheel motors,</li>
+        <li>magnetic torquers,</li>
+        <li>structural magnetic material,</li>
+        <li>calibration error,</li>
+        <li>environmental model error.</li>
+      </ul>
+
+      <p>
+        Therefore the measurement model is more realistically
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf B_m = \mathbf C_{BI}\mathbf B^I + \mathbf b_B + \mathbf n_B. }
+        \]
+      </p>
+
+      <p>
+        Here
+      </p>
+
+      <p>
+        \[
+        \mathbf b_B
+        \]
+      </p>
+
+      <p>
+        represents magnetic bias.
+      </p>
+
+      <p>
+        Calibration is therefore important.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.24 Magnetometer Calibration</h3>
+
+      <p>
+        A practical magnetometer model may include
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf B_m = \mathbf S_B \mathbf C_{BI}\mathbf B^I + \mathbf b_B + \mathbf n_B }
+        \]
+      </p>
+
+      <p>
+        where
+      </p>
+
+      <p>
+        \[
+        \mathbf S_B
+        \]
+      </p>
+
+      <p>
+        may include:
+      </p>
+
+      <ul>
+        <li>scale-factor errors,</li>
+        <li>non-orthogonality,</li>
+        <li>cross-axis sensitivity.</li>
+      </ul>
+
+      <p>
+        Poor calibration can directly appear as attitude-estimation bias.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.25 Sun Sensor and Magnetometer Fusion</h3>
+
+      <p>
+        Sun and magnetic vectors are frequently used together for coarse attitude determination.
+      </p>
+
+      <p>
+        The estimator receives
+      </p>
+
+      <p>
+        \[
+        \mathbf s_m^B
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf B_m^B.
+        \]
+      </p>
+
+      <p>
+        Together, when sufficiently non-collinear, they provide full three-axis attitude information.
+      </p>
+
+      <p>
+        This is especially useful in:
+      </p>
+
+      <ul>
+        <li>acquisition modes,</li>
+        <li>safe mode,</li>
+        <li>coarse attitude determination.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.26 Geometric Conditioning of Two Vectors</h3>
+
+      <p>
+        If the two reference vectors become nearly parallel, attitude determination becomes poorly conditioned.
+      </p>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \gamma = \cos^{-1} \left( \frac{ \mathbf v_1^T\mathbf v_2 }{ \|\mathbf v_1\|\|\mathbf v_2\| } \right).
+        \]
+      </p>
+
+      <p>
+        As
+      </p>
+
+      <p>
+        \[
+        \gamma\rightarrow0
+        \]
+      </p>
+
+      <p>
+        or
+      </p>
+
+      <p>
+        \[
+        \gamma\rightarrow\pi,
+        \]
+      </p>
+
+      <p>
+        the information provided by the two vectors becomes nearly redundant.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Good Vector Separation} \rightarrow \text{Better Attitude Observability}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Geometry controls conditioning</h4>
+        <p>Even when two vectors are mathematically non-collinear, nearly parallel vectors provide weak independent information. The resulting attitude solution can therefore be highly sensitive to noise.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.27 TRIAD Method</h3>
+
+      <p>
+        The TRIAD method constructs orthogonal triads using two vector observations.
+      </p>
+
+      <p>
+        From the reference vectors,
+      </p>
+
+      <p>
+        \[
+        \mathbf t_1^I = \frac{\mathbf v_1^I}{\|\mathbf v_1^I\|},
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf t_2^I = \frac{ \mathbf t_1^I \times \mathbf v_2^I }{ \| \mathbf t_1^I \times \mathbf v_2^I \| },
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf t_3^I = \mathbf t_1^I \times \mathbf t_2^I.
+        \]
+      </p>
+
+      <p>
+        A corresponding body triad is constructed.
+      </p>
+
+      <p>
+        Then the attitude matrix is obtained from the two triads.
+      </p>
+
+      <p>
+        TRIAD is useful for coarse or initial attitude determination.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.28 Wahba's Problem</h3>
+
+      <p>
+        A more general vector-attitude determination problem is Wahba's problem.
+      </p>
+
+      <p>
+        Given reference vectors
+      </p>
+
+      <p>
+        \[
+        \mathbf v_i^I
+        \]
+      </p>
+
+      <p>
+        and measured body vectors
+      </p>
+
+      <p>
+        \[
+        \mathbf v_i^B,
+        \]
+      </p>
+
+      <p>
+        find the rotation minimizing
+      </p>
+
+      <p>
+        \[
+        \boxed{ J(\mathbf C) = \frac12 \sum_i a_i \| \mathbf v_i^B - \mathbf C\mathbf v_i^I \|^2. }
+        \]
+      </p>
+
+      <p>
+        The weights
+      </p>
+
+      <p>
+        \[
+        a_i
+        \]
+      </p>
+
+      <p>
+        represent confidence in each measurement.
+      </p>
+
+      <p>
+        Many classical attitude-determination algorithms solve or approximate this problem.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.29 QUEST</h3>
+
+      <p>
+        QUEST is a computationally efficient solution to Wahba's problem.
+      </p>
+
+      <p>
+        It can combine multiple vector measurements such as:
+      </p>
+
+      <ul>
+        <li>star vectors,</li>
+        <li>Sun vectors,</li>
+        <li>magnetic-field vectors.</li>
+      </ul>
+
+      <p>
+        QUEST produces a best-fit quaternion estimate.
+      </p>
+
+      <p>
+        It is particularly useful for:
+      </p>
+
+      <ul>
+        <li>standalone attitude solutions,</li>
+        <li>initialization,</li>
+        <li>measurement preprocessing.</li>
+      </ul>
+
+      <p>
+        A recursive filter can then use that quaternion as an attitude measurement.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.30 Static Attitude Determination Versus Dynamic Filtering</h3>
+
+      <p>
+        Algorithms such as TRIAD and QUEST estimate attitude from measurements at one time.
+      </p>
+
+      <p>
+        A Kalman-type attitude estimator adds dynamics.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{TRIAD/QUEST} = \text{Instantaneous Attitude Determination} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{MEKF/ESKF} = \text{Recursive Dynamic Attitude Estimation}. }
+        \]
+      </p>
+
+      <p>
+        Dynamic filters can also estimate:
+      </p>
+
+      <ul>
+        <li>gyro bias,</li>
+        <li>sensor calibration,</li>
+        <li>attitude-rate uncertainty.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Static and recursive methods solve different problems</h4>
+        <p>TRIAD and QUEST solve an instantaneous attitude-determination problem. Recursive filters additionally exploit time evolution, gyro propagation, covariance, and bias states.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.31 Typical Attitude-Fusion Architecture</h3>
+
+      <p>
+        A representative architecture is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Gyroscope}\\ \downarrow\\ \text{Quaternion Propagation}\\ \downarrow\\ \hat{\mathbf q}^{-}\\ \downarrow\\ \text{Predict Sensor Measurements}\\ \downarrow\\ \text{Form Residuals}\\ \downarrow\\ \text{MEKF Update}\\ \downarrow\\ \hat{\mathbf q}^{+},\hat{\mathbf b}_g \end{array} }
+        \]
+      </p>
+
+      <p>
+        Absolute-reference sensors enter only when measurements are available.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.32 Multi-Rate Attitude Fusion</h3>
+
+      <p>
+        Gyroscopes may operate at
+      </p>
+
+      <p>
+        \[
+        100\text{–}1000~\mathrm{Hz},
+        \]
+      </p>
+
+      <p>
+        while star trackers may update at only a few hertz.
+      </p>
+
+      <p>
+        Sun sensors and magnetometers may have yet another rate.
+      </p>
+
+      <p>
+        Therefore the estimator usually propagates at gyro rate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Measurement} \rightarrow \text{Prediction at Every IMU Step} }
+        \]
+      </p>
+
+      <p>
+        and performs corrections asynchronously whenever other sensors arrive:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Absolute Measurement Arrives} \rightarrow \text{Measurement Update}. }
+        \]
+      </p>
+
+      <p>
+        This is naturally an event-driven estimation architecture.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why event-driven updates are natural</h4>
+        <p>The gyro defines the high-rate propagation clock, while lower-rate absolute sensors update the filter only when data arrive. This avoids forcing all sensors onto one artificial sample rate.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.33 Star Tracker Update</h3>
+
+      <p>
+        At time
+      </p>
+
+      <p>
+        \[
+        t_k,
+        \]
+      </p>
+
+      <p>
+        the filter may receive
+      </p>
+
+      <p>
+        \[
+        \mathbf q_{ST,k}.
+        \]
+      </p>
+
+      <p>
+        The relative quaternion is
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf q_k = \mathbf q_{ST,k} \otimes (\hat{\mathbf q}_k^-)^{-1}.
+        \]
+      </p>
+
+      <p>
+        The small-angle residual becomes approximately
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_k \approx 2\, \delta\mathbf q_{v,k}. }
+        \]
+      </p>
+
+      <p>
+        This residual is used in the Kalman correction.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.34 Vector-Sensor Linearization</h3>
+
+      <p>
+        For
+      </p>
+
+      <p>
+        \[
+        \mathbf v^B = \mathbf C_{BI}(\mathbf q) \mathbf v^I,
+        \]
+      </p>
+
+      <p>
+        a small attitude perturbation gives approximately
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf v^B \approx - [\hat{\mathbf v}^{B}\times] \delta\boldsymbol\theta.
+        \]
+      </p>
+
+      <p>
+        Therefore the measurement Jacobian is commonly
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf H = \begin{bmatrix} -[\hat{\mathbf v}^{B}\times] & \mathbf 0 \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        for an error state containing attitude error and gyro-bias error.
+      </p>
+
+      <p>
+        This is an important equation for Sun-sensor and magnetometer fusion.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why the skew matrix appears</h4>
+        <p>A small attitude perturbation changes a predicted vector primarily in the tangent plane perpendicular to that vector. The skew-symmetric matrix is the linear mapping from small rotation error to vector-measurement error.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.35 Kalman Measurement Update</h3>
+
+      <p>
+        The innovation is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r_k = \mathbf z_k - h(\hat{\mathbf x}_k^-). }
+        \]
+      </p>
+
+      <p>
+        The innovation covariance is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf S_k = \mathbf H_k \mathbf P_k^- \mathbf H_k^T + \mathbf R_k. }
+        \]
+      </p>
+
+      <p>
+        The Kalman gain is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf K_k = \mathbf P_k^- \mathbf H_k^T \mathbf S_k^{-1}. }
+        \]
+      </p>
+
+      <p>
+        The error-state correction is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x}_k = \mathbf K_k\mathbf r_k. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.36 Attitude Error Injection</h3>
+
+      <p>
+        Suppose the filter estimates
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\boldsymbol\theta}.
+        \]
+      </p>
+
+      <p>
+        Form a correction quaternion:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf q} \approx \begin{bmatrix} 1\\ \frac12\delta\hat{\boldsymbol\theta} \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Then correct the nominal quaternion:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf q}^{+} = \delta\hat{\mathbf q} \otimes \hat{\mathbf q}^{-}. }
+        \]
+      </p>
+
+      <p>
+        The multiplication order depends on convention.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.37 Gyro-Bias Correction</h3>
+
+      <p>
+        The bias correction is taken from the error-state estimate:
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf b}_g.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\mathbf b}_g^{+} = \hat{\mathbf b}_g^{-} + \delta\hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <p>
+        The improved bias estimate then affects all future attitude propagation.
+      </p>
+
+      <p>
+        Thus the absolute sensors indirectly improve gyro propagation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.38 Error-State Reset</h3>
+
+      <p>
+        After correction, the estimated attitude-error state is reset:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\hat{\boldsymbol\theta} \leftarrow \mathbf0. }
+        \]
+      </p>
+
+      <p>
+        Similarly,
+      </p>
+
+      <p>
+        \[
+        \delta\hat{\mathbf b}_g \leftarrow \mathbf0
+        \]
+      </p>
+
+      <p>
+        if the bias error has been injected into the nominal state.
+      </p>
+
+      <p>
+        Covariance must also be transformed consistently under the reset.
+      </p>
+
+      <p>
+        This is an important implementation detail in MEKF and ESKF architectures.
+      </p>
+
+      <div class="concept-note">
+        <h4>Reset is not merely setting numbers to zero</h4>
+        <p>After an error-state correction is injected into the nominal quaternion and bias, the local error coordinates have changed. The covariance must be transformed consistently so it still describes uncertainty in the new local coordinates.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.39 Quaternion Normalization</h3>
+
+      <p>
+        Numerical propagation can cause
+      </p>
+
+      <p>
+        \[
+        \|\mathbf q\| \neq1.
+        \]
+      </p>
+
+      <p>
+        Therefore the quaternion is commonly normalized:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q \leftarrow \frac{\mathbf q}{\|\mathbf q\|}. }
+        \]
+      </p>
+
+      <p>
+        This is simple and effective for maintaining the unit-quaternion constraint.
+      </p>
+
+      <p>
+        Normalization should not replace correct quaternion dynamics, but it helps control numerical drift.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.40 Safe-Mode Attitude Determination</h3>
+
+      <p>
+        Safe mode often prioritizes:
+      </p>
+
+      <ul>
+        <li>robustness,</li>
+        <li>simplicity,</li>
+        <li>power safety,</li>
+        <li>Sun acquisition,</li>
+        <li>communication survivability.</li>
+      </ul>
+
+      <p>
+        A fine star tracker may not be available or may not be required.
+      </p>
+
+      <p>
+        A common safe-mode combination is:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} + \text{Sun Sensor} + \text{Magnetometer}. }
+        \]
+      </p>
+
+      <p>
+        This provides sufficient information for coarse three-axis attitude knowledge when geometry is suitable.
+      </p>
+
+      <div class="concept-note">
+        <h4>Safe mode uses a different design priority</h4>
+        <p>Safe-mode attitude estimation usually values robustness, observability, and power survival more than fine pointing. A simpler sensor combination can therefore be more appropriate than the nominal high-accuracy architecture.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.41 Sun-Pointing Safe Mode</h3>
+
+      <p>
+        In many spacecraft, safe mode seeks to orient solar arrays or a spacecraft axis toward the Sun.
+      </p>
+
+      <p>
+        The key measurement is the Sun vector:
+      </p>
+
+      <p>
+        \[
+        \mathbf s_m^B.
+        \]
+      </p>
+
+      <p>
+        The estimated attitude can be used to determine the body-frame pointing error.
+      </p>
+
+      <p>
+        Because rotation about the Sun vector remains weakly constrained from the Sun sensor alone, magnetometer or gyro information can supplement the estimate.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.42 Detumbling and Attitude Estimation</h3>
+
+      <p>
+        During detumbling, angular rates may initially be high.
+      </p>
+
+      <p>
+        The estimator may rely strongly on:
+      </p>
+
+      <ul>
+        <li>gyroscopes,</li>
+        <li>magnetometers.</li>
+      </ul>
+
+      <p>
+        Star trackers may not be usable at high angular rates because of:
+      </p>
+
+      <ul>
+        <li>image smear,</li>
+        <li>lost-in-space limitations,</li>
+        <li>tracking limitations.</li>
+      </ul>
+
+      <p>
+        As rates decrease, higher-accuracy attitude sensors can be reintroduced.
+      </p>
+
+      <p>
+        Thus sensor fusion may change with spacecraft mode.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.43 Fine-Pointing Mode</h3>
+
+      <p>
+        Fine pointing may require:
+      </p>
+
+      <ul>
+        <li>star tracker attitude,</li>
+        <li>high-quality gyroscope rate propagation,</li>
+        <li>accurate gyro-bias estimation,</li>
+        <li>careful alignment calibration.</li>
+      </ul>
+
+      <p>
+        The architecture can be approximated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker} + \text{Gyro} \rightarrow \text{High-Precision Attitude Estimate}. }
+        \]
+      </p>
+
+      <p>
+        The star tracker limits long-term error while the gyro preserves high-bandwidth attitude knowledge between star-tracker updates.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.44 Pointing Knowledge Versus Pointing Control</h3>
+
+      <p>
+        Attitude estimation provides pointing knowledge.
+      </p>
+
+      <p>
+        Attitude control uses that estimate to command actuators.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Attitude Estimation Error} \rightarrow \text{Pointing Knowledge Error}. }
+        \]
+      </p>
+
+      <p>
+        The closed-loop control system then sees
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}
+        \]
+      </p>
+
+      <p>
+        rather than the true attitude.
+      </p>
+
+      <p>
+        Estimator quality therefore directly affects pointing performance.
+      </p>
+
+      <div class="concept-note">
+        <h4>Knowledge and control are coupled but not identical</h4>
+        <p>The estimator reports what it believes the attitude is; the controller acts on that estimate. Estimation error therefore appears to the control system as an error in pointing knowledge.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.45 Attitude Knowledge Error</h3>
+
+      <p>
+        A common performance metric is principal attitude error:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\theta = 2\cos^{-1} \left( |\delta q_0| \right). }
+        \]
+      </p>
+
+      <p>
+        This may be reported in:
+      </p>
+
+      <ul>
+        <li>degrees,</li>
+        <li>arcminutes,</li>
+        <li>arcseconds.</li>
+      </ul>
+
+      <p>
+        Axis-specific small-angle errors may also be reported:
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta = \begin{bmatrix} \delta\theta_x\\ \delta\theta_y\\ \delta\theta_z \end{bmatrix}.
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.46 Gyro-Bias Estimation Performance</h3>
+
+      <p>
+        Gyro bias estimation should be evaluated independently.
+      </p>
+
+      <p>
+        Define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \tilde{\mathbf b}_g = \mathbf b_g - \hat{\mathbf b}_g. }
+        \]
+      </p>
+
+      <p>
+        Metrics may include:
+      </p>
+
+      <ul>
+        <li>bias RMSE,</li>
+        <li>convergence time,</li>
+        <li>steady-state bias error,</li>
+        <li>covariance consistency.</li>
+      </ul>
+
+      <p>
+        Good attitude accuracy does not necessarily mean the gyro-bias state is well estimated.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.47 Attitude Covariance</h3>
+
+      <p>
+        For a multiplicative filter, attitude covariance usually describes the small-angle error:
+      </p>
+
+      <p>
+        \[
+        \mathbf P_\theta.
+        \]
+      </p>
+
+      <p>
+        The one-sigma uncertainty along each error-state axis is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \sigma_{\theta_i} = \sqrt{ P_{\theta,ii} }. }
+        \]
+      </p>
+
+      <p>
+        These values can be compared with the actual attitude-error components in simulation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.48 Attitude NEES</h3>
+
+      <p>
+        For attitude error
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta
+        \]
+      </p>
+
+      <p>
+        and covariance
+      </p>
+
+      <p>
+        \[
+        \mathbf P_\theta,
+        \]
+      </p>
+
+      <p>
+        define
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathrm{NEES}_{att} = \delta\boldsymbol\theta^T \mathbf P_\theta^{-1} \delta\boldsymbol\theta. }
+        \]
+      </p>
+
+      <p>
+        For a three-dimensional attitude-error state, the expected value under ideal assumptions is approximately
+      </p>
+
+      <p>
+        \[
+        3.
+        \]
+      </p>
+
+      <p>
+        This provides a consistency check for attitude covariance.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why attitude NEES uses a three-state error</h4>
+        <p>For MEKF-style filters the covariance normally describes the local three-dimensional attitude error, not four quaternion components. The consistency statistic should therefore be built from the same local error coordinates.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.49 Sensor Innovation Monitoring</h3>
+
+      <p>
+        Each attitude sensor produces its own innovation.
+      </p>
+
+      <p>
+        For star tracker:
+      </p>
+
+      <p>
+        \[
+        \mathbf r_{ST}.
+        \]
+      </p>
+
+      <p>
+        For Sun sensor:
+      </p>
+
+      <p>
+        \[
+        \mathbf r_{Sun}.
+        \]
+      </p>
+
+      <p>
+        For magnetometer:
+      </p>
+
+      <p>
+        \[
+        \mathbf r_{Mag}.
+        \]
+      </p>
+
+      <p>
+        These should be monitored separately because each sensor can fail or degrade independently.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.50 Innovation Gating</h3>
+
+      <p>
+        Before fusing an attitude measurement, calculate
+      </p>
+
+      <p>
+        \[
+        \mathrm{NIS} = \mathbf r^T \mathbf S^{-1} \mathbf r.
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \mathrm{NIS} > \gamma,
+        \]
+      </p>
+
+      <p>
+        the measurement may be rejected or down-weighted.
+      </p>
+
+      <p>
+        This is particularly useful for:
+      </p>
+
+      <ul>
+        <li>star-tracker false solutions,</li>
+        <li>Sun-sensor contamination,</li>
+        <li>magnetic disturbances,</li>
+        <li>corrupted measurements.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Gating protects the estimator, not just the sensor</h4>
+        <p>A statistically implausible attitude measurement can drive a large state correction. Innovation gating prevents a single bad star-tracker, Sun-sensor, or magnetometer update from corrupting the fused attitude.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.51 Star Tracker Failure Modes</h3>
+
+      <p>
+        Star-tracker measurements may degrade because of:
+      </p>
+
+      <ul>
+        <li>Sun intrusion,</li>
+        <li>Earth or Moon intrusion,</li>
+        <li>high angular rate,</li>
+        <li>star-field obscuration,</li>
+        <li>lost-in-space solution failure,</li>
+        <li>hot pixels,</li>
+        <li>catalog mismatch,</li>
+        <li>optical contamination.</li>
+      </ul>
+
+      <p>
+        Therefore the estimator should use quality information and innovation validation rather than blindly accepting every solution.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.52 Sun Sensor Limitations</h3>
+
+      <p>
+        Sun sensors may become unavailable during eclipse.
+      </p>
+
+      <p>
+        Therefore
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sun Sensor Availability} = 0 }
+        \]
+      </p>
+
+      <p>
+        during eclipse or when the Sun lies outside the sensor field of view.
+      </p>
+
+      <p>
+        The estimator must continue using other sensors.
+      </p>
+
+      <p>
+        Gyro propagation becomes particularly important during such intervals.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.53 Magnetometer Disturbance</h3>
+
+      <p>
+        A magnetometer may be corrupted while magnetic actuators are active.
+      </p>
+
+      <p>
+        For example, if a magnetorquer generates
+      </p>
+
+      <p>
+        \[
+        \mathbf B_{MTQ},
+        \]
+      </p>
+
+      <p>
+        the measurement may become
+      </p>
+
+      <p>
+        \[
+        \mathbf B_m = \mathbf B_{\text{Earth}} + \mathbf B_{MTQ} + \mathbf B_{\text{spacecraft}} + \mathbf n.
+        \]
+      </p>
+
+      <p>
+        The estimator may therefore:
+      </p>
+
+      <ul>
+        <li>ignore magnetometer data during torquer activation,</li>
+        <li>model the interference,</li>
+        <li>use timing separation between actuation and measurement.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.54 Sensor Alignment Errors</h3>
+
+      <p>
+        Each attitude sensor has its own sensor frame.
+      </p>
+
+      <p>
+        Let
+      </p>
+
+      <p>
+        \[
+        \mathbf C_{BS}
+        \]
+      </p>
+
+      <p>
+        represent the rotation from sensor frame to body frame.
+      </p>
+
+      <p>
+        Then a sensor measurement
+      </p>
+
+      <p>
+        \[
+        \mathbf v^S
+        \]
+      </p>
+
+      <p>
+        must be transformed:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf v^B = \mathbf C_{BS}\mathbf v^S. }
+        \]
+      </p>
+
+      <p>
+        If the alignment matrix is wrong, a systematic attitude error results.
+      </p>
+
+      <div class="concept-note">
+        <h4>Alignment is part of the measurement model</h4>
+        <p>A high-quality sensor still produces a biased body-frame measurement if its mounting transformation is wrong. Sensor-to-body alignment must therefore be treated with the same care as the sensor noise model.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.55 Misalignment Calibration</h3>
+
+      <p>
+        Small sensor misalignment may be represented by
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\alpha.
+        \]
+      </p>
+
+      <p>
+        The alignment matrix can be approximated as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf C_{BS} \approx \left( \mathbf I - [\delta\boldsymbol\alpha\times] \right) \mathbf C_{BS,0}. }
+        \]
+      </p>
+
+      <p>
+        Calibration states may even be estimated online if sufficiently observable.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.56 Sensor Lever Arms</h3>
+
+      <p>
+        Some sensors are not located at the spacecraft center of mass.
+      </p>
+
+      <p>
+        For pure attitude-vector sensors, lever arm may not directly affect the vector direction.
+      </p>
+
+      <p>
+        However, in systems combining translational and rotational measurements, sensor position can matter.
+      </p>
+
+      <p>
+        This becomes especially important for:
+      </p>
+
+      <ul>
+        <li>GNSS antennas,</li>
+        <li>cameras,</li>
+        <li>LiDAR,</li>
+        <li>accelerometers.</li>
+      </ul>
+
+      <p>
+        The general sensor-fusion architecture must therefore track sensor location and orientation accurately.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.57 Time Synchronization in Attitude Fusion</h3>
+
+      <p>
+        Gyro and star-tracker measurements must refer to the correct epochs.
+      </p>
+
+      <p>
+        Suppose a star-tracker measurement corresponds to
+      </p>
+
+      <p>
+        \[
+        t_m
+        \]
+      </p>
+
+      <p>
+        but is applied at
+      </p>
+
+      <p>
+        \[
+        t_k.
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        t_m\neq t_k,
+        \]
+      </p>
+
+      <p>
+        then for rotating spacecraft the attitude measurement is stale.
+      </p>
+
+      <p>
+        Approximate error due to delay is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta \approx \boldsymbol\omega\Delta t. }
+        \]
+      </p>
+
+      <p>
+        Thus even small timing errors can matter during rapid rotation.
+      </p>
+
+      <div class="concept-note">
+        <h4>Timing becomes attitude error during rotation</h4>
+        <p>A timestamp offset is approximately converted into an angular error through the spacecraft body rate. The faster the spacecraft rotates, the more damaging the same timing error becomes.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.58 Star Tracker Latency</h3>
+
+      <p>
+        A star tracker may have image exposure and processing latency.
+      </p>
+
+      <p>
+        The estimator should ideally know the timestamp of the observation itself, not merely the time when the processed quaternion was received.
+      </p>
+
+      <p>
+        Then the filter can:
+      </p>
+
+      <ul>
+        <li>update at measurement time,</li>
+        <li>propagate corrected state forward,</li>
+        <li>or compensate for known latency.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.59 Gyro Sampling and Coning Motion</h3>
+
+      <p>
+        When angular velocity changes significantly within a sample interval, simple rate integration can introduce coning error.
+      </p>
+
+      <p>
+        High-quality inertial processing may use coning corrections based on incremental angles.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \Delta\boldsymbol\theta
+        \]
+      </p>
+
+      <p>
+        is not always adequately represented by
+      </p>
+
+      <p>
+        \[
+        \boldsymbol\omega_k\Delta t.
+        \]
+      </p>
+
+      <p>
+        This becomes important for:
+      </p>
+
+      <ul>
+        <li>high-rate rotation,</li>
+        <li>vibration,</li>
+        <li>precision pointing.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Why coning correction can matter</h4>
+        <p>When rotation changes direction within a sample interval, sequential small rotations do not commute. High-fidelity inertial processing therefore uses incremental-angle corrections rather than assuming one constant rate.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.60 Gyro Noise and Attitude Error Growth</h3>
+
+      <p>
+        If gyro white noise has variance
+      </p>
+
+      <p>
+        \[
+        \sigma_\omega^2,
+        \]
+      </p>
+
+      <p>
+        integrated attitude uncertainty approximately grows with time.
+      </p>
+
+      <p>
+        For simple white noise,
+      </p>
+
+      <p>
+        \[
+        \sigma_\theta \propto \sqrt{t}.
+        \]
+      </p>
+
+      <p>
+        For constant unknown bias,
+      </p>
+
+      <p>
+        \[
+        \sigma_\theta \propto t.
+        \]
+      </p>
+
+      <p>
+        Therefore different gyro error processes produce different long-term attitude-error growth.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.61 Bias Observability</h3>
+
+      <p>
+        A constant gyro bias is not automatically observable under every measurement configuration.
+      </p>
+
+      <p>
+        Bias becomes observable through the way it causes propagated attitude to disagree with absolute attitude references over time.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Bias Observability} \rightarrow \text{Absolute Attitude Information + Time Evolution}. }
+        \]
+      </p>
+
+      <p>
+        If absolute attitude measurements disappear for a long interval, bias uncertainty grows.
+      </p>
+
+      <div class="concept-note">
+        <h4>Bias observability is created over time</h4>
+        <p>An absolute attitude sensor does not usually measure gyro bias directly. Bias becomes observable because an incorrect bias creates a systematic propagation error that later appears in attitude residuals.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.62 Covariance During Star Tracker Dropout</h3>
+
+      <p>
+        If the star tracker is lost, attitude covariance generally grows.
+      </p>
+
+      <p>
+        Conceptually,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P_\theta(t+\Delta t) > \mathbf P_\theta(t) }
+        \]
+      </p>
+
+      <p>
+        during gyro-only propagation.
+      </p>
+
+      <p>
+        When the star tracker returns, covariance may reduce sharply after successful measurement updates.
+      </p>
+
+      <p>
+        This behaviour is expected.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.63 Reacquisition After Star Tracker Return</h3>
+
+      <p>
+        When an absolute sensor returns after a long dropout, the attitude residual may be large.
+      </p>
+
+      <p>
+        The estimator should not blindly perform a large linearized update if the attitude error is outside the local validity region.
+      </p>
+
+      <p>
+        Possible strategies include:
+      </p>
+
+      <ul>
+        <li>reinitialization,</li>
+        <li>coarse attitude solution,</li>
+        <li>large-angle reset,</li>
+        <li>staged covariance handling.</li>
+      </ul>
+
+      <p>
+        The appropriate strategy depends on expected error magnitude.
+      </p>
+
+      <div class="concept-note">
+        <h4>Large residuals can violate the local filter assumption</h4>
+        <p>After a long dropout, the attitude error may no longer be small enough for a linearized MEKF correction. Reacquisition logic should therefore check whether a reset or coarse reinitialization is safer.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.64 Small-Angle Assumption</h3>
+
+      <p>
+        MEKF error-state linearization usually assumes
+      </p>
+
+      <p>
+        \[
+        \|\delta\boldsymbol\theta\| \ll1.
+        \]
+      </p>
+
+      <p>
+        If the initial attitude error is very large, the local linearization may be poor.
+      </p>
+
+      <p>
+        Therefore initialization may require:
+      </p>
+
+      <ul>
+        <li>TRIAD,</li>
+        <li>QUEST,</li>
+        <li>star-tracker quaternion,</li>
+        <li>coarse vector-based attitude.</li>
+      </ul>
+
+      <p>
+        After coarse alignment, the recursive error-state filter can operate within the small-angle region.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.65 Attitude Initialization</h3>
+
+      <p>
+        Initial attitude
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q}_0
+        \]
+      </p>
+
+      <p>
+        may come from:
+      </p>
+
+      <ul>
+        <li>star tracker,</li>
+        <li>TRIAD,</li>
+        <li>QUEST,</li>
+        <li>known deployment geometry,</li>
+        <li>coarse Sun/magnetic attitude determination.</li>
+      </ul>
+
+      <p>
+        Initial uncertainty is represented by
+      </p>
+
+      <p>
+        \[
+        \mathbf P_{\theta,0}.
+        \]
+      </p>
+
+      <p>
+        The covariance should reflect the actual quality of the initialization source.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.66 Initial Gyro Bias</h3>
+
+      <p>
+        The initial bias estimate may be obtained from stationary measurements:
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf b}_{g,0} = \frac1N \sum_{k=1}^{N} \boldsymbol\omega_{m,k}
+        \]
+      </p>
+
+      <p>
+        if true angular rate is known to be approximately zero.
+      </p>
+
+      <p>
+        In flight, this may not be possible.
+      </p>
+
+      <p>
+        Then a manufacturer calibration or previous estimate may be used with larger uncertainty.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.67 Attitude Filter Convergence</h3>
+
+      <p>
+        Attitude filter convergence should be evaluated for both:
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf b_g.
+        \]
+      </p>
+
+      <p>
+        Attitude may converge quickly while gyro bias takes longer.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ T_{\text{attitude}} \neq T_{\text{bias}}. }
+        \]
+      </p>
+
+      <p>
+        Both are important.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.68 Fine-Pointing Convergence</h3>
+
+      <p>
+        For fine-pointing operation, it is not enough for coarse attitude error to become small.
+      </p>
+
+      <p>
+        One may require:
+      </p>
+
+      <p>
+        \[
+        \|\delta\boldsymbol\theta\| < \theta_{\mathrm{fine}},
+        \]
+      </p>
+
+      <p>
+        \[
+        \|\delta\mathbf b_g\| < b_{\mathrm{fine}},
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \sigma_\theta < \sigma_{\mathrm{fine}}.
+        \]
+      </p>
+
+      <p>
+        These conditions ensure both accuracy and credible uncertainty.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.69 Sensor-Specific Measurement Covariance</h3>
+
+      <p>
+        Each sensor has its own covariance:
+      </p>
+
+      <p>
+        \[
+        \mathbf R_{ST},
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf R_{Sun},
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf R_{Mag}.
+        \]
+      </p>
+
+      <p>
+        These should reflect actual measurement quality.
+      </p>
+
+      <p>
+        A star tracker may provide much smaller attitude uncertainty than a coarse Sun sensor.
+      </p>
+
+      <p>
+        Therefore the estimator naturally weights them differently.
+      </p>
+
+      <div class="concept-note">
+        <h4>Measurement covariance is the filter&#x27;s trust model</h4>
+        <p>Different sensors should not be weighted by name or perceived quality alone. Their current covariance and measurement sensitivity determine how strongly they affect the fused estimate.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.70 Star Tracker Covariance</h3>
+
+      <p>
+        A star tracker may specify attitude error differently across axes.
+      </p>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        \sigma_{\mathrm{cross-boresight}}
+        \]
+      </p>
+
+      <p>
+        may differ from
+      </p>
+
+      <p>
+        \[
+        \sigma_{\mathrm{roll}}.
+        \]
+      </p>
+
+      <p>
+        Thus assuming isotropic covariance
+      </p>
+
+      <p>
+        \[
+        \mathbf R = \sigma^2\mathbf I
+        \]
+      </p>
+
+      <p>
+        may be inaccurate.
+      </p>
+
+      <p>
+        Anisotropic measurement covariance should be used when appropriate.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.71 Sun Sensor Covariance</h3>
+
+      <p>
+        Sun-sensor angular uncertainty may be represented approximately in tangent-plane coordinates.
+      </p>
+
+      <p>
+        Because the vector is normalized,
+      </p>
+
+      <p>
+        \[
+        \|\mathbf s\|=1,
+        \]
+      </p>
+
+      <p>
+        only two independent directional degrees of freedom are present.
+      </p>
+
+      <p>
+        The covariance should therefore correspond to directional uncertainty rather than arbitrary independent Cartesian noise.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.72 Magnetometer Covariance</h3>
+
+      <p>
+        Magnetometer measurement covariance should include the effects of:
+      </p>
+
+      <ul>
+        <li>electronic noise,</li>
+        <li>calibration residual,</li>
+        <li>field-model uncertainty,</li>
+        <li>spacecraft magnetic interference.</li>
+      </ul>
+
+      <p>
+        A very small electronics-noise figure alone may substantially underestimate real attitude information uncertainty.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.73 Normalizing Vector Measurements</h3>
+
+      <p>
+        Vector measurements are often normalized:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \bar{\mathbf v} = \frac{\mathbf v}{\|\mathbf v\|}. }
+        \]
+      </p>
+
+      <p>
+        This removes magnitude information and uses only direction.
+      </p>
+
+      <p>
+        For attitude determination, this is often appropriate because the attitude information is primarily contained in direction.
+      </p>
+
+      <p>
+        However, normalization changes the noise statistics and introduces correlation between components.
+      </p>
+
+      <div class="concept-note">
+        <h4>Normalization changes statistics</h4>
+        <p>Normalizing a noisy three-component vector constrains it to the unit sphere. The resulting component errors are correlated and lie mainly in the tangent plane.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.74 Vector Measurement Residual Choice</h3>
+
+      <p>
+        Instead of simple subtraction,
+      </p>
+
+      <p>
+        \[
+        \mathbf r = \mathbf v_m-\hat{\mathbf v},
+        \]
+      </p>
+
+      <p>
+        one may use the cross-product residual:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf v_m \times \hat{\mathbf v}. }
+        \]
+      </p>
+
+      <p>
+        For small angular error, this residual is directly related to attitude error.
+      </p>
+
+      <p>
+        This can be numerically convenient for normalized vectors.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.75 Cross-Product Residual</h3>
+
+      <p>
+        For small attitude error,
+      </p>
+
+      <p>
+        \[
+        \mathbf v_m \approx \hat{\mathbf v} - [\hat{\mathbf v}\times] \delta\boldsymbol\theta.
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \mathbf v_m\times\hat{\mathbf v}
+        \]
+      </p>
+
+      <p>
+        contains first-order attitude-error information.
+      </p>
+
+      <p>
+        This avoids treating the radial component of a normalized vector as an independent measurement.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.76 Sequential Versus Batch Sensor Updates</h3>
+
+      <p>
+        If several independent sensors arrive at the same epoch, measurements can be processed:
+      </p>
+
+      <ul>
+        <li>simultaneously in one stacked update,</li>
+        <li>sequentially one after another.</li>
+      </ul>
+
+      <p>
+        For independent measurement noise, properly implemented sequential and batch updates are theoretically equivalent in the linear case.
+      </p>
+
+      <p>
+        Sequential processing can reduce matrix dimension.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.77 Stacked Vector Measurement</h3>
+
+      <p>
+        For Sun sensor and magnetometer,
+      </p>
+
+      <p>
+        \[
+        \mathbf z = \begin{bmatrix} \mathbf s_m\\ \mathbf B_m \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The predicted measurement is
+      </p>
+
+      <p>
+        \[
+        h(\mathbf x) = \begin{bmatrix} \hat{\mathbf s}\\ \hat{\mathbf B} \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        The measurement covariance may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf R = \begin{bmatrix} \mathbf R_s & \mathbf 0\\ \mathbf 0 & \mathbf R_B \end{bmatrix} }
+        \]
+      </p>
+
+      <p>
+        if the measurement errors are independent.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.78 Cross-Sensor Correlation</h3>
+
+      <p>
+        If two attitude sensors share:
+      </p>
+
+      <ul>
+        <li>a common reference model,</li>
+        <li>timing errors,</li>
+        <li>calibration,</li>
+        <li>processing,</li>
+      </ul>
+
+      <p>
+        their errors may be correlated.
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ E[ \mathbf v_1 \mathbf v_2^T ] \neq 0. }
+        \]
+      </p>
+
+      <p>
+        Ignoring strong cross-sensor correlation can make the filter overconfident.
+      </p>
+
+      <div class="concept-note">
+        <h4>Shared error sources can create overconfidence</h4>
+        <p>If two sensors contain common timing, calibration, or reference-model error, fusing them as independent measurements counts some information twice and can shrink covariance unrealistically.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.79 Measurement Availability Logic</h3>
+
+      <p>
+        An attitude estimator should track whether each sensor is usable.
+      </p>
+
+      <p>
+        For sensor \(i\),
+      </p>
+
+      <p>
+        \[
+        \texttt{VALID}_i \in \{0,1\}.
+        \]
+      </p>
+
+      <p>
+        This validity may depend on:
+      </p>
+
+      <ul>
+        <li>hardware status,</li>
+        <li>field of view,</li>
+        <li>eclipse,</li>
+        <li>quality flag,</li>
+        <li>innovation gate,</li>
+        <li>saturation.</li>
+      </ul>
+
+      <p>
+        Only valid measurements should be fused.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.80 Sensor Priority Is Not the Same as Sensor Trust</h3>
+
+      <p>
+        The filter should not simply hard-code:
+      </p>
+
+      <blockquote>star tracker always better than magnetometer.</blockquote>
+
+      <p>
+        Trust should depend on actual covariance and validity.
+      </p>
+
+      <p>
+        The information contribution is governed by:
+      </p>
+
+      <p>
+        \[
+        \mathbf R_i
+        \]
+      </p>
+
+      <p>
+        and the measurement sensitivity.
+      </p>
+
+      <p>
+        Thus a degraded star tracker may temporarily contribute less useful information than a healthy alternative sensor.
+      </p>
+
+      <div class="concept-note">
+        <h4>Trust should be dynamic</h4>
+        <p>A normally precise star tracker may become poor during high-rate motion or optical contamination, while a coarser sensor may remain healthy. Fusion should therefore be driven by validity and uncertainty, not a permanent hierarchy.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.81 Attitude Sensor Redundancy</h3>
+
+      <p>
+        Multiple sensors of the same type may be installed for:
+      </p>
+
+      <ul>
+        <li>availability,</li>
+        <li>field-of-view coverage,</li>
+        <li>fault tolerance.</li>
+      </ul>
+
+      <p>
+        For example:
+      </p>
+
+      <p>
+        \[
+        ST_1, \quad ST_2.
+        \]
+      </p>
+
+      <p>
+        The estimator may:
+      </p>
+
+      <ul>
+        <li>fuse both,</li>
+        <li>select one,</li>
+        <li>compare them for fault detection.</li>
+      </ul>
+
+      <p>
+        Care is required if their errors are correlated.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.82 Redundant Star Trackers</h3>
+
+      <p>
+        Two star trackers mounted on different spacecraft faces can improve:
+      </p>
+
+      <ul>
+        <li>sky coverage,</li>
+        <li>robustness against Sun exclusion,</li>
+        <li>fault tolerance.</li>
+      </ul>
+
+      <p>
+        If both provide independent valid attitude solutions, they can be fused.
+      </p>
+
+      <p>
+        But if both depend on the same catalog or attitude-processing chain, some systematic errors may be common.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.83 Fault Detection Between Redundant Sensors</h3>
+
+      <p>
+        Suppose two star trackers provide
+      </p>
+
+      <p>
+        \[
+        \mathbf q_1, \qquad \mathbf q_2.
+        \]
+      </p>
+
+      <p>
+        Form the relative quaternion:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\mathbf q_{12} = \mathbf q_1 \otimes \mathbf q_2^{-1}. }
+        \]
+      </p>
+
+      <p>
+        A large disagreement can indicate a problem.
+      </p>
+
+      <p>
+        However, identifying which sensor is faulty may require:
+      </p>
+
+      <ul>
+        <li>a third reference,</li>
+        <li>innovation history,</li>
+        <li>sensor health data.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.84 Attitude Sensor Fusion and FDIR</h3>
+
+      <p>
+        Attitude estimation should interact with FDIR.
+      </p>
+
+      <p>
+        The estimator can provide:
+      </p>
+
+      <ul>
+        <li>innovation statistics,</li>
+        <li>rejection counts,</li>
+        <li>sensor consistency,</li>
+        <li>covariance growth.</li>
+      </ul>
+
+      <p>
+        FDIR can respond by:
+      </p>
+
+      <ul>
+        <li>excluding a sensor,</li>
+        <li>switching mode,</li>
+        <li>changing estimator configuration,</li>
+        <li>declaring degraded attitude knowledge.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Estimator residuals are useful FDIR evidence</h4>
+        <p>Repeated innovation failures, covariance growth, or disagreement between redundant sensors can provide evidence that a sensor should be isolated or the estimator should enter a degraded configuration.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.85 Degraded Attitude Navigation</h3>
+
+      <p>
+        If the star tracker fails, the estimator may continue using:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} + \text{Sun Sensor} + \text{Magnetometer}. }
+        \]
+      </p>
+
+      <p>
+        Accuracy may degrade, but navigation may remain adequate for safe mode.
+      </p>
+
+      <p>
+        If the Sun sensor also becomes unavailable during eclipse, the filter may rely on:
+      </p>
+
+      <p>
+        \[
+        \text{gyro} + \text{magnetometer}
+        \]
+      </p>
+
+      <p>
+        with further degraded observability.
+      </p>
+
+      <p>
+        The covariance should reflect this degradation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.86 Gyro-Only Mode</h3>
+
+      <p>
+        In complete loss of absolute-reference measurements:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro Only} \rightarrow \text{Unbounded Long-Term Attitude Drift}. }
+        \]
+      </p>
+
+      <p>
+        The filter can still propagate attitude temporarily.
+      </p>
+
+      <p>
+        But covariance should grow because absolute attitude is no longer constrained.
+      </p>
+
+      <p>
+        Thus gyro-only propagation is generally a temporary degraded mode, not a long-term absolute attitude solution.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.87 Attitude Observability</h3>
+
+      <p>
+        Attitude observability depends on:
+      </p>
+
+      <ul>
+        <li>available reference vectors,</li>
+        <li>vector geometry,</li>
+        <li>spacecraft motion,</li>
+        <li>gyro-bias dynamics.</li>
+      </ul>
+
+      <p>
+        A single fixed vector leaves rotation about that vector weakly observable.
+      </p>
+
+      <p>
+        Two non-collinear vectors provide full attitude information.
+      </p>
+
+      <p>
+        Bias observability additionally depends on time evolution.
+      </p>
+
+      <div class="concept-note">
+        <h4>Observability is mode-dependent</h4>
+        <p>The same spacecraft can move between fully observable and weakly observable attitude configurations as sensors disappear, geometry changes, or spacecraft motion changes.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.88 Attitude Observability Matrix</h3>
+
+      <p>
+        For a linearized error system,
+      </p>
+
+      <p>
+        \[
+        \delta\dot{\mathbf x} = \mathbf F\delta\mathbf x,
+        \]
+      </p>
+
+      <p>
+        \[
+        \delta\mathbf z = \mathbf H\delta\mathbf x,
+        \]
+      </p>
+
+      <p>
+        the observability matrix is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal O = \begin{bmatrix} \mathbf H\\ \mathbf H\mathbf F\\ \mathbf H\mathbf F^2\\ \vdots \end{bmatrix}. }
+        \]
+      </p>
+
+      <p>
+        Full rank indicates local linear observability.
+      </p>
+
+      <p>
+        For nonlinear attitude systems, observability is more complicated, but the same physical ideas remain important.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.89 Gyro Bias Observability Through Motion</h3>
+
+      <p>
+        Spacecraft motion can improve bias observability.
+      </p>
+
+      <p>
+        Different orientations relative to:
+      </p>
+
+      <ul>
+        <li>Sun,</li>
+        <li>Earth magnetic field,</li>
+        <li>stars,</li>
+      </ul>
+
+      <p>
+        change measurement sensitivity.
+      </p>
+
+      <p>
+        Therefore manoeuvres can sometimes improve estimator calibration.
+      </p>
+
+      <p>
+        This is an example of:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Motion} \rightarrow \text{Excitation} \rightarrow \text{Better Observability}. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.90 Attitude Sensor Fusion During Slews</h3>
+
+      <p>
+        During a slew:
+      </p>
+
+      <ul>
+        <li>angular rate increases,</li>
+        <li>star tracker quality may change,</li>
+        <li>latency becomes more important,</li>
+        <li>linearization error may increase.</li>
+      </ul>
+
+      <p>
+        The estimator should therefore be validated separately for:
+      </p>
+
+      <p>
+        \[
+        \text{fine pointing}
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \text{large-angle slews}.
+        \]
+      </p>
+
+      <p>
+        The same tuning may not perform equally well in both conditions.
+      </p>
+
+      <div class="concept-note">
+        <h4>Slew and fine-pointing cases should be validated separately</h4>
+        <p>Large slews stress timing, propagation, sensor tracking, and local linearization. Fine pointing instead emphasizes bias, low-frequency drift, and high-precision noise.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.91 Mode-Dependent Measurement Covariance</h3>
+
+      <p>
+        A star tracker may have different uncertainty during:
+      </p>
+
+      <ul>
+        <li>fine tracking,</li>
+        <li>acquisition,</li>
+        <li>high-rate motion.</li>
+      </ul>
+
+      <p>
+        Therefore,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf R_{ST} = \mathbf R_{ST}(\text{quality, rate, mode}). }
+        \]
+      </p>
+
+      <p>
+        Similarly, magnetometer quality may depend on actuator state.
+      </p>
+
+      <p>
+        Dynamic covariance models can therefore be more realistic than fixed values.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.92 Fine-Pointing Sensor Fusion</h3>
+
+      <p>
+        For precision pointing, the estimator may combine:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Low-Noise Gyro} + \text{Star Tracker}. }
+        \]
+      </p>
+
+      <p>
+        The gyro provides high-frequency attitude-rate information.
+      </p>
+
+      <p>
+        The star tracker provides low-frequency absolute attitude correction.
+      </p>
+
+      <p>
+        This can be interpreted as complementary information in the frequency domain.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.93 Frequency-Domain Interpretation</h3>
+
+      <p>
+        Gyros are strong at high frequency but drift at low frequency.
+      </p>
+
+      <p>
+        Absolute attitude sensors are strong at low frequency but may have:
+      </p>
+
+      <ul>
+        <li>lower bandwidth,</li>
+        <li>larger latency,</li>
+        <li>measurement noise.</li>
+      </ul>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyro} \rightarrow \text{High-Frequency Information} }
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Absolute Sensor} \rightarrow \text{Low-Frequency Reference}. }
+        \]
+      </p>
+
+      <p>
+        Kalman filtering provides a statistically derived way of combining these sources.
+      </p>
+
+      <div class="concept-note">
+        <h4>Frequency-domain view explains the complementarity</h4>
+        <p>Gyros preserve high-frequency rotational information well but drift at low frequency. Absolute sensors provide the low-frequency reference that prevents that drift.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.94 Complementary Filter Interpretation</h3>
+
+      <p>
+        A simplified attitude filter can be understood as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \hat{\theta} = \text{High-Pass Gyro Contribution} + \text{Low-Pass Absolute Attitude Contribution}. }
+        \]
+      </p>
+
+      <p>
+        A complementary filter explicitly performs this frequency separation.
+      </p>
+
+      <p>
+        A Kalman filter generalizes the idea using dynamic and measurement uncertainty.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.95 Attitude Rate Estimation</h3>
+
+      <p>
+        Some architectures estimate angular rate as a state:
+      </p>
+
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} \mathbf q\\ \boldsymbol\omega\\ \mathbf b_g \end{bmatrix}.
+        \]
+      </p>
+
+      <p>
+        Others treat gyro measurements directly as angular-rate input.
+      </p>
+
+      <p>
+        The choice depends on:
+      </p>
+
+      <ul>
+        <li>spacecraft dynamics,</li>
+        <li>sensor quality,</li>
+        <li>required rate accuracy,</li>
+        <li>estimator architecture.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.96 Dynamic Attitude Model</h3>
+
+      <p>
+        If angular rate is estimated using rigid-body dynamics,
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf J\dot{\boldsymbol\omega} + \boldsymbol\omega \times (\mathbf J\boldsymbol\omega) = \mathbf T. }
+        \]
+      </p>
+
+      <p>
+        Then the estimator may use:
+      </p>
+
+      <ul>
+        <li>inertia matrix,</li>
+        <li>actuator torque,</li>
+        <li>disturbance torque.</li>
+      </ul>
+
+      <p>
+        This can improve prediction but increases model dependence.
+      </p>
+
+      <div class="concept-note">
+        <h4>Dynamic models add information and risk</h4>
+        <p>Including rigid-body torque dynamics can improve prediction when inertia and torques are known accurately, but it also creates sensitivity to actuator and disturbance-model errors.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.97 Kinematic Versus Dynamic Attitude Filters</h3>
+
+      <p>
+        A kinematic filter propagates attitude primarily using gyro measurements.
+      </p>
+
+      <p>
+        A dynamic filter also propagates angular rate using rigid-body torque dynamics.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Kinematic Filter} \rightarrow \text{Sensor-Driven Propagation} }
+        \]
+      </p>
+
+      <p>
+        while
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Dynamic Filter} \rightarrow \text{Physics-Based Rate Prediction}. }
+        \]
+      </p>
+
+      <p>
+        Dynamic filters may offer benefits when torque models are reliable.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.98 Reaction-Wheel Information</h3>
+
+      <p>
+        Reaction-wheel speeds and commanded torques can provide useful dynamic information.
+      </p>
+
+      <p>
+        If wheel torque is known,
+      </p>
+
+      <p>
+        \[
+        \mathbf T_{RW},
+        \]
+      </p>
+
+      <p>
+        it may be included in the spacecraft rotational dynamics model.
+      </p>
+
+      <p>
+        However, actuator uncertainty and momentum-exchange effects must be modeled properly.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.99 Thruster-Induced Rotation</h3>
+
+      <p>
+        Thruster firings can generate attitude disturbances.
+      </p>
+
+      <p>
+        During such periods:
+      </p>
+
+      <p>
+        \[
+        \mathbf Q_{\omega}
+        \]
+      </p>
+
+      <p>
+        may need to represent increased dynamic uncertainty.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Thruster Activity} \rightarrow \text{Potential Increase in Attitude Process Noise}. }
+        \]
+      </p>
+
+      <p>
+        This is a general spacecraft estimation consideration.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.100 Flexible-Body Effects</h3>
+
+      <p>
+        Large spacecraft may experience:
+      </p>
+
+      <ul>
+        <li>structural vibration,</li>
+        <li>appendage flexibility,</li>
+        <li>solar-array motion.</li>
+      </ul>
+
+      <p>
+        These can affect:
+      </p>
+
+      <ul>
+        <li>gyro measurements,</li>
+        <li>star-tracker line of sight,</li>
+        <li>body attitude dynamics.</li>
+      </ul>
+
+      <p>
+        A rigid-body attitude filter may therefore show correlated innovations when flexible modes are significant.
+      </p>
+
+      <div class="concept-note">
+        <h4>Flexible dynamics can appear as estimator mismatch</h4>
+        <p>If the true line of sight or gyro motion contains flexible-body content that the rigid-body filter cannot represent, innovations may become temporally correlated rather than purely white.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.101 Structural Jitter</h3>
+
+      <p>
+        Fine-pointing missions may care about high-frequency jitter.
+      </p>
+
+      <p>
+        A star tracker may not measure such high-frequency motion at sufficient bandwidth.
+      </p>
+
+      <p>
+        Gyros or specialized sensors may capture it better.
+      </p>
+
+      <p>
+        Therefore sensor fusion can separate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Low-Frequency Absolute Attitude} }
+        \]
+      </p>
+
+      <p>
+        from
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{High-Frequency Jitter/Rate Information}. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.102 Attitude Determination During Eclipse</h3>
+
+      <p>
+        During eclipse:
+      </p>
+
+      <p>
+        \[
+        \text{Sun sensor unavailable}.
+        \]
+      </p>
+
+      <p>
+        The filter may rely on:
+      </p>
+
+      <ul>
+        <li>gyro,</li>
+        <li>star tracker,</li>
+        <li>magnetometer.</li>
+      </ul>
+
+      <p>
+        If star tracker is also unavailable, observability may degrade significantly.
+      </p>
+
+      <p>
+        The estimator covariance should grow accordingly rather than remaining artificially small.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.103 Star Tracker Blinding</h3>
+
+      <p>
+        If the Sun, Earth limb, or Moon enters a star tracker exclusion region, the sensor may become invalid.
+      </p>
+
+      <p>
+        The navigation system should not interpret missing star-tracker measurements as a filter fault.
+      </p>
+
+      <p>
+        Instead:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Known Sensor Unavailability} \neq \text{Unexpected Sensor Failure}. }
+        \]
+      </p>
+
+      <p>
+        The estimator should continue using the remaining sensors.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.104 Attitude Estimation During Safe Hold</h3>
+
+      <p>
+        Safe-hold attitude estimation may prioritize robustness over maximum accuracy.
+      </p>
+
+      <p>
+        A simplified state might contain only
+      </p>
+
+      <p>
+        \[
+        \mathbf q, \quad \mathbf b_g.
+        \]
+      </p>
+
+      <p>
+        A smaller, well-understood estimator can sometimes be preferable to a more complex estimator in emergency modes.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.105 Fine Attitude Determination</h3>
+
+      <p>
+        Fine attitude determination may include additional states:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf x = [ \delta\boldsymbol\theta, \mathbf b_g, \delta\boldsymbol\alpha_{ST}, \cdots ]^T. }
+        \]
+      </p>
+
+      <p>
+        Possible calibration states include:
+      </p>
+
+      <ul>
+        <li>star tracker alignment,</li>
+        <li>gyro scale factor,</li>
+        <li>gyro misalignment,</li>
+        <li>timing offset.</li>
+      </ul>
+
+      <p>
+        These states should only be added if sufficiently observable.
+      </p>
+
+      <div class="concept-note">
+        <h4>Extra states require information, not just equations</h4>
+        <p>Adding calibration or timing states is useful only when the measurements and motion actually excite those states. Otherwise covariance may grow without meaningful convergence.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.106 Calibration-State Estimation</h3>
+
+      <p>
+        Adding a state does not guarantee it can be estimated.
+      </p>
+
+      <p>
+        For calibration parameter
+      </p>
+
+      <p>
+        \[
+        c,
+        \]
+      </p>
+
+      <p>
+        the estimator needs measurement sensitivity:
+      </p>
+
+      <p>
+        \[
+        \frac{\partial h}{\partial c} \neq0.
+        \]
+      </p>
+
+      <p>
+        The spacecraft motion and sensor geometry must also provide sufficient excitation.
+      </p>
+
+      <p>
+        Otherwise the calibration state may simply increase covariance dimension without adding useful information.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.107 Gyro Scale-Factor Error</h3>
+
+      <p>
+        A gyro measurement may include scale-factor error:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_m = (\mathbf I+\mathbf S_g)\boldsymbol\omega + \mathbf b_g + \mathbf n_g. }
+        \]
+      </p>
+
+      <p>
+        Scale-factor states may be estimated if rotational motion sufficiently excites the relevant axes.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.108 Gyro Misalignment</h3>
+
+      <p>
+        Cross-axis misalignment may be modeled as
+      </p>
+
+      <p>
+        \[
+        \boldsymbol\omega_m = \mathbf M_g \boldsymbol\omega + \mathbf b_g + \mathbf n_g.
+        \]
+      </p>
+
+      <p>
+        If
+      </p>
+
+      <p>
+        \[
+        \mathbf M_g \neq\mathbf I,
+        \]
+      </p>
+
+      <p>
+        axis coupling occurs.
+      </p>
+
+      <p>
+        This can create systematic attitude errors during multi-axis rotation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.109 Time-Offset Estimation</h3>
+
+      <p>
+        A timing offset
+      </p>
+
+      <p>
+        \[
+        \Delta t
+        \]
+      </p>
+
+      <p>
+        between gyro and star tracker can produce attitude residuals approximately proportional to angular rate:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta_t \approx \boldsymbol\omega\Delta t. }
+        \]
+      </p>
+
+      <p>
+        Under suitable motion, timing offset may be estimated as a state.
+      </p>
+
+      <p>
+        But this requires sufficient excitation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.110 Measurement Preprocessing</h3>
+
+      <p>
+        Before an attitude measurement enters the filter, preprocessing may include:
+      </p>
+
+      <ul>
+        <li>frame transformation,</li>
+        <li>timestamp correction,</li>
+        <li>unit normalization,</li>
+        <li>quality validation,</li>
+        <li>covariance assignment,</li>
+        <li>field-of-view checks,</li>
+        <li>outlier screening.</li>
+      </ul>
+
+      <p>
+        This preprocessing is part of the estimation chain and should be validated just as carefully as the filter equations.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.111 Sign Handling for Quaternion Measurements</h3>
+
+      <p>
+        Because
+      </p>
+
+      <p>
+        \[
+        \mathbf q \equiv -\mathbf q,
+        \]
+      </p>
+
+      <p>
+        a measured quaternion may suddenly switch sign.
+      </p>
+
+      <p>
+        Before computing the relative quaternion, one can enforce
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf q_m^T\hat{\mathbf q}>0. }
+        \]
+      </p>
+
+      <p>
+        If not,
+      </p>
+
+      <p>
+        \[
+        \mathbf q_m \leftarrow -\mathbf q_m.
+        \]
+      </p>
+
+      <p>
+        This avoids an artificial large residual caused purely by quaternion sign choice.
+      </p>
+
+      <div class="concept-note">
+        <h4>Quaternion sign changes are not physical attitude jumps</h4>
+        <p>Because q and -q represent the same rotation, a sign flip from a star tracker must be handled before residual formation or the filter can see a false 360-degree-scale discrepancy.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.112 Quaternion Convention Consistency</h3>
+
+      <p>
+        Several conventions exist:
+      </p>
+
+      <ul>
+        <li>scalar-first,</li>
+        <li>scalar-last,</li>
+        <li>active rotation,</li>
+        <li>passive rotation,</li>
+        <li>body-to-inertial,</li>
+        <li>inertial-to-body.</li>
+      </ul>
+
+      <p>
+        A mathematically correct formula under one convention can be wrong under another.
+      </p>
+
+      <p>
+        Therefore a spacecraft attitude-estimation implementation should explicitly document:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Quaternion Definition} + \text{Multiplication Convention} + \text{Frame Direction}. }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Convention errors are structural errors</h4>
+        <p>A wrong convention cannot be repaired by retuning process or measurement covariance. Propagation, DCM conversion, measurement prediction, and error injection must all agree.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.113 DCM and Quaternion Consistency</h3>
+
+      <p>
+        The quaternion-to-DCM conversion must match the same convention used by:
+      </p>
+
+      <ul>
+        <li>gyro propagation,</li>
+        <li>sensor prediction,</li>
+        <li>error injection.</li>
+      </ul>
+
+      <p>
+        Otherwise vector predictions such as
+      </p>
+
+      <p>
+        \[
+        \mathbf C_{BI}\mathbf s^I
+        \]
+      </p>
+
+      <p>
+        may be reversed or transposed.
+      </p>
+
+      <p>
+        Frame-convention errors are among the most common causes of attitude-filter failure.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.114 Frame Chain for Sensor Measurements</h3>
+
+      <p>
+        A typical vector transformation may be
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathcal F_I \rightarrow \mathcal F_B \rightarrow \mathcal F_S. }
+        \]
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \mathbf v^S = \mathbf C_{SB} \mathbf C_{BI} \mathbf v^I.
+        \]
+      </p>
+
+      <p>
+        Every transformation should be clearly defined.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.115 Innovation in the Correct Frame</h3>
+
+      <p>
+        A measured vector and predicted vector must be expressed in the same coordinate frame before subtraction.
+      </p>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf z^B-\hat{\mathbf z}^B }
+        \]
+      </p>
+
+      <p>
+        is valid.
+      </p>
+
+      <p>
+        But
+      </p>
+
+      <p>
+        \[
+        \mathbf z^S-\hat{\mathbf z}^B
+        \]
+      </p>
+
+      <p>
+        is physically meaningless unless
+      </p>
+
+      <p>
+        \[
+        S=B.
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.116 Attitude-Filter Numerical Stability</h3>
+
+      <p>
+        Important numerical checks include:
+      </p>
+
+      <p>
+        \[
+        \|\mathbf q\|\approx1,
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf P=\mathbf P^T,
+        \]
+      </p>
+
+      <p>
+        \[
+        \lambda_i(\mathbf P)\ge0.
+        \]
+      </p>
+
+      <p>
+        The filter should also avoid:
+      </p>
+
+      <ul>
+        <li>NaN,</li>
+        <li>Inf,</li>
+        <li>matrix inversion failure,</li>
+        <li>covariance collapse.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Numerical health is part of navigation health</h4>
+        <p>A statistically sound attitude filter is still unusable if quaternion normalization, covariance symmetry, or positive semidefiniteness are lost during finite-precision computation.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.117 Joseph Covariance Update</h3>
+
+      <p>
+        A numerically robust covariance update is
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathbf P^+ = (\mathbf I-\mathbf K\mathbf H) \mathbf P^- (\mathbf I-\mathbf K\mathbf H)^T + \mathbf K\mathbf R\mathbf K^T. }
+        \]
+      </p>
+
+      <p>
+        This Joseph form better preserves symmetry and positive semidefiniteness than the simplified covariance equation under finite precision.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.118 Square-Root Attitude Filters</h3>
+
+      <p>
+        For high numerical robustness, one may propagate a square-root factor
+      </p>
+
+      <p>
+        \[
+        \mathbf S
+        \]
+      </p>
+
+      <p>
+        such that
+      </p>
+
+      <p>
+        \[
+        \mathbf P = \mathbf S\mathbf S^T.
+        \]
+      </p>
+
+      <p>
+        Square-root filtering can improve numerical conditioning, especially for high-precision or large-state estimators.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.119 Attitude Filter Performance Metrics</h3>
+
+      <p>
+        Important metrics include:
+      </p>
+
+      <ul>
+        <li>attitude RMSE,</li>
+        <li>principal-angle error,</li>
+        <li>axis-specific attitude error,</li>
+        <li>gyro-bias RMSE,</li>
+        <li>convergence time,</li>
+        <li>\(3\sigma\) coverage,</li>
+        <li>NIS,</li>
+        <li>NEES,</li>
+        <li>sensor-rejection rate,</li>
+        <li>reacquisition time.</li>
+      </ul>
+
+      <p>
+        Performance should be evaluated over multiple operating conditions.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.120 Monte Carlo Attitude Testing</h3>
+
+      <p>
+        Monte Carlo testing should vary:
+      </p>
+
+      <ul>
+        <li>initial attitude error,</li>
+        <li>initial gyro bias,</li>
+        <li>gyro noise,</li>
+        <li>bias instability,</li>
+        <li>star tracker noise,</li>
+        <li>Sun sensor noise,</li>
+        <li>magnetic-field error,</li>
+        <li>sensor dropouts,</li>
+        <li>timing offsets,</li>
+        <li>alignment errors.</li>
+      </ul>
+
+      <p>
+        This reveals whether the estimator performs reliably rather than only in a nominal case.
+      </p>
+
+      <div class="concept-note">
+        <h4>Why Monte Carlo is required</h4>
+        <p>Attitude performance depends on random initial error, sensor noise, bias, geometry, dropouts, and timing. Multiple randomized runs are therefore needed to establish probability, percentile, and convergence behaviour.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.121 Monte Carlo Attitude Error</h3>
+
+      <p>
+        For run \(j\),
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\theta^{(j)}(t)
+        \]
+      </p>
+
+      <p>
+        can be recorded.
+      </p>
+
+      <p>
+        Then evaluate:
+      </p>
+
+      <p>
+        \[
+        \mathrm{RMSE},
+        \]
+      </p>
+
+      <p>
+        \[
+        \theta_{95},
+        \]
+      </p>
+
+      <p>
+        \[
+        \theta_{99},
+        \]
+      </p>
+
+      <p>
+        \[
+        \theta_{\max}.
+        \]
+      </p>
+
+      <p>
+        This provides a statistical description of attitude performance.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.122 Convergence Probability</h3>
+
+      <p>
+        Define
+      </p>
+
+      <p>
+        \[
+        I_j = \begin{cases} 1,&\text{attitude filter converges},\\ 0,&\text{otherwise}. \end{cases}
+        \]
+      </p>
+
+      <p>
+        Then
+      </p>
+
+      <p>
+        \[
+        \boxed{ P_{\mathrm{conv}} \approx \frac1N \sum_{j=1}^{N} I_j. }
+        \]
+      </p>
+
+      <p>
+        This is particularly important when initial attitude uncertainty can be large.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.123 Star Tracker Dropout Testing</h3>
+
+      <p>
+        A representative test is:
+      </p>
+
+      <ol>
+        <li>operate with gyro + star tracker,</li>
+        <li>disable star tracker,</li>
+        <li>continue gyro propagation,</li>
+        <li>observe error and covariance growth,</li>
+        <li>restore star tracker,</li>
+        <li>evaluate correction and recovery.</li>
+      </ol>
+
+      <p>
+        Key quantities are:
+      </p>
+
+      <p>
+        \[
+        e_{\theta,\max},
+        \]
+      </p>
+
+      <p>
+        \[
+        P_{\theta,\max},
+        \]
+      </p>
+
+      <p>
+        \[
+        T_{\mathrm{recover}}.
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Dropout testing checks both prediction and recovery</h4>
+        <p>The outage period tests gyro propagation and covariance growth; reacquisition tests gating, large-residual handling, correction magnitude, and reconvergence.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.124 Sun Sensor Dropout Testing</h3>
+
+      <p>
+        Similarly, eclipse intervals can be simulated.
+      </p>
+
+      <p>
+        The estimator should:
+      </p>
+
+      <ul>
+        <li>stop using invalid Sun measurements,</li>
+        <li>propagate with remaining sensors,</li>
+        <li>increase uncertainty appropriately,</li>
+        <li>resume Sun-sensor fusion after valid reacquisition.</li>
+      </ul>
+
+      <p>
+        No artificial discontinuity should occur merely because the measurement stream resumes.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.125 Magnetic Disturbance Testing</h3>
+
+      <p>
+        Inject magnetic disturbance:
+      </p>
+
+      <p>
+        \[
+        \Delta\mathbf B.
+        \]
+      </p>
+
+      <p>
+        Evaluate:
+      </p>
+
+      <ul>
+        <li>innovation magnitude,</li>
+        <li>NIS,</li>
+        <li>measurement rejection,</li>
+        <li>attitude error,</li>
+        <li>recovery.</li>
+      </ul>
+
+      <p>
+        This validates both estimation and sensor-fault handling.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.126 Sensor Bias Testing</h3>
+
+      <p>
+        Inject a bias into an attitude sensor.
+      </p>
+
+      <p>
+        For example,
+      </p>
+
+      <p>
+        \[
+        \mathbf z = h(\mathbf x) + \mathbf b + \mathbf v.
+        \]
+      </p>
+
+      <p>
+        Observe whether the filter:
+      </p>
+
+      <ul>
+        <li>absorbs the bias incorrectly,</li>
+        <li>rejects the measurement,</li>
+        <li>detects the sensor fault,</li>
+        <li>maintains attitude using other sensors.</li>
+      </ul>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.127 Misalignment Testing</h3>
+
+      <p>
+        Introduce a fixed alignment error
+      </p>
+
+      <p>
+        \[
+        \delta\boldsymbol\alpha.
+        \]
+      </p>
+
+      <p>
+        Then evaluate whether:
+      </p>
+
+      <ul>
+        <li>attitude bias appears,</li>
+        <li>calibration state converges,</li>
+        <li>innovation mean becomes nonzero.</li>
+      </ul>
+
+      <p>
+        This is useful for distinguishing random noise from systematic calibration errors.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.128 Timing Error Testing</h3>
+
+      <p>
+        Introduce sensor delay
+      </p>
+
+      <p>
+        \[
+        \Delta t.
+        \]
+      </p>
+
+      <p>
+        During a slew, attitude error may approximately scale with
+      </p>
+
+      <p>
+        \[
+        \|\boldsymbol\omega\|\Delta t.
+        \]
+      </p>
+
+      <p>
+        This makes slew cases particularly useful for detecting timing problems.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.129 High-Rate Rotation Testing</h3>
+
+      <p>
+        Validate the estimator across expected angular rates.
+      </p>
+
+      <p>
+        Check:
+      </p>
+
+      <ul>
+        <li>gyro saturation,</li>
+        <li>star tracker availability,</li>
+        <li>numerical propagation,</li>
+        <li>small-angle update validity,</li>
+        <li>time synchronization.</li>
+      </ul>
+
+      <p>
+        An estimator tuned only for fine pointing may not behave correctly during rapid reorientation.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.130 Low-Rate Fine-Pointing Testing</h3>
+
+      <p>
+        At very low angular rate, different problems become important:
+      </p>
+
+      <ul>
+        <li>gyro bias,</li>
+        <li>quantization,</li>
+        <li>low-frequency drift,</li>
+        <li>star-tracker noise.</li>
+      </ul>
+
+      <p>
+        Fine-pointing tests should therefore use realistic low-rate sensor models rather than only large manoeuvres.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.131 Attitude-Sensor Fusion in Flight Software</h3>
+
+      <p>
+        A practical flight-software sequence may be:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Read Gyro}\\ \downarrow\\ \text{Propagate Quaternion}\\ \downarrow\\ \text{Propagate Covariance}\\ \downarrow\\ \text{Check New Absolute Measurements}\\ \downarrow\\ \text{Validate Measurement}\\ \downarrow\\ \text{Compute Innovation}\\ \downarrow\\ \text{Gate}\\ \downarrow\\ \text{Kalman Update}\\ \downarrow\\ \text{Inject Error}\\ \downarrow\\ \text{Reset Error State}\\ \downarrow\\ \text{Publish Attitude + Covariance} \end{array} }
+        \]
+      </p>
+
+      <div class="concept-note">
+        <h4>Flight-software ordering matters</h4>
+        <p>The sequence ensures the nominal attitude and covariance refer to the same epoch before measurement validation and correction. Changing this order carelessly can introduce timing and consistency errors.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.132 Published Attitude Solution</h3>
+
+      <p>
+        The estimator may publish:
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q},
+        \]
+      </p>
+
+      <p>
+        \[
+        \hat{\boldsymbol\omega},
+        \]
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf b}_g,
+        \]
+      </p>
+
+      <p>
+        \[
+        \mathbf P,
+        \]
+      </p>
+
+      <p>
+        along with health flags such as:
+      </p>
+
+      <p>
+        \[
+        \texttt{ATT\_VALID},
+        \]
+      </p>
+
+      <p>
+        \[
+        \texttt{ST\_VALID},
+        \]
+      </p>
+
+      <p>
+        \[
+        \texttt{SUN\_VALID},
+        \]
+      </p>
+
+      <p>
+        \[
+        \texttt{MAG\_VALID}.
+        \]
+      </p>
+
+      <p>
+        Downstream control should use both the state and its validity.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.133 Attitude Validity Logic</h3>
+
+      <p>
+        Attitude validity may require:
+      </p>
+
+      <p>
+        \[
+        \sigma_\theta < \sigma_{\max},
+        \]
+      </p>
+
+      <p>
+        valid numerical state,
+      </p>
+
+      <p>
+        and sufficient sensor/observability conditions.
+      </p>
+
+      <p>
+        Thus:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Valid Attitude} \neq \text{Filter Is Running}. }
+        \]
+      </p>
+
+      <p>
+        The filter can continue propagating internally even when the published attitude is considered degraded.
+      </p>
+
+      <div class="concept-note">
+        <h4>Running is not the same as valid</h4>
+        <p>An estimator can continue propagating internally while uncertainty grows beyond the level permitted for control or mission decisions. Validity logic communicates that distinction downstream.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.134 Attitude Accuracy Requirement</h3>
+
+      <p>
+        A requirement may be written
+      </p>
+
+      <p>
+        \[
+        \boxed{ \theta_{95} < \theta_{\mathrm{req}}. }
+        \]
+      </p>
+
+      <p>
+        Or in RMS form:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \mathrm{RMSE}_{\theta} < \theta_{\mathrm{req}}. }
+        \]
+      </p>
+
+      <p>
+        The statistical meaning must be explicit.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.135 Attitude Knowledge Versus Stability</h3>
+
+      <p>
+        Attitude knowledge is an estimation property.
+      </p>
+
+      <p>
+        Pointing stability describes how much the spacecraft physically moves.
+      </p>
+
+      <p>
+        A spacecraft may have:
+      </p>
+
+      <ul>
+        <li>excellent attitude knowledge but poor stability,</li>
+        <li>excellent stability but poor attitude knowledge.</li>
+      </ul>
+
+      <p>
+        Therefore:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Knowledge} \neq \text{Stability}. }
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.136 Estimation and Control Interaction</h3>
+
+      <p>
+        If attitude estimation is noisy, control may produce excessive actuator activity.
+      </p>
+
+      <p>
+        If attitude estimate is delayed, the controller may experience effective phase lag.
+      </p>
+
+      <p>
+        If covariance is overconfident, mode logic may permit operations before attitude knowledge is actually sufficient.
+      </p>
+
+      <p>
+        Thus estimation performance must ultimately be checked in closed loop.
+      </p>
+
+      <div class="concept-note">
+        <h4>Closed-loop assessment is the final test</h4>
+        <p>Attitude estimation affects actuator commands, which alter spacecraft motion and the next sensor measurements. A filter that looks acceptable offline can still produce undesirable control interaction.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.137 High-Level Sensor Role Summary</h3>
+
+      <p>
+        The major attitude sensors can be summarized as:
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Gyroscope} \rightarrow \text{High-Rate Relative Rotation} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Star Tracker} \rightarrow \text{High-Accuracy Absolute Attitude} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Sun Sensor} \rightarrow \text{Sun-Vector Reference} }
+        \]
+      </p>
+
+      <p>
+        \[
+        \boxed{ \text{Magnetometer} \rightarrow \text{Geomagnetic Vector Reference}. }
+        \]
+      </p>
+
+      <p>
+        Their strengths are complementary.
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.138 Why No Single Sensor Is Sufficient for Every Mode</h3>
+
+      <p>
+        A gyro drifts.
+      </p>
+
+      <p>
+        A star tracker can be unavailable or relatively low rate.
+      </p>
+
+      <p>
+        A Sun sensor loses availability in eclipse and provides only one direction.
+      </p>
+
+      <p>
+        A magnetometer is comparatively coarse and sensitive to disturbances.
+      </p>
+
+      <p>
+        Therefore spacecraft attitude determination naturally benefits from sensor fusion.
+      </p>
+
+      <p>
+        The objective is not simply to average sensor outputs.
+      </p>
+
+      <p>
+        It is to use each sensor according to:
+      </p>
+
+      <ul>
+        <li>what it measures,</li>
+        <li>its uncertainty,</li>
+        <li>its update rate,</li>
+        <li>its validity,</li>
+        <li>its observability.</li>
+      </ul>
+
+      <div class="concept-note">
+        <h4>Fusion is selective information use, not averaging</h4>
+        <p>Each sensor constrains different directions, at different rates and uncertainties. A good estimator uses only the information that is currently valid and statistically credible.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.139 Overall Attitude-Fusion Architecture</h3>
+
+      <p>
+        The complete concept can be summarized as
+      </p>
+
+      <p>
+        \[
+        \boxed{ \begin{array}{ccccc} \text{Gyro} & \rightarrow & \text{Quaternion Propagation} & \rightarrow & \hat{\mathbf q}^{-} \\[6pt] && \uparrow && \\[-2pt] \text{Star Tracker} & \rightarrow & \text{Absolute Attitude Residual} & \rightarrow & \text{Correction} \\[6pt] \text{Sun Sensor} & \rightarrow & \text{Vector Residual} & \rightarrow & \text{Correction} \\[6pt] \text{Magnetometer} & \rightarrow & \text{Vector Residual} & \rightarrow & \text{Correction} \end{array} }
+        \]
+      </p>
+
+      <p>
+        with the estimator simultaneously updating:
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf q},
+        \]
+      </p>
+
+      <p>
+        \[
+        \hat{\mathbf b}_g,
+        \]
+      </p>
+
+      <p>
+        and
+      </p>
+
+      <p>
+        \[
+        \mathbf P.
+        \]
+      </p>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.140 Practical Design Philosophy</h3>
+
+      <p>
+        A strong spacecraft attitude estimator should:
+      </p>
+
+      <ol>
+        <li>propagate attitude continuously using gyro information,</li>
+        <li>estimate gyro bias,</li>
+        <li>use absolute attitude or vector references to bound drift,</li>
+        <li>account for sensor-specific noise,</li>
+        <li>handle asynchronous measurements,</li>
+        <li>maintain quaternion consistency,</li>
+        <li>validate every measurement statistically,</li>
+        <li>reject faults and outliers,</li>
+        <li>increase uncertainty when observability degrades,</li>
+        <li>recover correctly after sensor return,</li>
+        <li>produce credible attitude covariance,</li>
+        <li>remain numerically stable.</li>
+      </ol>
+
+      <div class="concept-note">
+        <h4>Design philosophy</h4>
+        <p>A robust attitude estimator is built around propagation, absolute-reference correction, bias estimation, validity management, uncertainty growth, recovery, and numerical consistency rather than around one preferred sensor.</p>
+      </div>
+
+    </section>
+    <section class="notes-section-card">
+
+<h3>4.2.21.141 Key Takeaways</h3>
+
+      <h4>1. Spacecraft attitude sensor fusion combines complementary information.</h4>
+      <p>
+        \[
+        \boxed{ \text{Gyro Propagation} + \text{Absolute References} \rightarrow \text{Continuous Attitude Estimation}. }
+        \]
+      </p>
+
+      <h4>2. Gyroscopes provide high-rate angular information but drift because of bias and noise.</h4>
+      <p>
+        \[
+        \boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf n_g.
+        \]
+      </p>
+
+      <h4>3. Quaternion propagation is driven by angular velocity.</h4>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf q} = \frac12 \mathbf\Omega(\boldsymbol\omega)\mathbf q. }
+        \]
+      </p>
+
+      <h4>4. Gyro bias should normally be estimated as part of the attitude filter.</h4>
+      <p>
+        \[
+        \boxed{ \mathbf x = [ \mathbf q, \mathbf b_g ]^T. }
+        \]
+      </p>
+
+      <h4>5. Star trackers provide highly accurate absolute attitude references and bound gyro drift.</h4>
+      <h4>6. Sun sensors and magnetometers are vector sensors rather than complete attitude sensors individually.</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf v}^{B} = \mathbf C_{BI}(\hat{\mathbf q})\mathbf v^I. }
+        \]
+      </p>
+
+      <h4>7. A single vector cannot completely determine three-axis attitude.</h4>
+      <p>
+        Rotation about the reference vector remains unconstrained.
+      </p>
+
+      <h4>8. Two non-collinear vector references can provide complete attitude information.</h4>
+      <p>
+        This is why Sun sensor and magnetometer combinations are useful in safe mode.
+      </p>
+
+      <h4>9. TRIAD and QUEST provide instantaneous attitude determination; MEKF and related filters provide recursive dynamic estimation.</h4>
+      <h4>10. The MEKF uses a nominal quaternion and a three-dimensional attitude-error state.</h4>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = [ \delta\boldsymbol\theta, \delta\mathbf b_g ]^T. }
+        \]
+      </p>
+
+      <h4>11. Quaternion corrections should be multiplicative rather than simple additive quaternion subtraction.</h4>
+      <h4>12. Sensor measurements must be transformed into consistent coordinate frames before fusion.</h4>
+      <h4>13. Timing is critical.</h4>
+      <p>
+        \[
+        \delta\boldsymbol\theta \approx \boldsymbol\omega\Delta t.
+        \]
+      </p>
+
+      <h4>14. Sensor availability changes with operating condition.</h4>
+      <p>
+        Star trackers may be blinded, Sun sensors become unavailable during eclipse, and magnetometers can be disturbed by spacecraft-generated fields.
+      </p>
+
+      <h4>15. The covariance should increase when attitude information is lost.</h4>
+      <p>
+        A growing covariance during absolute-sensor dropout is physically reasonable.
+      </p>
+
+      <h4>16. Gyro-only attitude propagation is temporary because long-term error is unbounded.</h4>
+      <h4>17. Star-tracker reacquisition after a large error may require more than a small-angle linearized correction.</h4>
+      <h4>18. Sensor validity and measurement gating are essential parts of attitude fusion.</h4>
+      <p>
+        \[
+        \mathrm{NIS} = \mathbf r^T \mathbf S^{-1} \mathbf r.
+        \]
+      </p>
+
+      <h4>19. Attitude performance should be evaluated using principal-angle error, bias error, covariance consistency, NIS, NEES, convergence, and recovery.</h4>
+      <h4>20. Safe mode and fine-pointing mode can use different sensor combinations and estimator configurations.</h4>
+      <h4>21. Calibration, misalignment, timing, and frame conventions can dominate attitude-estimation error even when the filter equations are correct.</h4>
+      <h4>22. Quaternion convention must be explicitly documented.</h4>
+      <p>
+        \[
+        \boxed{ \text{Convention Consistency} = \text{Propagation} + \text{DCM} + \text{Measurement Model} + \text{Correction}. }
+        \]
+      </p>
+
+      <h4>23. A valid attitude solution means more than simply having a running estimator.</h4>
+      <p>
+        It requires acceptable uncertainty, sufficient observability, valid sensors, and numerical health.
+      </p>
+
+      <h4>24. The central engineering principle is</h4>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Gyros carry attitude information forward in time,}\\[4pt] \text{while absolute-reference sensors repeatedly anchor that propagated attitude}\\[4pt] \text{and allow gyro biases and uncertainty to be estimated.} \end{array} }
+        \]
+      </p>
+
+      <p>
+        The natural next section is <strong>4.2.22 IMU/GNSS Sensor Fusion</strong>, where the same propagation-and-correction philosophy is extended from rotational navigation to full inertial position and velocity estimation using accelerometers, gyroscopes, and GNSS.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+      <h2>Next: 4.2.22 IMU/GNSS Sensor Fusion</h2>
+
+      <p>
+        After developing spacecraft attitude fusion using gyroscopes, star trackers,
+        Sun sensors, magnetometers, quaternion propagation, bias estimation,
+        measurement validation, safe-mode operation, and fine-pointing estimation,
+        the next section extends the same propagation-and-correction principle to
+        full inertial navigation.
+      </p>
+
+      <a href="imu-gnss-sensor-fusion.html"
+         class="sensor-link-card">
+
+        <div class="sensor-link-content">
+
+          <h3>4.2.22 IMU/GNSS Sensor Fusion</h3>
+
+          <p>
+            Inertial navigation mechanisation, accelerometer and gyroscope
+            integration, GNSS position and velocity correction, IMU bias
+            estimation, loose coupling, tight coupling, GNSS outages,
+            and spacecraft navigation.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to IMU/GNSS Sensor Fusion &rarr;
+          </p>
+
+        </div>
+
+      </a>
+
+    </section>
+
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and spacecraft sensor fusion.
+    </p>
+  </footer>
+
+</body>
+</html>
