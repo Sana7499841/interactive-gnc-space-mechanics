@@ -1,0 +1,3427 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.2.30 Monte Carlo Verification of Sensor Fusion | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="notes-hero">
+    <h1>Monte Carlo Verification of Sensor Fusion</h1>
+
+    <p class="notes-tagline">
+      Statistical variation of sensor bias, noise, misalignment, initialization error, timing, dropouts, dynamic uncertainty,
+      navigation errors, covariance consistency, success criteria, confidence intervals, NIS, NEES, mission-level verification,
+      reproducibility, sensitivity analysis, numerical robustness, and progressive validation of spacecraft sensor fusion.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.2.30 Monte Carlo Verification of Sensor Fusion</h2>
+      <p>
+        A deterministic sensor-fusion simulation can demonstrate that an estimator works for one particular set of initial conditions, sensor errors, model parameters, and timing assumptions. That is necessary, but it is not enough to establish that the estimator is robust.
+      </p>
+      <p>
+        Real navigation systems operate under uncertainty. Sensor biases vary from unit to unit, noise realizations change from run to run, mounting errors are never exactly zero, initialization is imperfect, measurements may be delayed or dropped, and the real spacecraft dynamics never match the estimator model perfectly.
+      </p>
+      <p>
+        Monte Carlo verification addresses this problem by repeating the complete sensor-fusion simulation many times while randomly varying the uncertain quantities according to justified statistical models.
+      </p>
+      <p>
+        The central idea is
+      </p>
+      <p>
+        \[
+\boxed{ \text{One Simulation} \rightarrow \text{One Realization} }
+        \]
+      </p>
+      <p>
+        whereas
+      </p>
+      <p>
+        \[
+\boxed{ \text{Monte Carlo Simulation} \rightarrow \text{Statistical Distribution of Possible Outcomes} }
+        \]
+      </p>
+      <p>
+        The objective is therefore not simply to ask
+      </p>
+      <blockquote>
+        <p>“Did the estimator work in this run?”</p>
+      </blockquote>
+      <p>
+        but rather
+      </p>
+      <blockquote>
+        <p>“How reliably does the estimator work across the full expected uncertainty environment?”</p>
+      </blockquote>
+      <p>
+        For spacecraft sensor fusion, Monte Carlo analysis is particularly important because the navigation solution is influenced simultaneously by sensor noise, bias, calibration uncertainty, dynamic-model error, timing uncertainty, initialization error, measurement availability, geometry, estimator tuning, and numerical behavior.
+      </p>
+      <p>
+        A useful high-level Monte Carlo architecture is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Nominal Scenario} + \text{Randomized Uncertainties} \rightarrow \text{Many Sensor-Fusion Runs} \rightarrow \text{Statistical Performance Assessment} }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.1 Why Monte Carlo Verification Is Required</h3>
+      <p>
+        Suppose a navigation estimator is tested once using
+      </p>
+      <p>
+        \[
+\hat{\mathbf x}_0 = \mathbf x_{true,0},
+        \]
+      </p>
+      <p>
+        nominal sensor noise, perfect timing, no measurement dropout, and nominal physical parameters.
+      </p>
+      <p>
+        The result may look excellent.
+      </p>
+      <p>
+        However, this does not demonstrate robustness because the estimator may behave very differently when
+      </p>
+      <p>
+        \[
+\hat{\mathbf x}_0 \neq \mathbf x_{true,0},
+        \]
+      </p>
+      <p>
+        or when the actual sensor bias differs from its assumed nominal value.
+      </p>
+      <p>
+        A practical estimator must therefore be evaluated over many realizations such as
+      </p>
+      <p>
+        \[
+\mathbf x_0^{(i)}, \qquad \mathbf b^{(i)}, \qquad \mathbf R^{(i)}, \qquad \mathbf Q^{(i)}, \qquad \tau^{(i)}, \qquad \boldsymbol{\epsilon}^{(i)},
+        \]
+      </p>
+      <p>
+        for Monte Carlo run <code>i</code>.
+      </p>
+      <p>
+        The result of one run describes behavior under one realization.
+      </p>
+      <p>
+        The distribution across all runs describes robustness.
+      </p>
+      <p>
+        Thus,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Nominal Accuracy} \neq \text{Robustness} }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.2 Monte Carlo Run Definition</h3>
+      <p>
+        Let the uncertain parameter vector for run <code>i</code> be
+      </p>
+      <p>
+        \[
+\boldsymbol{\theta}^{(i)} = \begin{bmatrix} \delta\mathbf x_0 & \mathbf b_0 & \boldsymbol{\eta}_{sensor} & \boldsymbol{\epsilon}_{misalign} & \boldsymbol{\delta}_{model} & \tau & \cdots \end{bmatrix}^{T}.
+        \]
+      </p>
+      <p>
+        Each Monte Carlo realization draws
+      </p>
+      <p>
+        \[
+\boldsymbol{\theta}^{(i)} \sim p(\boldsymbol{\theta}),
+        \]
+      </p>
+      <p>
+        where <code>p(\boldsymbol{\theta})</code> represents the assumed uncertainty distribution.
+      </p>
+      <p>
+        The complete simulation is then executed:
+      </p>
+      <p>
+        \[
+\boxed{ \boldsymbol{\theta}^{(i)} \rightarrow \text{Truth Dynamics} \rightarrow \text{Sensors} \rightarrow \text{Estimator} \rightarrow \text{Navigation Performance} }
+        \]
+      </p>
+      <p>
+        This is repeated for
+      </p>
+      <p>
+        \[
+i=1,2,\ldots,N_{MC}.
+        \]
+      </p>
+      <p>
+        The important point is that the estimator algorithm itself should normally remain unchanged between runs. The uncertainties change; the estimator is being tested against them.
+      </p>
+      <p><strong>Engineering interpretation:</strong> The run definition is the contract for repeatability: every randomized quantity should be traceable to a distribution, seed, and physical interpretation so that the same realization can be regenerated later.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.3 Sensor Bias Variation</h3>
+      <p>
+        Sensor bias is one of the most important quantities to randomize.
+      </p>
+      <p>
+        For a gyroscope,
+      </p>
+      <p>
+        \[
+\boldsymbol{\omega}_m = \boldsymbol{\omega}_{true} + \mathbf b_g + \mathbf n_g.
+        \]
+      </p>
+      <p>
+        The initial bias may be sampled as
+      </p>
+      <p>
+        \[
+\mathbf b_{g,0}^{(i)} \sim \mathcal N \left( \bar{\mathbf b}_g, \mathbf P_{b_g} \right).
+        \]
+      </p>
+      <p>
+        Similarly, accelerometer bias can be varied as
+      </p>
+      <p>
+        \[
+\mathbf b_{a,0}^{(i)} \sim \mathcal N \left( \bar{\mathbf b}_a, \mathbf P_{b_a} \right).
+        \]
+      </p>
+      <p>
+        Monte Carlo analysis then reveals whether the estimator can correctly identify, track, or tolerate realistic bias uncertainty.
+      </p>
+      <p>
+        If the estimator contains bias states, the verification should examine both navigation-state performance and bias-estimation performance.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\mathbf e_{b_g} = \mathbf b_{g,true} - \hat{\mathbf b}_g.
+        \]
+      </p>
+      <p>
+        Persistent bias-estimation error may indicate poor observability, incorrect process-noise tuning, insufficient excitation, or a mismatch between the assumed and actual bias dynamics.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.4 Sensor Noise Variation</h3>
+      <p>
+        Sensor noise should not be represented by one fixed realization.
+      </p>
+      <p>
+        For each Monte Carlo run, a different noise sequence should normally be generated.
+      </p>
+      <p>
+        For a measurement
+      </p>
+      <p>
+        \[
+\mathbf z_k = h(\mathbf x_k) + \mathbf v_k,
+        \]
+      </p>
+      <p>
+        with
+      </p>
+      <p>
+        \[
+\mathbf v_k \sim \mathcal N(\mathbf 0,\mathbf R),
+        \]
+      </p>
+      <p>
+        different runs should use independent realizations
+      </p>
+      <p>
+        \[
+\mathbf v_k^{(1)}, \mathbf v_k^{(2)}, \ldots, \mathbf v_k^{(N_{MC})}.
+        \]
+      </p>
+      <p>
+        This is important because a filter that appears excellent under one favorable noise realization may behave differently under another.
+      </p>
+      <p>
+        Monte Carlo analysis therefore measures performance over the distribution implied by the sensor noise model.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.5 Noise-Parameter Uncertainty</h3>
+      <p>
+        The actual sensor noise may itself be uncertain.
+      </p>
+      <p>
+        Suppose the estimator assumes
+      </p>
+      <p>
+        \[
+R_{filter},
+        \]
+      </p>
+      <p>
+        while the true sensor behaves according to
+      </p>
+      <p>
+        \[
+R_{true}.
+        \]
+      </p>
+      <p>
+        A realistic Monte Carlo campaign may therefore vary
+      </p>
+      <p>
+        \[
+R_{true}^{(i)}
+        \]
+      </p>
+      <p>
+        while keeping
+      </p>
+      <p>
+        \[
+R_{filter}
+        \]
+      </p>
+      <p>
+        fixed at the nominal tuning value.
+      </p>
+      <p>
+        This evaluates robustness to imperfect sensor characterization.
+      </p>
+      <p>
+        The distinction is important:
+      </p>
+      <p>
+        \[
+\boxed{ R_{true} \neq R_{filter} }
+        \]
+      </p>
+      <p>
+        is often more realistic than assuming they are exactly identical.
+      </p>
+      <p><strong>Engineering interpretation:</strong> This separation between truth noise and filter-assumed noise is essential because a filter is normally tuned using imperfect sensor characterization; verification should therefore test both stochastic noise realizations and uncertainty in the assumed statistics.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.6 Sensor Misalignment</h3>
+      <p>
+        Sensor mounting is never perfectly aligned with the assumed body frame.
+      </p>
+      <p>
+        A true sensor-to-body transformation may be
+      </p>
+      <p>
+        \[
+\mathbf C_{S}^{B,true}
+        \]
+      </p>
+      <p>
+        while the estimator assumes
+      </p>
+      <p>
+        \[
+\mathbf C_{S}^{B,est}.
+        \]
+      </p>
+      <p>
+        The difference can be represented by a small rotation
+      </p>
+      <p>
+        \[
+\delta\boldsymbol{\theta}_{SB}.
+        \]
+      </p>
+      <p>
+        For each Monte Carlo run,
+      </p>
+      <p>
+        \[
+\delta\boldsymbol{\theta}_{SB}^{(i)} \sim p(\delta\boldsymbol{\theta}_{SB}).
+        \]
+      </p>
+      <p>
+        The true sensor model then uses the perturbed mounting orientation.
+      </p>
+      <p>
+        This is especially important for gyroscopes, accelerometers, star trackers, cameras, Sun sensors, magnetometers, and LiDAR systems because small alignment errors can appear as state-estimation biases.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.7 Scale-Factor and Calibration Errors</h3>
+      <p>
+        Sensor scale-factor uncertainty can also be randomized.
+      </p>
+      <p>
+        For a measurement axis,
+      </p>
+      <p>
+        \[
+z_m = (1+s)z_{true} + b + n.
+        \]
+      </p>
+      <p>
+        The scale factor <code>s</code> may vary across the Monte Carlo population:
+      </p>
+      <p>
+        \[
+s^{(i)} \sim \mathcal N(0,\sigma_s^2).
+        \]
+      </p>
+      <p>
+        Other calibration parameters may include
+      </p>
+      <p>
+        \[
+\text{lever arm}, \quad \text{camera intrinsics}, \quad \text{boresight alignment}, \quad \text{timing offset}, \quad \text{temperature coefficient}.
+        \]
+      </p>
+      <p>
+        These uncertainties are often small individually, but they can become significant in high-accuracy navigation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.8 Initialization Error</h3>
+      <p>
+        A filter should never be verified only from perfect initial conditions.
+      </p>
+      <p>
+        The true initial state is
+      </p>
+      <p>
+        \[
+\mathbf x_0,
+        \]
+      </p>
+      <p>
+        while the estimator begins with
+      </p>
+      <p>
+        \[
+\hat{\mathbf x}_0 = \mathbf x_0 + \delta\mathbf x_0.
+        \]
+      </p>
+      <p>
+        Monte Carlo runs can sample
+      </p>
+      <p>
+        \[
+\delta\mathbf x_0^{(i)} \sim \mathcal N (\mathbf 0,\mathbf P_{init}).
+        \]
+      </p>
+      <p>
+        The uncertainty may involve
+      </p>
+      <p>
+        \[
+\delta \mathbf r_0, \quad \delta \mathbf v_0, \quad \delta \boldsymbol{\theta}_0, \quad \delta \mathbf b_{g,0}, \quad \delta \mathbf b_{a,0}.
+        \]
+      </p>
+      <p>
+        This allows verification of convergence behavior rather than merely steady-state accuracy.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.9 Initial Covariance Uncertainty</h3>
+      <p>
+        The estimator's initial covariance
+      </p>
+      <p>
+        \[
+\mathbf P_0
+        \]
+      </p>
+      <p>
+        also influences early behavior.
+      </p>
+      <p>
+        Monte Carlo verification should examine whether the assumed covariance realistically represents the actual spread of initialization errors.
+      </p>
+      <p>
+        Suppose across runs the actual initial estimation error covariance is approximately
+      </p>
+      <p>
+        \[
+E[ (\mathbf x_0-\hat{\mathbf x}_0) (\mathbf x_0-\hat{\mathbf x}_0)^T ].
+        \]
+      </p>
+      <p>
+        This should be consistent with the selected
+      </p>
+      <p>
+        \[
+\mathbf P_0.
+        \]
+      </p>
+      <p>
+        If <code>\mathbf P_0</code> is too small, the estimator becomes initially overconfident.
+      </p>
+      <p>
+        If it is excessively large, correction gains may become unnecessarily aggressive.
+      </p>
+      <p><strong>Engineering interpretation:</strong> The practical test is not only whether the filter converges, but whether the early correction behavior and reported confidence are compatible with the actual initialization-error population.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.10 Timing Uncertainty</h3>
+      <p>
+        Measurement timing should also be randomized where appropriate.
+      </p>
+      <p>
+        Suppose a measurement generated at
+      </p>
+      <p>
+        \[
+t_m
+        \]
+      </p>
+      <p>
+        arrives at
+      </p>
+      <p>
+        \[
+t_m+\tau.
+        \]
+      </p>
+      <p>
+        The latency may vary:
+      </p>
+      <p>
+        \[
+\tau^{(i)} \sim p(\tau).
+        \]
+      </p>
+      <p>
+        Additional timing uncertainties can include
+      </p>
+      <p>
+        \[
+\text{clock offset}, \quad \text{jitter}, \quad \text{timestamp error}, \quad \text{processing latency}, \quad \text{communication delay}.
+        \]
+      </p>
+      <p>
+        A robust sensor-fusion architecture should remain consistent when these effects are within their expected ranges.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.11 Measurement Dropout</h3>
+      <p>
+        Sensors may become temporarily unavailable.
+      </p>
+      <p>
+        Monte Carlo scenarios should therefore include dropout.
+      </p>
+      <p>
+        For sensor <code>j</code>,
+      </p>
+      <p>
+        \[
+valid_j(k) = 0
+        \]
+      </p>
+      <p>
+        during selected intervals.
+      </p>
+      <p>
+        Dropout can be modeled using
+      </p>
+      <ul>
+        <li>fixed-duration outages,</li>
+        <li>randomly occurring outages,</li>
+        <li>geometry-dependent availability,</li>
+        <li>field-of-view loss,</li>
+        <li>communication loss,</li>
+        <li>or health-state transitions.</li>
+      </ul>
+      <p>
+        The estimator should continue propagating while measurement information is unavailable.
+      </p>
+      <p>
+        Uncertainty should generally grow during the outage.
+      </p>
+      <p>
+        When measurements return, reacquisition should occur without unacceptable transients.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.12 Random Dropout Models</h3>
+      <p>
+        A simple stochastic dropout model may use probability
+      </p>
+      <p>
+        \[
+P(dropout)=p_d.
+        \]
+      </p>
+      <p>
+        At each measurement opportunity,
+      </p>
+      <p>
+        \[
+d_k \sim \operatorname{Bernoulli}(p_d).
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+d_k=1
+        \]
+      </p>
+      <p>
+        may indicate that the measurement is unavailable.
+      </p>
+      <p>
+        More realistic models may use burst outages rather than independent dropouts because real communication or visibility losses often persist for several samples.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Independent Bernoulli loss is convenient for basic testing, while burst or state-dependent dropout models are usually better for representing visibility loss, communication interruptions, and sustained sensor outages.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.13 Dynamic-Model Uncertainty</h3>
+      <p>
+        The truth dynamics and estimator dynamics should not be identical.
+      </p>
+      <p>
+        Let
+      </p>
+      <p>
+        \[
+\dot{\mathbf x}_{true} = f_{true} ( \mathbf x, \mathbf u, \mathbf p_{true} ),
+        \]
+      </p>
+      <p>
+        while the estimator uses
+      </p>
+      <p>
+        \[
+\dot{\hat{\mathbf x}} = f_{est} ( \hat{\mathbf x}, \mathbf u, \mathbf p_{nom} ).
+        \]
+      </p>
+      <p>
+        Monte Carlo runs may vary
+      </p>
+      <p>
+        \[
+\mathbf p_{true}^{(i)} = \mathbf p_{nom} + \delta\mathbf p^{(i)}.
+        \]
+      </p>
+      <p>
+        Examples include
+      </p>
+      <p>
+        \[
+\text{mass}, \quad \text{inertia}, \quad \text{drag parameters}, \quad \text{disturbance coefficients}, \quad \text{actuator characteristics}, \quad \text{environmental parameters}.
+        \]
+      </p>
+      <p>
+        This tests whether process-noise modeling and measurement correction can compensate for realistic model mismatch.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.14 Actuator Uncertainty</h3>
+      <p>
+        When sensor fusion is tested in closed-loop GNC, actuator uncertainty can affect navigation indirectly because control changes the trajectory.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\mathbf u_{actual} = \mathbf u_{cmd} + \delta\mathbf u.
+        \]
+      </p>
+      <p>
+        Possible uncertainties include
+      </p>
+      <p>
+        \[
+\text{magnitude error}, \quad \text{misalignment}, \quad \text{delay}, \quad \text{deadband}, \quad \text{saturation}, \quad \text{minimum impulse behavior}.
+        \]
+      </p>
+      <p>
+        These need not be estimator states, but they influence the truth trajectory and therefore the measurements available to the estimator.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.15 Correlated Uncertainties</h3>
+      <p>
+        Not all uncertain quantities are independent.
+      </p>
+      <p>
+        For example, calibration errors may share common temperature dependence, or multiple axes may have correlated noise.
+      </p>
+      <p>
+        Instead of independently sampling
+      </p>
+      <p>
+        \[
+x_i \sim \mathcal N(0,\sigma_i^2),
+        \]
+      </p>
+      <p>
+        a correlated vector can be sampled as
+      </p>
+      <p>
+        \[
+\mathbf e \sim \mathcal N ( \mathbf 0, \mathbf \Sigma ).
+        \]
+      </p>
+      <p>
+        A covariance matrix containing off-diagonal terms then represents correlation.
+      </p>
+      <p>
+        Ignoring known correlations can produce an unrealistic Monte Carlo environment.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Correlation matters because several individually reasonable one-dimensional uncertainty models can become physically unrealistic when combined independently. The sampled joint distribution should preserve known common-mode effects.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.16 Choice of Probability Distributions</h3>
+      <p>
+        Gaussian uncertainty is common but not always appropriate.
+      </p>
+      <p>
+        Possible distributions include
+      </p>
+      <p>
+        \[
+\mathcal N(\mu,\sigma^2),
+        \]
+      </p>
+      <p>
+        uniform distributions,
+      </p>
+      <p>
+        \[
+x \sim \mathcal U(a,b),
+        \]
+      </p>
+      <p>
+        bounded distributions, discrete states, Bernoulli events, or empirically derived distributions.
+      </p>
+      <p>
+        The chosen distribution should represent the physical uncertainty source.
+      </p>
+      <p>
+        For example, manufacturing tolerance may be naturally bounded, whereas electronic noise may be approximately Gaussian.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.17 Gaussian <code>3\sigma</code> Interpretation</h3>
+      <p>
+        For a Gaussian scalar variable,
+      </p>
+      <p>
+        \[
+x \sim \mathcal N(\mu,\sigma^2),
+        \]
+      </p>
+      <p>
+        approximately <code>99.7\%</code> of realizations lie within
+      </p>
+      <p>
+        \[
+\mu \pm 3\sigma.
+        \]
+      </p>
+      <p>
+        This is often used to define simulation uncertainty ranges.
+      </p>
+      <p>
+        However,
+      </p>
+      <p>
+        \[
+\boxed{ 3\sigma \neq \text{physical hard bound} }
+        \]
+      </p>
+      <p>
+        for a true Gaussian variable.
+      </p>
+      <p>
+        Monte Carlo assumptions should therefore distinguish between statistical standard deviation and absolute engineering limits.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.18 Bounded Engineering Uncertainty</h3>
+      <p>
+        Some parameters have known engineering bounds.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\delta\theta \in [-\theta_{\max},\theta_{\max}].
+        \]
+      </p>
+      <p>
+        A uniform model may then be more appropriate:
+      </p>
+      <p>
+        \[
+\delta\theta \sim \mathcal U (-\theta_{\max},\theta_{\max}).
+        \]
+      </p>
+      <p>
+        This is particularly useful when tolerance data are specified as allowable ranges rather than statistical standard deviations.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.19 Monte Carlo Sample Size</h3>
+      <p>
+        The number of runs
+      </p>
+      <p>
+        \[
+N_{MC}
+        \]
+      </p>
+      <p>
+        must be large enough to estimate the desired performance statistics.
+      </p>
+      <p>
+        There is no universally sufficient number.
+      </p>
+      <p>
+        The required number depends on
+      </p>
+      <p>
+        \[
+\text{dimensionality}, \quad \text{tail probability of interest}, \quad \text{metric variance}, \quad \text{required confidence}, \quad \text{computational cost}.
+        \]
+      </p>
+      <p>
+        A few tens of runs may reveal obvious sensitivity.
+      </p>
+      <p>
+        Hundreds or thousands may be required for stable statistical estimates.
+      </p>
+      <p>
+        Very rare failure probability estimation may require substantially more sophisticated methods than ordinary Monte Carlo.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Sample size should therefore be selected from the statistical claim being made rather than from a fixed rule of thumb. Estimating a mean accurately is much easier than demonstrating a very small failure probability.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.20 Random Seed Management</h3>
+      <p>
+        Monte Carlo simulations should use controlled random seeds.
+      </p>
+      <p>
+        A useful configuration records
+      </p>
+      <p>
+        \[
+seed_i
+        \]
+      </p>
+      <p>
+        for every run.
+      </p>
+      <p>
+        Then a failed case can be reproduced exactly.
+      </p>
+      <p>
+        This is essential because an unexplained failure is difficult to debug if its random realization cannot be recreated.
+      </p>
+      <p>
+        Thus,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Monte Carlo Randomness} + \text{Recorded Seeds} = \text{Reproducible Verification} }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.21 Navigation Error Metrics</h3>
+      <p>
+        For run <code>i</code>, define estimation error
+      </p>
+      <p>
+        \[
+\mathbf e_k^{(i)} = \mathbf x_{true,k}^{(i)} - \hat{\mathbf x}_k^{(i)}.
+        \]
+      </p>
+      <p>
+        Important components may include
+      </p>
+      <p>
+        \[
+\mathbf e_r, \quad \mathbf e_v, \quad \mathbf e_\theta, \quad \mathbf e_\omega, \quad \mathbf e_b.
+        \]
+      </p>
+      <p>
+        These errors should normally be evaluated over time and across runs.
+      </p>
+      <p>
+        The Monte Carlo campaign should not reduce all performance to one scalar too early.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Keeping vector, component-wise, norm, peak, and time-history errors available prevents an apparently good aggregate score from hiding a directional or transient weakness.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.22 Position Error</h3>
+      <p>
+        For translational navigation,
+      </p>
+      <p>
+        \[
+\mathbf e_r = \mathbf r_{true} - \hat{\mathbf r}.
+        \]
+      </p>
+      <p>
+        Useful metrics include component errors
+      </p>
+      <p>
+        \[
+e_x, \quad e_y, \quad e_z,
+        \]
+      </p>
+      <p>
+        and norm
+      </p>
+      <p>
+        \[
+\boxed{ e_r = \|\mathbf e_r\|. }
+        \]
+      </p>
+      <p>
+        The position error distribution can be examined at specific mission epochs or over the entire trajectory.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.23 Velocity Error</h3>
+      <p>
+        Similarly,
+      </p>
+      <p>
+        \[
+\mathbf e_v = \mathbf v_{true} - \hat{\mathbf v},
+        \]
+      </p>
+      <p>
+        with magnitude
+      </p>
+      <p>
+        \[
+\boxed{ e_v = \|\mathbf e_v\|. }
+        \]
+      </p>
+      <p>
+        Velocity error can be especially important in relative-navigation and proximity-operation applications because small velocity errors can integrate into substantial position deviations over time.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.24 Attitude Error</h3>
+      <p>
+        Quaternion subtraction should not normally be used as the physical attitude-error metric.
+      </p>
+      <p>
+        Instead, define an attitude-error quaternion such as
+      </p>
+      <p>
+        \[
+\delta q = q_{true} \otimes \hat q^{-1}.
+        \]
+      </p>
+      <p>
+        The corresponding angular error can then be obtained from the quaternion.
+      </p>
+      <p>
+        For small errors,
+      </p>
+      <p>
+        \[
+\delta\boldsymbol{\theta} \approx 2\delta\mathbf q_v.
+        \]
+      </p>
+      <p>
+        A Monte Carlo campaign can then evaluate
+      </p>
+      <p>
+        \[
+\|\delta\boldsymbol{\theta}\|
+        \]
+      </p>
+      <p>
+        rather than individual quaternion-component differences.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.25 Root-Mean-Square Error</h3>
+      <p>
+        For scalar error samples,
+      </p>
+      <p>
+        \[
+RMSE = \sqrt{ \frac{1}{N} \sum_{k=1}^{N} e_k^2 }.
+        \]
+      </p>
+      <p>
+        For each Monte Carlo run, this produces
+      </p>
+      <p>
+        \[
+RMSE^{(i)}.
+        \]
+      </p>
+      <p>
+        The distribution
+      </p>
+      <p>
+        \[
+\{ RMSE^{(1)}, RMSE^{(2)}, \ldots, RMSE^{(N_{MC})} \}
+        \]
+      </p>
+      <p>
+        can then be summarized using mean, median, percentile, standard deviation, and worst observed values.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.26 Maximum Error</h3>
+      <p>
+        RMSE can hide short-duration peaks.
+      </p>
+      <p>
+        Therefore also evaluate
+      </p>
+      <p>
+        \[
+e_{\max}^{(i)} = \max_k |e_k^{(i)}|.
+        \]
+      </p>
+      <p>
+        Maximum error is particularly useful when navigation requirements specify hard transient limits.
+      </p>
+      <p>
+        A filter may have a low RMSE but still violate a critical maximum-error requirement during initialization or sensor transition.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.27 Convergence Time</h3>
+      <p>
+        Define a convergence condition, for example
+      </p>
+      <p>
+        \[
+\|\mathbf e(t)\| < e_{tol}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+\sigma(t) < \sigma_{tol}
+        \]
+      </p>
+      <p>
+        for a required dwell interval.
+      </p>
+      <p>
+        The convergence time for run <code>i</code> is
+      </p>
+      <p>
+        \[
+t_{conv}^{(i)}.
+        \]
+      </p>
+      <p>
+        Monte Carlo analysis can then determine how initialization uncertainty and sensor conditions influence convergence.
+      </p>
+      <p><strong>Engineering interpretation:</strong> A dwell requirement prevents a momentary crossing of the tolerance threshold from being misclassified as convergence. This is especially important when noisy measurements cause the error to oscillate around the limit.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.28 Navigation Availability</h3>
+      <p>
+        A useful operational metric is the fraction of time navigation remains valid.
+      </p>
+      <p>
+        For run <code>i</code>,
+      </p>
+      <p>
+        \[
+A^{(i)} = \frac{T_{NavValid}^{(i)}}{T_{total}}.
+        \]
+      </p>
+      <p>
+        Across all runs, this gives the distribution of navigation availability.
+      </p>
+      <p>
+        This captures effects that pure state-error metrics can miss, such as estimator invalidation, prolonged dropout, or health-monitor transitions.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.29 Innovation Statistics</h3>
+      <p>
+        For sensor <code>j</code>,
+      </p>
+      <p>
+        \[
+\boldsymbol{\nu}_{j,k} = \mathbf z_{j,k} - h_j(\hat{\mathbf x}_k^-).
+        \]
+      </p>
+      <p>
+        Across Monte Carlo runs, innovations should be analyzed statistically.
+      </p>
+      <p>
+        Useful checks include
+      </p>
+      <p>
+        \[
+E[\boldsymbol{\nu}],
+        \]
+      </p>
+      <p>
+        innovation variance,
+      </p>
+      <p>
+        \[
+Cov(\boldsymbol{\nu}),
+        \]
+      </p>
+      <p>
+        autocorrelation, rejection frequency, and Normalised Innovation Squared.
+      </p>
+      <p>
+        A biased innovation distribution often reveals model or calibration mismatch.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Innovation analysis is particularly useful because it checks the internal consistency of the estimator before a large state error necessarily becomes visible. Persistent structure in the residual often reveals a modelling problem early.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.30 Innovation Covariance</h3>
+      <p>
+        The predicted innovation covariance is
+      </p>
+      <p>
+        \[
+\boxed{ \mathbf S_k = \mathbf H_k \mathbf P_k^- \mathbf H_k^T + \mathbf R_k. }
+        \]
+      </p>
+      <p>
+        The actual innovation dispersion across Monte Carlo runs should be broadly consistent with this prediction when the filter assumptions are valid.
+      </p>
+      <p>
+        This provides a powerful internal consistency check.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.31 Normalised Innovation Squared</h3>
+      <p>
+        The NIS is
+      </p>
+      <p>
+        \[
+\boxed{ \epsilon_{\nu,k} = \boldsymbol{\nu}_k^T \mathbf S_k^{-1} \boldsymbol{\nu}_k. }
+        \]
+      </p>
+      <p>
+        If the measurement model is correct and the assumptions are satisfied, NIS follows a chi-square distribution with degrees of freedom equal to the measurement dimension:
+      </p>
+      <p>
+        \[
+\epsilon_{\nu,k} \sim \chi^2_m.
+        \]
+      </p>
+      <p>
+        This enables statistically meaningful consistency testing.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.32 Why NIS Is Important</h3>
+      <p>
+        Small state-estimation error alone does not prove that the filter is statistically consistent.
+      </p>
+      <p>
+        Suppose the actual error is modest, but the estimator covariance is unrealistically tiny.
+      </p>
+      <p>
+        The filter is then overconfident.
+      </p>
+      <p>
+        NIS provides a way to compare innovation magnitude with the uncertainty the filter itself predicts.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Accuracy} \neq \text{Consistency} }
+        \]
+      </p>
+      <p>
+        and both should be verified.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.33 NIS Confidence Bounds</h3>
+      <p>
+        For significance level <code>\alpha</code>,
+      </p>
+      <p>
+        \[
+\chi^2_{\alpha/2,m} \le \epsilon_{\nu} \le \chi^2_{1-\alpha/2,m}
+        \]
+      </p>
+      <p>
+        provides a statistical interval for individual tests.
+      </p>
+      <p>
+        Across many Monte Carlo realizations and epochs, the fraction of values outside the expected interval can be compared with the theoretical significance level.
+      </p>
+      <p>
+        Persistent high NIS suggests underestimated uncertainty, model mismatch, outliers, or wrong measurement models.
+      </p>
+      <p>
+        Persistent very low NIS can indicate overly conservative uncertainty.
+      </p>
+      <p><strong>Engineering interpretation:</strong> The bounds should be interpreted statistically over an ensemble, not as a rule that every single sample must remain inside the interval. Occasional excursions are expected even for a correctly tuned filter.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.34 Normalised Estimation Error Squared</h3>
+      <p>
+        When truth is available in simulation, NEES can be calculated:
+      </p>
+      <p>
+        \[
+\boxed{ \epsilon_x = \mathbf e^T \mathbf P^{-1} \mathbf e. }
+        \]
+      </p>
+      <p>
+        For a state dimension <code>n</code>,
+      </p>
+      <p>
+        \[
+\epsilon_x \sim \chi^2_n
+        \]
+      </p>
+      <p>
+        under ideal consistency assumptions.
+      </p>
+      <p>
+        NEES compares actual state-estimation error against the covariance claimed by the filter.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.35 Why NEES Is Powerful</h3>
+      <p>
+        Suppose
+      </p>
+      <p>
+        \[
+\|\mathbf e\|
+        \]
+      </p>
+      <p>
+        is small.
+      </p>
+      <p>
+        That might appear satisfactory.
+      </p>
+      <p>
+        But if
+      </p>
+      <p>
+        \[
+\mathbf P
+        \]
+      </p>
+      <p>
+        is much smaller still, then the estimator is statistically overconfident.
+      </p>
+      <p>
+        Conversely, a large covariance paired with very small actual error may indicate excessive conservatism.
+      </p>
+      <p>
+        NEES therefore tests whether
+      </p>
+      <p>
+        \[
+\boxed{ \text{Actual Error} \quad\text{matches}\quad \text{Predicted Uncertainty} }
+        \]
+      </p>
+      <p>
+        rather than examining either quantity alone.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.36 NIS Versus NEES</h3>
+      <p>
+        NIS uses only quantities normally available onboard:
+      </p>
+      <p>
+        \[
+\boldsymbol{\nu}, \quad \mathbf S.
+        \]
+      </p>
+      <p>
+        NEES requires truth:
+      </p>
+      <p>
+        \[
+\mathbf x_{true}.
+        \]
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+\boxed{ \text{NIS} \rightarrow \text{measurement-space consistency} }
+        \]
+      </p>
+      <p>
+        while
+      </p>
+      <p>
+        \[
+\boxed{ \text{NEES} \rightarrow \text{state-space consistency}. }
+        \]
+      </p>
+      <p>
+        NIS can be useful even with real flight data.
+      </p>
+      <p>
+        NEES is primarily a simulation or truth-referenced verification metric.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.37 Averaged NIS</h3>
+      <p>
+        For <code>N</code> statistically independent samples,
+      </p>
+      <p>
+        \[
+\bar{\epsilon}_{\nu} = \frac{1}{N} \sum_{i=1}^{N} \epsilon_{\nu}^{(i)}.
+        \]
+      </p>
+      <p>
+        The average provides a more stable assessment of consistency than one instantaneous value.
+      </p>
+      <p>
+        The same concept can be applied across Monte Carlo runs, time samples, or both.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.38 Averaged NEES</h3>
+      <p>
+        Similarly,
+      </p>
+      <p>
+        \[
+\bar{\epsilon}_{x} = \frac{1}{N} \sum_{i=1}^{N} \epsilon_x^{(i)}.
+        \]
+      </p>
+      <p>
+        The expected value is related to the state dimension when the estimator is consistent.
+      </p>
+      <p>
+        Systematic deviation indicates that the covariance model may not accurately represent actual estimation error.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.39 Covariance Consistency</h3>
+      <p>
+        Another intuitive check compares state error against covariance envelopes.
+      </p>
+      <p>
+        For state <code>x_j</code>,
+      </p>
+      <p>
+        \[
+\sigma_j = \sqrt{P_{jj}}.
+        \]
+      </p>
+      <p>
+        Plot
+      </p>
+      <p>
+        \[
+e_j = x_{true,j} - \hat x_j
+        \]
+      </p>
+      <p>
+        with
+      </p>
+      <p>
+        \[
+\pm 1\sigma_j, \qquad \pm 2\sigma_j, \qquad \pm 3\sigma_j.
+        \]
+      </p>
+      <p>
+        Across many Monte Carlo runs, the empirical fraction of errors falling within these intervals can be compared with expected Gaussian coverage.
+      </p>
+      <p>
+        This produces a highly intuitive visualization of filter consistency.
+      </p>
+      <p><strong>Engineering interpretation:</strong> These plots connect actual estimation error with the uncertainty reported by the filter, making overconfidence and excessive conservatism visible in a form that is easy to interpret alongside NIS and NEES.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.40 Monte Carlo Error Envelopes</h3>
+      <p>
+        At time <code>t</code>, suppose the position error from each run is
+      </p>
+      <p>
+        \[
+e_r^{(1)}(t), \ldots, e_r^{(N)}(t).
+        \]
+      </p>
+      <p>
+        Monte Carlo envelopes can show
+      </p>
+      <p>
+        \[
+P_{5}(t), \quad P_{50}(t), \quad P_{95}(t),
+        \]
+      </p>
+      <p>
+        where <code>P_p</code> denotes the <code>p</code>-th percentile.
+      </p>
+      <p>
+        These percentile envelopes reveal both typical and tail behavior.
+      </p>
+      <p>
+        They are often more informative than plotting hundreds of individual trajectories.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.41 Mean Error</h3>
+      <p>
+        The Monte Carlo mean error is
+      </p>
+      <p>
+        \[
+\bar{\mathbf e}(t) = \frac{1}{N_{MC}} \sum_{i=1}^{N_{MC}} \mathbf e^{(i)}(t).
+        \]
+      </p>
+      <p>
+        Ideally,
+      </p>
+      <p>
+        \[
+\bar{\mathbf e} \approx 0
+        \]
+      </p>
+      <p>
+        for an unbiased estimator.
+      </p>
+      <p>
+        Persistent non-zero mean can indicate
+      </p>
+      <p>
+        \[
+\text{bias}, \quad \text{incorrect calibration}, \quad \text{model mismatch}, \quad \text{initialization asymmetry}, \quad \text{timing error}.
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.42 Empirical Error Covariance</h3>
+      <p>
+        Across runs,
+      </p>
+      <p>
+        \[
+\mathbf P_{emp}(t) = \frac{1}{N_{MC}-1} \sum_{i=1}^{N_{MC}} \left( \mathbf e^{(i)}-\bar{\mathbf e} \right) \left( \mathbf e^{(i)}-\bar{\mathbf e} \right)^T.
+        \]
+      </p>
+      <p>
+        This empirical covariance can be compared with the estimator's predicted covariance.
+      </p>
+      <p>
+        If the estimator consistently reports significantly smaller uncertainty than observed,
+      </p>
+      <p>
+        \[
+\mathbf P_{filter} < \mathbf P_{emp},
+        \]
+      </p>
+      <p>
+        the filter may be overconfident.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.43 Success Criteria</h3>
+      <p>
+        Every Monte Carlo campaign should define success before the simulations are run.
+      </p>
+      <p>
+        Success may depend on conditions such as
+      </p>
+      <p>
+        \[
+e_r < e_{r,\max},
+        \]
+      </p>
+      <p>
+        \[
+e_v < e_{v,\max},
+        \]
+      </p>
+      <p>
+        \[
+e_\theta < e_{\theta,\max},
+        \]
+      </p>
+      <p>
+        \[
+P_{ii} < P_{ii,\max},
+        \]
+      </p>
+      <p>
+        \[
+NavValid = 1,
+        \]
+      </p>
+      <p>
+        and absence of estimator divergence.
+      </p>
+      <p>
+        A run should not be judged subjectively after the result is seen.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Success criteria should be fixed before examining the Monte Carlo results so that pass/fail classification remains objective and traceable to navigation or system requirements.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.44 Run-Level Success</h3>
+      <p>
+        Define a binary outcome
+      </p>
+      <p>
+        \[
+s_i = \begin{cases} 1,&\text{run meets all required criteria},\\ 0,&\text{otherwise}. \end{cases}
+        \]
+      </p>
+      <p>
+        Then the observed success fraction is
+      </p>
+      <p>
+        \[
+\boxed{ \hat p_s = \frac{1}{N_{MC}} \sum_{i=1}^{N_{MC}} s_i. }
+        \]
+      </p>
+      <p>
+        This is one of the simplest mission-level Monte Carlo metrics.
+      </p>
+      <p>
+        However, the sample size and confidence interval must also be reported.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.45 Confidence Intervals</h3>
+      <p>
+        An observed success rate from finite Monte Carlo simulations is only an estimate of the underlying probability.
+      </p>
+      <p>
+        For example, if
+      </p>
+      <p>
+        \[
+97
+        \]
+      </p>
+      <p>
+        of
+      </p>
+      <p>
+        \[
+100
+        \]
+      </p>
+      <p>
+        runs succeed, the underlying success probability is not proven to be exactly <code>97\%</code>.
+      </p>
+      <p>
+        A statistical confidence interval should therefore accompany the estimate.
+      </p>
+      <p>
+        Thus,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Observed Success Fraction} \neq \text{Exact True Success Probability} }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> Reporting only the observed percentage can overstate the strength of the evidence. The interval communicates how much uncertainty remains because only a finite number of realizations were simulated.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.46 Confidence Intervals for Continuous Metrics</h3>
+      <p>
+        For metrics such as RMSE or convergence time, uncertainty in the estimated mean can also be reported.
+      </p>
+      <p>
+        For sample mean
+      </p>
+      <p>
+        \[
+\bar x
+        \]
+      </p>
+      <p>
+        and sample standard deviation
+      </p>
+      <p>
+        \[
+s,
+        \]
+      </p>
+      <p>
+        the standard error is approximately
+      </p>
+      <p>
+        \[
+SE = \frac{s}{\sqrt{N}}.
+        \]
+      </p>
+      <p>
+        Confidence intervals then quantify how precisely the Monte Carlo population mean has been estimated.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.47 Percentiles</h3>
+      <p>
+        Navigation verification often benefits from percentile metrics such as
+      </p>
+      <p>
+        \[
+P_{50}, \quad P_{90}, \quad P_{95}, \quad P_{99}.
+        \]
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+P_{95}(e_r)
+        \]
+      </p>
+      <p>
+        means <code>95\%</code> of observed runs had position error below that value.
+      </p>
+      <p>
+        Percentiles are useful because they do not assume that the performance metric itself is normally distributed.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.48 Worst-Case Observed Run</h3>
+      <p>
+        The maximum observed metric
+      </p>
+      <p>
+        \[
+e_{\max} = \max_i e^{(i)}
+        \]
+      </p>
+      <p>
+        should be inspected.
+      </p>
+      <p>
+        However,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Worst Observed Monte Carlo Case} \neq \text{Guaranteed Physical Worst Case} }
+        \]
+      </p>
+      <p>
+        because ordinary Monte Carlo sampling does not necessarily explore every extreme corner of the uncertainty space.
+      </p>
+      <p>
+        Worst-case analysis and Monte Carlo analysis serve different purposes.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.49 Sensitivity Analysis</h3>
+      <p>
+        Monte Carlo results can also be used to understand which uncertainties dominate performance.
+      </p>
+      <p>
+        Suppose output metric
+      </p>
+      <p>
+        \[
+J
+        \]
+      </p>
+      <p>
+        depends on uncertain parameters
+      </p>
+      <p>
+        \[
+\theta_1, \theta_2,\ldots,\theta_p.
+        \]
+      </p>
+      <p>
+        Statistical correlation, regression, variance decomposition, or structured sweeps can identify which parameters most strongly influence
+      </p>
+      <p>
+        \[
+J.
+        \]
+      </p>
+      <p>
+        This helps prioritize calibration, sensor selection, estimator tuning, and verification effort.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Sensitivity results are most useful when they connect a dominant output variation to a physically interpretable uncertainty source, because that identifies whether improvement should come from calibration, sensing, modelling, or filter tuning.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.50 One-Factor-at-a-Time Studies</h3>
+      <p>
+        Before full Monte Carlo, it can be useful to vary one source at a time:
+      </p>
+      <p>
+        \[
+\text{bias only},
+        \]
+      </p>
+      <p>
+        then
+      </p>
+      <p>
+        \[
+\text{noise only},
+        \]
+      </p>
+      <p>
+        then
+      </p>
+      <p>
+        \[
+\text{misalignment only},
+        \]
+      </p>
+      <p>
+        and so forth.
+      </p>
+      <p>
+        This provides physical understanding.
+      </p>
+      <p>
+        Full Monte Carlo then combines all uncertainties.
+      </p>
+      <p>
+        Thus a strong verification program often uses
+      </p>
+      <p>
+        \[
+\boxed{ \text{Deterministic Sensitivity Studies} \rightarrow \text{Combined Monte Carlo} }
+        \]
+      </p>
+      <p>
+        rather than jumping directly to random combinations.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.51 Combined Uncertainty</h3>
+      <p>
+        The most realistic campaign eventually combines multiple effects:
+      </p>
+      <p>
+        \[
+\boxed{ \begin{aligned} &\text{initial-state error} + \text{sensor bias} + \text{sensor noise}\\ &+ \text{misalignment} + \text{timing uncertainty} + \text{dropout}\\ &+ \text{model uncertainty} + \text{actuator uncertainty} + \text{environmental variation}. \end{aligned} }
+        \]
+      </p>
+      <p>
+        This tests the estimator under conditions closer to actual operation.
+      </p>
+      <p>
+        Combined effects are important because individual uncertainties can interact nonlinearly.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.52 Filter Tuning Under Monte Carlo</h3>
+      <p>
+        Monte Carlo should not be used merely to search blindly for <code>Q</code> and <code>R</code>.
+      </p>
+      <p>
+        However, it is useful for evaluating whether a tuning choice performs robustly across uncertainty.
+      </p>
+      <p>
+        For example, candidate process-noise settings
+      </p>
+      <p>
+        \[
+Q_1, Q_2, Q_3
+        \]
+      </p>
+      <p>
+        can each be tested over the same random realizations.
+      </p>
+      <p>
+        This enables meaningful comparison because the environmental cases are held constant.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.53 Common Random Numbers</h3>
+      <p>
+        When comparing two estimator variants, using identical random realizations can greatly improve interpretability.
+      </p>
+      <p>
+        Estimator A and estimator B should experience the same
+      </p>
+      <p>
+        \[
+\mathbf x_0^{(i)}, \quad \mathbf b^{(i)}, \quad \mathbf n^{(i)}, \quad \tau^{(i)}.
+        \]
+      </p>
+      <p>
+        Then performance differences are more directly attributable to the estimator architecture rather than random scenario variation.
+      </p>
+      <p>
+        This is sometimes called use of common random numbers.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Using the same random realizations makes estimator comparisons paired rather than independent; this removes much of the run-to-run environmental variation from the comparison.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.54 Monte Carlo for Sensor Selection</h3>
+      <p>
+        Monte Carlo can also compare sensor-suite architectures.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+\text{IMU + GNSS}
+        \]
+      </p>
+      <p>
+        versus
+      </p>
+      <p>
+        \[
+\text{IMU + GNSS + camera}
+        \]
+      </p>
+      <p>
+        versus
+      </p>
+      <p>
+        \[
+\text{IMU + GNSS + camera + LiDAR}.
+        \]
+      </p>
+      <p>
+        Metrics may include
+      </p>
+      <p>
+        \[
+\text{accuracy}, \quad \text{availability}, \quad \text{consistency}, \quad \text{dropout tolerance}, \quad \text{convergence}.
+        \]
+      </p>
+      <p>
+        This turns sensor selection into a quantitative system-level trade study.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.55 Monte Carlo for Multi-Rate Fusion</h3>
+      <p>
+        Sensor-rate uncertainties and timing combinations can also be varied.
+      </p>
+      <p>
+        Examples include
+      </p>
+      <p>
+        \[
+f_{IMU}, \quad f_{GNSS}, \quad f_{camera}, \quad f_{LiDAR},
+        \]
+      </p>
+      <p>
+        plus jitter and latency.
+      </p>
+      <p>
+        The objective is to confirm that estimator behavior does not rely on one ideal synchronous timing relationship.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.56 Monte Carlo for Measurement Gating</h3>
+      <p>
+        Innovation-gating thresholds affect both outlier rejection and valid-measurement acceptance.
+      </p>
+      <p>
+        Monte Carlo analysis can quantify
+      </p>
+      <p>
+        \[
+P(\text{reject valid measurement})
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+P(\text{accept invalid measurement}).
+        \]
+      </p>
+      <p>
+        A gate that is too tight may remove useful information.
+      </p>
+      <p>
+        A gate that is too loose may allow bad measurements to corrupt the estimate.
+      </p>
+      <p>
+        Thus gating thresholds should be verified statistically.
+      </p>
+      <p><strong>Engineering interpretation:</strong> This is a direct way to tune the trade between protection and availability: a strict gate protects the state from bad data but can also discard valid information needed for convergence and observability.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.57 Monte Carlo with Outliers</h3>
+      <p>
+        Outlier events can be injected with randomized time, magnitude, direction, or duration.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\mathbf z_{fault} = \mathbf z + \Delta\mathbf z_{outlier}.
+        \]
+      </p>
+      <p>
+        The verification should examine
+      </p>
+      <p>
+        \[
+\text{detection}, \quad \text{rejection}, \quad \text{state disturbance}, \quad \text{recovery time}, \quad \text{false alarms}.
+        \]
+      </p>
+      <p>
+        This connects Monte Carlo analysis with robust fusion and FDIR validation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.58 Monte Carlo with Sensor Failure</h3>
+      <p>
+        A sensor may be completely removed during selected runs.
+      </p>
+      <p>
+        The estimator should transition from
+      </p>
+      <p>
+        \[
+\text{Nominal Sensor Set}
+        \]
+      </p>
+      <p>
+        to
+      </p>
+      <p>
+        \[
+\text{Reduced Sensor Set}.
+        \]
+      </p>
+      <p>
+        The resulting impact on
+      </p>
+      <p>
+        \[
+\text{accuracy}, \quad \text{observability}, \quad \text{covariance}, \quad \text{navigation validity}
+        \]
+      </p>
+      <p>
+        should be quantified.
+      </p>
+      <p>
+        This provides evidence for graceful degradation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.59 Monte Carlo During General RPO</h3>
+      <p>
+        For general rendezvous and proximity operations, Monte Carlo verification may vary
+      </p>
+      <p>
+        \[
+\text{relative-state initialization},
+        \]
+      </p>
+      <p>
+        \[
+\text{relative sensor noise},
+        \]
+      </p>
+      <p>
+        \[
+\text{bearing uncertainty},
+        \]
+      </p>
+      <p>
+        \[
+\text{range uncertainty},
+        \]
+      </p>
+      <p>
+        \[
+\text{camera/LiDAR availability},
+        \]
+      </p>
+      <p>
+        \[
+\text{timing},
+        \]
+      </p>
+      <p>
+        \[
+\text{geometry},
+        \]
+      </p>
+      <p>
+        and model parameters.
+      </p>
+      <p>
+        The relative navigation state may be
+      </p>
+      <p>
+        \[
+\mathbf x_{rel} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol{\omega}_{rel} \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        The general purpose of Monte Carlo analysis is to verify whether the estimator remains accurate, consistent, observable, and operationally valid as range, geometry, and measurement availability change.
+      </p>
+      <p>
+        This is a general RPO principle and does not depend on any particular mission implementation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.60 Phase-Dependent Performance</h3>
+      <p>
+        A spacecraft estimator may behave differently in different operating regimes.
+      </p>
+      <p>
+        Monte Carlo statistics can therefore be computed separately for
+      </p>
+      <p>
+        \[
+\text{far-range}, \quad \text{intermediate-range}, \quad \text{close-range}, \quad \text{terminal phases}.
+        \]
+      </p>
+      <p>
+        A filter that performs well overall may still have a weak phase.
+      </p>
+      <p>
+        Phase-dependent metrics expose these local performance limitations.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.61 Covariance Growth During Sensor Loss</h3>
+      <p>
+        When a major measurement source disappears, covariance should usually grow.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+P_{rr}(t) \uparrow
+        \]
+      </p>
+      <p>
+        during prolonged position-measurement loss.
+      </p>
+      <p>
+        Monte Carlo verification should check whether this growth is physically reasonable and whether navigation-health logic responds before uncertainty exceeds operational limits.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Correct covariance growth is a feature, not a failure. It communicates the loss of information to downstream navigation-health logic and should reflect how quickly uncertainty actually increases without the missing sensor.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.62 Reacquisition Performance</h3>
+      <p>
+        After dropout, the estimator may receive measurements again.
+      </p>
+      <p>
+        Important Monte Carlo metrics include
+      </p>
+      <p>
+        \[
+t_{reacquire},
+        \]
+      </p>
+      <p>
+        \[
+e_{peak,reacquire},
+        \]
+      </p>
+      <p>
+        \[
+\text{number of rejected measurements},
+        \]
+      </p>
+      <p>
+        and whether convergence returns smoothly.
+      </p>
+      <p>
+        A filter that handles dropout well but reacts badly during reacquisition is not fully robust.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.63 Numerical Robustness Across Runs</h3>
+      <p>
+        Monte Carlo verification should also detect numerical failures.
+      </p>
+      <p>
+        Record events such as
+      </p>
+      <p>
+        \[
+NaN, \quad Inf, \quad P \not\succeq 0, \quad \text{Cholesky failure}, \quad \|q\|\neq1, \quad \text{matrix singularity}.
+        \]
+      </p>
+      <p>
+        Even if these occur rarely, they are important because rare numerical failures may become unacceptable in long-duration or safety-critical operation.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Rare numerical failures should be treated seriously because a statistically good estimator that occasionally produces an invalid covariance or undefined state may still be unsuitable for autonomous operation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.64 Filter Divergence Detection</h3>
+      <p>
+        A Monte Carlo run should be flagged as diverged if defined criteria are violated.
+      </p>
+      <p>
+        Possible indicators include
+      </p>
+      <p>
+        \[
+\|\mathbf e\| > e_{div},
+        \]
+      </p>
+      <p>
+        \[
+P_{ii} > P_{div},
+        \]
+      </p>
+      <p>
+        persistent excessive NIS,
+      </p>
+      <p>
+        invalid covariance,
+      </p>
+      <p>
+        or invalid numerical state.
+      </p>
+      <p>
+        The divergence criterion should be explicit and consistent across all runs.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.65 Run Classification</h3>
+      <p>
+        Each run can be classified as
+      </p>
+      <p>
+        \[
+\boxed{ \text{Nominal} \quad \text{Degraded} \quad \text{Failed} }
+        \]
+      </p>
+      <p>
+        rather than only pass/fail.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        <strong>Nominal</strong> — all accuracy, consistency, and availability requirements satisfied.
+      </p>
+      <p>
+        <strong>Degraded</strong> — navigation remains usable but with reduced performance or temporary limit violations.
+      </p>
+      <p>
+        <strong>Failed</strong> — estimator divergence, navigation invalidity, or critical requirement violation.
+      </p>
+      <p>
+        This provides more diagnostic information than one binary outcome.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.66 Mission-Level Metrics</h3>
+      <p>
+        Sensor-fusion performance should ultimately be connected to mission-level consequences.
+      </p>
+      <p>
+        Possible metrics include
+      </p>
+      <p>
+        \[
+\text{navigation availability},
+        \]
+      </p>
+      <p>
+        \[
+\text{guidance error},
+        \]
+      </p>
+      <p>
+        \[
+\text{control effort},
+        \]
+      </p>
+      <p>
+        \[
+\text{pointing accuracy},
+        \]
+      </p>
+      <p>
+        \[
+\text{relative-navigation accuracy},
+        \]
+      </p>
+      <p>
+        or whether downstream GNC requirements remain satisfied.
+      </p>
+      <p>
+        The objective is not merely to show that the covariance matrix behaves correctly, but that the navigation system supports the required operation.
+      </p>
+      <p><strong>Engineering interpretation:</strong> This connection is important because estimator accuracy is not an end in itself. The navigation solution is valuable only insofar as it supports the required guidance, control, pointing, or relative-navigation function.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.67 Estimator Metrics and GNC Metrics</h3>
+      <p>
+        A strong Monte Carlo campaign distinguishes between
+      </p>
+      <p>
+        \[
+\boxed{ \text{Estimator Metrics} }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+\boxed{ \text{System-Level GNC Metrics}. }
+        \]
+      </p>
+      <p>
+        Estimator metrics may include
+      </p>
+      <p>
+        \[
+RMSE, \quad NIS, \quad NEES, \quad P, \quad \text{convergence}.
+        \]
+      </p>
+      <p>
+        System-level metrics may include
+      </p>
+      <p>
+        \[
+\text{tracking error}, \quad \text{control effort}, \quad \text{mission-state success}, \quad \text{navigation validity}.
+        \]
+      </p>
+      <p>
+        Both levels are needed.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.68 Open-Loop Monte Carlo</h3>
+      <p>
+        Before closed-loop testing, Monte Carlo analysis can be performed using a prescribed truth trajectory.
+      </p>
+      <p>
+        \[
+\boxed{ \text{Truth Trajectory} \rightarrow \text{Sensor Models} \rightarrow \text{Estimator} }
+        \]
+      </p>
+      <p>
+        This isolates estimator behavior from controller interaction.
+      </p>
+      <p>
+        It is particularly useful during early tuning and model validation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.69 Closed-Loop Monte Carlo</h3>
+      <p>
+        The next level is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Plant} \rightarrow \text{Sensors} \rightarrow \text{Estimator} \rightarrow \text{Guidance} \rightarrow \text{Control} \rightarrow \text{Plant} }
+        \]
+      </p>
+      <p>
+        with uncertainties randomized across runs.
+      </p>
+      <p>
+        This is more realistic because estimator error influences control, and control modifies future measurements.
+      </p>
+      <p>
+        Closed-loop Monte Carlo therefore verifies the complete coupled GNC system.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.70 Parallel Execution</h3>
+      <p>
+        Monte Carlo simulations are naturally parallel because run <code>i</code> is usually independent of run <code>j</code>.
+      </p>
+      <p>
+        Thus
+      </p>
+      <p>
+        \[
+Run_1, Run_2, \ldots, Run_N
+        \]
+      </p>
+      <p>
+        can be distributed across multiple processor cores or compute nodes.
+      </p>
+      <p>
+        This can substantially reduce total verification time.
+      </p>
+      <p>
+        However, deterministic seed management and result indexing must be preserved.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Parallel execution changes computational throughput, not the statistical definition of the campaign. Run identity, seeds, configuration, and result ordering should therefore remain deterministic even when jobs finish out of order.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.71 Monte Carlo Data Storage</h3>
+      <p>
+        Saving every signal from every run can become expensive.
+      </p>
+      <p>
+        A good strategy is to retain key time histories such as
+      </p>
+      <p>
+        \[
+\mathbf e(t), \quad P(t), \quad NIS(t), \quad NavValid(t),
+        \]
+      </p>
+      <p>
+        while also storing compact run-level metrics.
+      </p>
+      <p>
+        For failed or unusual cases, full logging can be retained for diagnosis.
+      </p>
+      <p>
+        This balances traceability with storage efficiency.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.72 Run Metadata</h3>
+      <p>
+        Every run should record configuration information such as
+      </p>
+      <p>
+        \[
+runID, \quad seed, \quad parameter\ set, \quad software\ version, \quad scenario, \quad result.
+        \]
+      </p>
+      <p>
+        Without this metadata, a statistical result may be difficult to reproduce or audit later.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.73 Failed-Run Investigation</h3>
+      <p>
+        Monte Carlo verification should never stop at
+      </p>
+      <blockquote>
+        <p>“3 runs failed.”</p>
+      </blockquote>
+      <p>
+        Each failed run should be reproducible and investigated.
+      </p>
+      <p>
+        Questions include:
+      </p>
+      <ul>
+        <li>Which uncertainty realization triggered the failure?</li>
+        <li>Did the estimator become inconsistent before divergence?</li>
+        <li>Was a measurement wrongly accepted or rejected?</li>
+        <li>Did covariance become unrealistic?</li>
+        <li>Was the issue observability, timing, tuning, geometry, or numerical failure?</li>
+      </ul>
+      <p>
+        Failure investigation often provides more engineering value than the overall success percentage.
+      </p>
+      <p><strong>Engineering interpretation:</strong> A failed run is often more informative than many nominal runs because it exposes the combination of uncertainty, geometry, timing, or numerical behavior that drives the system toward its limit.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.74 Scatter Plots</h3>
+      <p>
+        Scatter plots can reveal relationships between uncertain inputs and output performance.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+b_{gyro,0} \quad \text{versus} \quad RMSE_\theta.
+        \]
+      </p>
+      <p>
+        or
+      </p>
+      <p>
+        \[
+\tau_{camera} \quad \text{versus} \quad e_{r,max}.
+        \]
+      </p>
+      <p>
+        Visible trends can identify important sensitivity drivers.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.75 Histograms</h3>
+      <p>
+        Histograms are useful for quantities such as
+      </p>
+      <p>
+        \[
+RMSE, \quad t_{conv}, \quad e_{max}, \quad NIS, \quad NEES.
+        \]
+      </p>
+      <p>
+        They reveal whether performance is approximately Gaussian, skewed, multimodal, or heavy-tailed.
+      </p>
+      <p>
+        This matters because mean and standard deviation alone may hide important distribution structure.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.76 Empirical Cumulative Distribution Function</h3>
+      <p>
+        The empirical CDF is particularly useful.
+      </p>
+      <p>
+        For performance metric <code>J</code>,
+      </p>
+      <p>
+        \[
+F_J(x) = P(J\le x).
+        \]
+      </p>
+      <p>
+        From it one can directly read quantities such as
+      </p>
+      <p>
+        \[
+P(J<J_{req}).
+        \]
+      </p>
+      <p>
+        This provides an intuitive connection between Monte Carlo statistics and engineering requirements.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.77 Time-History Confidence Envelopes</h3>
+      <p>
+        For a state-error time history, envelopes can be plotted across runs.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+e_{50}(t), \quad e_{95}(t), \quad e_{99}(t).
+        \]
+      </p>
+      <p>
+        This reveals when uncertainty becomes largest during the trajectory.
+      </p>
+      <p>
+        Such envelopes are especially useful for mission-phase analysis.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.78 Requirement Verification</h3>
+      <p>
+        Each requirement should map to a measurable Monte Carlo quantity.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+\|\mathbf e_r\|<r_{req},
+        \]
+      </p>
+      <p>
+        \[
+\|\mathbf e_v\|<v_{req},
+        \]
+      </p>
+      <p>
+        \[
+\|\delta\boldsymbol{\theta}\|<\theta_{req},
+        \]
+      </p>
+      <p>
+        \[
+NavValid=1.
+        \]
+      </p>
+      <p>
+        Verification then becomes a traceable statement of whether the run population satisfies these requirements.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.79 Statistical Requirement Interpretation</h3>
+      <p>
+        If a requirement is probabilistic, such as
+      </p>
+      <p>
+        \[
+P(e_r<e_{req})>0.99,
+        \]
+      </p>
+      <p>
+        then the Monte Carlo sample size must support meaningful estimation of that probability.
+      </p>
+      <p>
+        The number of runs and confidence interval therefore become part of the verification argument.
+      </p>
+      <p>
+        A very high claimed probability cannot be convincingly demonstrated with only a handful of simulations.
+      </p>
+      <p><strong>Engineering interpretation:</strong> The tighter the claimed probability, the stronger the evidence required. Sample count, observed failures, and the chosen confidence method therefore form part of the requirement-verification result.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.80 Monte Carlo Is Not a Substitute for Model Validation</h3>
+      <p>
+        Running thousands of simulations does not make an incorrect model correct.
+      </p>
+      <p>
+        If the sensor-noise distribution, bias dynamics, calibration uncertainty, or truth dynamics are unrealistic, the Monte Carlo results will also be unrealistic.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+\boxed{ \text{Monte Carlo Quality} \le \text{Model Quality} }
+        \]
+      </p>
+      <p>
+        in the practical sense that statistical verification cannot compensate for poor underlying assumptions.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Statistical repetition only explores the model that was supplied. If the physical assumptions are wrong, additional runs simply characterize the wrong system more precisely.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.81 Monte Carlo Is Not the Same as Worst-Case Analysis</h3>
+      <p>
+        Monte Carlo estimates probabilistic behavior based on sampled distributions.
+      </p>
+      <p>
+        Worst-case analysis searches for extreme allowable combinations.
+      </p>
+      <p>
+        These answer different questions.
+      </p>
+      <p>
+        Monte Carlo asks:
+      </p>
+      <p>
+        \[
+\text{What happens with high probability?}
+        \]
+      </p>
+      <p>
+        Worst-case analysis asks:
+      </p>
+      <p>
+        \[
+\text{What is the most adverse allowable condition?}
+        \]
+      </p>
+      <p>
+        A strong verification program may use both.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.82 Corner Cases</h3>
+      <p>
+        Specific corner cases should still be tested deliberately even when their random probability is low.
+      </p>
+      <p>
+        Examples include
+      </p>
+      <p>
+        \[
+\text{maximum bias}, \quad \text{maximum delay}, \quad \text{minimum visibility}, \quad \text{worst initialization}, \quad \text{simultaneous sensor loss}.
+        \]
+      </p>
+      <p>
+        These should not be left entirely to chance sampling.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.83 Statistical Independence</h3>
+      <p>
+        When combining results, care should be taken regarding independence.
+      </p>
+      <p>
+        Multiple time samples from one run are not necessarily statistically independent.
+      </p>
+      <p>
+        Similarly, correlated measurement sequences should not be treated as independent observations when constructing confidence arguments.
+      </p>
+      <p>
+        This matters especially for formal statistical interpretation of NIS, NEES, and confidence intervals.
+      </p>
+      <p><strong>Engineering interpretation:</strong> This matters when constructing confidence bounds: treating many correlated time samples from one realization as if they were independent can make the evidence appear much stronger than it actually is.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.84 Measurement Correlation</h3>
+      <p>
+        If measurement noise is correlated,
+      </p>
+      <p>
+        \[
+E[\mathbf v_i\mathbf v_j^T] \neq0,
+        \]
+      </p>
+      <p>
+        the Monte Carlo sensor model should reproduce that correlation where relevant.
+      </p>
+      <p>
+        Otherwise the simulated environment may be easier than the real one.
+      </p>
+      <p>
+        This is particularly important when several measurements share common processing or common physical error sources.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.85 Process-Noise Realizations</h3>
+      <p>
+        Truth disturbances can also be randomized.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+\mathbf w_k \sim \mathcal N(\mathbf 0,Q_{true}).
+        \]
+      </p>
+      <p>
+        The estimator may use
+      </p>
+      <p>
+        \[
+Q_{filter}.
+        \]
+      </p>
+      <p>
+        Comparing performance for different
+      </p>
+      <p>
+        \[
+Q_{true}
+        \]
+      </p>
+      <p>
+        relative to
+      </p>
+      <p>
+        \[
+Q_{filter}
+        \]
+      </p>
+      <p>
+        helps evaluate robustness to process-model uncertainty.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.86 Confidence Calibration</h3>
+      <p>
+        A well-calibrated estimator should satisfy the intuitive condition
+      </p>
+      <p>
+        \[
+\boxed{ \text{Reported Uncertainty} \approx \text{Observed Error Statistics}. }
+        \]
+      </p>
+      <p>
+        If actual errors repeatedly exceed predicted <code>3\sigma</code> bounds, the filter is overconfident.
+      </p>
+      <p>
+        If actual errors are consistently much smaller than predicted uncertainty, the estimator may be overly conservative.
+      </p>
+      <p>
+        Monte Carlo simulation is one of the best ways to examine this calibration.
+      </p>
+      <p><strong>Engineering interpretation:</strong> A calibrated filter does not merely produce small error; it reports uncertainty that has the correct statistical relationship to that error. This is why covariance validation is as important as state-error validation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.87 Conservative Filters</h3>
+      <p>
+        Conservative covariance is not automatically desirable.
+      </p>
+      <p>
+        Very large covariance can produce large Kalman gains, increased measurement sensitivity, or unnecessary degraded-mode declarations.
+      </p>
+      <p>
+        The objective is not
+      </p>
+      <p>
+        \[
+\text{make }P\text{ as large as possible},
+        \]
+      </p>
+      <p>
+        but rather
+      </p>
+      <p>
+        \[
+\boxed{ P \text{ should realistically represent estimation uncertainty}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.88 Overconfident Filters</h3>
+      <p>
+        An overconfident filter may show
+      </p>
+      <p>
+        \[
+P_{filter} \ll P_{empirical}.
+        \]
+      </p>
+      <p>
+        This can cause
+      </p>
+      <ul>
+        <li>excessive rejection of otherwise valid measurements,</li>
+        <li>underestimated navigation risk,</li>
+        <li>inappropriate downstream GNC decisions,</li>
+        <li>or eventual divergence.</li>
+      </ul>
+      <p>
+        NIS and NEES statistics are particularly valuable for detecting this condition.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.89 Mission-Phase Conditional Statistics</h3>
+      <p>
+        Instead of only reporting aggregate performance, statistics can be conditioned on phase:
+      </p>
+      <p>
+        \[
+J_{far}, \quad J_{mid}, \quad J_{close}, \quad J_{terminal}.
+        \]
+      </p>
+      <p>
+        This prevents one long, easy mission segment from dominating average metrics and hiding poorer performance in a short but critical phase.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.90 Sensor-Availability Conditional Statistics</h3>
+      <p>
+        Similarly, compute performance for cases such as
+      </p>
+      <p>
+        \[
+\text{all sensors available},
+        \]
+      </p>
+      <p>
+        \[
+\text{GNSS unavailable},
+        \]
+      </p>
+      <p>
+        \[
+\text{camera unavailable},
+        \]
+      </p>
+      <p>
+        \[
+\text{LiDAR unavailable}.
+        \]
+      </p>
+      <p>
+        This quantifies graceful degradation and redundancy value.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.91 Configuration Management</h3>
+      <p>
+        Monte Carlo results depend on
+      </p>
+      <p>
+        \[
+\text{software version}, \quad \text{estimator tuning}, \quad \text{sensor model}, \quad \text{uncertainty distributions}, \quad \text{scenario version}.
+        \]
+      </p>
+      <p>
+        All of these should be recorded.
+      </p>
+      <p>
+        Otherwise statistical results cannot be reproduced reliably after the model changes.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Versioning the complete statistical configuration is essential because a small change to a distribution, sensor model, threshold, or software revision changes the population being verified.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.92 Automated Monte Carlo Pipeline</h3>
+      <p>
+        A useful automated workflow is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Generate Run Parameters} \rightarrow \text{Execute Simulation} \rightarrow \text{Extract Metrics} \rightarrow \text{Classify Run} \rightarrow \text{Aggregate Statistics} \rightarrow \text{Generate Report} }
+        \]
+      </p>
+      <p>
+        Automation is important because manual handling becomes impractical for hundreds or thousands of simulations.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.93 Pre-Run Validation</h3>
+      <p>
+        Before launching a large campaign, validate each generated parameter set.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+m>0,
+        \]
+      </p>
+      <p>
+        \[
+P_0\succeq0,
+        \]
+      </p>
+      <p>
+        \[
+R\succeq0,
+        \]
+      </p>
+      <p>
+        \[
+Q\succeq0,
+        \]
+      </p>
+      <p>
+        and all sampled physical parameters should remain within allowed ranges.
+      </p>
+      <p>
+        This prevents invalid random draws from being incorrectly counted as estimator failures.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Pre-run checks protect the integrity of the campaign by separating invalid test generation from genuine estimator failure. Otherwise, nonphysical samples can distort the observed failure rate.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.94 Post-Run Validation</h3>
+      <p>
+        Each completed run should also pass basic integrity checks before inclusion in the statistics.
+      </p>
+      <p>
+        Examples include
+      </p>
+      <p>
+        \[
+\text{simulation completed},
+        \]
+      </p>
+      <p>
+        \[
+\text{no missing logs},
+        \]
+      </p>
+      <p>
+        \[
+\text{time vector valid},
+        \]
+      </p>
+      <p>
+        \[
+\text{metrics computable},
+        \]
+      </p>
+      <p>
+        \[
+\text{no unintended numerical corruption}.
+        \]
+      </p>
+      <p>
+        A simulation crash is itself important but should be classified correctly rather than silently mixed into normal metric distributions.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Post-run checks serve the same purpose at the output side: they distinguish an estimator result from a simulation infrastructure problem and ensure that only interpretable runs enter the statistics.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.95 Monte Carlo Verification Matrix</h3>
+      <p>
+        A useful verification matrix can group uncertainties by category:
+      </p>
+      <p>
+        \[
+\boxed{ \begin{array}{c|c} \text{Category} & \text{Examples}\\ \hline \text{Initialization} & \mathbf r_0,\mathbf v_0,\mathbf q_0,\mathbf b_0\\ \text{Sensors} & \text{noise, bias, misalignment, scale factor}\\ \text{Timing} & \text{latency, jitter, clock offset}\\ \text{Availability} & \text{dropout, outage, FOV loss}\\ \text{Dynamics} & \text{mass, inertia, disturbance parameters}\\ \text{Estimator} & Q,R,P_0,\text{thresholds}\\ \text{Actuation} & \text{magnitude, delay, misalignment}\\ \end{array} }
+        \]
+      </p>
+      <p>
+        This helps ensure that important uncertainty sources are not omitted.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.96 Verification Progression</h3>
+      <p>
+        A disciplined sequence is
+      </p>
+      <p>
+        \[
+\boxed{ \text{Deterministic Nominal} \rightarrow \text{Single-Uncertainty Sweeps} \rightarrow \text{Combined Monte Carlo} \rightarrow \text{Faulted Monte Carlo} \rightarrow \text{Closed-Loop Monte Carlo} }
+        \]
+      </p>
+      <p>
+        Each stage answers a different question.
+      </p>
+      <p>
+        This progression makes failures easier to diagnose.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.97 What Should Be Plotted</h3>
+      <p>
+        A strong sensor-fusion Monte Carlo report should normally include
+      </p>
+      <ul>
+        <li>state-error envelopes,</li>
+        <li>covariance envelopes,</li>
+        <li>error versus <code>3\sigma</code>,</li>
+        <li>NIS distributions,</li>
+        <li>NEES distributions,</li>
+        <li>RMSE histograms,</li>
+        <li>convergence-time distributions,</li>
+        <li>maximum-error distributions,</li>
+        <li>navigation-validity statistics,</li>
+        <li>success/failure counts,</li>
+        <li>percentile tables,</li>
+        <li>and sensitivity plots.</li>
+      </ul>
+      <p>
+        These plots together provide far more information than one nominal trajectory.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.98 Recommended Numerical Outputs</h3>
+      <p>
+        For every run, useful scalar outputs include
+      </p>
+      <p>
+        \[
+RMSE_r, \quad RMSE_v, \quad RMSE_\theta,
+        \]
+      </p>
+      <p>
+        \[
+e_{r,max}, \quad e_{v,max}, \quad e_{\theta,max},
+        \]
+      </p>
+      <p>
+        \[
+t_{conv}, \quad A_{nav}, \quad NIS_{mean}, \quad NEES_{mean},
+        \]
+      </p>
+      <p>
+        \[
+N_{reject}, \quad N_{dropout}, \quad success.
+        \]
+      </p>
+      <p>
+        These can be assembled into a Monte Carlo results table for statistical analysis.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.99 Failure-Mode Statistics</h3>
+      <p>
+        The campaign should not only count failures but classify causes.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+N_{divergence}, \quad N_{timeout}, \quad N_{covariance}, \quad N_{observability}, \quad N_{numerical}, \quad N_{sensor}.
+        \]
+      </p>
+      <p>
+        This reveals where the navigation system is fragile.
+      </p>
+      <p>
+        A <code>95\%</code> overall success rate means little if all failures share one systematic and correctable cause.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.100 Verification of Covariance Bounds</h3>
+      <p>
+        For each state component,
+      </p>
+      <p>
+        \[
+e_i^{(j)}(t)
+        \]
+      </p>
+      <p>
+        can be compared with
+      </p>
+      <p>
+        \[
+3\sqrt{P_{ii}^{(j)}(t)}.
+        \]
+      </p>
+      <p>
+        Across all runs and times, compute the fraction satisfying
+      </p>
+      <p>
+        \[
+|e_i| \le 3\sigma_i.
+        \]
+      </p>
+      <p>
+        For a well-calibrated Gaussian system, this should broadly agree with expected coverage, subject to correlation and finite-sample effects.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.101 Verification of Innovation Gates</h3>
+      <p>
+        For a selected chi-square gate,
+      </p>
+      <p>
+        \[
+\gamma_\alpha,
+        \]
+      </p>
+      <p>
+        measure the empirical rejection frequency for nominal measurements.
+      </p>
+      <p>
+        If nominal measurements are rejected far more often than expected, then
+      </p>
+      <p>
+        \[
+R, \quad P, \quad H, \quad \text{timing},
+        \]
+      </p>
+      <p>
+        or the gate itself may be inconsistent.
+      </p>
+      <p><strong>Engineering interpretation:</strong> Comparing empirical rejection frequency against the designed chi-square probability checks the entire chain of covariance prediction, measurement noise modelling, residual calculation, timing, and threshold selection.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.102 Monte Carlo for Adaptive Filters</h3>
+      <p>
+        If the estimator changes <code>Q</code>, <code>R</code>, sensor weighting, or mode online, Monte Carlo verification becomes even more important.
+      </p>
+      <p>
+        The adaptation law itself introduces another dynamic system.
+      </p>
+      <p>
+        The analysis should verify
+      </p>
+      <p>
+        \[
+\text{adaptation stability},
+        \]
+      </p>
+      <p>
+        \[
+\text{adaptation bounds},
+        \]
+      </p>
+      <p>
+        \[
+\text{recovery behavior},
+        \]
+      </p>
+      <p>
+        and whether adaptation improves performance rather than merely hiding modeling errors.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.103 Monte Carlo for Federated or Multi-Filter Architectures</h3>
+      <p>
+        For federated or distributed filters, Monte Carlo analysis should consider
+      </p>
+      <p>
+        \[
+\text{local-filter consistency},
+        \]
+      </p>
+      <p>
+        \[
+\text{cross-correlation},
+        \]
+      </p>
+      <p>
+        \[
+\text{information sharing},
+        \]
+      </p>
+      <p>
+        \[
+\text{fault isolation},
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+\text{master-filter performance}.
+        \]
+      </p>
+      <p>
+        The complete architecture should be randomized and verified, not only each local estimator independently.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.104 Monte Carlo for Non-Gaussian Filters</h3>
+      <p>
+        Particle filters or other non-Gaussian methods may require different consistency metrics.
+      </p>
+      <p>
+        Nevertheless, Monte Carlo verification remains fundamental.
+      </p>
+      <p>
+        One can still examine
+      </p>
+      <p>
+        \[
+\text{state error},
+        \]
+      </p>
+      <p>
+        \[
+\text{credible-interval coverage},
+        \]
+      </p>
+      <p>
+        \[
+\text{effective sample size},
+        \]
+      </p>
+      <p>
+        \[
+\text{degeneracy},
+        \]
+      </p>
+      <p>
+        \[
+\text{convergence},
+        \]
+      </p>
+      <p>
+        and system-level navigation performance.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.105 Monte Carlo and Observability</h3>
+      <p>
+        A filter may perform well in some geometric conditions and poorly in others because observability changes.
+      </p>
+      <p>
+        Randomizing geometry, motion, measurement availability, or initial conditions can expose these cases.
+      </p>
+      <p>
+        Poor Monte Carlo outcomes may therefore reflect
+      </p>
+      <p>
+        \[
+\boxed{ \text{Estimator Weakness} \quad\text{or}\quad \text{Fundamental Observability Limitation}. }
+        \]
+      </p>
+      <p>
+        These should not be confused.
+      </p>
+      <p><strong>Engineering interpretation:</strong> This distinction is critical because no amount of covariance tuning can recover information that the sensor geometry and motion do not make observable. Monte Carlo can reveal the condition, but the remedy may require different sensing or excitation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.106 Geometry-Dependent Performance</h3>
+      <p>
+        Camera, LiDAR, GNSS, and relative-navigation sensors often have geometry-dependent sensitivity.
+      </p>
+      <p>
+        The measurement Jacobian
+      </p>
+      <p>
+        \[
+H
+        \]
+      </p>
+      <p>
+        changes with geometry.
+      </p>
+      <p>
+        Monte Carlo analysis should therefore sample representative geometries rather than one convenient alignment.
+      </p>
+      <p>
+        This is especially important for range-only, bearing-only, and relative-pose estimation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.107 Long-Duration Monte Carlo</h3>
+      <p>
+        Some filters behave well over short runs but degrade over long duration because of
+      </p>
+      <p>
+        \[
+\text{bias accumulation}, \quad \text{clock drift}, \quad \text{numerical roundoff}, \quad \text{slow covariance inconsistency}.
+        \]
+      </p>
+      <p>
+        Long-duration Monte Carlo can expose these effects.
+      </p>
+      <p>
+        It is often computationally expensive but important for missions requiring prolonged autonomous navigation.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.108 Rare-Event Limitations</h3>
+      <p>
+        Ordinary Monte Carlo is inefficient for extremely rare events.
+      </p>
+      <p>
+        If one wants to estimate probabilities such as
+      </p>
+      <p>
+        \[
+10^{-6},
+        \]
+      </p>
+      <p>
+        millions of ordinary runs may be required.
+      </p>
+      <p>
+        Methods such as importance sampling, subset simulation, or targeted stress testing may then be more appropriate.
+      </p>
+      <p>
+        For ordinary sensor-fusion verification, however, standard Monte Carlo remains extremely valuable for moderate-probability uncertainty assessment.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.109 Verification Versus Validation</h3>
+      <p>
+        Monte Carlo can support both, but they are conceptually different.
+      </p>
+      <p>
+        <strong>Verification</strong> asks whether the estimator implementation behaves according to its mathematical and software design.
+      </p>
+      <p>
+        <strong>Validation</strong> asks whether the overall model represents the real navigation system sufficiently well for the intended use.
+      </p>
+      <p>
+        Thousands of runs can verify a model implementation statistically, but physical validation still requires realistic sensor characteristics and, eventually, representative hardware or measured data.
+      </p>
+      <p><strong>Engineering interpretation:</strong> A complete program therefore progresses from mathematical and software verification toward representative sensor data, processors, interfaces, and hardware so that the assumptions used in simulation are progressively confronted with reality.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.110 Connection to SIL and HIL</h3>
+      <p>
+        Monte Carlo verification naturally prepares the system for
+      </p>
+      <p>
+        \[
+\text{Software-in-the-Loop},
+        \]
+      </p>
+      <p>
+        \[
+\text{Processor-in-the-Loop},
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+\text{Hardware-in-the-Loop}.
+        \]
+      </p>
+      <p>
+        The same uncertainty cases can later be replayed against actual implementation code or hardware.
+      </p>
+      <p>
+        This creates continuity between model-level verification and implementation-level validation.
+      </p>
+      <p><strong>Engineering interpretation:</strong> The value of this continuity is that the same uncertainty cases, seeds, metrics, and acceptance criteria can be carried forward as the implementation becomes more flight representative.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.111 Recommended Monte Carlo Workflow</h3>
+      <p>
+        A practical workflow is:
+      </p>
+      <ol>
+        <li>define the nominal scenario,</li>
+        <li>identify uncertainty sources,</li>
+        <li>assign physically justified distributions,</li>
+        <li>define correlations where required,</li>
+        <li>define deterministic success criteria,</li>
+        <li>define statistical metrics,</li>
+        <li>assign random seeds,</li>
+        <li>generate run parameters,</li>
+        <li>execute simulations,</li>
+        <li>log state, covariance, innovations, status, and GNC quantities,</li>
+        <li>reject invalid simulation runs only for clearly defined setup failures,</li>
+        <li>calculate run-level metrics,</li>
+        <li>evaluate NIS and NEES,</li>
+        <li>calculate percentiles and confidence intervals,</li>
+        <li>identify failures,</li>
+        <li>reproduce failed seeds,</li>
+        <li>perform sensitivity analysis,</li>
+        <li>verify requirements,</li>
+        <li>document the complete configuration.</li>
+      </ol>
+      <p>
+        This workflow makes Monte Carlo verification traceable rather than simply producing a large collection of plots.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.112 Complete Monte Carlo Architecture</h3>
+      <p>
+        The overall architecture can be summarized as
+      </p>
+      <p>
+        \[
+\boxed{ \begin{array}{c} \text{Define Uncertainty Models}\\ \downarrow\\ \text{Generate Random Realization}\\ \downarrow\\ \text{Configure Truth + Sensors + Estimator}\\ \downarrow\\ \text{Run Complete Sensor-Fusion Simulation}\\ \downarrow\\ \text{Compute State Errors}\\ \downarrow\\ \text{Compute RMSE / Maximum Error / Convergence}\\ \downarrow\\ \text{Compute NIS / NEES / Covariance Consistency}\\ \downarrow\\ \text{Check Navigation and Mission Criteria}\\ \downarrow\\ \text{Store Run Metrics}\\ \downarrow\\ \text{Repeat for }N_{MC}\text{ Runs}\\ \downarrow\\ \text{Aggregate Statistics}\\ \downarrow\\ \text{Confidence Intervals + Percentiles + Failure Analysis} \end{array} }
+        \]
+      </p>
+      <p>
+        This is the core statistical verification loop.
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.30.113 Key Takeaways</h3>
+      <p>
+        Monte Carlo verification transforms sensor-fusion testing from <strong>one deterministic demonstration</strong> into a <strong>statistical assessment of robustness</strong>.
+      </p>
+      <p>
+        The most important uncertainty sources include
+      </p>
+      <p>
+        \[
+\boxed{ \text{Sensor Bias} + \text{Noise} + \text{Misalignment} + \text{Initialization Error} + \text{Timing} + \text{Dropouts} + \text{Dynamic Uncertainty} }
+        \]
+      </p>
+      <p>
+        together with calibration, actuator, environmental, and configuration uncertainties where relevant.
+      </p>
+      <p>
+        The estimator should be evaluated using actual state-estimation error, RMSE, peak error, convergence, innovation statistics, covariance consistency, NIS, NEES, navigation availability, failure classification, percentile metrics, and mission-level criteria.
+      </p>
+      <p>
+        NIS evaluates measurement-space consistency:
+      </p>
+      <p>
+        \[
+\boxed{ \epsilon_\nu = \nu^TS^{-1}\nu }
+        \]
+      </p>
+      <p>
+        while NEES evaluates state-space consistency:
+      </p>
+      <p>
+        \[
+\boxed{ \epsilon_x = e^TP^{-1}e. }
+        \]
+      </p>
+      <p>
+        Monte Carlo verification should include both accuracy and uncertainty calibration.
+      </p>
+      <p>
+        A filter that produces a small state error but unrealistic covariance is not fully verified.
+      </p>
+      <p>
+        A filter that reports conservative covariance but repeatedly violates operational navigation requirements is also not sufficient.
+      </p>
+      <p>
+        The central engineering principle is therefore
+      </p>
+      <p>
+        \[
+\boxed{ \text{A robust navigation estimator must be accurate, consistent, available, numerically stable, and reliable across the expected uncertainty population.} }
+        \]
+      </p>
+      <p>
+        Finally, Monte Carlo verification should be reproducible. Every run should retain its random seed, parameter realization, model version, estimator configuration, and result classification so that unusual or failed cases can be replayed and investigated.
+      </p>
+      <p>
+        This provides the natural transition to <strong>4.2.31 SIL/HIL and Flight Validation</strong>, where the statistically verified estimator architecture is exercised using real implementation code, representative processors, interfaces, hardware, recorded sensor data, timing effects, and progressively more flight-like environments.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.2.31 SIL/HIL and Flight Validation</h2>
+
+      <p>
+        Monte Carlo verification has now established statistical confidence in the estimator across uncertainty, noise, bias,
+        timing variation, dropouts, model mismatch, numerical behavior, consistency metrics, and mission-level acceptance criteria.
+      </p>
+
+      <p>
+        The next section moves from model-level statistical verification toward increasingly flight-representative validation using
+        software-in-the-loop, processor-in-the-loop, hardware-in-the-loop, sensor emulation, real interfaces, communication timing,
+        recorded-data replay, and flight-test evidence.
+      </p>
+
+      <a href="sensor-fusion-sil-hil.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2.31 SIL/HIL and Flight Validation</h3>
+          <p>
+            Software-in-the-loop, processor-in-the-loop, hardware-in-the-loop, sensor emulation, real interfaces, timing verification,
+            latency, communication protocols, recorded-data replay, flight-test validation, and estimator qualification.
+          </p>
+          <p class="sensor-link-arrow">
+            Continue to SIL/HIL and Flight Validation &rarr;
+          </p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, and spacecraft navigation.
+    </p>
+  </footer>
+
+</body>
+</html>
