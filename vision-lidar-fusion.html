@@ -1,0 +1,4418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.2.24 Vision and LiDAR Fusion | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .concept-note { margin:1.5rem 0 0; padding:1.1rem 1.25rem; border-left:4px solid #9bb8d3; background:#f5f8fb; border-radius:10px; }
+    .concept-note h4 { margin-top:0; margin-bottom:.45rem; }
+    .concept-note p { margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Vision and LiDAR Fusion</h1>
+    <p class="notes-tagline">
+      Bearing measurements, image features, target detection, optical pose estimation, LiDAR range measurements, point-cloud geometry, camera–LiDAR calibration, relative pose fusion, observability, timing, robustness, and close-range relative navigation.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+
+    <section class="notes-section-card">
+      <h2>4.2.24 Vision and LiDAR Fusion</h2>
+      <p>
+        Vision and LiDAR fusion combines the complementary strengths of <strong>passive optical sensing</strong> and <strong>active range sensing</strong> to estimate the relative position, orientation, geometry, and motion of a target.
+      </p>
+      <p>
+        A camera is very effective at measuring:
+      </p>
+      <ul>
+        <li>angular direction,</li>
+        <li>image features,</li>
+        <li>edges and contours,</li>
+        <li>target identity or geometry,</li>
+        <li>relative orientation from visual structure.</li>
+      </ul>
+      <p>
+        LiDAR is particularly effective at measuring:
+      </p>
+      <ul>
+        <li>direct range,</li>
+        <li>depth,</li>
+        <li>three-dimensional surface geometry,</li>
+        <li>point clouds,</li>
+        <li>target shape,</li>
+        <li>range-dependent pose information.</li>
+      </ul>
+      <p>
+        The central idea is therefore
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Vision Information} + \text{LiDAR Geometry} \rightarrow \text{Improved Relative Pose Estimation} }
+        \]
+      </p>
+      <p>
+        Vision and LiDAR do not simply provide two estimates that are averaged together. Each sensor measures a different aspect of the physical geometry, and a fusion algorithm combines these measurements using the appropriate sensor models and uncertainty.
+      </p>
+      <p>
+        For general spacecraft relative-navigation applications, the fused state may contain
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol\omega_{rel} \end{bmatrix} }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <ul>
+        <li>\(\mathbf r_{rel}\) is relative position,</li>
+        <li>\(\mathbf v_{rel}\) is relative velocity,</li>
+        <li>\(\mathbf q_{rel}\) is relative attitude,</li>
+        <li>\(\boldsymbol\omega_{rel}\) is relative angular velocity.</li>
+      </ul>
+      <p>
+        Additional states may represent:
+      </p>
+      <ul>
+        <li>camera alignment,</li>
+        <li>LiDAR alignment,</li>
+        <li>camera intrinsics,</li>
+        <li>range bias,</li>
+        <li>timing offsets,</li>
+        <li>target angular motion,</li>
+        <li>calibration uncertainty.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.1 Why Fuse Vision and LiDAR?</h3>
+      <p>
+        The motivation comes from their complementary weaknesses.
+      </p>
+      <p>
+        A camera can estimate target direction very accurately but may have weak instantaneous depth information.
+      </p>
+      <p>
+        LiDAR directly measures depth but may provide less appearance information than an image.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera} \rightarrow \text{Strong Angular / Visual Information} }
+        \]
+      </p>
+      <p>
+        while
+      </p>
+      <p>
+        \[
+        \boxed{ \text{LiDAR} \rightarrow \text{Strong Range / Depth Information}. }
+        \]
+      </p>
+      <p>
+        Together:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Angular Information} + \text{Depth Information} \rightarrow \text{Better 3-D Geometry}. }
+        \]
+      </p>
+      <p>
+        This complementary information is one of the strongest reasons to combine the two sensors.
+      </p>
+      <div class="concept-note">
+        <h4>Why the fusion is powerful</h4>
+        <p>The two sensors constrain different parts of the same geometry: vision is naturally strong in angular and appearance information, while LiDAR supplies direct depth and surface structure. The fusion is valuable because the weaknesses of one sensor are often complemented by the strengths of the other.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.2 Measurement Complementarity</h3>
+      <p>
+        Suppose a camera provides a line-of-sight unit vector
+      </p>
+      <p>
+        \[
+        \mathbf u_{LOS}
+        \]
+      </p>
+      <p>
+        and LiDAR provides range
+      </p>
+      <p>
+        \[
+        \rho.
+        \]
+      </p>
+      <p>
+        Then a simple relative-position reconstruction is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel} = \rho\mathbf u_{LOS}. }
+        \]
+      </p>
+      <p>
+        This equation illustrates the physical complementarity directly.
+      </p>
+      <p>
+        The camera provides direction.
+      </p>
+      <p>
+        The LiDAR provides scale.
+      </p>
+      <p>
+        Together, they define a three-dimensional relative vector.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.3 Vision Measurement Model</h3>
+      <p>
+        A camera forms a perspective projection of a three-dimensional target point.
+      </p>
+      <p>
+        For a target point expressed in the camera frame as
+      </p>
+      <p>
+        \[
+        \mathbf p^C = \begin{bmatrix} X_C\\ Y_C\\ Z_C \end{bmatrix},
+        \]
+      </p>
+      <p>
+        the pinhole-camera model gives
+      </p>
+      <p>
+        \[
+        \boxed{ u = f_x\frac{X_C}{Z_C}+c_x }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ v = f_y\frac{Y_C}{Z_C}+c_y. }
+        \]
+      </p>
+      <p>
+        Thus the image coordinates depend nonlinearly on the three-dimensional target geometry.
+      </p>
+      <p>
+        This nonlinearity is fundamental to vision-based relative navigation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.4 Camera Intrinsic Matrix</h3>
+      <p>
+        Camera intrinsic parameters may be represented by
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf K = \begin{bmatrix} f_x & 0 & c_x\\ 0 & f_y & c_y\\ 0 & 0 & 1 \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Here
+      </p>
+      <ul>
+        <li>\(f_x,f_y\) represent focal scaling,</li>
+        <li>\(c_x,c_y\) represent the principal point.</li>
+      </ul>
+      <p>
+        The projection relationship can be written conceptually as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf p_{image} \sim \mathbf K \mathbf p^C. }
+        \]
+      </p>
+      <p>
+        Errors in camera intrinsics can appear directly as navigation bias.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.5 Lens Distortion</h3>
+      <p>
+        Real cameras do not follow the ideal pinhole model perfectly.
+      </p>
+      <p>
+        Distortion can include:
+      </p>
+      <ul>
+        <li>radial distortion,</li>
+        <li>tangential distortion,</li>
+        <li>higher-order lens effects.</li>
+      </ul>
+      <p>
+        An undistorted normalized point
+      </p>
+      <p>
+        \[
+        (x,y)
+        \]
+      </p>
+      <p>
+        may be related to distorted image coordinates through a nonlinear calibration model.
+      </p>
+      <p>
+        Therefore image measurements should generally be corrected using calibrated intrinsic parameters before being used for high-accuracy navigation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.6 Bearing Measurements</h3>
+      <p>
+        A camera can naturally provide bearing information.
+      </p>
+      <p>
+        Given a calibrated pixel coordinate, a camera-frame direction can be formed:
+      </p>
+      <p>
+        \[
+        \boxed{ \tilde{\mathbf u}^C = \mathbf K^{-1} \begin{bmatrix} u\\ v\\ 1 \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Normalize:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf u^C = \frac{\tilde{\mathbf u}^C} {\|\tilde{\mathbf u}^C\|}. }
+        \]
+      </p>
+      <p>
+        This produces the observed line-of-sight direction.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.7 Bearing Does Not Directly Give Range</h3>
+      <p>
+        From a single monocular image, a bearing measurement constrains the target to a ray:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel} = \rho\mathbf u_{LOS}, \qquad \rho>0. }
+        \]
+      </p>
+      <p>
+        The direction is measured.
+      </p>
+      <p>
+        The scale \(\rho\) remains unknown unless additional information is available.
+      </p>
+      <p>
+        This additional information may come from:
+      </p>
+      <ul>
+        <li>LiDAR,</li>
+        <li>known target size,</li>
+        <li>stereo vision,</li>
+        <li>multiple observations over time,</li>
+        <li>dynamics.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.8 LiDAR Range Measurement</h3>
+      <p>
+        A LiDAR determines distance using emitted light and measured return time.
+      </p>
+      <p>
+        For a simple time-of-flight system,
+      </p>
+      <p>
+        \[
+        \boxed{ \rho = \frac{c\Delta t}{2} }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <ul>
+        <li><code>c</code> is the speed of light,</li>
+        <li>\(\Delta t\) is round-trip travel time.</li>
+      </ul>
+      <p>
+        The factor of two accounts for the outgoing and returning signal path.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.9 LiDAR Measurement Model</h3>
+      <p>
+        A scalar LiDAR range can be represented as
+      </p>
+      <p>
+        \[
+        \boxed{ z_\rho = \rho + b_\rho + v_\rho }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <ul>
+        <li>\(b_\rho\) is range bias,</li>
+        <li>\(v_\rho\) is random measurement noise.</li>
+      </ul>
+      <p>
+        For a relative position vector,
+      </p>
+      <p>
+        \[
+        \rho = \|\mathbf r_{rel}\|.
+        \]
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ z_\rho = \|\mathbf r_{rel}\| + b_\rho + v_\rho. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.10 Why LiDAR Adds Scale Information</h3>
+      <p>
+        Camera bearing provides
+      </p>
+      <p>
+        \[
+        \mathbf u_{LOS}.
+        \]
+      </p>
+      <p>
+        LiDAR provides
+      </p>
+      <p>
+        \[
+        \rho.
+        \]
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel} = \rho\mathbf u_{LOS}. }
+        \]
+      </p>
+      <p>
+        Without LiDAR, a monocular camera may know the target direction very accurately while still remaining uncertain about distance.
+      </p>
+      <p>
+        LiDAR directly reduces that ambiguity.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.11 LiDAR Point Clouds</h3>
+      <p>
+        Many LiDAR systems provide more than one range measurement.
+      </p>
+      <p>
+        They generate a set of three-dimensional points:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathcal P = \{ \mathbf p_1^L, \mathbf p_2^L, \ldots, \mathbf p_N^L \}. }
+        \]
+      </p>
+      <p>
+        Each point describes a surface return in the LiDAR frame.
+      </p>
+      <p>
+        A point cloud therefore contains target shape information in addition to range.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.12 Point-Cloud Geometry</h3>
+      <p>
+        A point cloud can provide:
+      </p>
+      <ul>
+        <li>target dimensions,</li>
+        <li>surface normals,</li>
+        <li>corners,</li>
+        <li>edges,</li>
+        <li>planes,</li>
+        <li>object orientation.</li>
+      </ul>
+      <p>
+        If a target geometry model is known, point-cloud alignment can estimate relative pose.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Measured Point Cloud} + \text{Target Model} \rightarrow \text{Relative Pose}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.13 Rigid Point-Cloud Registration</h3>
+      <p>
+        Suppose model points are
+      </p>
+      <p>
+        \[
+        \mathbf p_i^{M}
+        \]
+      </p>
+      <p>
+        and measured LiDAR points are
+      </p>
+      <p>
+        \[
+        \mathbf p_i^{L}.
+        \]
+      </p>
+      <p>
+        The registration problem seeks
+      </p>
+      <p>
+        \[
+        \mathbf R,\mathbf t
+        \]
+      </p>
+      <p>
+        such that
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf p_i^{L} \approx \mathbf R \mathbf p_i^{M} + \mathbf t. }
+        \]
+      </p>
+      <p>
+        Here
+      </p>
+      <ul>
+        <li>\(\mathbf R\) estimates orientation,</li>
+        <li>\(\mathbf t\) estimates translation.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.14 Iterative Closest Point</h3>
+      <p>
+        A common registration approach is <strong>Iterative Closest Point (ICP)</strong>.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Match Points} \rightarrow \text{Estimate Transform} \rightarrow \text{Update Alignment} \rightarrow \text{Repeat}. }
+        \]
+      </p>
+      <p>
+        ICP attempts to minimize a cost such as
+      </p>
+      <p>
+        \[
+        \boxed{ J = \sum_i \| \mathbf p_i^{meas} - ( \mathbf R\mathbf p_i^{model} + \mathbf t ) \|^2. }
+        \]
+      </p>
+      <p>
+        The method works best when the initial pose estimate is already reasonably close.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.15 ICP Limitations</h3>
+      <p>
+        ICP may perform poorly when:
+      </p>
+      <ul>
+        <li>initialization is poor,</li>
+        <li>only a small target region is visible,</li>
+        <li>geometry is symmetric,</li>
+        <li>point density is low,</li>
+        <li>many outliers exist,</li>
+        <li>the target contains repetitive surfaces.</li>
+      </ul>
+      <p>
+        Therefore a low ICP residual does not automatically imply a unique or accurate pose estimate.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.16 Point-to-Plane Registration</h3>
+      <p>
+        Instead of minimizing point-to-point distance, registration can minimize distance to local surfaces.
+      </p>
+      <p>
+        A point-to-plane residual may be
+      </p>
+      <p>
+        \[
+        \boxed{ r_i = \mathbf n_i^T \left[ \mathbf p_i^{meas} - ( \mathbf R\mathbf p_i^{model} + \mathbf t ) \right]. }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <p>
+        \[
+        \mathbf n_i
+        \]
+      </p>
+      <p>
+        is a surface normal.
+      </p>
+      <p>
+        This can improve convergence for smooth surfaces.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.17 Camera Image Features</h3>
+      <p>
+        Camera-based navigation can use:
+      </p>
+      <ul>
+        <li>corners,</li>
+        <li>edges,</li>
+        <li>line segments,</li>
+        <li>blobs,</li>
+        <li>fiducial markers,</li>
+        <li>natural image features,</li>
+        <li>silhouette contours.</li>
+      </ul>
+      <p>
+        Each feature provides geometric information about the target.
+      </p>
+      <p>
+        The most useful feature type depends on target appearance and range.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.18 Feature Detection</h3>
+      <p>
+        The first step is detecting candidate image features:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Image} \rightarrow \text{Feature Detector} \rightarrow \{\mathbf p_i\}. }
+        \]
+      </p>
+      <p>
+        Detection alone does not determine what physical target point each image feature represents.
+      </p>
+      <p>
+        That requires feature association.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.19 Feature Association</h3>
+      <p>
+        Suppose an image feature
+      </p>
+      <p>
+        \[
+        \mathbf p_i
+        \]
+      </p>
+      <p>
+        is assumed to correspond to target point
+      </p>
+      <p>
+        \[
+        \mathbf P_j.
+        \]
+      </p>
+      <p>
+        An incorrect correspondence can generate a large pose-estimation error.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Feature Detection} \neq \text{Feature Association}. }
+        \]
+      </p>
+      <p>
+        Robust association is essential for optical navigation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.20 Reprojection Error</h3>
+      <p>
+        Once a pose hypothesis exists, a known target feature can be projected into the image.
+      </p>
+      <p>
+        Let the measured pixel be
+      </p>
+      <p>
+        \[
+        \mathbf z_i
+        \]
+      </p>
+      <p>
+        and the predicted pixel be
+      </p>
+      <p>
+        \[
+        \hat{\mathbf z}_i.
+        \]
+      </p>
+      <p>
+        Then the reprojection residual is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_i = \mathbf z_i - \hat{\mathbf z}_i. }
+        \]
+      </p>
+      <p>
+        A small reprojection error indicates consistency with the hypothesized pose.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.21 Perspective-n-Point Pose Estimation</h3>
+      <p>
+        If several known three-dimensional target points are associated with their two-dimensional image positions, the relative pose can be estimated through a Perspective-n-Point problem.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <p>
+        \[
+        \boxed{ \{ \mathbf P_i^{3D} \} + \{ \mathbf p_i^{2D} \} \rightarrow \mathbf R,\mathbf t. }
+        \]
+      </p>
+      <p>
+        This produces both relative orientation and translation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.22 Why PnP Still Depends on Geometry</h3>
+      <p>
+        PnP performance depends strongly on:
+      </p>
+      <ul>
+        <li>number of features,</li>
+        <li>feature distribution,</li>
+        <li>depth variation,</li>
+        <li>image noise,</li>
+        <li>target symmetry,</li>
+        <li>camera calibration.</li>
+      </ul>
+      <p>
+        Features distributed widely over the target generally provide stronger pose constraints than features clustered in a small region.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.23 Target Detection</h3>
+      <p>
+        Before pose estimation, the target must be detected.
+      </p>
+      <p>
+        A general processing chain is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Image} \rightarrow \text{Target Detection} \rightarrow \text{Feature Extraction} \rightarrow \text{Pose Estimation}. }
+        \]
+      </p>
+      <p>
+        Target detection identifies where the object is in the image.
+      </p>
+      <p>
+        Pose estimation then determines its relative three-dimensional geometry.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.24 Detection Versus Tracking</h3>
+      <p>
+        Detection asks:
+      </p>
+      <blockquote>Where is the target in the current image?</blockquote>
+      <p>
+        Tracking asks:
+      </p>
+      <blockquote>Given previous state information, where should the target appear now?</blockquote>
+      <p>
+        These are different problems.
+      </p>
+      <p>
+        Recursive navigation can make tracking easier because it predicts the target location.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.25 Navigation-Aided Image Processing</h3>
+      <p>
+        Suppose the navigation filter predicts the target image position
+      </p>
+      <p>
+        \[
+        \hat{\mathbf p}
+        \]
+      </p>
+      <p>
+        with covariance
+      </p>
+      <p>
+        \[
+        \mathbf P_p.
+        \]
+      </p>
+      <p>
+        Image processing can search only within an uncertainty region around that prediction.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Navigation Prediction} \rightarrow \text{Reduced Image Search Region}. }
+        \]
+      </p>
+      <p>
+        This reduces computational cost and false detections.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.26 Camera Search Window</h3>
+      <p>
+        If the predicted image uncertainty is approximately Gaussian, a search ellipse may be defined using
+      </p>
+      <p>
+        \[
+        \boxed{ ( \mathbf p-\hat{\mathbf p} )^T \mathbf P_p^{-1} ( \mathbf p-\hat{\mathbf p} ) < \gamma. }
+        \]
+      </p>
+      <p>
+        The threshold \(\gamma\) determines the search confidence region.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.27 Optical Pose Estimation</h3>
+      <p>
+        Optical pose estimation seeks
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}_{rel}, \qquad \hat{\mathbf q}_{rel}. }
+        \]
+      </p>
+      <p>
+        A high-level fusion architecture may treat this optical pose as one measurement.
+      </p>
+      <p>
+        Alternatively, individual image features can be fused directly.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.28 High-Level Vision Fusion</h3>
+      <p>
+        A high-level architecture is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Image} \rightarrow \text{Pose Estimator} \rightarrow (\hat{\mathbf r}_{vision}, \hat{\mathbf q}_{vision}) \rightarrow \text{Fusion Filter}. }
+        \]
+      </p>
+      <p>
+        Advantages include:
+      </p>
+      <ul>
+        <li>simpler filter interfaces,</li>
+        <li>modular vision software,</li>
+        <li>lower estimator dimension.</li>
+      </ul>
+      <p>
+        But some raw image information is lost.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.29 Low-Level Vision Fusion</h3>
+      <p>
+        In a lower-level approach,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Image Features} \rightarrow \text{Navigation Filter}. }
+        \]
+      </p>
+      <p>
+        The filter directly predicts pixel coordinates and forms image residuals.
+      </p>
+      <p>
+        Advantages include:
+      </p>
+      <ul>
+        <li>direct use of raw measurement geometry,</li>
+        <li>potentially better covariance consistency,</li>
+        <li>no need to compress all information into one pose estimate.</li>
+      </ul>
+      <p>
+        The cost is greater complexity.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.30 High-Level LiDAR Fusion</h3>
+      <p>
+        LiDAR processing may independently produce:
+      </p>
+      <p>
+        \[
+        \hat{\mathbf r}_{LiDAR}, \qquad \hat{\mathbf q}_{LiDAR}.
+        \]
+      </p>
+      <p>
+        These may then be used as pose measurements:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z_L = \begin{bmatrix} \hat{\mathbf r}_{LiDAR}\\ \hat{\boldsymbol\theta}_{LiDAR} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        This resembles high-level vision fusion.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.31 Low-Level LiDAR Fusion</h3>
+      <p>
+        A lower-level estimator may instead use:
+      </p>
+      <ul>
+        <li>raw ranges,</li>
+        <li>point coordinates,</li>
+        <li>plane constraints,</li>
+        <li>surface normals.</li>
+      </ul>
+      <p>
+        This preserves more information but requires a more complicated measurement model.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.32 Vision–LiDAR Fusion Levels</h3>
+      <p>
+        Three broad architectures are possible:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Raw Measurement Fusion} }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Feature-Level Fusion} }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Pose-Level Fusion}. }
+        \]
+      </p>
+      <p>
+        The appropriate level depends on:
+      </p>
+      <ul>
+        <li>computational budget,</li>
+        <li>sensor interface,</li>
+        <li>required accuracy,</li>
+        <li>calibration quality,</li>
+        <li>desired robustness.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.33 Raw Measurement Fusion</h3>
+      <p>
+        Raw fusion combines measurements such as:
+      </p>
+      <ul>
+        <li>camera pixels,</li>
+        <li>LiDAR ranges,</li>
+        <li>IMU measurements.</li>
+      </ul>
+      <p>
+        The filter directly models each measurement.
+      </p>
+      <p>
+        This provides maximum control over uncertainty modeling but can significantly increase computational load.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.34 Feature-Level Fusion</h3>
+      <p>
+        Feature-level fusion combines intermediate geometric information.
+      </p>
+      <p>
+        Examples include:
+      </p>
+      <ul>
+        <li>image corners,</li>
+        <li>LiDAR edges,</li>
+        <li>surface planes,</li>
+        <li>object contours.</li>
+      </ul>
+      <p>
+        This can preserve meaningful structure while reducing raw data volume.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.35 Pose-Level Fusion</h3>
+      <p>
+        Pose-level fusion combines independently generated poses:
+      </p>
+      <p>
+        \[
+        \mathbf T_{vision}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \mathbf T_{LiDAR}.
+        \]
+      </p>
+      <p>
+        This is simpler but requires reliable covariance for each pose estimate.
+      </p>
+      <p>
+        Poor pose covariance can produce incorrect fusion weighting.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.36 Relative Pose Representation</h3>
+      <p>
+        A rigid-body pose can be represented by
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf T = \begin{bmatrix} \mathbf R & \mathbf t\\ \mathbf 0^T & 1 \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <ul>
+        <li>\(\mathbf R\in SO(3)\) is orientation,</li>
+        <li>\(\mathbf t\in\mathbb R^3\) is translation.</li>
+      </ul>
+      <p>
+        This homogeneous transformation is widely used in camera–LiDAR geometry.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.37 Pose Composition</h3>
+      <p>
+        Suppose
+      </p>
+      <p>
+        \[
+        \mathbf T_{BC}
+        \]
+      </p>
+      <p>
+        describes the camera with respect to the body frame and
+      </p>
+      <p>
+        \[
+        \mathbf T_{CL}
+        \]
+      </p>
+      <p>
+        describes LiDAR relative to the camera.
+      </p>
+      <p>
+        Then transformations can be composed:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf T_{BL} = \mathbf T_{BC} \mathbf T_{CL}. }
+        \]
+      </p>
+      <p>
+        Transformation order matters.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.38 Camera–LiDAR Extrinsic Calibration</h3>
+      <p>
+        Vision and LiDAR measurements cannot be fused correctly unless the rigid transformation between their frames is known.
+      </p>
+      <p>
+        Let
+      </p>
+      <p>
+        \[
+        \mathbf T_{CL} = \begin{bmatrix} \mathbf R_{CL} & \mathbf t_{CL}\\ 0 & 1 \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        This defines the LiDAR-to-camera transformation.
+      </p>
+      <p>
+        Calibration errors appear directly as systematic fusion errors.
+      </p>
+      <div class="concept-note">
+        <h4>Calibration is part of the measurement model</h4>
+        <p>Camera and LiDAR measurements cannot be compared in a common geometry unless their relative rotation and translation are known. A calibration error therefore behaves like a systematic navigation error, not merely a cosmetic sensor mismatch.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.39 Rotational Calibration Error</h3>
+      <p>
+        Suppose the true LiDAR-to-camera rotation is
+      </p>
+      <p>
+        \[
+        \mathbf R_{CL}
+        \]
+      </p>
+      <p>
+        but the estimator uses
+      </p>
+      <p>
+        \[
+        \hat{\mathbf R}_{CL}.
+        \]
+      </p>
+      <p>
+        A small calibration error can be represented by
+      </p>
+      <p>
+        \[
+        \delta\boldsymbol\alpha.
+        \]
+      </p>
+      <p>
+        Then measured LiDAR directions are projected incorrectly into the camera frame.
+      </p>
+      <p>
+        This can create structured residuals across many measurements.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.40 Translational Calibration Error</h3>
+      <p>
+        A translational offset error
+      </p>
+      <p>
+        \[
+        \delta\mathbf t_{CL}
+        \]
+      </p>
+      <p>
+        causes range-dependent projection errors.
+      </p>
+      <p>
+        This becomes especially important at close range because the sensor baseline is no longer negligible compared with target distance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.41 Why Calibration Becomes More Important at Close Range</h3>
+      <p>
+        At long range:
+      </p>
+      <p>
+        \[
+        \rho \gg \|\mathbf t_{CL}\|.
+        \]
+      </p>
+      <p>
+        The camera–LiDAR baseline may have relatively little effect.
+      </p>
+      <p>
+        At close range, however,
+      </p>
+      <p>
+        \[
+        \rho \sim \|\mathbf t_{CL}\|
+        \]
+      </p>
+      <p>
+        can make lever-arm effects significant.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Smaller Separation} \rightarrow \text{Greater Sensitivity to Extrinsic Calibration}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.42 Temporal Calibration</h3>
+      <p>
+        Spatial calibration alone is not sufficient.
+      </p>
+      <p>
+        The camera and LiDAR measurements must also refer to compatible epochs.
+      </p>
+      <p>
+        Let camera timestamp be
+      </p>
+      <p>
+        \[
+        t_C
+        \]
+      </p>
+      <p>
+        and LiDAR timestamp be
+      </p>
+      <p>
+        \[
+        t_L.
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \Delta t = t_C-t_L.
+        \]
+      </p>
+      <p>
+        If the target moves significantly during \(\Delta t\), spatial fusion becomes inconsistent.
+      </p>
+      <div class="concept-note">
+        <h4>Spatially aligned but temporally misaligned data are still inconsistent</h4>
+        <p>Even perfect extrinsic calibration cannot compensate for measurements that correspond to different physical epochs. Relative motion converts timestamp error directly into apparent position and attitude error.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.43 Timing Error During Relative Motion</h3>
+      <p>
+        A first-order positional discrepancy caused by timing offset is approximately
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf r \approx \mathbf v_{rel}\Delta t. }
+        \]
+      </p>
+      <p>
+        For relative attitude,
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol\theta \approx \boldsymbol\omega_{rel}\Delta t. }
+        \]
+      </p>
+      <p>
+        Thus timing accuracy becomes increasingly important as relative translational or angular rates increase.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.44 Rolling-Shutter Cameras</h3>
+      <p>
+        Some cameras do not expose the whole image simultaneously.
+      </p>
+      <p>
+        A rolling-shutter camera reads different image rows at slightly different times.
+      </p>
+      <p>
+        Then:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{One Image} \neq \text{One Exact Instant}. }
+        \]
+      </p>
+      <p>
+        During rapid relative motion or rotation, this can distort target geometry.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.45 Global-Shutter Cameras</h3>
+      <p>
+        A global-shutter camera exposes the image approximately simultaneously.
+      </p>
+      <p>
+        This simplifies geometric interpretation because the whole image corresponds more closely to one epoch.
+      </p>
+      <p>
+        For high-dynamic relative navigation, this can significantly reduce motion-induced image distortion.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.46 LiDAR Scan Timing</h3>
+      <p>
+        A scanning LiDAR also does not necessarily observe the whole target at one instant.
+      </p>
+      <p>
+        Different points can correspond to different timestamps.
+      </p>
+      <p>
+        Therefore the resulting point cloud may contain motion distortion.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.47 Point-Cloud Motion Distortion</h3>
+      <p>
+        If the relative motion during a scan is significant,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf p_i = \mathbf p_i(t_i) }
+        \]
+      </p>
+      <p>
+        rather than all points being measured at one common time.
+      </p>
+      <p>
+        Ignoring this can distort the apparent target shape.
+      </p>
+      <p>
+        Motion compensation may therefore be necessary.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.48 Motion Compensation</h3>
+      <p>
+        If relative velocity and angular rate are estimated, each measurement can be approximately transformed to a common reference time.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Raw Time-Distributed Measurements} \rightarrow \text{Motion Compensation} \rightarrow \text{Common-Epoch Geometry}. }
+        \]
+      </p>
+      <p>
+        This can improve camera–LiDAR registration.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.49 Vision Measurement Covariance</h3>
+      <p>
+        Image-feature uncertainty can be represented by
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R_{pixel} = \begin{bmatrix} \sigma_u^2 & \sigma_{uv}\\ \sigma_{uv} & \sigma_v^2 \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Pixel uncertainty depends on:
+      </p>
+      <ul>
+        <li>image quality,</li>
+        <li>feature detector,</li>
+        <li>target size,</li>
+        <li>blur,</li>
+        <li>illumination.</li>
+      </ul>
+      <p>
+        It should not always be assumed constant.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.50 LiDAR Measurement Covariance</h3>
+      <p>
+        LiDAR uncertainty may depend on:
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>reflectivity,</li>
+        <li>incidence angle,</li>
+        <li>return signal strength,</li>
+        <li>surface geometry.</li>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R_L = \mathbf R_L( \rho, \text{incidence}, \text{reflectivity}, \text{quality} ). }
+        \]
+      </p>
+      <p>
+        Dynamic covariance can better represent actual measurement quality.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.51 Pose Covariance</h3>
+      <p>
+        A pose estimate should ideally include covariance.
+      </p>
+      <p>
+        A simple local pose-error vector may be
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x_{pose} = \begin{bmatrix} \delta\mathbf r\\ \delta\boldsymbol\theta \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Then pose covariance is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P_{pose} = E[ \delta\mathbf x_{pose} \delta\mathbf x_{pose}^T ]. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.52 Pose Covariance Is Usually Anisotropic</h3>
+      <p>
+        Pose accuracy is rarely identical in every direction.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>camera may strongly constrain cross-line-of-sight position,</li>
+        <li>LiDAR may strongly constrain radial distance,</li>
+        <li>planar geometry may weakly constrain one rotation.</li>
+      </ul>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \sigma_x \neq \sigma_y \neq \sigma_z. }
+        \]
+      </p>
+      <p>
+        Full covariance should be preserved when possible.
+      </p>
+      <div class="concept-note">
+        <h4>Why full covariance matters</h4>
+        <p>Pose uncertainty is directional. Camera and LiDAR geometry can constrain some translations or rotations strongly while leaving others weak, so one scalar accuracy number can hide important weak directions.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.53 Target Geometry and Observability</h3>
+      <p>
+        Sensor information depends on target shape.
+      </p>
+      <p>
+        A target with:
+      </p>
+      <ul>
+        <li>corners,</li>
+        <li>depth variation,</li>
+        <li>asymmetric geometry,</li>
+      </ul>
+      <p>
+        provides stronger pose constraints than a featureless symmetric target.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Target Geometry} \rightarrow \text{Pose Observability}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.54 Planar Targets</h3>
+      <p>
+        A nearly planar visible surface may provide weaker information about some pose directions.
+      </p>
+      <p>
+        For example, certain translations or rotations can produce similar measurements.
+      </p>
+      <p>
+        Therefore low point-cloud residual does not necessarily mean full 6-DOF pose is equally accurate.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.55 Symmetric Targets</h3>
+      <p>
+        A symmetric target may produce multiple geometrically similar solutions.
+      </p>
+      <p>
+        For example, rotating the target by a symmetry angle may generate nearly identical measurements.
+      </p>
+      <p>
+        This can produce a multi-modal pose posterior.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.56 Visual Ambiguity</h3>
+      <p>
+        A camera can experience ambiguity due to:
+      </p>
+      <ul>
+        <li>repeated textures,</li>
+        <li>repeated structural elements,</li>
+        <li>symmetry,</li>
+        <li>shadows,</li>
+        <li>low resolution.</li>
+      </ul>
+      <p>
+        LiDAR geometry can help distinguish solutions that look visually similar.
+      </p>
+      <p>
+        This is another reason sensor fusion improves robustness.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.57 LiDAR Ambiguity</h3>
+      <p>
+        LiDAR can also be ambiguous.
+      </p>
+      <p>
+        A flat or repetitive surface may provide insufficient structure to determine all pose components.
+      </p>
+      <p>
+        Vision may provide texture information that resolves this ambiguity.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Vision Ambiguity} \neq \text{LiDAR Ambiguity} }
+        \]
+      </p>
+      <p>
+        and this difference is valuable.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.58 Joint Geometric Constraint</h3>
+      <p>
+        If both camera and LiDAR observe the same target geometry, their residuals can be combined:
+      </p>
+      <p>
+        \[
+        \boxed{ J = J_{vision} + J_{LiDAR}. }
+        \]
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        J_{vision} = \sum_i \| \mathbf z_i-\hat{\mathbf z}_i \|^2
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        J_{LiDAR} = \sum_j \| \mathbf p_j-\hat{\mathbf p}_j \|^2.
+        \]
+      </p>
+      <p>
+        A weighted form may incorporate covariance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.59 Weighted Joint Cost</h3>
+      <p>
+        A statistically motivated cost is
+      </p>
+      <p>
+        \[
+        \boxed{ J = \mathbf r_C^T \mathbf R_C^{-1} \mathbf r_C + \mathbf r_L^T \mathbf R_L^{-1} \mathbf r_L. }
+        \]
+      </p>
+      <p>
+        This prevents one sensor from dominating merely because it produces more measurements.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.60 Why Number of Measurements Is Not the Same as Information</h3>
+      <p>
+        A camera may produce hundreds of features.
+      </p>
+      <p>
+        A LiDAR may produce thousands of points.
+      </p>
+      <p>
+        But:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{More Measurements} \neq \text{Proportionally More Independent Information}. }
+        \]
+      </p>
+      <p>
+        Many measurements may be highly correlated or constrain the same state direction.
+      </p>
+      <p>
+        Geometry and covariance determine actual information content.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.61 Information Matrix</h3>
+      <p>
+        Measurement information can be approximated by
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf \Lambda = \mathbf H^T \mathbf R^{-1} \mathbf H. }
+        \]
+      </p>
+      <p>
+        This shows that information depends on both:
+      </p>
+      <ul>
+        <li>measurement precision,</li>
+        <li>measurement sensitivity.</li>
+      </ul>
+      <p>
+        A low-noise measurement that is insensitive to one state direction adds little information about that direction.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.62 Vision–LiDAR EKF</h3>
+      <p>
+        A fused EKF may use
+      </p>
+      <p>
+        \[
+        \mathbf x = [ \mathbf r_{rel}, \mathbf v_{rel}, \delta\boldsymbol\theta_{rel}, \ldots ]^T.
+        \]
+      </p>
+      <p>
+        Propagation:
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^- = f( \hat{\mathbf x}_{k-1}^+ ) }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P_k^- = \mathbf F \mathbf P_{k-1}^+ \mathbf F^T + \mathbf Q. }
+        \]
+      </p>
+      <p>
+        Vision and LiDAR measurements are then applied asynchronously.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.63 Vision Measurement Update</h3>
+      <p>
+        For visual measurement
+      </p>
+      <p>
+        \[
+        \mathbf z_C,
+        \]
+      </p>
+      <p>
+        predict
+      </p>
+      <p>
+        \[
+        \hat{\mathbf z}_C = h_C(\hat{\mathbf x}^-).
+        \]
+      </p>
+      <p>
+        Innovation:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_C = \mathbf z_C - \hat{\mathbf z}_C. }
+        \]
+      </p>
+      <p>
+        Innovation covariance:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf S_C = \mathbf H_C \mathbf P^- \mathbf H_C^T + \mathbf R_C. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.64 LiDAR Measurement Update</h3>
+      <p>
+        Similarly,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_L = \mathbf z_L - h_L(\hat{\mathbf x}^-) }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf S_L = \mathbf H_L \mathbf P^- \mathbf H_L^T + \mathbf R_L. }
+        \]
+      </p>
+      <p>
+        Camera and LiDAR updates can be processed sequentially if they arrive at different times.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.65 Sequential Fusion</h3>
+      <p>
+        Suppose a camera measurement arrives at
+      </p>
+      <p>
+        \[
+        t_C
+        \]
+      </p>
+      <p>
+        and a LiDAR measurement arrives at
+      </p>
+      <p>
+        \[
+        t_L.
+        \]
+      </p>
+      <p>
+        Then a natural sequence is
+      </p>
+      <p>
+        \[
+        \boxed{ t_C: \text{Vision Update} }
+        \]
+      </p>
+      <p>
+        followed by
+      </p>
+      <p>
+        \[
+        \boxed{ t_L: \text{LiDAR Update}. }
+        \]
+      </p>
+      <p>
+        There is no requirement that the measurements be artificially synchronized into one update if their true timestamps differ.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.66 Simultaneous Fusion</h3>
+      <p>
+        If camera and LiDAR measurements truly correspond to the same epoch, they may be stacked:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z = \begin{bmatrix} \mathbf z_C\\ \mathbf z_L \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \mathbf R = \begin{bmatrix} \mathbf R_C & \mathbf R_{CL}\\ \mathbf R_{LC} & \mathbf R_L \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        Cross-covariance terms should be included if sensor errors are correlated.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.67 Camera–LiDAR Correlation</h3>
+      <p>
+        Vision and LiDAR may share error sources such as:
+      </p>
+      <ul>
+        <li>body-frame alignment,</li>
+        <li>timing errors,</li>
+        <li>target geometry errors,</li>
+        <li>common navigation-state uncertainty.</li>
+      </ul>
+      <p>
+        Treating such errors as independent can cause overconfidence.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.68 Innovation Gating</h3>
+      <p>
+        For a measurement innovation
+      </p>
+      <p>
+        \[
+        \mathbf r
+        \]
+      </p>
+      <p>
+        with covariance
+      </p>
+      <p>
+        \[
+        \mathbf S,
+        \]
+      </p>
+      <p>
+        Normalized Innovation Squared is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NIS} = \mathbf r^T \mathbf S^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>
+        This can be used to reject inconsistent visual or LiDAR measurements.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.69 Vision-Specific Validation</h3>
+      <p>
+        Visual measurements may be validated using:
+      </p>
+      <ul>
+        <li>reprojection error,</li>
+        <li>feature count,</li>
+        <li>feature distribution,</li>
+        <li>detection confidence,</li>
+        <li>optical-flow consistency,</li>
+        <li>target-in-frame checks.</li>
+      </ul>
+      <p>
+        These sensor-specific checks should occur before or alongside estimator-level gating.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.70 LiDAR-Specific Validation</h3>
+      <p>
+        LiDAR measurements may be validated using:
+      </p>
+      <ul>
+        <li>return strength,</li>
+        <li>point count,</li>
+        <li>registration residual,</li>
+        <li>geometric consistency,</li>
+        <li>range limits,</li>
+        <li>target-shape agreement.</li>
+      </ul>
+      <p>
+        A low-quality LiDAR point cloud should not be given the same covariance as a high-quality point cloud.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.71 RANSAC for Vision</h3>
+      <p>
+        Feature association can contain outliers.
+      </p>
+      <p>
+        RANSAC-type methods repeatedly estimate geometry from subsets and identify measurements consistent with one model.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Candidate Features} \rightarrow \text{Hypotheses} \rightarrow \text{Consensus Set}. }
+        \]
+      </p>
+      <p>
+        Only the consistent subset should normally enter the pose solution.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.72 Robust LiDAR Registration</h3>
+      <p>
+        Point clouds may also contain outliers.
+      </p>
+      <p>
+        Robust registration can use:
+      </p>
+      <ul>
+        <li>trimmed ICP,</li>
+        <li>robust loss functions,</li>
+        <li>correspondence rejection,</li>
+        <li>surface-normal consistency,</li>
+        <li>range gating.</li>
+      </ul>
+      <p>
+        This reduces sensitivity to spurious points.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.73 Robust Loss Functions</h3>
+      <p>
+        Instead of minimizing pure squared residuals,
+      </p>
+      <p>
+        \[
+        r^2,
+        \]
+      </p>
+      <p>
+        a robust estimator may use a loss
+      </p>
+      <p>
+        \[
+        \rho(r)
+        \]
+      </p>
+      <p>
+        that grows more slowly for large residuals.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Large Residual} \rightarrow \text{Reduced Influence}. }
+        \]
+      </p>
+      <p>
+        This can prevent a few bad measurements from dominating the pose solution.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.74 Huber-Type Weighting</h3>
+      <p>
+        A Huber-style weighting behaves quadratically for small residuals and approximately linearly for large residuals.
+      </p>
+      <p>
+        This preserves sensitivity near the solution while reducing the influence of outliers.
+      </p>
+      <p>
+        Robust weighting may be applied at:
+      </p>
+      <ul>
+        <li>feature level,</li>
+        <li>point-cloud level,</li>
+        <li>filter measurement level.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.75 Occlusion</h3>
+      <p>
+        The target may be only partially visible.
+      </p>
+      <p>
+        Occlusion can arise from:
+      </p>
+      <ul>
+        <li>spacecraft structure,</li>
+        <li>target rotation,</li>
+        <li>appendages,</li>
+        <li>line-of-sight obstruction.</li>
+      </ul>
+      <p>
+        Partial visibility changes both image features and point-cloud geometry.
+      </p>
+      <p>
+        The estimator should not assume the entire target is always observed.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.76 Partial Point Clouds</h3>
+      <p>
+        LiDAR may observe only one side of the target.
+      </p>
+      <p>
+        Then the visible geometry may become poorly conditioned for some rotations or translations.
+      </p>
+      <p>
+        Pose covariance should reflect this loss of information.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.77 Partial Visual Features</h3>
+      <p>
+        Similarly, the camera may see only a small set of target features.
+      </p>
+      <p>
+        The pose estimator may still produce a solution, but its uncertainty can increase substantially.
+      </p>
+      <p>
+        Feature count alone is not sufficient; feature geometry also matters.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.78 Field of View</h3>
+      <p>
+        A camera requires the target to remain within its optical field of view.
+      </p>
+      <p>
+        If
+      </p>
+      <p>
+        \[
+        |\alpha|>\alpha_{FOV}
+        \]
+      </p>
+      <p>
+        or
+      </p>
+      <p>
+        \[
+        |\beta|>\beta_{FOV},
+        \]
+      </p>
+      <p>
+        the target may disappear from the image.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Pointing} \rightarrow \text{Vision Availability}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.79 LiDAR Field of Regard</h3>
+      <p>
+        LiDAR has similar geometric constraints.
+      </p>
+      <p>
+        Useful measurements may require
+      </p>
+      <p>
+        \[
+        \boxed{ \rho_{\min} < \rho < \rho_{\max} }
+        \]
+      </p>
+      <p>
+        and target direction within scan limits.
+      </p>
+      <p>
+        A healthy LiDAR can therefore be unavailable simply because of geometry.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.80 Sensor Availability Is State Dependent</h3>
+      <p>
+        Vision and LiDAR availability can depend on the current relative state.
+      </p>
+      <p>
+        Examples:
+      </p>
+      <ul>
+        <li>target outside field of view,</li>
+        <li>target too close,</li>
+        <li>target too far,</li>
+        <li>unfavorable orientation.</li>
+      </ul>
+      <p>
+        Thus sensor availability is not always an independent random event.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.81 Illumination Effects on Vision</h3>
+      <p>
+        Passive cameras depend strongly on illumination.
+      </p>
+      <p>
+        Performance can degrade due to:
+      </p>
+      <ul>
+        <li>eclipse,</li>
+        <li>shadow,</li>
+        <li>glare,</li>
+        <li>Sun intrusion,</li>
+        <li>Earth background,</li>
+        <li>low contrast.</li>
+      </ul>
+      <p>
+        Image measurement covariance may therefore need to vary with image quality.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.82 LiDAR and Illumination</h3>
+      <p>
+        LiDAR is active and therefore less dependent on natural illumination than a passive camera.
+      </p>
+      <p>
+        However, strong background light can still affect some optical ranging systems.
+      </p>
+      <p>
+        This makes LiDAR useful when visual contrast becomes poor.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.83 Target Reflectivity</h3>
+      <p>
+        LiDAR return strength depends on target surface reflectivity.
+      </p>
+      <p>
+        Low-reflectivity surfaces may produce:
+      </p>
+      <ul>
+        <li>fewer valid points,</li>
+        <li>larger range noise,</li>
+        <li>reduced maximum usable range.</li>
+      </ul>
+      <p>
+        Reflectivity can therefore influence measurement covariance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.84 Incidence Angle</h3>
+      <p>
+        LiDAR performance can degrade when the laser strikes a surface at a shallow angle.
+      </p>
+      <p>
+        A large incidence angle may reduce returned energy and increase ranging uncertainty.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ R_{LiDAR} = f( \rho, \text{reflectivity}, \text{incidence angle} ). }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.85 Vision Resolution Versus Range</h3>
+      <p>
+        Suppose the target physical dimension is
+      </p>
+      <p>
+        \[
+        L.
+        \]
+      </p>
+      <p>
+        Its approximate image size decreases with range:
+      </p>
+      <p>
+        \[
+        \boxed{ p \propto \frac{fL}{\rho}. }
+        \]
+      </p>
+      <p>
+        At long range, the target occupies fewer pixels.
+      </p>
+      <p>
+        This reduces the ability to detect detailed features and estimate pose.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.86 Angular Error to Position Error</h3>
+      <p>
+        Suppose camera angular uncertainty is
+      </p>
+      <p>
+        \[
+        \sigma_\theta.
+        \]
+      </p>
+      <p>
+        Equivalent lateral uncertainty is approximately
+      </p>
+      <p>
+        \[
+        \boxed{ \sigma_{cross} \approx \rho\sigma_\theta. }
+        \]
+      </p>
+      <p>
+        Thus the same angular accuracy produces larger translational uncertainty at longer range.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.87 LiDAR Range Accuracy Versus Range</h3>
+      <p>
+        LiDAR accuracy may also vary with range.
+      </p>
+      <p>
+        Some systems maintain relatively good range precision across a useful range band, while others degrade strongly with signal strength.
+      </p>
+      <p>
+        Therefore sensor datasheet range accuracy should be translated into the actual estimator measurement covariance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.88 Sensor Dominance Changes With Range</h3>
+      <p>
+        At longer range:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Vision} \rightarrow \text{Strong Angular Information}. }
+        \]
+      </p>
+      <p>
+        At shorter range:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{LiDAR} \rightarrow \text{Strong Detailed Geometry}. }
+        \]
+      </p>
+      <p>
+        The fused estimator can therefore change weighting smoothly with range instead of hard-switching between sensors.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.89 Long-Range Vision Use</h3>
+      <p>
+        At long range, the target may appear as:
+      </p>
+      <ul>
+        <li>a point source,</li>
+        <li>a small blob,</li>
+        <li>a low-detail silhouette.</li>
+      </ul>
+      <p>
+        The camera may provide mainly:
+      </p>
+      <ul>
+        <li>bearing,</li>
+        <li>target detection,</li>
+        <li>coarse line of sight.</li>
+      </ul>
+      <p>
+        Detailed pose may not yet be observable.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.90 Intermediate-Range Vision Use</h3>
+      <p>
+        At intermediate range, the target may reveal:
+      </p>
+      <ul>
+        <li>contours,</li>
+        <li>structural features,</li>
+        <li>identifiable corners.</li>
+      </ul>
+      <p>
+        This can enable increasingly accurate position and orientation estimation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.91 Close-Range Vision Use</h3>
+      <p>
+        At close range, detailed image features can support:
+      </p>
+      <ul>
+        <li>precise pose,</li>
+        <li>target orientation,</li>
+        <li>local structure identification.</li>
+      </ul>
+      <p>
+        However, close range also increases sensitivity to:
+      </p>
+      <ul>
+        <li>camera lever arm,</li>
+        <li>calibration,</li>
+        <li>field-of-view limits,</li>
+        <li>partial visibility.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.92 Long-Range LiDAR Use</h3>
+      <p>
+        LiDAR may have limited point density or signal strength at long distance.
+      </p>
+      <p>
+        It may initially provide:
+      </p>
+      <ul>
+        <li>sparse range,</li>
+        <li>coarse target detection.</li>
+      </ul>
+      <p>
+        Useful pose information often increases as the target approaches.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.93 Close-Range LiDAR Use</h3>
+      <p>
+        At shorter distances, LiDAR can produce denser and more accurate geometry.
+      </p>
+      <p>
+        This supports:
+      </p>
+      <ul>
+        <li>point-cloud registration,</li>
+        <li>surface reconstruction,</li>
+        <li>accurate range,</li>
+        <li>relative attitude estimation.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.94 Close-Range Navigation</h3>
+      <p>
+        Vision–LiDAR fusion is especially valuable for general close-range relative navigation because the estimator may require accurate knowledge of:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel}, \qquad \mathbf v_{rel}, \qquad \mathbf q_{rel}, \qquad \boldsymbol\omega_{rel}. }
+        \]
+      </p>
+      <p>
+        At these ranges, pose geometry often matters more than simple center-to-center range.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.95 Relative Pose State</h3>
+      <p>
+        A relative pose state can be written as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{pose} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf q_{rel} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        For dynamic estimation:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol\omega_{rel} \end{bmatrix}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.96 Pose Error State</h3>
+      <p>
+        A local error state may use
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = \begin{bmatrix} \delta\mathbf r\\ \delta\mathbf v\\ \delta\boldsymbol\theta\\ \delta\boldsymbol\omega \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        The attitude error is represented by a three-dimensional small-angle vector rather than direct quaternion subtraction.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.97 Relative Quaternion Error</h3>
+      <p>
+        Define
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf q = \mathbf q_{true} \otimes \hat{\mathbf q}^{-1}. }
+        \]
+      </p>
+      <p>
+        For small errors:
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf q \approx \begin{bmatrix} 1\\ \frac12\delta\boldsymbol\theta \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        This is suitable for EKF-style local attitude updates.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.98 Pose Innovation</h3>
+      <p>
+        Suppose a vision or LiDAR subsystem outputs relative pose.
+      </p>
+      <p>
+        Translation innovation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_p = \mathbf r_{meas} - \hat{\mathbf r}. }
+        \]
+      </p>
+      <p>
+        Orientation innovation should be formed multiplicatively rather than through direct quaternion subtraction.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.99 Orientation Innovation</h3>
+      <p>
+        For measured quaternion
+      </p>
+      <p>
+        \[
+        \mathbf q_m
+        \]
+      </p>
+      <p>
+        and predicted quaternion
+      </p>
+      <p>
+        \[
+        \hat{\mathbf q},
+        \]
+      </p>
+      <p>
+        define
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf q = \mathbf q_m \otimes \hat{\mathbf q}^{-1}. }
+        \]
+      </p>
+      <p>
+        The vector part gives an approximate small-angle innovation:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_\theta \approx 2\delta\mathbf q_v. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.100 Quaternion Sign Ambiguity</h3>
+      <p>
+        Quaternions satisfy
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf q \equiv -\mathbf q. }
+        \]
+      </p>
+      <p>
+        A vision pose estimator may therefore return either sign.
+      </p>
+      <p>
+        Before forming quaternion residuals, the sign should be made consistent, for example by enforcing
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf q_m^T \hat{\mathbf q} \ge0. }
+        \]
+      </p>
+      <p>
+        Otherwise a mathematically identical attitude could appear as a large error.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.101 EKF Pose Update</h3>
+      <p>
+        For pose measurement
+      </p>
+      <p>
+        \[
+        \mathbf z
+        \]
+      </p>
+      <p>
+        with predicted measurement
+      </p>
+      <p>
+        \[
+        h(\hat{\mathbf x}^-),
+        \]
+      </p>
+      <p>
+        the innovation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf z - h(\hat{\mathbf x}^-) }
+        \]
+      </p>
+      <p>
+        for Euclidean components, combined with appropriate multiplicative attitude residuals.
+      </p>
+      <p>
+        The update then follows the standard Kalman structure.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.102 UKF for Vision–LiDAR Fusion</h3>
+      <p>
+        Vision projection is strongly nonlinear.
+      </p>
+      <p>
+        LiDAR registration may also produce nonlinear measurement relationships.
+      </p>
+      <p>
+        A UKF can therefore be useful when:
+      </p>
+      <ul>
+        <li>pose uncertainty is large,</li>
+        <li>camera projection nonlinearity is significant,</li>
+        <li>relative geometry changes rapidly.</li>
+      </ul>
+      <p>
+        The UKF propagates sigma points through the nonlinear models instead of relying only on first-order Jacobians.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.103 Particle Filters for Ambiguous Pose</h3>
+      <p>
+        If several pose hypotheses are plausible,
+      </p>
+      <p>
+        \[
+        p(\mathbf x|\mathbf z)
+        \]
+      </p>
+      <p>
+        may be multi-modal.
+      </p>
+      <p>
+        Examples include:
+      </p>
+      <ul>
+        <li>symmetric targets,</li>
+        <li>uncertain feature correspondence,</li>
+        <li>weakly observed depth.</li>
+      </ul>
+      <p>
+        A particle filter can represent multiple hypotheses simultaneously.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.104 Pose Initialization</h3>
+      <p>
+        Vision–LiDAR tracking requires an initial pose estimate.
+      </p>
+      <p>
+        Possible sources include:
+      </p>
+      <ul>
+        <li>coarse camera detection,</li>
+        <li>LiDAR range,</li>
+        <li>known orbital geometry,</li>
+        <li>previous navigation state,</li>
+        <li>GNSS-based relative position.</li>
+      </ul>
+      <p>
+        The initialization covariance should reflect actual uncertainty.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.105 Initialization With Camera Bearing and LiDAR Range</h3>
+      <p>
+        If the camera provides
+      </p>
+      <p>
+        \[
+        \mathbf u_{LOS}
+        \]
+      </p>
+      <p>
+        and LiDAR provides
+      </p>
+      <p>
+        \[
+        \rho,
+        \]
+      </p>
+      <p>
+        initial relative position can be formed:
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}_0 = \rho \mathbf u_{LOS}. }
+        \]
+      </p>
+      <p>
+        Its covariance should reflect both angular and range uncertainty.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.106 Initial Covariance Geometry</h3>
+      <p>
+        If LiDAR range is accurate but camera angle is uncertain, uncertainty will be elongated mainly transverse to the line of sight.
+      </p>
+      <p>
+        If camera bearing is accurate but LiDAR range is uncertain, uncertainty will be elongated mainly radially.
+      </p>
+      <p>
+        Thus initial covariance should reproduce physical sensor geometry.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.107 Observability of Relative Position</h3>
+      <p>
+        With only camera bearing, range may be poorly observable.
+      </p>
+      <p>
+        With only LiDAR range, direction may be poorly observable.
+      </p>
+      <p>
+        Together:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Bearing} + \text{Range} \rightarrow \text{Strong Instantaneous Position Observability}. }
+        \]
+      </p>
+      <p>
+        This is the core observability advantage of vision–LiDAR fusion.
+      </p>
+      <div class="concept-note">
+        <h4>Complementary observability</h4>
+        <p>Bearing and range constrain different directions in state space. When both are available with suitable geometry, the fused estimator can obtain a much stronger instantaneous position constraint than either sensor provides alone.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.108 Observability of Relative Attitude</h3>
+      <p>
+        Relative attitude becomes observable through:
+      </p>
+      <ul>
+        <li>visual feature geometry,</li>
+        <li>LiDAR surface geometry,</li>
+        <li>known target model.</li>
+      </ul>
+      <p>
+        The quality depends strongly on how asymmetric and geometrically rich the visible target region is.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.109 Weak Attitude Geometry</h3>
+      <p>
+        Suppose LiDAR sees one flat surface.
+      </p>
+      <p>
+        Rotation about the surface normal may be weakly constrained.
+      </p>
+      <p>
+        Similarly, a visually symmetric target may provide poor yaw observability.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Visible Geometry} \rightarrow \text{Relative-Attitude Observability}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.110 Joint Observability</h3>
+      <p>
+        Vision and LiDAR may constrain different pose directions.
+      </p>
+      <p>
+        If camera information matrix is
+      </p>
+      <p>
+        \[
+        \mathbf\Lambda_C
+        \]
+      </p>
+      <p>
+        and LiDAR information matrix is
+      </p>
+      <p>
+        \[
+        \mathbf\Lambda_L,
+        \]
+      </p>
+      <p>
+        then approximately
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf\Lambda_{fused} = \mathbf\Lambda_C + \mathbf\Lambda_L. }
+        \]
+      </p>
+      <p>
+        The fused geometry can therefore reduce weak directions present in either sensor individually.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.111 Measurement Dropout</h3>
+      <p>
+        Either sensor may temporarily become unavailable.
+      </p>
+      <p>
+        Camera dropout can result from:
+      </p>
+      <ul>
+        <li>poor illumination,</li>
+        <li>target outside field of view,</li>
+        <li>image processing failure.</li>
+      </ul>
+      <p>
+        LiDAR dropout can result from:
+      </p>
+      <ul>
+        <li>range limits,</li>
+        <li>poor reflectivity,</li>
+        <li>scan geometry,</li>
+        <li>hardware or processing failure.</li>
+      </ul>
+      <p>
+        The estimator should continue with remaining sensors where possible.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.112 Camera Dropout</h3>
+      <p>
+        If camera measurements disappear while LiDAR remains valid, the estimator can continue relative-state estimation.
+      </p>
+      <p>
+        However, uncertainty may increase particularly in directions that were strongly constrained by visual information.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.113 LiDAR Dropout</h3>
+      <p>
+        If LiDAR disappears while the camera remains valid, angular information may remain excellent.
+      </p>
+      <p>
+        But direct range or depth uncertainty may grow.
+      </p>
+      <p>
+        This illustrates why degraded covariance should depend on which sensor was lost.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.114 Covariance During Dropout</h3>
+      <p>
+        A correct estimator should show
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Loss of Measurement Information} \rightarrow \text{Covariance Growth}. }
+        \]
+      </p>
+      <p>
+        The covariance may grow anisotropically according to the information lost.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.115 Sensor Reacquisition</h3>
+      <p>
+        When a sensor returns, the estimator should not immediately trust it without validation.
+      </p>
+      <p>
+        Check:
+      </p>
+      <ul>
+        <li>sensor health,</li>
+        <li>target identity,</li>
+        <li>geometry,</li>
+        <li>innovation,</li>
+        <li>covariance,</li>
+        <li>timing.</li>
+      </ul>
+      <p>
+        A large residual after a long outage may indicate either genuine accumulated drift or a bad reacquired measurement.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.116 Vision Reacquisition</h3>
+      <p>
+        After camera tracking loss, the system may use predicted relative state to estimate where the target should reappear.
+      </p>
+      <p>
+        The search region can be expanded according to propagated uncertainty.
+      </p>
+      <p>
+        This is more efficient than searching the full image blindly.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.117 LiDAR Reacquisition</h3>
+      <p>
+        LiDAR reacquisition can similarly use predicted:
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>bearing,</li>
+        <li>target pose,</li>
+      </ul>
+      <p>
+        to focus processing on likely returns.
+      </p>
+      <p>
+        Estimator prediction can therefore aid LiDAR data association.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.118 Cross-Sensor Validation</h3>
+      <p>
+        Camera and LiDAR can validate one another.
+      </p>
+      <p>
+        For example, a camera predicts target direction:
+      </p>
+      <p>
+        \[
+        \mathbf u_C.
+        \]
+      </p>
+      <p>
+        LiDAR points transformed into the camera frame should lie near the corresponding image region.
+      </p>
+      <p>
+        Disagreement can indicate:
+      </p>
+      <ul>
+        <li>calibration error,</li>
+        <li>timing error,</li>
+        <li>incorrect target association,</li>
+        <li>sensor fault.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.119 Projecting LiDAR Into the Image</h3>
+      <p>
+        A LiDAR point
+      </p>
+      <p>
+        \[
+        \mathbf p^L
+        \]
+      </p>
+      <p>
+        can be transformed into the camera frame:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf p^C = \mathbf R_{CL}\mathbf p^L + \mathbf t_{CL}. }
+        \]
+      </p>
+      <p>
+        Then project:
+      </p>
+      <p>
+        \[
+        \boxed{ \begin{bmatrix} u\\ v\\ 1 \end{bmatrix} \sim \mathbf K \mathbf p^C. }
+        \]
+      </p>
+      <p>
+        This allows direct image–point-cloud comparison.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.120 Image–LiDAR Registration Error</h3>
+      <p>
+        After projection, one may compare:
+      </p>
+      <ul>
+        <li>LiDAR projected edges,</li>
+        <li>image edges,</li>
+        <li>target contours.</li>
+      </ul>
+      <p>
+        A systematic offset between them can indicate poor extrinsic calibration.
+      </p>
+      <p>
+        Thus camera–LiDAR fusion itself can be used to monitor calibration quality.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.121 Online Extrinsic Calibration</h3>
+      <p>
+        An estimator may augment calibration parameters:
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = [ \delta\mathbf x_{nav}, \delta\boldsymbol\alpha_{CL}, \delta\mathbf t_{CL} ]^T. }
+        \]
+      </p>
+      <p>
+        This allows online estimation of camera–LiDAR alignment.
+      </p>
+      <p>
+        However, these states are useful only if sufficiently observable.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.122 Calibration Observability</h3>
+      <p>
+        If the target is viewed from nearly the same geometry continuously, calibration parameters may be poorly observable.
+      </p>
+      <p>
+        Changing viewing geometry can separate:
+      </p>
+      <ul>
+        <li>target pose error,</li>
+        <li>camera–LiDAR alignment error.</li>
+      </ul>
+      <p>
+        Thus manoeuvres may help calibration.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.123 Too Many Calibration States</h3>
+      <p>
+        Adding:
+      </p>
+      <ul>
+        <li>intrinsics,</li>
+        <li>extrinsics,</li>
+        <li>range biases,</li>
+        <li>timing offsets,</li>
+        <li>target-model errors</li>
+      </ul>
+      <p>
+        all at once can create a poorly conditioned estimator.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{More Calibration States} \neq \text{Automatically Better Accuracy}. }
+        \]
+      </p>
+      <p>
+        Only observable quantities should normally be estimated.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.124 Adaptive Measurement Covariance</h3>
+      <p>
+        Sensor covariance may be adapted according to current quality.
+      </p>
+      <p>
+        For camera:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R_C = f( N_{features}, \text{reprojection error}, \text{blur}, \text{illumination} ). }
+        \]
+      </p>
+      <p>
+        For LiDAR:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R_L = f( N_{points}, \text{registration error}, \rho, \text{geometry} ). }
+        \]
+      </p>
+      <p>
+        This can make fusion more responsive to actual measurement quality.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.125 Danger of Arbitrary Adaptive Covariance</h3>
+      <p>
+        Changing covariance without physical or statistical justification can make the estimator inconsistent.
+      </p>
+      <p>
+        Therefore adaptive covariance mappings should be calibrated from:
+      </p>
+      <ul>
+        <li>simulation,</li>
+        <li>test data,</li>
+        <li>Monte Carlo results,</li>
+        <li>empirical sensor characterization.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.126 Vision Failure Modes</h3>
+      <p>
+        Important visual failure modes include:
+      </p>
+      <ul>
+        <li>missed detection,</li>
+        <li>false detection,</li>
+        <li>feature mismatch,</li>
+        <li>glare,</li>
+        <li>blur,</li>
+        <li>low contrast,</li>
+        <li>shadow transition,</li>
+        <li>target symmetry,</li>
+        <li>incorrect camera calibration.</li>
+      </ul>
+      <p>
+        Each can produce a different residual pattern.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.127 LiDAR Failure Modes</h3>
+      <p>
+        LiDAR failure modes include:
+      </p>
+      <ul>
+        <li>missing returns,</li>
+        <li>spurious returns,</li>
+        <li>low reflectivity,</li>
+        <li>saturation,</li>
+        <li>poor incidence angle,</li>
+        <li>background returns,</li>
+        <li>scan distortion,</li>
+        <li>alignment errors.</li>
+      </ul>
+      <p>
+        Robust fusion should distinguish transient bad data from persistent sensor faults.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.128 Sensor-Level Health Flags</h3>
+      <p>
+        Useful outputs may include
+      </p>
+      <p>
+        \[
+        \boxed{ \texttt{CAM\_VALID} }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ \texttt{LIDAR\_VALID}. }
+        \]
+      </p>
+      <p>
+        These should reflect more than whether hardware is powered.
+      </p>
+      <p>
+        They may depend on:
+      </p>
+      <ul>
+        <li>measurement quality,</li>
+        <li>geometry,</li>
+        <li>consistency,</li>
+        <li>recent innovation statistics.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.129 Vision–LiDAR Fusion Validity</h3>
+      <p>
+        The fused solution may publish
+      </p>
+      <p>
+        \[
+        \boxed{ \texttt{POSE\_VALID} \in \{0,1\}. }
+        \]
+      </p>
+      <p>
+        Validity may depend on:
+      </p>
+      <ul>
+        <li>pose covariance,</li>
+        <li>number of valid sensors,</li>
+        <li>observability,</li>
+        <li>innovation statistics,</li>
+        <li>numerical health.</li>
+      </ul>
+      <div class="concept-note">
+        <h4>A running estimator is not automatically a valid estimator</h4>
+        <p>Validity should summarize whether the fused pose is sufficiently observable, statistically consistent, numerically healthy, and supported by credible measurements for downstream use.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.130 Degraded Pose Mode</h3>
+      <p>
+        If only one sensor remains available, the fused solution may continue in a degraded mode.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{LiDAR Lost} \rightarrow \text{Vision-Only Pose With Larger Depth Uncertainty}. }
+        \]
+      </p>
+      <p>
+        or
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera Lost} \rightarrow \text{LiDAR-Only Pose With Geometry-Dependent Uncertainty}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.131 Pose Accuracy Metrics</h3>
+      <p>
+        Translation error is
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf r = \mathbf r_{true} - \hat{\mathbf r}. }
+        \]
+      </p>
+      <p>
+        Scalar translation error:
+      </p>
+      <p>
+        \[
+        \boxed{ e_r = \|\delta\mathbf r\|. }
+        \]
+      </p>
+      <p>
+        Relative orientation error can be computed using quaternion error.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.132 Attitude Error Metric</h3>
+      <p>
+        Let
+      </p>
+      <p>
+        \[
+        \delta\mathbf q = \mathbf q_{true} \otimes \hat{\mathbf q}^{-1}.
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \boxed{ e_\theta = 2\cos^{-1} (|\delta q_0|). }
+        \]
+      </p>
+      <p>
+        Pose performance should generally report translation and attitude separately.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.133 Reprojection Error Metric</h3>
+      <p>
+        For <code>N</code> image features,
+      </p>
+      <p>
+        \[
+        \boxed{ e_{reproj} = \sqrt{ \frac{1}{N} \sum_{i=1}^{N} \| \mathbf z_i-\hat{\mathbf z}_i \|^2 }. }
+        \]
+      </p>
+      <p>
+        This measures image-space consistency.
+      </p>
+      <p>
+        It does not alone guarantee accurate three-dimensional pose.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.134 Point-Cloud Registration Error</h3>
+      <p>
+        A representative registration RMSE is
+      </p>
+      <p>
+        \[
+        \boxed{ e_{pc} = \sqrt{ \frac{1}{N} \sum_{i=1}^{N} \| \mathbf p_i^{meas} - \hat{\mathbf p}_i \|^2 }. }
+        \]
+      </p>
+      <p>
+        Again, low error does not automatically imply good observability in every pose direction.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.135 Innovation Statistics</h3>
+      <p>
+        For camera innovation
+      </p>
+      <p>
+        \[
+        \mathbf r_C,
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NIS}_C = \mathbf r_C^T \mathbf S_C^{-1} \mathbf r_C. }
+        \]
+      </p>
+      <p>
+        For LiDAR innovation:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NIS}_L = \mathbf r_L^T \mathbf S_L^{-1} \mathbf r_L. }
+        \]
+      </p>
+      <p>
+        These allow sensor-specific consistency monitoring.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.136 Pose NEES</h3>
+      <p>
+        For pose truth error
+      </p>
+      <p>
+        \[
+        \delta\mathbf x_{pose}
+        \]
+      </p>
+      <p>
+        and covariance
+      </p>
+      <p>
+        \[
+        \mathbf P_{pose},
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NEES} = \delta\mathbf x_{pose}^T \mathbf P_{pose}^{-1} \delta\mathbf x_{pose}. }
+        \]
+      </p>
+      <p>
+        This tests whether the estimator's uncertainty matches actual pose error.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.137 Innovation Whiteness</h3>
+      <p>
+        A well-modeled estimator should not show strongly predictable innovation structure.
+      </p>
+      <p>
+        Persistent residual trends may indicate:
+      </p>
+      <ul>
+        <li>calibration errors,</li>
+        <li>timing errors,</li>
+        <li>target-model errors,</li>
+        <li>incorrect covariance,</li>
+        <li>unmodeled motion.</li>
+      </ul>
+      <p>
+        Innovation autocorrelation is therefore an important diagnostic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.138 Monte Carlo Vision–LiDAR Testing</h3>
+      <p>
+        Monte Carlo testing should vary:
+      </p>
+      <ul>
+        <li>initial relative pose,</li>
+        <li>camera noise,</li>
+        <li>LiDAR noise,</li>
+        <li>camera alignment,</li>
+        <li>LiDAR alignment,</li>
+        <li>timing offsets,</li>
+        <li>illumination,</li>
+        <li>feature detection,</li>
+        <li>point-cloud density,</li>
+        <li>target geometry,</li>
+        <li>target motion,</li>
+        <li>sensor dropouts.</li>
+      </ul>
+      <p>
+        This establishes statistical robustness.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.139 Monte Carlo Performance Measures</h3>
+      <p>
+        For run <code>j</code>,
+      </p>
+      <p>
+        \[
+        \delta\mathbf r^{(j)}(t)
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \delta\boldsymbol\theta^{(j)}(t)
+        \]
+      </p>
+      <p>
+        can be recorded.
+      </p>
+      <p>
+        Then evaluate:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{RMSE}, \quad P_{95}, \quad P_{99}, \quad e_{\max}, \quad T_{\mathrm{recover}}. }
+        \]
+      </p>
+      <p>
+        NIS and NEES statistics should also be examined.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.140 Sensor-Dropout Monte Carlo Tests</h3>
+      <p>
+        Important cases include:
+      </p>
+      <ul>
+        <li>camera loss,</li>
+        <li>LiDAR loss,</li>
+        <li>both sensors temporarily unavailable,</li>
+        <li>sensor reacquisition.</li>
+      </ul>
+      <p>
+        Metrics should include:
+      </p>
+      <ul>
+        <li>covariance growth,</li>
+        <li>maximum pose error,</li>
+        <li>continuity,</li>
+        <li>recovery time.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.141 Calibration Monte Carlo Tests</h3>
+      <p>
+        Randomize:
+      </p>
+      <p>
+        \[
+        \delta\boldsymbol\alpha_{CL}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \delta\mathbf t_{CL}.
+        \]
+      </p>
+      <p>
+        Evaluate how calibration uncertainty affects:
+      </p>
+      <ul>
+        <li>relative position,</li>
+        <li>relative attitude,</li>
+        <li>innovation statistics,</li>
+        <li>pose covariance.</li>
+      </ul>
+      <p>
+        This establishes alignment requirements.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.142 Timing Monte Carlo Tests</h3>
+      <p>
+        Randomize camera and LiDAR timestamp offsets:
+      </p>
+      <p>
+        \[
+        \Delta t_C, \qquad \Delta t_L.
+        \]
+      </p>
+      <p>
+        Then study pose error as relative rate changes.
+      </p>
+      <p>
+        This reveals the timing accuracy required for a given navigation performance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.143 Range-Dependent Testing</h3>
+      <p>
+        Fusion should be evaluated across multiple ranges.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{ \rho_1 > \rho_2 > \rho_3. }
+        \]
+      </p>
+      <p>
+        At each range assess:
+      </p>
+      <ul>
+        <li>feature count,</li>
+        <li>LiDAR point density,</li>
+        <li>pose error,</li>
+        <li>covariance,</li>
+        <li>observability.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.144 Geometry-Dependent Testing</h3>
+      <p>
+        Different target orientations should also be tested.
+      </p>
+      <p>
+        Some orientations may expose rich geometry.
+      </p>
+      <p>
+        Others may expose nearly planar or symmetric surfaces.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Same Range} \neq \text{Same Pose Accuracy}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.145 Illumination Testing</h3>
+      <p>
+        Vision testing should include:
+      </p>
+      <ul>
+        <li>bright illumination,</li>
+        <li>dim illumination,</li>
+        <li>backlighting,</li>
+        <li>shadow,</li>
+        <li>glare.</li>
+      </ul>
+      <p>
+        LiDAR can provide important geometric continuity when passive vision degrades.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.146 Motion Testing</h3>
+      <p>
+        Test:
+      </p>
+      <ul>
+        <li>low angular rate,</li>
+        <li>high angular rate,</li>
+        <li>low relative velocity,</li>
+        <li>high relative velocity.</li>
+      </ul>
+      <p>
+        High dynamics stress:
+      </p>
+      <ul>
+        <li>timing,</li>
+        <li>blur,</li>
+        <li>LiDAR scan distortion,</li>
+        <li>filter propagation.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.147 Image Blur Testing</h3>
+      <p>
+        Introduce realistic exposure time
+      </p>
+      <p>
+        \[
+        T_{exp}
+        \]
+      </p>
+      <p>
+        and target image rate
+      </p>
+      <p>
+        \[
+        \dot p.
+        \]
+      </p>
+      <p>
+        Approximate blur magnitude:
+      </p>
+      <p>
+        \[
+        \boxed{ \Delta p \propto \dot pT_{exp}. }
+        \]
+      </p>
+      <p>
+        Evaluate feature detection and pose degradation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.148 LiDAR Scan-Distortion Testing</h3>
+      <p>
+        Simulate target motion during the LiDAR scan.
+      </p>
+      <p>
+        Then compare:
+      </p>
+      <ul>
+        <li>uncompensated point cloud,</li>
+        <li>motion-compensated point cloud.</li>
+      </ul>
+      <p>
+        This determines whether scan timing must be modeled explicitly.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.149 Target-Model Error Testing</h3>
+      <p>
+        Perturb:
+      </p>
+      <ul>
+        <li>dimensions,</li>
+        <li>feature locations,</li>
+        <li>surface geometry,</li>
+        <li>marker positions.</li>
+      </ul>
+      <p>
+        Then evaluate resulting pose bias.
+      </p>
+      <p>
+        Target-model uncertainty can become an important error source for model-based vision and LiDAR.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.150 Model Error Versus Sensor Error</h3>
+      <p>
+        A systematic disagreement does not always mean a sensor is faulty.
+      </p>
+      <p>
+        It may originate from an incorrect target model.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Residual} = \text{Sensor Error} + \text{Model Error} + \text{State Error}. }
+        \]
+      </p>
+      <p>
+        Diagnostics should consider all three.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.151 Feature Distribution Metric</h3>
+      <p>
+        Feature quality can depend on both number and spatial distribution.
+      </p>
+      <p>
+        Many features clustered together may provide weaker pose information than fewer widely distributed features.
+      </p>
+      <p>
+        Therefore measurement-quality logic should consider geometry, not only feature count.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.152 Point-Cloud Geometry Metric</h3>
+      <p>
+        Similarly, LiDAR point-cloud quality depends on:
+      </p>
+      <ul>
+        <li>spatial extent,</li>
+        <li>surface-normal diversity,</li>
+        <li>depth variation.</li>
+      </ul>
+      <p>
+        A large number of points from one flat plane may still provide poor rotational observability.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.153 Sensor Information Weighting</h3>
+      <p>
+        Fusion weighting should follow uncertainty.
+      </p>
+      <p>
+        Conceptually:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Higher Measurement Uncertainty} \rightarrow \text{Lower Information Weight}. }
+        \]
+      </p>
+      <p>
+        The filter should not trust vision simply because a camera is normally precise, nor LiDAR simply because it gives range.
+      </p>
+      <p>
+        Current measurement quality matters.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.154 Smooth Weight Transition</h3>
+      <p>
+        As separation changes, sensor confidence can vary continuously.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R_C=\mathbf R_C(\rho) }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R_L=\mathbf R_L(\rho). }
+        \]
+      </p>
+      <p>
+        This naturally changes Kalman gain without a hard sensor switch.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.155 Avoiding Double Counting</h3>
+      <p>
+        Suppose a visual pose estimate and the image features used to generate that pose are both fused.
+      </p>
+      <p>
+        They are not independent measurements.
+      </p>
+      <p>
+        Fusing both without accounting for correlation double-counts information.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Pose Derived From Features} + \text{Same Features} \neq \text{Independent Measurements}. }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Derived information is correlated with its source</h4>
+        <p>If a pose estimate was computed from image features, that pose and those same features are not independent pieces of information. Fusing both as if independent can shrink covariance unrealistically.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.156 Vision–LiDAR Sensor Handover</h3>
+      <p>
+        Vision–LiDAR fusion often exists inside a larger sensor suite.
+      </p>
+      <p>
+        At one range the camera may be dominant.
+      </p>
+      <p>
+        At another range LiDAR may become dominant.
+      </p>
+      <p>
+        The estimator should transition based on:
+      </p>
+      <ul>
+        <li>validity,</li>
+        <li>geometry,</li>
+        <li>covariance,</li>
+        <li>range,</li>
+        <li>measurement quality.</li>
+      </ul>
+      <p>
+        This leads naturally to sensor-handover logic.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.157 Overlap Region</h3>
+      <p>
+        An overlap region where both sensors perform well is valuable.
+      </p>
+      <p>
+        It allows:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} \rightarrow \text{Cross-Validation}. }
+        \]
+      </p>
+      <p>
+        This supports calibration, consistency checking, and smooth handover.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.158 Handover Without State Discontinuity</h3>
+      <p>
+        Sensor handover should not create an artificial state jump.
+      </p>
+      <p>
+        The fused state should remain continuous while the information contribution from sensors changes.
+      </p>
+      <p>
+        This is better achieved through covariance-based weighting than blind replacement of one pose estimate with another.
+      </p>
+      <div class="concept-note">
+        <h4>Handover should be an information transition</h4>
+        <p>A well-designed estimator keeps one continuous state while the relative contribution of each sensor changes. This avoids artificial jumps caused by replacing one navigation solution with another.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.159 Vision–LiDAR and IMU Integration</h3>
+      <p>
+        Vision and LiDAR can also be fused with inertial propagation.
+      </p>
+      <p>
+        A general architecture is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \text{High-Rate Propagation} }
+        \]
+      </p>
+      <p>
+        with
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera / LiDAR} \rightarrow \text{Relative-State Correction}. }
+        \]
+      </p>
+      <p>
+        The IMU bridges periods between external measurements.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.160 Why the IMU Helps During Optical Processing Delay</h3>
+      <p>
+        Image and point-cloud processing may require significant computation.
+      </p>
+      <p>
+        IMU propagation can maintain a high-rate estimate while slower vision and LiDAR measurements are being processed.
+      </p>
+      <p>
+        Delayed measurements should still be applied at their correct timestamps.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.161 Vision–LiDAR–IMU State</h3>
+      <p>
+        A general state may contain
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol\omega_{rel}\\ \mathbf b_a\\ \mathbf b_g \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Additional sensor-calibration states may be appended where necessary.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.162 Multi-Rate Architecture</h3>
+      <p>
+        Typical processing rates may satisfy
+      </p>
+      <p>
+        \[
+        \boxed{ f_{IMU} > f_{camera} > f_{LiDAR} }
+        \]
+      </p>
+      <p>
+        although actual systems vary.
+      </p>
+      <p>
+        This naturally produces an asynchronous estimator.
+      </p>
+      <p>
+        Each measurement should be processed at its actual timestamp.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.163 Event-Driven Fusion</h3>
+      <p>
+        A suitable architecture is:
+      </p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Propagate State}\\ \downarrow\\ \text{Camera Measurement Arrives?}\\ \downarrow\\ \text{Vision Update}\\ \downarrow\\ \text{LiDAR Measurement Arrives?}\\ \downarrow\\ \text{LiDAR Update} \end{array} }
+        \]
+      </p>
+      <p>
+        rather than forcing all sensors into one uniform measurement packet.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.164 Vision–LiDAR Fusion and Observability</h3>
+      <p>
+        The combination is particularly powerful because camera and LiDAR sensitivity directions differ.
+      </p>
+      <p>
+        Camera:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Strong Angular Sensitivity}. }
+        \]
+      </p>
+      <p>
+        LiDAR:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Strong Radial / Surface Geometry Sensitivity}. }
+        \]
+      </p>
+      <p>
+        Their joint information can reduce poorly observed pose directions.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.165 Navigation Integrity</h3>
+      <p>
+        A fused pose solution should communicate whether it is trustworthy.
+      </p>
+      <p>
+        Accuracy asks:
+      </p>
+      <blockquote>How close is the estimated pose to truth?</blockquote>
+      <p>
+        Integrity asks:
+      </p>
+      <blockquote>Can the system detect when that pose should not be trusted?</blockquote>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Good Pose Navigation} = \text{Accuracy} + \text{Consistency} + \text{Fault Awareness}. }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Integrity is about trust, not only accuracy</h4>
+        <p>The fused solution should indicate when its own uncertainty, geometry, or sensor consistency no longer supports reliable downstream use.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.166 Vision–LiDAR Failure Detection</h3>
+      <p>
+        Evidence of sensor problems can come from:
+      </p>
+      <ul>
+        <li>repeated NIS failures,</li>
+        <li>disagreement between sensors,</li>
+        <li>sudden feature loss,</li>
+        <li>abnormal point-cloud residual,</li>
+        <li>impossible geometry.</li>
+      </ul>
+      <p>
+        Persistent inconsistencies may trigger sensor isolation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.167 Cross-Check Residual</h3>
+      <p>
+        If vision estimates position
+      </p>
+      <p>
+        \[
+        \hat{\mathbf r}_C
+        \]
+      </p>
+      <p>
+        and LiDAR estimates
+      </p>
+      <p>
+        \[
+        \hat{\mathbf r}_L,
+        \]
+      </p>
+      <p>
+        a simple cross-check is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf d = \hat{\mathbf r}_C - \hat{\mathbf r}_L. }
+        \]
+      </p>
+      <p>
+        But \(\mathbf d\) must be interpreted with the combined covariance.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.168 Statistical Cross-Check</h3>
+      <p>
+        If
+      </p>
+      <p>
+        \[
+        \mathbf P_C
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \mathbf P_L
+        \]
+      </p>
+      <p>
+        are independent pose-position covariances, then
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf S_d = \mathbf P_C+\mathbf P_L. }
+        \]
+      </p>
+      <p>
+        A normalized discrepancy can be formed:
+      </p>
+      <p>
+        \[
+        \boxed{ D^2 = \mathbf d^T \mathbf S_d^{-1} \mathbf d. }
+        \]
+      </p>
+      <p>
+        This is more meaningful than a raw Euclidean difference alone.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.169 Sensor Isolation</h3>
+      <p>
+        If one sensor repeatedly disagrees with:
+      </p>
+      <ul>
+        <li>the predicted state,</li>
+        <li>another independent sensor,</li>
+        <li>its own expected uncertainty,</li>
+      </ul>
+      <p>
+        it may be isolated.
+      </p>
+      <p>
+        A general logic is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Residual Failure} \rightarrow \text{Persistent Confirmation} \rightarrow \text{Sensor Isolation}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.170 Graceful Degradation</h3>
+      <p>
+        After isolating one sensor, the estimator should continue with the remaining information when possible.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera Failure} \rightarrow \text{LiDAR-Dominant Navigation} }
+        \]
+      </p>
+      <p>
+        or
+      </p>
+      <p>
+        \[
+        \boxed{ \text{LiDAR Failure} \rightarrow \text{Vision-Dominant Navigation}. }
+        \]
+      </p>
+      <p>
+        The covariance should reflect reduced observability.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.171 Numerical Health</h3>
+      <p>
+        The estimator should monitor:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P=\mathbf P^T }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ \lambda_i(\mathbf P)\ge0. }
+        \]
+      </p>
+      <p>
+        For attitude:
+      </p>
+      <p>
+        \[
+        \boxed{ \|\mathbf q\|\approx1. }
+        \]
+      </p>
+      <p>
+        Also monitor:
+      </p>
+      <ul>
+        <li>NaN,</li>
+        <li>Inf,</li>
+        <li>failed matrix inversion,</li>
+        <li>invalid pose transformations.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.172 Computational Load</h3>
+      <p>
+        Vision and LiDAR can be computationally intensive.
+      </p>
+      <p>
+        Camera processing may include:
+      </p>
+      <ul>
+        <li>feature extraction,</li>
+        <li>descriptor matching,</li>
+        <li>pose solving.</li>
+      </ul>
+      <p>
+        LiDAR processing may include:
+      </p>
+      <ul>
+        <li>point filtering,</li>
+        <li>correspondence search,</li>
+        <li>registration.</li>
+      </ul>
+      <p>
+        The navigation architecture must account for processing latency as well as algorithm accuracy.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.173 Processing Latency Versus Accuracy</h3>
+      <p>
+        A more complex algorithm may provide a more accurate pose but require longer processing time.
+      </p>
+      <p>
+        The useful question is therefore not only
+      </p>
+      <p>
+        \[
+        \boxed{ \text{How Accurate Is the Measurement?} }
+        \]
+      </p>
+      <p>
+        but also
+      </p>
+      <p>
+        \[
+        \boxed{ \text{How Old Is the Measurement When It Becomes Available?} }
+        \]
+      </p>
+      <p>
+        Latency can negate some benefits of high measurement accuracy if not handled correctly.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.174 Hardware Acceleration</h3>
+      <p>
+        Vision and point-cloud processing may use:
+      </p>
+      <ul>
+        <li>GPU,</li>
+        <li>FPGA,</li>
+        <li>dedicated vision processors,</li>
+        <li>parallel CPU processing.</li>
+      </ul>
+      <p>
+        The estimator itself should remain aware of the measurement timestamp even if processing finishes later.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.175 Software Interface</h3>
+      <p>
+        A sensor-processing module should ideally provide:
+      </p>
+      <ul>
+        <li>measurement value,</li>
+        <li>measurement covariance,</li>
+        <li>measurement timestamp,</li>
+        <li>validity,</li>
+        <li>quality metrics.</li>
+      </ul>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{ \{ \mathbf z, \mathbf R, t, \texttt{VALID}, \texttt{QUALITY} \}. }
+        \]
+      </p>
+      <p>
+        This creates a clean interface between perception and estimation.
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.176 Flight-Software Processing Sequence</h3>
+      <p>
+        A representative sequence is:
+      </p>
+      <ol>
+        <li>propagate relative state,</li>
+        <li>propagate covariance,</li>
+        <li>receive camera frame,</li>
+        <li>detect target,</li>
+        <li>extract and associate features,</li>
+        <li>validate visual measurement,</li>
+        <li>receive LiDAR scan,</li>
+        <li>filter point cloud,</li>
+        <li>register target geometry,</li>
+        <li>validate LiDAR measurement,</li>
+        <li>transform all measurements into consistent frames,</li>
+        <li>compensate lever arms and timing,</li>
+        <li>form innovations,</li>
+        <li>apply statistical gating,</li>
+        <li>update fused state,</li>
+        <li>update covariance,</li>
+        <li>update sensor health,</li>
+        <li>publish relative pose and validity.</li>
+      </ol>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.177 Published Fusion Output</h3>
+      <p>
+        The estimator may publish
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}_{rel}, \quad \hat{\mathbf v}_{rel}, \quad \hat{\mathbf q}_{rel}, \quad \hat{\boldsymbol\omega}_{rel}, \quad \mathbf P. }
+        \]
+      </p>
+      <p>
+        Sensor-specific outputs may include
+      </p>
+      <p>
+        \[
+        \texttt{CAM\_VALID}, \qquad \texttt{LIDAR\_VALID}, \qquad \texttt{POSE\_VALID}.
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.178 Practical Design Philosophy</h3>
+      <p>
+        A robust Vision–LiDAR fusion system should:
+      </p>
+      <ol>
+        <li>calibrate camera intrinsics accurately,</li>
+        <li>calibrate camera–LiDAR extrinsics,</li>
+        <li>maintain frame consistency,</li>
+        <li>account for sensor lever arms,</li>
+        <li>use true measurement timestamps,</li>
+        <li>compensate scan or exposure timing where required,</li>
+        <li>validate camera features,</li>
+        <li>reject visual outliers,</li>
+        <li>validate point-cloud geometry,</li>
+        <li>reject LiDAR outliers,</li>
+        <li>represent sensor covariance realistically,</li>
+        <li>allow covariance to depend on geometry and quality,</li>
+        <li>account for target symmetry,</li>
+        <li>monitor observability,</li>
+        <li>support sensor dropout,</li>
+        <li>support reacquisition,</li>
+        <li>avoid double counting derived information,</li>
+        <li>maintain pose continuity,</li>
+        <li>monitor filter consistency,</li>
+        <li>verify performance statistically.</li>
+      </ol>
+      <div class="concept-note">
+        <h4>Engineering principle</h4>
+        <p>The quality of Vision–LiDAR fusion depends as much on calibration, timing, covariance realism, data validation, observability, and failure handling as on the estimator equations themselves.</p>
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.2.24.179 Key Takeaways</h3>
+      <p>
+        <strong>1. Vision and LiDAR measure complementary aspects of geometry.</strong>
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Vision} \rightarrow \text{Bearing / Appearance / Features} }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \text{LiDAR} \rightarrow \text{Range / Depth / Surface Geometry}. }
+        \]
+      </p>
+      <p>
+        <strong>2. Their combination improves three-dimensional relative-state observability.</strong>
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Bearing} + \text{Range} \rightarrow \text{Relative Position}. }
+        \]
+      </p>
+      <p>
+        <strong>3. A monocular camera does not directly provide range from one unconstrained observation.</strong>
+      </p>
+      <p>
+        <strong>4. LiDAR directly contributes scale and depth.</strong>
+      </p>
+      <p>
+        <strong>5. Point clouds can support full relative-pose estimation.</strong>
+      </p>
+      <p>
+        <strong>6. Optical pose estimation depends strongly on feature geometry.</strong>
+      </p>
+      <p>
+        <strong>7. LiDAR pose estimation depends strongly on surface geometry.</strong>
+      </p>
+      <p>
+        <strong>8. Target symmetry can create ambiguous pose solutions.</strong>
+      </p>
+      <p>
+        <strong>9. Camera–LiDAR extrinsic calibration is fundamental.</strong>
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf T_{CL} = \begin{bmatrix} \mathbf R_{CL} & \mathbf t_{CL}\\ 0 & 1 \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        <strong>10. Spatial calibration alone is insufficient; timing must also be calibrated.</strong>
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf r \approx \mathbf v_{rel}\Delta t. }
+        \]
+      </p>
+      <p>
+        <strong>11. Rolling-shutter cameras and scanning LiDAR can contain intra-frame timing effects.</strong>
+      </p>
+      <p>
+        <strong>12. Vision and LiDAR measurements should be fused using their measurement models, not simply averaged.</strong>
+      </p>
+      <p>
+        <strong>13. Raw, feature-level, and pose-level fusion are all possible.</strong>
+      </p>
+      <p>
+        <strong>14. Pose-level fusion is simpler but depends heavily on credible pose covariance.</strong>
+      </p>
+      <p>
+        <strong>15. Sensor uncertainty is generally anisotropic.</strong>
+      </p>
+      <p>
+        <strong>16. Measurement quality changes with range and geometry.</strong>
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R = \mathbf R( \rho, \text{geometry}, \text{quality} ). }
+        \]
+      </p>
+      <p>
+        <strong>17. Vision quality depends strongly on illumination, resolution, blur, and target appearance.</strong>
+      </p>
+      <p>
+        <strong>18. LiDAR quality depends on range, reflectivity, incidence angle, and visible surface geometry.</strong>
+      </p>
+      <p>
+        <strong>19. Sensor weighting should change with actual uncertainty rather than fixed preference.</strong>
+      </p>
+      <p>
+        <strong>20. Vision–LiDAR overlap provides useful cross-validation.</strong>
+      </p>
+      <p>
+        <strong>21. Losing one sensor does not necessarily eliminate all relative-navigation capability.</strong>
+      </p>
+      <p>
+        <strong>22. Covariance should grow in directions that become weakly observed during sensor dropout.</strong>
+      </p>
+      <p>
+        <strong>23. Vision and LiDAR reacquisition should be validated statistically.</strong>
+      </p>
+      <p>
+        <strong>24. Camera and LiDAR outputs may share common errors and therefore may not be independent.</strong>
+      </p>
+      <p>
+        <strong>25. NIS can monitor measurement consistency.</strong>
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NIS} = \mathbf r^T \mathbf S^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>
+        <strong>26. NEES can monitor state-covariance consistency when truth is available.</strong>
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NEES} = \delta\mathbf x^T \mathbf P^{-1} \delta\mathbf x. }
+        \]
+      </p>
+      <p>
+        <strong>27. Monte Carlo validation should include alignment, timing, noise, geometry, illumination, target motion, dropouts, and calibration uncertainty.</strong>
+      </p>
+      <p>
+        <strong>28. Processing latency is part of sensor performance.</strong>
+      </p>
+      <p>
+        <strong>29. A clean measurement interface should provide measurement, covariance, timestamp, validity, and quality.</strong>
+      </p>
+      <p>
+        <strong>30. The central engineering principle is</strong>
+      </p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Vision constrains how the target appears and in which direction it lies,}\\[4pt] \text{while LiDAR constrains distance and three-dimensional surface geometry.}\\[4pt] \text{Accurate calibration, timing, uncertainty modelling, and measurement validation}\\[4pt] \text{allow these complementary measurements to form a robust relative-pose estimate.} \end{array} }
+        \]
+      </p>
+      <p>
+        The next section is naturally <strong>4.2.25 Sensor Handover and Mode-Dependent Fusion</strong>, where the focus shifts from fusing vision and LiDAR simultaneously to deciding <strong>which sensors should dominate in far-range, mid-range, and close-range navigation, how overlapping sensors should be validated, and how the estimator should transition between measurement sources without producing artificial state or covariance discontinuities.</strong>
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.2.25 Sensor Handover and Mode-Dependent Fusion</h2>
+      <p>
+        After developing Vision and LiDAR fusion, including camera bearing measurements, optical pose estimation, LiDAR ranging and point-cloud geometry, calibration, timing, uncertainty, observability, validation, dropout handling, and multi-rate fusion, the next section focuses on how a navigation system transitions between sensor combinations as operating conditions and measurement quality change.
+      </p>
+      <a href="sensor-handover.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2.25 Sensor Handover and Mode-Dependent Fusion</h3>
+          <p>
+            Far-range, mid-range, close-range, and capture navigation modes; overlapping sensors, sensor validity, covariance transition, estimator handover, smooth switching, and mission-phase-dependent fusion logic.
+          </p>
+          <p class="sensor-link-arrow">Continue to Sensor Handover and Mode-Dependent Fusion &rarr;</p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+  <footer class="site-footer">
+    <p>© 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics. Educational resource for spacecraft dynamics, orbital mechanics, guidance–navigation–control systems, sensor modelling, state estimation, and spacecraft sensor fusion.</p>
+  </footer>
+</body>
+</html>
