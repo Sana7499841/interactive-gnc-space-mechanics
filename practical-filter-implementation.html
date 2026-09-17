@@ -1,0 +1,2575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.2.28 Practical Filter Implementation | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)'], ['$', '$']],
+        displayMath: [['\\[', '\\]'], ['$$', '$$']],
+        processEscapes: true
+      },
+      chtml: { scale: 1.0 }
+    };
+  </script>
+  <script id="MathJax-script" async
+    src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .equation-box {
+      margin: 1.35rem 0;
+      padding: 1.15rem 1.25rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f5f8fb;
+      border-radius: 10px;
+      overflow-x: auto;
+      text-align: center;
+    }
+    .equation-box mjx-container[display="true"] { margin: 0 !important; }
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: .9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+    .notes-section-card h4 {
+      margin-top: 1.4rem;
+      margin-bottom: .55rem;
+      font-family: Georgia, "Times New Roman", serif;
+    }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Practical Filter Implementation</h1>
+    <p class="notes-tagline">
+      Continuous-to-discrete conversion, state propagation, covariance propagation, numerical stability,
+      covariance symmetry, positive-semidefinite covariance, matrix conditioning, Joseph-form covariance
+      updates, real-time scheduling, computational load, embedded software, estimator health, and verification.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="notes-section-card">
+<h2>4.2.28 Practical Filter Implementation</h2>
+<p>A Kalman filter, EKF, ESKF, MEKF, UKF, or any other state estimator may look straightforward when written as a compact set of equations. In practice, however, a flight-ready estimator is not simply a direct transcription of those equations into software.</p>
+<p>Real implementation must deal with:</p>
+<ul>
+<li>continuous dynamics but discrete computation,</li>
+<li>numerical integration,</li>
+<li>covariance propagation,</li>
+<li>changing sampling intervals,</li>
+<li>asynchronous measurements,</li>
+<li>floating-point precision,</li>
+<li>matrix conditioning,</li>
+<li>positive-semidefinite covariance,</li>
+<li>covariance symmetry,</li>
+<li>stable innovation solves,</li>
+<li>quaternion normalization,</li>
+<li>estimator scheduling,</li>
+<li>computational limits,</li>
+<li>software architecture,</li>
+<li>and integration with the rest of the GNC system.</li>
+</ul>
+<p>The difference between a mathematically correct filter and a robust flight implementation can therefore be substantial.</p>
+<p>The central engineering idea is</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{Estimator Theory}
+\rightarrow
+\text{Numerically Stable Discrete Algorithm}
+\rightarrow
+\text{Real-Time Flight Software}
+}
+\]
+</div>
+<p>A practical estimator must satisfy all three levels.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.1 From Mathematical Filter to Flight Software</h3>
+<p>Consider a continuous nonlinear spacecraft model:</p>
+<div class="equation-box">
+\[
+\dot{\mathbf x}
+=
+f(\mathbf x,\mathbf u,t)
++
+G\mathbf w.
+\]
+</div>
+<p>The estimator runs on a digital processor, so the continuous system must ultimately be represented at discrete times</p>
+<div class="equation-box">
+\[
+t_0,t_1,\ldots,t_k.
+\]
+</div>
+<p>Thus the flight estimator actually performs something closer to</p>
+<div class="equation-box">
+\[
+\boxed{
+\hat{\mathbf x}_{k+1}^{-}
+=
+f_d(
+\hat{\mathbf x}_k^{+},
+\mathbf u_k,
+\Delta t_k
+)
+}
+\]
+</div>
+<p>followed by covariance propagation and, when a measurement is available, a measurement update.</p>
+<p>This means practical implementation begins with one fundamental transformation:</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{continuous dynamics}
+\rightarrow
+\text{discrete estimator dynamics}.
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.2 Continuous-Time State Model</h3>
+<p>A general continuous linear model is</p>
+<div class="equation-box">
+\[
+\dot{\mathbf x}(t)
+=
+F(t)\mathbf x(t)
++
+B(t)\mathbf u(t)
++
+G(t)\mathbf w(t).
+\]
+</div>
+<p>The corresponding covariance dynamics are</p>
+<div class="equation-box">
+\[
+\boxed{
+\dot P
+=
+FP+PF^T+GQ_cG^T
+}
+\]
+</div>
+<p>where \(Q_c\) is the continuous-time process-noise spectral-density matrix.</p>
+<p>For nonlinear systems, \(F\) is usually the Jacobian</p>
+<div class="equation-box">
+\[
+F
+=
+\frac{\partial f}{\partial x}
+\]
+</div>
+<p>evaluated at the current nominal state.</p>
+<p>These continuous equations are useful theoretically, but flight software requires a discrete representation.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.3 Discrete State Propagation</h3>
+<p>The discrete linear model is</p>
+<div class="equation-box">
+\[
+\boxed{
+\mathbf x_{k+1}
+=
+\Phi_k\mathbf x_k
++
+\Gamma_k\mathbf u_k
++
+\mathbf w_k
+}
+\]
+</div>
+<p>where \(\Phi_k\) is the state-transition matrix and \(\Gamma_k\) is the discrete input matrix.</p>
+<p>For a time-invariant linear system,</p>
+<div class="equation-box">
+\[
+\boxed{
+\Phi
+=
+e^{F\Delta t}
+}
+\]
+</div>
+<p>where \(\Delta t\) is the propagation interval.</p>
+<p>Thus the discrete filter depends strongly on how accurately \(\Phi\) is computed.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.4 First-Order Discretization</h3>
+<p>For sufficiently small \(\Delta t\),</p>
+<div class="equation-box">
+\[
+\Phi
+\approx
+I+F\Delta t.
+\]
+</div>
+<p>This is computationally inexpensive.</p>
+<p>The corresponding propagation becomes</p>
+<div class="equation-box">
+\[
+\hat x_{k+1}
+\approx
+(I+F\Delta t)\hat x_k.
+\]
+</div>
+<p>However, the approximation error increases with both \(\|F\|\) and \(\Delta t\).</p>
+<p>Therefore</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{small timestep}
+\not\Rightarrow
+\text{first-order discretization is always adequate}.
+}
+\]
+</div>
+<p>The approximation should be verified for the actual dynamics and estimator update rate.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.5 Higher-Order State Transition Approximation</h3>
+<p>The matrix exponential can be expanded as</p>
+<div class="equation-box">
+\[
+e^{F\Delta t}
+=
+I
++
+F\Delta t
++
+\frac{1}{2!}F^2\Delta t^2
++
+\frac{1}{3!}F^3\Delta t^3
++\cdots.
+\]
+</div>
+<p>Keeping additional terms improves accuracy.</p>
+<p>For example,</p>
+<div class="equation-box">
+\[
+\Phi
+\approx
+I
++
+F\Delta t
++
+\frac{1}{2}F^2\Delta t^2.
+\]
+</div>
+<p>This can be useful when first-order propagation is insufficient but computing a full matrix exponential every cycle is unnecessary or too expensive.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.6 Exact Matrix Exponential</h3>
+<p>For linear time-invariant dynamics, an exact discrete transition matrix is</p>
+<div class="equation-box">
+\[
+\boxed{\Phi=e^{F\Delta t}.}
+\]
+</div>
+<p>Numerical methods such as scaling-and-squaring or Padé approximations can evaluate this matrix exponential reliably.</p>
+<p>However, repeatedly computing matrix exponentials onboard may be computationally expensive for large states.</p>
+<p>Therefore implementation choices may include:</p>
+<ul>
+<li>precomputing \(\Phi\) for fixed \(\Delta t\),</li>
+<li>using analytical expressions,</li>
+<li>using low-order approximations,</li>
+<li>or computing the exponential only when necessary.</li>
+</ul>
+</section><section class="notes-section-card">
+<h3>4.2.28.7 Nonlinear State Integration</h3>
+<p>For nonlinear dynamics,</p>
+<div class="equation-box">
+\[
+\dot{\mathbf x}=f(\mathbf x,\mathbf u,t),
+\]
+</div>
+<p>the state can be propagated numerically.</p>
+<p>A simple Euler step is</p>
+<div class="equation-box">
+\[
+\mathbf x_{k+1}
+=
+\mathbf x_k
++
+f(\mathbf x_k,\mathbf u_k,t_k)\Delta t.
+\]
+</div>
+<p>Higher-order integrators such as Runge–Kutta methods can provide greater accuracy.</p>
+<p>For example, classical RK4 evaluates several intermediate slopes before computing \(\mathbf x_{k+1}\).</p>
+<p>The numerical integration method used by the estimator should be consistent with the accuracy required by the navigation system.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.8 State Propagation and Covariance Propagation Are Different Problems</h3>
+<p>One common implementation mistake is to propagate the nonlinear state accurately but approximate the covariance carelessly.</p>
+<p>The nominal state may use</p>
+<div class="equation-box">
+\[
+\hat x_{k+1}^{-}
+=
+f_d(\hat x_k^{+},u_k),
+\]
+</div>
+<p>while covariance propagation uses</p>
+<div class="equation-box">
+\[
+P_{k+1}^{-}
+=
+\Phi_kP_k^{+}\Phi_k^T+Q_k.
+\]
+</div>
+<p>Thus two separate discretization problems exist:</p>
+<div class="equation-box">
+\[
+\boxed{\text{state propagation}}
+\]
+</div>
+<p>and</p>
+<div class="equation-box">
+\[
+\boxed{\text{uncertainty propagation}.}
+\]
+</div>
+<p>Both must be implemented consistently.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.9 Discrete Process Noise</h3>
+<p>The discrete process covariance is not generally equal to the continuous spectral density multiplied blindly by the timestep.</p>
+<p>The correct relationship is</p>
+<div class="equation-box">
+\[
+\boxed{
+Q_d
+=
+\int_0^{\Delta t}
+\Phi(\tau)
+GQ_cG^T
+\Phi^T(\tau)
+\,d\tau.
+}
+\]
+</div>
+<p>This integral accounts for how process noise propagates through the dynamics over the integration interval.</p>
+<p>For simple systems, analytical forms can be derived.</p>
+<p>For more complex systems, numerical or matrix-exponential methods may be used.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.10 Why \(Q_d\neq Q_c\)</h3>
+<p>The units themselves demonstrate the distinction.</p>
+<p>If \(Q_c\) is a continuous noise spectral density, its units involve time. The discrete covariance \(Q_d\) represents uncertainty accumulated over a finite interval.</p>
+<p>Thus,</p>
+<div class="equation-box">
+\[
+\boxed{Q_c\neq Q_d}
+\]
+</div>
+<p>in general.</p>
+<p>Incorrect conversion between them is a common source of tuning inconsistency.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.11 Van Loan Discretization</h3>
+<p>For linear systems, one systematic method for obtaining both \(\Phi\) and \(Q_d\) uses the Van Loan matrix exponential.</p>
+<p>A block matrix is constructed from</p>
+<div class="equation-box">
+\[
+F,
+\qquad
+GQ_cG^T.
+\]
+</div>
+<p>The exponential of this augmented matrix contains the quantities needed for discrete propagation.</p>
+<p>The exact block convention varies, so implementation must follow one chosen derivation consistently.</p>
+<p>The important idea is that state transition and process-noise discretization can be derived together rather than approximated independently.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.12 Covariance Prediction</h3>
+<p>After discretization,</p>
+<div class="equation-box">
+\[
+\boxed{
+P_{k+1}^{-}
+=
+\Phi_k
+P_k^{+}
+\Phi_k^T
++
+Q_{d,k}.
+}
+\]
+</div>
+<p>This equation appears simple but becomes numerically important because it is executed repeatedly over long periods.</p>
+<p>Any small numerical defect can accumulate across thousands or millions of cycles.</p>
+<p>Therefore covariance propagation should be treated as a numerically sensitive operation.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.13 Covariance Symmetry</h3>
+<p>In theory,</p>
+<div class="equation-box">
+\[
+P=P^T.
+\]
+</div>
+<p>Floating-point computation can gradually produce</p>
+<div class="equation-box">
+\[
+P\neq P^T.
+\]
+</div>
+<p>Even tiny asymmetry may eventually affect decomposition, consistency checks, and matrix operations.</p>
+<p>A common numerical safeguard is</p>
+<div class="equation-box">
+\[
+\boxed{
+P
+\leftarrow
+\frac{1}{2}(P+P^T).
+}
+\]
+</div>
+<p>This does not correct a fundamentally wrong covariance model, but it removes small asymmetries caused by finite numerical precision.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.14 Positive-Semidefinite Covariance</h3>
+<p>A valid covariance must satisfy</p>
+<div class="equation-box">
+\[
+\boxed{P\succeq0.}
+\]
+</div>
+<p>For every vector \(a\),</p>
+<div class="equation-box">
+\[
+a^TPa\ge0.
+\]
+</div>
+<p>Negative covariance eigenvalues are physically meaningless.</p>
+<p>Yet numerical roundoff, unstable updates, or poor conditioning can produce small negative eigenvalues.</p>
+<p>Therefore practical implementation may monitor:</p>
+<ul>
+<li>diagonal entries,</li>
+<li>Cholesky decomposition success,</li>
+<li>eigenvalues during testing,</li>
+<li>and numerical conditioning.</li>
+</ul>
+<p>A covariance matrix that loses positive semidefiniteness should be treated as a serious estimator-health problem.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.15 Joseph-Form Covariance Update</h3>
+<p>The theoretical covariance update is commonly written</p>
+<div class="equation-box">
+\[
+P_k^{+}
+=
+(I-K_kH_k)P_k^{-}.
+\]
+</div>
+<p>This compact form can be numerically fragile.</p>
+<p>A more robust expression is the Joseph form:</p>
+<div class="equation-box">
+\[
+\boxed{
+P_k^{+}
+=
+(I-K_kH_k)
+P_k^{-}
+(I-K_kH_k)^T
++
+K_kR_kK_k^T.
+}
+\]
+</div>
+<p>The Joseph form more explicitly preserves covariance symmetry and positive-semidefinite structure in finite-precision arithmetic.</p>
+<p>For practical implementations, its additional computational cost is often worthwhile.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.16 Why the Simple Covariance Update Can Be Risky</h3>
+<p>Suppose \(I-KH\) contains quantities formed through subtraction of nearly equal floating-point numbers.</p>
+<p>Roundoff can create asymmetry and even slightly negative covariance directions.</p>
+<p>The Joseph form avoids some of this cancellation because it retains both uncertainty contributions explicitly.</p>
+<p>Thus,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{algebraically equivalent}
+\not\Rightarrow
+\text{numerically equivalent}.
+}
+\]
+</div>
+<p>This is a fundamental lesson in estimator software.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.17 Innovation Computation</h3>
+<p>The innovation is</p>
+<div class="equation-box">
+\[
+\boxed{
+\nu_k
+=
+z_k-h(\hat x_k^-).
+}
+\]
+</div>
+<p>Its covariance is</p>
+<div class="equation-box">
+\[
+\boxed{
+S_k
+=
+H_kP_k^-H_k^T+R_k.
+}
+\]
+</div>
+<p>The Kalman gain is</p>
+<div class="equation-box">
+\[
+K_k
+=
+P_k^-H_k^TS_k^{-1}.
+\]
+</div>
+<p>Mathematically this uses \(S_k^{-1}\), but practical software should usually <strong>not explicitly invert \(S_k\)</strong>.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.18 Avoid Explicit Matrix Inversion</h3>
+<p>Instead of calculating \(S^{-1}\), the implementation should solve the corresponding linear system.</p>
+<p>For example,</p>
+<div class="equation-box">
+\[
+KS
+=
+PH^T
+\]
+</div>
+<p>can be solved for \(K\).</p>
+<p>If \(S\) is symmetric positive definite, Cholesky decomposition can be especially efficient and stable.</p>
+<p>Therefore,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{solve linear systems}
+\quad\text{rather than}\quad
+\text{forming explicit inverses}
+}
+\]
+</div>
+<p>is an important numerical implementation principle.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.19 Cholesky Decomposition</h3>
+<p>For a symmetric positive-definite matrix,</p>
+<div class="equation-box">
+\[
+S=LL^T
+\]
+</div>
+<p>where \(L\) is lower triangular.</p>
+<p>The system \(Sx=b\) can then be solved using two triangular solves:</p>
+<div class="equation-box">
+\[
+Ly=b
+\]
+</div>
+<p>followed by</p>
+<div class="equation-box">
+\[
+L^Tx=y.
+\]
+</div>
+<p>This is generally more stable and efficient than explicitly evaluating \(S^{-1}\).</p>
+<p>Failure of Cholesky decomposition can also act as a useful diagnostic that the covariance has lost expected numerical properties.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.20 Matrix Conditioning</h3>
+<p>A matrix can be theoretically invertible yet numerically difficult to use.</p>
+<p>The condition number is conceptually</p>
+<div class="equation-box">
+\[
+\kappa(A)
+=
+\|A\|
+\|A^{-1}\|.
+\]
+</div>
+<p>Large \(\kappa(A)\) means that small numerical perturbations can produce large solution changes.</p>
+<p>Poor conditioning can arise when states have dramatically different scales.</p>
+<p>For example, an estimator might combine:</p>
+<div class="equation-box">
+\[
+10^6\text{ m},
+\qquad
+10^{-3}\text{ rad},
+\qquad
+10^{-6}\text{ rad/s}.
+\]
+</div>
+<p>State scaling can therefore improve numerical behaviour.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.21 State Scaling</h3>
+<p>Suppose</p>
+<div class="equation-box">
+\[
+x=D\tilde x
+\]
+</div>
+<p>where \(D\) is a scaling matrix.</p>
+<p>The transformed state \(\tilde x\) can be chosen so that its components have comparable numerical magnitude.</p>
+<p>This may improve:</p>
+<ul>
+<li>covariance conditioning,</li>
+<li>Jacobian calculations,</li>
+<li>matrix factorizations,</li>
+<li>and numerical robustness.</li>
+</ul>
+<p>Scaling should be performed systematically because all associated dynamics, measurements, and covariance matrices must be transformed consistently.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.22 Floating-Point Precision</h3>
+<p>A practical implementation must choose numeric precision.</p>
+<p>Common options include:</p>
+<ul>
+<li>single precision,</li>
+<li>double precision,</li>
+<li>mixed precision,</li>
+<li>or fixed-point arithmetic for constrained embedded systems.</li>
+</ul>
+<p>Double precision provides wider dynamic range and generally greater numerical robustness.</p>
+<p>Single precision may reduce memory and computational burden.</p>
+<p>The correct choice should be based on:</p>
+<ul>
+<li>state scale,</li>
+<li>covariance dynamic range,</li>
+<li>processor architecture,</li>
+<li>estimator accuracy,</li>
+<li>and worst-case numerical analysis.</li>
+</ul>
+</section><section class="notes-section-card">
+<h3>4.2.28.23 Single Precision Is Not Automatically Unsafe</h3>
+<p>Many real-time systems successfully use single precision.</p>
+<p>The correct question is not:</p>
+<blockquote>“Is single precision acceptable?”</blockquote>
+<p>but rather:</p>
+<blockquote>“Does single precision preserve the required estimator accuracy and numerical stability for this state definition, scaling, covariance range, and mission duration?”</blockquote>
+<p>This should be demonstrated through testing rather than assumed.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.24 Quaternion Normalization</h3>
+<p>Attitude estimators frequently propagate a quaternion</p>
+<div class="equation-box">
+\[
+q=
+\begin{bmatrix}
+q_0&q_1&q_2&q_3
+\end{bmatrix}^T.
+\]
+</div>
+<p>A valid quaternion satisfies</p>
+<div class="equation-box">
+\[
+\boxed{\|q\|=1.}
+\]
+</div>
+<p>Numerical integration and correction can cause small norm errors.</p>
+<p>A practical implementation may therefore perform</p>
+<div class="equation-box">
+\[
+\boxed{
+q
+\leftarrow
+\frac{q}{\|q\|}.
+}
+\]
+</div>
+<p>For MEKF/ESKF architectures, quaternion correction and covariance reset must remain consistent with the selected multiplicative error convention.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.25 Quaternion Sign</h3>
+<p>The quaternions \(q\) and \(-q\) represent the same physical orientation.</p>
+<p>However, arbitrary sign switching can create discontinuities in logged states or naive differencing operations.</p>
+<p>A practical implementation may enforce sign continuity, for example by selecting the representation satisfying</p>
+<div class="equation-box">
+\[
+q_k^Tq_{k-1}>0.
+\]
+</div>
+<p>This is mainly a representation-management issue, but it prevents confusing numerical discontinuities.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.26 Error-State Injection</h3>
+<p>For an ESKF, the estimator maintains a nominal state and an error state.</p>
+<p>After measurement correction, \(\delta\hat x\) is injected into the nominal state:</p>
+<div class="equation-box">
+\[
+\boxed{
+\hat x^{+}
+=
+\hat x^{-}
+\oplus
+\delta\hat x.
+}
+\]
+</div>
+<p>For additive states this may be ordinary addition.</p>
+<p>For attitude it may involve quaternion multiplication.</p>
+<p>After injection, the error state is reset.</p>
+<p>Implementation must ensure that state injection, covariance transformation, and reset are consistent.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.27 Error-State Reset</h3>
+<p>After injection,</p>
+<div class="equation-box">
+\[
+\delta\hat x\rightarrow0.
+\]
+</div>
+<p>However, covariance cannot always simply be left unchanged.</p>
+<p>A reset Jacobian \(G_r\) may be required:</p>
+<div class="equation-box">
+\[
+\boxed{
+P^{+}
+\leftarrow
+G_r
+P^{+}
+G_r^T.
+}
+\]
+</div>
+<p>This is particularly important when the error representation is nonlinear, as in attitude error states.</p>
+<p>Ignoring the reset transformation can gradually make covariance inconsistent with the error-state definition.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.28 Covariance Initialization</h3>
+<p>The initial covariance \(P_0\) must represent actual uncertainty in the initial state.</p>
+<p>If \(P_0\) is too small, the estimator becomes overconfident.</p>
+<p>If it is excessively large, early gains may become unnecessarily aggressive.</p>
+<p>Thus each diagonal element should represent a physically meaningful initial uncertainty:</p>
+<div class="equation-box">
+\[
+P_{0,ii}
+=
+\sigma_{x_i,0}^{2}.
+\]
+</div>
+<p>Cross-covariances should also be included when justified.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.29 Covariance Floors</h3>
+<p>Sometimes numerical or modelling behaviour causes a variance to become unrealistically small.</p>
+<p>A covariance floor can impose</p>
+<div class="equation-box">
+\[
+P_{ii}
+\ge
+P_{ii,\min}.
+\]
+</div>
+<p>This can prevent numerical collapse, but such floors should not be used to hide incorrect filter tuning.</p>
+<p>A physically justified minimum uncertainty is preferable to an arbitrary software patch.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.30 Covariance Ceilings</h3>
+<p>Similarly, large covariance can produce extremely large gains or numerical issues in some architectures.</p>
+<p>An implementation may monitor upper bounds.</p>
+<p>However, clipping covariance artificially can misrepresent true uncertainty.</p>
+<p>Usually, excessive covariance should instead trigger a navigation-health or degraded-mode response.</p>
+<p>Thus,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{large uncertainty should normally be reported, not hidden}.
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.31 Variable Time Steps</h3>
+<p>Real software timing is not always perfectly periodic.</p>
+<p>The actual interval may be</p>
+<div class="equation-box">
+\[
+\Delta t_k
+=
+t_k-t_{k-1}.
+\]
+</div>
+<p>The estimator should generally use this actual interval rather than assuming \(\Delta t=\text{constant}\) if meaningful timing variation exists.</p>
+<p>Both \(\Phi_k\) and \(Q_{d,k}\) should then depend on the measured timestep.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.32 Timestamp-Driven Propagation</h3>
+<p>A robust estimator architecture uses measurement timestamps and propagation time explicitly.</p>
+<p>Suppose a measurement belongs to time \(t_m\). The filter state may currently exist at \(t_f\).</p>
+<p>The implementation should determine whether it must:</p>
+<ul>
+<li>propagate to \(t_m\),</li>
+<li>update at \(t_m\),</li>
+<li>propagate forward afterward,</li>
+<li>or perform an out-of-sequence update.</li>
+</ul>
+<p>This is especially important for asynchronous multi-sensor fusion.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.33 Multi-Rate Estimator Scheduling</h3>
+<p>Suppose</p>
+<div class="equation-box">
+\[
+f_{IMU}=200\text{ Hz},
+\qquad
+f_{GNSS}=10\text{ Hz},
+\qquad
+f_{camera}=5\text{ Hz}.
+\]
+</div>
+<p>A practical estimator can propagate at the high-rate inertial frequency and perform correction events whenever lower-rate measurements arrive.</p>
+<p>Conceptually,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{propagate frequently}
++
+\text{correct when information arrives}.
+}
+\]
+</div>
+<p>This architecture avoids forcing every sensor into one artificial synchronous cycle.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.34 Event-Driven Measurement Updates</h3>
+<p>Rather than checking every sensor at every estimator tick, measurement arrival can trigger an update.</p>
+<p>A generic event-driven loop is:</p>
+<div class="equation-box">
+\[
+\boxed{
+\begin{array}{c}
+\text{new measurement arrives}\\
+\downarrow\\
+\text{validate timestamp}\\
+\downarrow\\
+\text{propagate to measurement time}\\
+\downarrow\\
+\text{validate measurement}\\
+\downarrow\\
+\text{update estimator}
+\end{array}
+}
+\]
+</div>
+<p>This can be cleaner for heterogeneous sensor suites.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.35 Handling Delayed Measurements</h3>
+<p>Suppose the estimator has propagated to \(t_k\), but receives a valid measurement generated at \(t_m&lt;t_k\).</p>
+<p>Possible solutions include:</p>
+<ul>
+<li>rejecting excessively old data,</li>
+<li>updating a stored historical state and repropagating,</li>
+<li>fixed-lag smoothing,</li>
+<li>state augmentation,</li>
+<li>or specialized out-of-sequence measurement processing.</li>
+</ul>
+<p>Simply applying the old measurement to the current state is generally incorrect when significant dynamics occur between \(t_m\) and \(t_k\).</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.36 State History Buffer</h3>
+<p>One practical approach is to maintain a history buffer containing</p>
+<div class="equation-box">
+\[
+\{
+t_i,\hat x_i,P_i,u_i
+\}.
+\]
+</div>
+<p>When a delayed measurement arrives, the estimator can retrieve the appropriate historical state, apply the update, and then repropagate to the current time.</p>
+<p>The buffer length must cover the expected measurement latency.</p>
+<p>This trades memory and computational load for better delayed-measurement handling.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.37 Measurement Gating Implementation</h3>
+<p>The NIS is</p>
+<div class="equation-box">
+\[
+\epsilon
+=
+\nu^TS^{-1}\nu.
+\]
+</div>
+<p>Again, implementation should avoid explicitly computing \(S^{-1}\).</p>
+<p>Instead solve</p>
+<div class="equation-box">
+\[
+Sy=\nu
+\]
+</div>
+<p>and evaluate</p>
+<div class="equation-box">
+\[
+\boxed{
+\epsilon=\nu^Ty.
+}
+\]
+</div>
+<p>This provides the same quantity more stably.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.38 Chi-Square Thresholds</h3>
+<p>For measurement dimension \(m\), innovation gating can compare \(\epsilon\) against a threshold \(\gamma_{\alpha,m}\).</p>
+<p>Thus,</p>
+<div class="equation-box">
+\[
+\epsilon
+\le
+\gamma_{\alpha,m}
+\]
+</div>
+<p>may define acceptance.</p>
+<p>The threshold should depend on measurement dimension and chosen confidence level.</p>
+<p>It should not simply be a single arbitrary number reused for every sensor.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.39 Sequential Versus Batch Updates</h3>
+<p>When several measurements arrive at the same epoch, they can be processed sequentially or together.</p>
+<p>Sequentially:</p>
+<div class="equation-box">
+\[
+z_1
+\rightarrow
+z_2
+\rightarrow
+z_3.
+\]
+</div>
+<p>Batch:</p>
+<div class="equation-box">
+\[
+z=
+\begin{bmatrix}
+z_1\\z_2\\z_3
+\end{bmatrix}.
+\]
+</div>
+<p>For independent linear measurements, both may be equivalent mathematically.</p>
+<p>Sequential updates can reduce matrix size.</p>
+<p>Batch updates can handle known cross-correlation more naturally.</p>
+<p>The implementation choice should reflect measurement structure and computational constraints.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.40 Measurement Dimension and Computational Cost</h3>
+<p>The innovation covariance dimension equals the measurement dimension.</p>
+<p>Inverting or factorizing</p>
+<div class="equation-box">
+\[
+S\in\mathbb R^{m\times m}
+\]
+</div>
+<p>costs approximately</p>
+<div class="equation-box">
+\[
+O(m^3)
+\]
+</div>
+<p>for general dense operations.</p>
+<p>Thus large batch measurements can become computationally expensive.</p>
+<p>This becomes particularly important for vision systems containing many image features.</p>
+<p>Sparse, sequential, or reduced-order update strategies may therefore be advantageous.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.41 Computational Complexity</h3>
+<p>For a state dimension \(n\), dense covariance operations often scale roughly as</p>
+<div class="equation-box">
+\[
+O(n^3).
+\]
+</div>
+<p>Memory for a full covariance matrix scales as</p>
+<div class="equation-box">
+\[
+O(n^2).
+\]
+</div>
+<p>For small spacecraft navigation filters, this may be manageable.</p>
+<p>For large augmented states containing many biases, calibration terms, landmarks, or feature states, computation can become substantial.</p>
+<p>State selection therefore has direct implementation consequences.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.42 State Dimension Should Be Justified</h3>
+<p>Adding a state can improve modelling capability.</p>
+<p>But every additional state can increase:</p>
+<ul>
+<li>covariance size,</li>
+<li>propagation cost,</li>
+<li>measurement Jacobian complexity,</li>
+<li>observability requirements,</li>
+<li>tuning burden,</li>
+<li>and verification complexity.</li>
+</ul>
+<p>Therefore,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{estimate a parameter online only when doing so adds justified value}.
+}
+\]
+</div>
+<p>A parameter that is poorly observable may degrade the filter rather than improve it.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.43 Sparse Matrices</h3>
+<p>Some large estimation problems contain sparse Jacobians and covariance structures.</p>
+<p>Exploiting sparsity can reduce computational cost.</p>
+<p>Instead of storing and operating on every zero element, sparse methods retain only significant structural entries.</p>
+<p>This becomes especially important in larger navigation architectures, mapping, multi-object estimation, or factor-graph approaches.</p>
+<p>For ordinary small spacecraft Kalman filters, dense algebra may remain simpler and entirely adequate.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.44 Square-Root Filters</h3>
+<p>Instead of propagating \(P\) directly, a square-root filter propagates a factor such as</p>
+<div class="equation-box">
+\[
+P=SS^T.
+\]
+</div>
+<p>This can improve numerical stability and preserve positive-definite structure.</p>
+<p>Square-root filtering is attractive when:</p>
+<ul>
+<li>covariance conditioning is difficult,</li>
+<li>high numerical accuracy is required,</li>
+<li>or long-duration propagation magnifies roundoff effects.</li>
+</ul>
+<p>The implementation is more involved but can offer substantial numerical advantages.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.45 Information Filters</h3>
+<p>An alternative representation uses the information matrix</p>
+<div class="equation-box">
+\[
+Y=P^{-1}
+\]
+</div>
+<p>and information vector</p>
+<div class="equation-box">
+\[
+y=Y\hat x.
+\]
+</div>
+<p>Measurement updates can become additive in information space.</p>
+<p>This can be useful for decentralized fusion.</p>
+<p>However, propagation can become less convenient.</p>
+<p>Thus filter representation should be selected based on architecture rather than mathematical elegance alone.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.46 Numerical Jacobians</h3>
+<p>For nonlinear filters, Jacobians may be obtained analytically or numerically.</p>
+<p>A finite-difference approximation is</p>
+<div class="equation-box">
+\[
+\frac{\partial f}{\partial x_i}
+\approx
+\frac{
+f(x+\epsilon e_i)-f(x)
+}{\epsilon}.
+\]
+</div>
+<p>Choosing \(\epsilon\) is delicate.</p>
+<p>Too large gives truncation error.</p>
+<p>Too small gives roundoff error.</p>
+<p>Analytical Jacobians are often preferable for flight implementations when feasible.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.47 Automatic Differentiation</h3>
+<p>Automatic differentiation can generate accurate derivatives without symbolic hand derivation.</p>
+<p>This can reduce implementation mistakes, particularly for complicated models.</p>
+<p>However, flight-software suitability depends on:</p>
+<ul>
+<li>toolchain qualification,</li>
+<li>generated code,</li>
+<li>computational cost,</li>
+<li>memory,</li>
+<li>determinism,</li>
+<li>and verification requirements.</li>
+</ul>
+<p>It can be extremely useful during development even if final flight derivatives are coded analytically.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.48 Jacobian Verification</h3>
+<p>Analytical Jacobians should be verified numerically.</p>
+<p>A common development check compares \(H_{\text{analytic}}\) with \(H_{\text{finite difference}}\).</p>
+<p>The difference</p>
+<div class="equation-box">
+\[
+\Delta H
+=
+H_{\text{analytic}}
+-
+H_{\text{numerical}}
+\]
+</div>
+<p>should be appropriately small over representative operating points.</p>
+<p>This simple test can reveal sign errors, frame mistakes, and omitted terms before they become difficult estimator problems.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.49 Angle Wrapping</h3>
+<p>Angular measurements require careful handling.</p>
+<p>Suppose</p>
+<div class="equation-box">
+\[
+\theta_m=179^\circ
+\]
+</div>
+<p>and</p>
+<div class="equation-box">
+\[
+\hat\theta=-179^\circ.
+\]
+</div>
+<p>A naive residual is</p>
+<div class="equation-box">
+\[
+358^\circ,
+\]
+</div>
+<p>while the physically meaningful residual is</p>
+<div class="equation-box">
+\[
+-2^\circ.
+\]
+</div>
+<p>Thus angle innovations must be wrapped to a consistent interval.</p>
+<p>For example,</p>
+<div class="equation-box">
+\[
+\boxed{
+\nu_\theta
+=
+\operatorname{wrapToPi}
+(
+\theta_m-\hat\theta
+).
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.50 Unit Consistency</h3>
+<p>A practical filter may combine:</p>
+<ul>
+<li>metres,</li>
+<li>kilometres,</li>
+<li>seconds,</li>
+<li>radians,</li>
+<li>degrees,</li>
+<li>N,</li>
+<li>m/s,</li>
+<li>rad/s,</li>
+<li>and dimensionless quantities.</li>
+</ul>
+<p>A single unit mismatch can produce catastrophic estimator behaviour while every equation remains syntactically correct.</p>
+<p>Therefore interfaces should define units explicitly.</p>
+<p>For flight software,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{units are part of the data contract}.
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.51 Frame Metadata</h3>
+<p>Similarly, vectors should have an explicitly defined frame.</p>
+<p>A vector named \(\mathbf r\) is insufficient.</p>
+<p>The implementation should conceptually distinguish quantities such as</p>
+<div class="equation-box">
+\[
+{}^{I}\mathbf r,
+\qquad
+{}^{B}\mathbf r,
+\qquad
+{}^{S}\mathbf r.
+\]
+</div>
+<p>Good naming conventions and interface documentation greatly reduce silent frame errors.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.52 Estimator Software Layers</h3>
+<p>A clean implementation can separate:</p>
+<h4><strong>Sensor interface layer</strong></h4>
+<p>Receives raw sensor data.</p>
+<h4><strong>Preprocessing layer</strong></h4>
+<p>Applies calibration, units, timestamps, and frame conversion.</p>
+<h4><strong>Validation layer</strong></h4>
+<p>Checks validity and health.</p>
+<h4><strong>Propagation layer</strong></h4>
+<p>Advances nominal state and covariance.</p>
+<h4><strong>Measurement-model layer</strong></h4>
+<p>Computes predicted measurements and Jacobians.</p>
+<h4><strong>Update layer</strong></h4>
+<p>Performs innovation, gating, gain, correction, and covariance update.</p>
+<h4><strong>Navigation-monitor layer</strong></h4>
+<p>Checks estimator consistency and health.</p>
+<h4><strong>Output layer</strong></h4>
+<p>Publishes state, covariance, validity, and mode.</p>
+<p>This modularity improves testability.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.53 Separation of Truth and Estimate</h3>
+<p>In simulation, the truth state and estimated state should be strictly separated.</p>
+<p>Truth dynamics may use \(x_{\text{truth}}\).</p>
+<p>Sensors are generated from truth.</p>
+<p>The estimator should receive only simulated sensor outputs and allowed ancillary data.</p>
+<p>Feeding truth directly into the estimator, even accidentally through initialization or helper blocks, produces unrealistic performance.</p>
+<p>Thus,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{truth belongs to simulation; estimates belong to navigation}.
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.54 Sensor Model Separation</h3>
+<p>Each sensor model should produce realistic measurement data independently.</p>
+<p>For example:</p>
+<div class="equation-box">
+\[
+z_i
+=
+h_i(x_{\text{truth}})
++
+b_i
++
+n_i
++
+e_i.
+\]
+</div>
+<p>Sensor models may include:</p>
+<ul>
+<li>noise,</li>
+<li>bias,</li>
+<li>scale factor,</li>
+<li>misalignment,</li>
+<li>latency,</li>
+<li>quantization,</li>
+<li>dropout,</li>
+<li>saturation,</li>
+<li>and faults.</li>
+</ul>
+<p>The estimator should not know the true injected error unless that quantity is explicitly available in the real system.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.55 Measurement Bus</h3>
+<p>A standardized measurement structure can include</p>
+<div class="equation-box">
+\[
+\boxed{
+\{
+ID,
+t,
+z,
+R,
+frame,
+valid,
+quality
+\}.
+}
+\]
+</div>
+<p>This simplifies fusion of heterogeneous sensors.</p>
+<p>It also supports logging and traceability.</p>
+<p>When an unexpected filter correction occurs, engineers can identify exactly which measurement, timestamp, covariance, and validity state produced it.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.56 Estimator Output Bus</h3>
+<p>The estimator output may include</p>
+<div class="equation-box">
+\[
+\boxed{
+\{
+\hat x,
+P,
+t,
+health,
+mode,
+validity
+\}.
+}
+\]
+</div>
+<p>Downstream GNC should generally consume both the state estimate and navigation-health information.</p>
+<p>A state estimate without its associated uncertainty can be misleading.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.57 Navigation Health Monitoring</h3>
+<p>Useful online checks include:</p>
+<ul>
+<li>covariance trace,</li>
+<li>selected standard deviations,</li>
+<li>NIS,</li>
+<li>state bounds,</li>
+<li>Cholesky success,</li>
+<li>innovation magnitude,</li>
+<li>update freshness,</li>
+<li>sensor availability,</li>
+<li>covariance positivity,</li>
+<li>and estimator-reset events.</li>
+</ul>
+<p>A health monitor can convert these quantities into operational states such as</p>
+<div class="equation-box">
+\[
+\{
+\text{valid},
+\text{degraded},
+\text{invalid}
+\}.
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.58 Watchdog Logic</h3>
+<p>A software watchdog may monitor whether estimator execution completes within its deadline.</p>
+<p>If the filter must run every \(T_f\) seconds, then execution time should satisfy</p>
+<div class="equation-box">
+\[
+\boxed{
+T_{\text{exec}}
+<
+T_f
+}
+\]
+</div>
+<p>with suitable margin.</p>
+<p>Deadline overruns may require:</p>
+<ul>
+<li>skipping nonessential updates,</li>
+<li>reducing processing,</li>
+<li>entering degraded mode,</li>
+<li>or triggering fault-management logic.</li>
+</ul>
+</section><section class="notes-section-card">
+<h3>4.2.28.59 Worst-Case Execution Time</h3>
+<p>Average runtime is not sufficient for flight software.</p>
+<p>The relevant requirement is often closer to</p>
+<div class="equation-box">
+\[
+\boxed{
+T_{\text{WCET}}
+<
+T_{\text{deadline}}.
+}
+\]
+</div>
+<p>Worst-case execution time should consider:</p>
+<ul>
+<li>largest measurement batch,</li>
+<li>maximum active sensor count,</li>
+<li>delayed measurement processing,</li>
+<li>reset operations,</li>
+<li>fault logic,</li>
+<li>logging,</li>
+<li>and memory effects.</li>
+</ul>
+<p>Deterministic timing is often more important than average speed.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.60 Dynamic Memory Allocation</h3>
+<p>Dynamic memory allocation during real-time estimator execution can introduce:</p>
+<ul>
+<li>unpredictable timing,</li>
+<li>fragmentation,</li>
+<li>allocation failure,</li>
+<li>and verification difficulty.</li>
+</ul>
+<p>Therefore embedded implementations often prefer statically allocated arrays and fixed-size buffers.</p>
+<p>This is particularly useful when state and measurement dimensions are known in advance.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.61 Matrix Libraries</h3>
+<p>Matrix operations should use well-tested numerical libraries where possible.</p>
+<p>However, embedded flight software may require:</p>
+<ul>
+<li>bounded memory,</li>
+<li>deterministic execution,</li>
+<li>no hidden dynamic allocation,</li>
+<li>code-generation compatibility,</li>
+<li>and certification constraints.</li>
+</ul>
+<p>Therefore desktop scientific libraries are not always directly suitable for flight use.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.62 Fixed Dimensions Versus Variable Dimensions</h3>
+<p>A filter with fixed state and maximum measurement dimensions is easier to optimize and verify.</p>
+<p>Variable measurement dimension is often still required because sensors may appear and disappear.</p>
+<p>One implementation approach is to allocate for \(m_{\max}\) but use only the active portion.</p>
+<p>Another is to process sensors sequentially with small fixed update dimensions.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.63 Embedded Processor Constraints</h3>
+<p>A flight computer may have limited:</p>
+<ul>
+<li>CPU throughput,</li>
+<li>RAM,</li>
+<li>nonvolatile memory,</li>
+<li>power,</li>
+<li>and communication bandwidth.</li>
+</ul>
+<p>Therefore the most mathematically sophisticated estimator is not necessarily the best practical implementation.</p>
+<p>The estimator must satisfy</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{accuracy}
++
+\text{robustness}
++
+\text{timing}
++
+\text{memory}
++
+\text{verification}.
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.64 Update Rate Selection</h3>
+<p>Running a filter faster does not automatically improve performance.</p>
+<p>If the process and measurements contain little new information between updates, excessive rate can waste processor time.</p>
+<p>Too low a rate can introduce discretization error and miss fast dynamics.</p>
+<p>Thus update rate should reflect:</p>
+<ul>
+<li>system dynamics,</li>
+<li>sensor bandwidth,</li>
+<li>control bandwidth,</li>
+<li>timing accuracy,</li>
+<li>and computational resources.</li>
+</ul>
+</section><section class="notes-section-card">
+<h3>4.2.28.65 Sensor Rate Versus Estimator Rate</h3>
+<p>The estimator rate does not necessarily equal every sensor rate.</p>
+<p>For example:</p>
+<div class="equation-box">
+\[
+f_{filter}=100\text{ Hz},
+\qquad
+f_{star}=5\text{ Hz}.
+\]
+</div>
+<p>The filter may propagate 20 times between star-tracker corrections.</p>
+<p>This is normal.</p>
+<p>The estimator architecture should therefore distinguish between</p>
+<div class="equation-box">
+\[
+\boxed{\text{propagation rate}}
+\]
+</div>
+<p>and</p>
+<div class="equation-box">
+\[
+\boxed{\text{measurement-update rates}.}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.66 Control and Estimation Rates</h3>
+<p>The controller may operate at a different rate from the estimator.</p>
+<p>Suppose</p>
+<div class="equation-box">
+\[
+f_{est}=100\text{ Hz}
+\]
+</div>
+<p>and</p>
+<div class="equation-box">
+\[
+f_{ctrl}=50\text{ Hz}.
+\]
+</div>
+<p>The controller can use the most recent valid navigation estimate.</p>
+<p>However, the age of that estimate should remain bounded and known.</p>
+<p>Timestamping is therefore important at the estimator–controller interface as well.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.67 Closed-Loop GNC Integration</h3>
+<p>The complete chain is</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{Sensors}
+\rightarrow
+\text{Estimator}
+\rightarrow
+\text{Guidance}
+\rightarrow
+\text{Control}
+\rightarrow
+\text{Actuators}
+\rightarrow
+\text{Spacecraft Dynamics}
+\rightarrow
+\text{Sensors}.
+}
+\]
+</div>
+<p>Estimator latency affects control.</p>
+<p>Control changes the spacecraft state.</p>
+<p>The changed state alters future measurements.</p>
+<p>Thus filter implementation cannot be validated only in isolation.</p>
+<p>Closed-loop testing is essential.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.68 Estimator Latency</h3>
+<p>If navigation output corresponds to time \(t_e\) but the controller acts at \(t_c&gt;t_e\), the effective delay is</p>
+<div class="equation-box">
+\[
+\tau=t_c-t_e.
+\]
+</div>
+<p>For fast dynamics, this can degrade control performance.</p>
+<p>A system may compensate by propagating the estimate to the control epoch when appropriate.</p>
+<p>Thus navigation latency should be measured and included in GNC analysis.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.69 General RPO Considerations</h3>
+<p>In general rendezvous and proximity operations, implementation becomes particularly sensitive to:</p>
+<ul>
+<li>multi-rate sensors,</li>
+<li>relative-navigation geometry,</li>
+<li>changing sensor availability,</li>
+<li>delayed optical processing,</li>
+<li>asynchronous ranging,</li>
+<li>covariance growth,</li>
+<li>estimator mode transitions,</li>
+<li>and strict navigation-validity requirements.</li>
+</ul>
+<p>A hypothetical close-approach estimator may process different relative-navigation sensors at different times.</p>
+<p>The fundamental implementation requirement remains:</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{every measurement must be fused at the correct epoch, frame, uncertainty, and validity state}.
+}
+\]
+</div>
+<p>This is a general RPO principle and does not depend on any particular mission architecture.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.70 Mode-Dependent Filter Configuration</h3>
+<p>Different operating phases may use different:</p>
+<ul>
+<li>states,</li>
+<li>sensors,</li>
+<li>\(Q\),</li>
+<li>\(R\),</li>
+<li>gating thresholds,</li>
+<li>propagation models,</li>
+<li>and update rates.</li>
+</ul>
+<p>For example,</p>
+<div class="equation-box">
+\[
+\mathcal M
+=
+\{
+M_1,M_2,\ldots,M_n
+\}.
+\]
+</div>
+<p>Each mode can define an estimator configuration appropriate to the current navigation regime.</p>
+<p>Transitions must preserve state and covariance consistency.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.71 Filter Reconfiguration</h3>
+<p>Suppose a state is added or removed.</p>
+<p>The covariance dimension changes.</p>
+<p>Adding a state requires appropriate initialization: \(\hat x_{new}\) and \(P_{new}\).</p>
+<p>Removing a state requires extracting the appropriate marginal covariance rather than simply deleting arbitrary rows and columns without understanding correlation.</p>
+<p>Reconfiguration should therefore be designed explicitly.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.72 Sensor Enable and Disable</h3>
+<p>When a sensor becomes unavailable, the measurement update is skipped.</p>
+<p>The covariance naturally grows through propagation.</p>
+<p>When it returns, measurement processing resumes after validation.</p>
+<p>The filter should not generally reset its entire state merely because one sensor temporarily disappears.</p>
+<p>This is a major advantage of recursive multi-sensor estimation.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.73 Reinitialization</h3>
+<p>Sometimes reinitialization is required.</p>
+<p>Possible triggers include:</p>
+<ul>
+<li>covariance divergence,</li>
+<li>invalid state,</li>
+<li>prolonged sensor outage,</li>
+<li>severe numerical failure,</li>
+<li>major mode transition,</li>
+<li>or recovery from reset.</li>
+</ul>
+<p>Reinitialization should define:</p>
+<div class="equation-box">
+\[
+\hat x_0,
+\qquad
+P_0,
+\qquad
+\text{required sensors},
+\qquad
+\text{validity criteria}.
+\]
+</div>
+<p>It should not be an undefined emergency software action.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.74 Soft Reset Versus Hard Reset</h3>
+<p>A <strong>soft reset</strong> may preserve some valid state components while resetting others.</p>
+<p>A <strong>hard reset</strong> may reconstruct the entire navigation state from available measurements.</p>
+<p>For example, attitude might be reinitialized while orbital position remains valid.</p>
+<p>This can preserve useful information and reduce recovery time.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.75 Numerical Failure Detection</h3>
+<p>The estimator should detect conditions such as:</p>
+<ul>
+<li>NaN,</li>
+<li>Inf,</li>
+<li>failed matrix decomposition,</li>
+<li>negative variance,</li>
+<li>invalid quaternion,</li>
+<li>excessive state magnitude,</li>
+<li>and impossible covariance.</li>
+</ul>
+<p>These are not merely debugging issues.</p>
+<p>In flight, they require defined responses.</p>
+<p>A useful philosophy is</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{detect numerical failure before it propagates into GNC commands}.
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.76 NaN Containment</h3>
+<p>A single NaN entering a matrix operation can contaminate the entire navigation solution.</p>
+<p>Sensor interfaces should therefore validate data before fusion.</p>
+<p>Estimator output should also be checked before publication.</p>
+<p>If invalid values are detected, the system should enter a defined recovery or degraded-navigation mode rather than continuing silently.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.77 Saturation and Overflow</h3>
+<p>Even floating-point systems can encounter extreme values.</p>
+<p>Fixed-point implementations are especially sensitive.</p>
+<p>Input validation should therefore check:</p>
+<ul>
+<li>range,</li>
+<li>physical plausibility,</li>
+<li>numeric limits,</li>
+<li>and scaling.</li>
+</ul>
+<p>A saturated sensor measurement should not be treated as an ordinary Gaussian measurement.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.78 Logging</h3>
+<p>During development, useful logged quantities include</p>
+<div class="equation-box">
+\[
+\hat x,
+\quad
+P,
+\quad
+\nu,
+\quad
+S,
+\quad
+K,
+\quad
+Q,
+\quad
+R.
+\]
+</div>
+<p>Also log:</p>
+<ul>
+<li>raw measurements,</li>
+<li>processed measurements,</li>
+<li>timestamps,</li>
+<li>measurement acceptance,</li>
+<li>sensor health,</li>
+<li>mode,</li>
+<li>resets,</li>
+<li>and estimator runtime.</li>
+</ul>
+<p>Without these signals, diagnosing filter problems becomes unnecessarily difficult.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.79 Covariance Logging</h3>
+<p>Logging the entire covariance matrix can be expensive.</p>
+<p>Possible alternatives include logging:</p>
+<ul>
+<li>diagonal variances,</li>
+<li>selected cross-covariances,</li>
+<li>covariance trace,</li>
+<li>determinant,</li>
+<li>eigenvalue diagnostics,</li>
+<li>or state-specific uncertainty summaries.</li>
+</ul>
+<p>During detailed offline testing, full covariance logging is often worthwhile.</p>
+<p>Flight telemetry may use a reduced set.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.80 Innovation Logging</h3>
+<p>Innovations are among the most valuable diagnostic quantities.</p>
+<p>For each sensor, log \(\nu_k\) and ideally \(S_k\).</p>
+<p>This allows offline evaluation of:</p>
+<ul>
+<li>mean,</li>
+<li>variance,</li>
+<li>correlation,</li>
+<li>NIS,</li>
+<li>bias,</li>
+<li>model mismatch,</li>
+<li>and measurement-noise tuning.</li>
+</ul>
+<p>An estimator with no innovation logging is much harder to validate statistically.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.81 Deterministic Replay</h3>
+<p>A powerful development capability is the ability to replay recorded sensor data through the estimator deterministically.</p>
+<p>Given identical inputs,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{same input sequence}
+\rightarrow
+\text{same estimator output}
+}
+\]
+</div>
+<p>should hold for deterministic software.</p>
+<p>Replay allows developers to reproduce rare failures and compare algorithm revisions exactly.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.82 Unit Testing</h3>
+<p>Individual estimator functions should be unit tested.</p>
+<p>Examples include:</p>
+<ul>
+<li>quaternion multiplication,</li>
+<li>quaternion normalization,</li>
+<li>frame transformations,</li>
+<li>state transition calculation,</li>
+<li>process covariance discretization,</li>
+<li>Jacobians,</li>
+<li>innovation computation,</li>
+<li>Joseph update,</li>
+<li>gating,</li>
+<li>and state reset.</li>
+</ul>
+<p>Testing small components makes later system integration much easier.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.83 Analytical Test Cases</h3>
+<p>Where possible, numerical implementation should be compared against analytical solutions.</p>
+<p>For example, a constant-velocity model has simple closed-form propagation.</p>
+<p>If the estimator cannot reproduce a simple analytical case, more complicated nonlinear simulations should not yet be trusted.</p>
+<p>This is an effective development principle.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.84 Zero-Noise Tests</h3>
+<p>Setting all measurement and process noise to zero can be useful.</p>
+<p>For a consistent deterministic scenario, estimator error should behave according to the model and initialization.</p>
+<p>This can isolate mathematical or frame errors before stochastic noise obscures them.</p>
+<p>Zero-noise testing is especially useful during early verification.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.85 Single-Sensor Tests</h3>
+<p>Each measurement update should be tested independently.</p>
+<p>For example:</p>
+<div class="equation-box">
+\[
+\text{Estimator + Sensor A only}
+\]
+</div>
+<p>before</p>
+<div class="equation-box">
+\[
+\text{Estimator + A + B + C}.
+\]
+</div>
+<p>This confirms whether each measurement model and Jacobian behaves correctly before interactions between sensors complicate diagnosis.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.86 Fault-Injection Tests</h3>
+<p>Implementation should be tested with injected:</p>
+<ul>
+<li>bias,</li>
+<li>drift,</li>
+<li>dropout,</li>
+<li>latency,</li>
+<li>timestamp error,</li>
+<li>frame error,</li>
+<li>outlier,</li>
+<li>saturation,</li>
+<li>and corrupted covariance.</li>
+</ul>
+<p>The objective is not only to see whether the estimator survives, but whether navigation-health and fault-management logic respond correctly.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.87 Monte Carlo Testing</h3>
+<p>Once deterministic implementation is correct, Monte Carlo testing evaluates robustness.</p>
+<p>Randomized quantities can include:</p>
+<div class="equation-box">
+\[
+x_0,
+\quad
+b_0,
+\quad
+Q,
+\quad
+R,
+\quad
+\Delta t,
+\quad
+\text{misalignment},
+\quad
+\text{dropout}.
+\]
+</div>
+<p>Performance should be assessed statistically rather than by one simulation trajectory.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.88 SIL Testing</h3>
+<p>Software-in-the-loop testing runs estimator software against simulated dynamics and sensors.</p>
+<p>This helps verify:</p>
+<ul>
+<li>actual software logic,</li>
+<li>execution ordering,</li>
+<li>interfaces,</li>
+<li>numerical implementation,</li>
+<li>and code-level behaviour.</li>
+</ul>
+<p>SIL bridges the gap between equations and deployed software.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.89 HIL Testing</h3>
+<p>Hardware-in-the-loop adds representative processors, communication interfaces, or sensors.</p>
+<p>HIL can reveal:</p>
+<ul>
+<li>processor timing,</li>
+<li>data transport delays,</li>
+<li>packet loss,</li>
+<li>timestamping errors,</li>
+<li>bus contention,</li>
+<li>quantization,</li>
+<li>and actual embedded numerical behaviour.</li>
+</ul>
+<p>These effects may not be visible in desktop simulation.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.90 Processor-in-the-Loop</h3>
+<p>Processor-in-the-loop testing executes generated estimator code on the intended or representative processor while the environment remains simulated.</p>
+<p>This is useful for validating:</p>
+<ul>
+<li>execution time,</li>
+<li>memory usage,</li>
+<li>compiler effects,</li>
+<li>precision,</li>
+<li>and code-generation behaviour.</li>
+</ul>
+<p>It can be performed before full HIL infrastructure is available.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.91 Code Generation</h3>
+<p>Model-based workflows may generate C or C++ from estimator models.</p>
+<p>Generated code should be reviewed for:</p>
+<ul>
+<li>deterministic memory use,</li>
+<li>numerical equivalence,</li>
+<li>unsupported dynamic constructs,</li>
+<li>matrix dimensions,</li>
+<li>function call overhead,</li>
+<li>and timing.</li>
+</ul>
+<p>Automatic code generation reduces some transcription errors but does not eliminate the need for verification.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.92 Model–Code Equivalence</h3>
+<p>A key question is whether generated or hand-written embedded code reproduces the reference algorithm.</p>
+<p>For identical test vectors, \(\hat x_{\text{model}}\) should be compared with \(\hat x_{\text{code}}\).</p>
+<p>Likewise, \(P_{\text{model}}\) should be compared with \(P_{\text{code}}\).</p>
+<p>Differences should remain within justified numerical tolerance.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.93 Regression Testing</h3>
+<p>Every estimator modification should be tested against a regression suite.</p>
+<p>This prevents a change intended to improve one case from silently breaking another.</p>
+<p>Useful regression scenarios include:</p>
+<ul>
+<li>nominal propagation,</li>
+<li>sensor dropout,</li>
+<li>large initial error,</li>
+<li>delayed measurement,</li>
+<li>bias estimation,</li>
+<li>mode transition,</li>
+<li>and numerical edge cases.</li>
+</ul>
+</section><section class="notes-section-card">
+<h3>4.2.28.94 Software Configuration Control</h3>
+<p>Estimator behaviour depends on:</p>
+<ul>
+<li>code version,</li>
+<li>state definition,</li>
+<li>\(Q\),</li>
+<li>\(R\),</li>
+<li>sensor configuration,</li>
+<li>initialization,</li>
+<li>thresholds,</li>
+<li>and timing parameters.</li>
+</ul>
+<p>These should be under configuration control.</p>
+<p>Otherwise, reproducing a simulation or flight result becomes difficult.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.95 Parameter Management</h3>
+<p>Filter parameters should not be scattered throughout code as unexplained constants.</p>
+<p>A structured parameter set can contain:</p>
+<div class="equation-box">
+\[
+Q,
+\quad
+R_i,
+\quad
+P_0,
+\quad
+\gamma_i,
+\quad
+f_{prop},
+\quad
+\text{sensor limits}.
+\]
+</div>
+<p>Each should have:</p>
+<ul>
+<li>units,</li>
+<li>source,</li>
+<li>rationale,</li>
+<li>allowed range,</li>
+<li>and version.</li>
+</ul>
+<p>This improves traceability.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.96 Calibration Database</h3>
+<p>Sensor calibration parameters may include:</p>
+<ul>
+<li>scale factors,</li>
+<li>biases,</li>
+<li>mounting matrices,</li>
+<li>lever arms,</li>
+<li>timing offsets,</li>
+<li>intrinsic camera parameters,</li>
+<li>and temperature coefficients.</li>
+</ul>
+<p>These should be versioned and traceable.</p>
+<p>Using the wrong calibration version can make an otherwise correct estimator appear defective.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.97 Runtime Parameter Updates</h3>
+<p>Some systems allow filter parameters to be updated during operation.</p>
+<p>This can be useful, but changes should be bounded and validated.</p>
+<p>Unexpected modification of \(Q\), \(R\), or \(P\) can drastically alter estimator behaviour.</p>
+<p>Runtime parameter management should therefore be treated as part of the navigation safety architecture.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.98 Covariance Interpretation in Software</h3>
+<p>Each covariance element must correspond exactly to the implemented state ordering.</p>
+<p>If</p>
+<div class="equation-box">
+\[
+x=
+[
+r_x,r_y,r_z,v_x,v_y,v_z,b_{gx},\ldots]^T,
+\]
+</div>
+<p>then row and column indices in \(P\) must match that ordering everywhere.</p>
+<p>Changing state order without updating all Jacobians and covariance operations is a serious software risk.</p>
+<p>A centralized state-index definition is therefore valuable.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.99 State Index Management</h3>
+<p>Instead of hard-coded numerical indices scattered throughout software, state indices should be defined symbolically or centrally.</p>
+<p>For example:</p>
+<div class="equation-box">
+\[
+IDX\_POS=1{:}3,
+\]
+</div>
+<div class="equation-box">
+\[
+IDX\_VEL=4{:}6.
+\]
+</div>
+<p>The specific programming syntax varies, but the principle is universal:</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{state structure should be explicit and maintainable}.
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.100 Sensor Interface Contracts</h3>
+<p>Each sensor interface should define:</p>
+<ul>
+<li>measurement dimension,</li>
+<li>units,</li>
+<li>frame,</li>
+<li>timestamp convention,</li>
+<li>covariance convention,</li>
+<li>validity flags,</li>
+<li>update rate,</li>
+<li>and failure behaviour.</li>
+</ul>
+<p>Without this contract, integration errors can be misdiagnosed as estimator problems.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.101 Time Convention</h3>
+<p>Every timestamp should have a clearly defined reference and unit.</p>
+<p>For example:</p>
+<ul>
+<li>seconds since boot,</li>
+<li>GPS time,</li>
+<li>UTC-related system time,</li>
+<li>or simulation epoch.</li>
+</ul>
+<p>Mixing time bases can create subtle fusion errors.</p>
+<p>Therefore,</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{time reference is part of the measurement definition}.
+}
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.102 Thread Safety and Concurrency</h3>
+<p>If sensor interfaces and estimator tasks run concurrently, shared data must be protected.</p>
+<p>Potential problems include:</p>
+<ul>
+<li>partially updated measurement packets,</li>
+<li>inconsistent timestamp/data pairs,</li>
+<li>race conditions,</li>
+<li>and overwritten buffers.</li>
+</ul>
+<p>Double buffering, message queues, or atomic transfer structures can provide cleaner interfaces.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.103 Measurement Queues</h3>
+<p>An asynchronous architecture may place measurements into a time-ordered queue.</p>
+<p>Each item contains</p>
+<div class="equation-box">
+\[
+\{
+t_i,z_i,R_i,ID_i
+\}.
+\]
+</div>
+<p>The estimator processes the queue according to measurement timestamp.</p>
+<p>This naturally supports different sensor rates.</p>
+<p>However, queue depth and latency limits must be controlled.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.104 Handling Queue Overflow</h3>
+<p>If measurements arrive faster than they can be processed, the queue may overflow.</p>
+<p>The system must define whether it:</p>
+<ul>
+<li>drops oldest measurements,</li>
+<li>drops newest measurements,</li>
+<li>prioritizes particular sensors,</li>
+<li>reduces measurement rate,</li>
+<li>or enters a degraded mode.</li>
+</ul>
+<p>Silent uncontrolled overflow is unacceptable.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.105 Sensor Priority</h3>
+<p>Not all measurements necessarily have equal processing priority.</p>
+<p>For example, high-rate inertial propagation may be essential for estimator continuity, while a computationally expensive secondary update may tolerate occasional delay.</p>
+<p>Priority scheduling should therefore be related to navigation importance and timing requirements.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.106 Data Freshness</h3>
+<p>A measurement may be physically valid but too old to be useful.</p>
+<p>Define age</p>
+<div class="equation-box">
+\[
+\tau_i
+=
+t_{\text{current}}
+-
+t_i.
+\]
+</div>
+<p>A measurement can be rejected if</p>
+<div class="equation-box">
+\[
+\tau_i>\tau_{i,\max}.
+\]
+</div>
+<p>Freshness thresholds should depend on sensor type and system dynamics.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.107 Sensor Timeout</h3>
+<p>If no valid measurement has been received for</p>
+<div class="equation-box">
+\[
+T>T_{\text{timeout}},
+\]
+</div>
+<p>the sensor can be marked unavailable.</p>
+<p>The estimator should then stop expecting corrections from that source.</p>
+<p>Timeout logic must distinguish between:</p>
+<ul>
+<li>slow nominal sensor rate,</li>
+<li>communication delay,</li>
+<li>temporary dropout,</li>
+<li>and actual sensor failure.</li>
+</ul>
+</section><section class="notes-section-card">
+<h3>4.2.28.108 Filter Output Freshness</h3>
+<p>Downstream GNC may similarly require navigation data no older than</p>
+<div class="equation-box">
+\[
+\tau_{\text{nav,max}}.
+\]
+</div>
+<p>Even an accurate estimate can become unsuitable if not refreshed in time.</p>
+<p>Thus navigation validity can include both uncertainty and age.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.109 Numerical Assertions</h3>
+<p>During development, assertions can check properties such as</p>
+<div class="equation-box">
+\[
+P=P^T,
+\qquad
+P_{ii}\ge0,
+\qquad
+\|q\|\approx1.
+\]
+</div>
+<p>Flight software may replace development assertions with health-monitoring logic rather than terminating execution.</p>
+<p>These checks provide valuable early warning of implementation errors.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.110 Covariance Symmetry Error Metric</h3>
+<p>A useful numerical metric is</p>
+<div class="equation-box">
+\[
+\epsilon_{sym}
+=
+\frac{\|P-P^T\|}
+{\|P\|}.
+\]
+</div>
+<p>Small values are expected.</p>
+<p>A growing symmetry error can indicate numerical problems or incorrect matrix updates.</p>
+<p>This can be monitored during Monte Carlo and long-duration simulation.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.111 Covariance Eigenvalue Monitoring</h3>
+<p>During development, examine</p>
+<div class="equation-box">
+\[
+\lambda_{\min}(P).
+\]
+</div>
+<p>A valid covariance should satisfy</p>
+<div class="equation-box">
+\[
+\lambda_{\min}(P)\ge0
+\]
+</div>
+<p>within numerical tolerance.</p>
+<p>Repeatedly negative eigenvalues usually indicate a deeper numerical or modelling issue.</p>
+<p>Eigenvalue computation may be too expensive for continuous flight monitoring, but it is valuable during verification.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.112 Condition Number Monitoring</h3>
+<p>Another development diagnostic is</p>
+<div class="equation-box">
+\[
+\kappa(P).
+\]
+</div>
+<p>A rapidly increasing condition number may indicate:</p>
+<ul>
+<li>poorly scaled states,</li>
+<li>weak observability,</li>
+<li>near-deterministic covariance directions,</li>
+<li>or numerical degradation.</li>
+</ul>
+<p>Such monitoring helps identify cases where theoretically valid filters become computationally fragile.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.113 Covariance Regularization</h3>
+<p>If a matrix becomes nearly singular, small regularization may be introduced:</p>
+<div class="equation-box">
+\[
+S'
+=
+S+\epsilon I.
+\]
+</div>
+<p>However, this should be used carefully.</p>
+<p>Regularization changes the statistical model.</p>
+<p>It is appropriate as a controlled numerical safeguard, not as a routine way to conceal poor conditioning.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.114 Process Noise Tuning and Numerical Stability</h3>
+<p>Very small \(Q\) can make the estimator excessively confident and produce nearly singular covariance directions.</p>
+<p>Very large \(Q\) can produce high gains and noisy estimates.</p>
+<p>Thus process-noise tuning affects both statistical performance and numerical behaviour.</p>
+<p>This is another reason \(Q\) should be physically justified rather than selected solely by trial and error.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.115 Measurement Noise Tuning and Numerical Stability</h3>
+<p>Similarly, extremely small \(R\) causes the filter to treat a sensor as nearly perfect.</p>
+<p>Then</p>
+<div class="equation-box">
+\[
+S
+=
+HPH^T+R
+\]
+</div>
+<p>may become poorly conditioned in certain situations.</p>
+<p>Measurement uncertainty should therefore reflect realistic sensor performance, including irreducible calibration and modelling uncertainty.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.116 Filter Divergence</h3>
+<p>Divergence occurs when estimation error grows while the estimator remains unaware of its true uncertainty.</p>
+<p>Possible causes include:</p>
+<ul>
+<li>incorrect dynamics,</li>
+<li>wrong Jacobians,</li>
+<li>underestimated \(Q\),</li>
+<li>underestimated \(R\),</li>
+<li>frame errors,</li>
+<li>timing errors,</li>
+<li>unmodelled bias,</li>
+<li>poor initialization,</li>
+<li>or numerical failure.</li>
+</ul>
+<p>A practical estimator must detect symptoms of divergence rather than assuming the recursion always remains valid.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.117 Divergence Indicators</h3>
+<p>Useful indicators include:</p>
+<ul>
+<li>sustained high NIS,</li>
+<li>large residual mean,</li>
+<li>covariance inconsistency,</li>
+<li>state jumps,</li>
+<li>frequent gating failures,</li>
+<li>disagreement among independent sensors,</li>
+<li>and impossible physical states.</li>
+</ul>
+<p>No single indicator proves divergence.</p>
+<p>A combination of statistical and physical checks is more robust.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.118 Innovation Whiteness</h3>
+<p>For a well-modelled estimator, innovations should approximately behave as white noise.</p>
+<p>Autocorrelation can be examined:</p>
+<div class="equation-box">
+\[
+R_\nu(\tau)
+=
+E[
+\nu_k\nu_{k-\tau}^{T}
+].
+\]
+</div>
+<p>Strong temporal structure may indicate:</p>
+<ul>
+<li>missing dynamics,</li>
+<li>unmodelled bias,</li>
+<li>timing error,</li>
+<li>or inappropriate noise assumptions.</li>
+</ul>
+<p>Whiteness analysis is therefore useful during filter tuning and implementation verification.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.119 Long-Duration Testing</h3>
+<p>A filter that behaves correctly for 60 seconds may fail over hours or days because of:</p>
+<ul>
+<li>numerical accumulation,</li>
+<li>slow bias growth,</li>
+<li>covariance collapse,</li>
+<li>clock effects,</li>
+<li>or rare mode transitions.</li>
+</ul>
+<p>Long-duration testing should therefore be included where representative of the intended mission.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.120 Initialization Transients</h3>
+<p>Estimator performance immediately after startup is often different from steady-state performance.</p>
+<p>The implementation should explicitly handle</p>
+<div class="equation-box">
+\[
+t\approx t_0
+\]
+</div>
+<p>as an initialization phase.</p>
+<p>Possible differences include:</p>
+<ul>
+<li>larger covariance,</li>
+<li>stricter validity restrictions,</li>
+<li>limited adaptation,</li>
+<li>delayed control authority,</li>
+<li>and special sensor-acquisition logic.</li>
+</ul>
+</section><section class="notes-section-card">
+<h3>4.2.28.121 Convergence Flag</h3>
+<p>A navigation system may provide</p>
+<div class="equation-box">
+\[
+\text{filter\_converged}.
+\]
+</div>
+<p>This flag should not simply mean</p>
+<blockquote>“the filter has been running for 30 seconds.”</blockquote>
+<p>A stronger condition can use:</p>
+<ul>
+<li>covariance bounds,</li>
+<li>sufficient sensor availability,</li>
+<li>innovation consistency,</li>
+<li>bias convergence,</li>
+<li>and stable state estimates.</li>
+</ul>
+<p>Thus convergence should be evidence-based.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.122 Navigation Validity Flag</h3>
+<p>Similarly,</p>
+<div class="equation-box">
+\[
+\text{nav\_valid}
+\]
+</div>
+<p>may require</p>
+<div class="equation-box">
+\[
+P<P_{\max},
+\]
+</div>
+<p>acceptable measurement freshness,</p>
+<div class="equation-box">
+\[
+H_{\text{sensor}}=\text{healthy},
+\]
+</div>
+<p>and no critical numerical faults.</p>
+<p>The specific condition depends on system requirements.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.123 GNC Interface</h3>
+<p>The estimator should present a clearly defined interface to guidance and control.</p>
+<p>Typical outputs include:</p>
+<div class="equation-box">
+\[
+\hat r,
+\quad
+\hat v,
+\quad
+\hat q,
+\quad
+\hat\omega,
+\]
+</div>
+<p>together with uncertainty and status.</p>
+<p>Guidance and control should not need to know the internal details of EKF, UKF, or ESKF implementation.</p>
+<p>This encapsulation makes the architecture easier to maintain.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.124 Mode-Transition Interface</h3>
+<p>When GNC changes mode, estimator configuration may need to change.</p>
+<p>For example,</p>
+<div class="equation-box">
+\[
+M_A\rightarrow M_B.
+\]
+</div>
+<p>The transition interface should define:</p>
+<ul>
+<li>required sensor set,</li>
+<li>required covariance,</li>
+<li>state continuity,</li>
+<li>filter configuration,</li>
+<li>and failure response.</li>
+</ul>
+<p>Estimator transitions should not be hidden side effects of unrelated software logic.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.125 Embedded Implementation Philosophy</h3>
+<p>A practical embedded estimator should generally be:</p>
+<div class="equation-box">
+\[
+\boxed{
+\text{deterministic}
++
+\text{bounded}
++
+\text{observable}
++
+\text{testable}
++
+\text{recoverable}.
+}
+\]
+</div>
+<p><strong>Deterministic:</strong> execution behaviour is predictable.</p>
+<p><strong>Bounded:</strong> memory and computation are controlled.</p>
+<p><strong>Observable:</strong> internal health and diagnostic quantities can be inspected.</p>
+<p><strong>Testable:</strong> algorithm components can be verified independently.</p>
+<p><strong>Recoverable:</strong> numerical or sensor failures have defined responses.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.126 Practical Development Workflow</h3>
+<p>A strong development sequence is:</p>
+<ol>
+<li>derive the continuous-time model,</li>
+<li>verify dynamics independently,</li>
+<li>derive measurement models,</li>
+<li>verify analytical Jacobians,</li>
+<li>derive discrete propagation,</li>
+<li>derive \(Q_d\),</li>
+<li>implement deterministic zero-noise tests,</li>
+<li>implement covariance propagation,</li>
+<li>verify symmetry and positivity,</li>
+<li>add individual sensor updates,</li>
+<li>verify innovation statistics,</li>
+<li>add gating,</li>
+<li>add multi-rate scheduling,</li>
+<li>add sensor dropout and recovery,</li>
+<li>add navigation-health logic,</li>
+<li>perform Monte Carlo,</li>
+<li>perform SIL,</li>
+<li>perform processor-in-the-loop,</li>
+<li>perform HIL,</li>
+<li>perform closed-loop GNC verification.</li>
+</ol>
+<p>This progression reduces debugging complexity.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.127 Common Implementation Mistakes</h3>
+<p>Some errors appear repeatedly.</p>
+<h4>Explicit matrix inversion</h4>
+<p>Computing \(S^{-1}\) directly when a linear solve would be more stable.</p>
+<h4>Incorrect \(Q\) discretization</h4>
+<p>Using continuous noise covariance directly as discrete covariance.</p>
+<h4>Ignoring covariance symmetry</h4>
+<p>Allowing small numerical asymmetry to accumulate.</p>
+<h4>Using the simplified covariance update</h4>
+<p>when numerical robustness requires the Joseph form.</p>
+<h4>Incorrect timestamp handling</h4>
+<p>Applying delayed measurements at the current epoch.</p>
+<h4>Wrong frame convention</h4>
+<p>Mixing body, inertial, orbital, or sensor-frame vectors.</p>
+<h4>Quaternion convention mismatch</h4>
+<p>Mixing scalar-first/scalar-last or left/right multiplicative conventions.</p>
+<h4>Hard-coded state indices</h4>
+<p>causing errors when the state vector changes.</p>
+<h4>Ignoring units</h4>
+<p>particularly degrees versus radians.</p>
+<h4>Treating simulation truth as estimator input</h4>
+<p>which creates unrealistically good navigation.</p>
+<h4>No runtime health monitoring</h4>
+<p>allowing NaNs or invalid covariance to propagate to GNC.</p>
+</section><section class="notes-section-card">
+<h3>4.2.28.128 Practical Checklist</h3>
+<p>Before an estimator is considered implementation-ready, verify:</p>
+<h4><strong>Dynamics</strong></h4>
+<ul>
+<li>state equations verified,</li>
+<li>state transition verified,</li>
+<li>integration timestep justified.</li>
+</ul>
+<h4><strong>Noise</strong></h4>
+<ul>
+<li>continuous/discrete distinction correct,</li>
+<li>\(Q_d\) derivation verified,</li>
+<li>\(R\) units correct.</li>
+</ul>
+<h4><strong>Numerics</strong></h4>
+<ul>
+<li>no unnecessary matrix inversion,</li>
+<li>covariance symmetry preserved,</li>
+<li>positive-semidefinite behaviour checked,</li>
+<li>matrix conditioning acceptable.</li>
+</ul>
+<h4><strong>Attitude</strong></h4>
+<ul>
+<li>quaternion convention documented,</li>
+<li>normalization implemented,</li>
+<li>error injection/reset verified.</li>
+</ul>
+<h4><strong>Timing</strong></h4>
+<ul>
+<li>actual timestamps used,</li>
+<li>asynchronous updates supported,</li>
+<li>delayed measurements handled consistently.</li>
+</ul>
+<h4><strong>Software</strong></h4>
+<ul>
+<li>state indices centralized,</li>
+<li>interfaces documented,</li>
+<li>memory bounded,</li>
+<li>execution time measured.</li>
+</ul>
+<h4><strong>Health</strong></h4>
+<ul>
+<li>innovation monitoring,</li>
+<li>covariance monitoring,</li>
+<li>invalid-value detection,</li>
+<li>reset strategy defined.</li>
+</ul>
+<h4><strong>Verification</strong></h4>
+<ul>
+<li>unit tests,</li>
+<li>analytical cases,</li>
+<li>Monte Carlo,</li>
+<li>SIL,</li>
+<li>HIL,</li>
+<li>closed-loop tests.</li>
+</ul>
+</section><section class="notes-section-card">
+<h3>4.2.28.129 Complete Practical Filter Execution Cycle</h3>
+<p>A practical estimator cycle can be summarized as</p>
+<div class="equation-box">
+\[
+\boxed{
+\begin{array}{c}
+\text{Receive Time / Inputs}\\
+\downarrow\\
+\text{Compute }\Delta t\\
+\downarrow\\
+\text{Propagate State}\\
+\downarrow\\
+\text{Propagate Covariance}\\
+\downarrow\\
+\text{Restore Numerical Symmetry}\\
+\downarrow\\
+\text{Process Available Measurements}\\
+\downarrow\\
+\text{Validate / Gate}\\
+\downarrow\\
+\text{Solve for Kalman Gain}\\
+\downarrow\\
+\text{Correct State}\\
+\downarrow\\
+\text{Joseph Covariance Update}\\
+\downarrow\\
+\text{Normalize / Reset Manifold States}\\
+\downarrow\\
+\text{Check Numerical Health}\\
+\downarrow\\
+\text{Publish State + Covariance + Health}
+\end{array}
+}
+\]
+</div>
+<p>This is much closer to a real navigation implementation than the short textbook expression</p>
+<div class="equation-box">
+\[
+\text{predict}\rightarrow\text{update}.
+\]
+</div>
+</section><section class="notes-section-card">
+<h3>4.2.28.130 Key Takeaways</h3>
+<h4><strong>Practical filter implementation is the engineering discipline that converts estimator mathematics into reliable real-time navigation software.</strong></h4>
+<p>The most important principles are:</p>
+<ul>
+<li>Continuous spacecraft dynamics must be discretized carefully.</li>
+<li>State and covariance propagation should be treated as separate numerical problems.</li>
+<li>Continuous process spectral density and discrete process covariance are not the same quantity.</li>
+<li>Covariance propagation must preserve physically meaningful uncertainty.</li>
+<li>Covariance should remain symmetric and positive semidefinite.</li>
+<li>Joseph-form covariance updates provide improved numerical robustness.</li>
+<li>Explicit matrix inversions should generally be replaced by linear solves.</li>
+<li>Matrix conditioning and state scaling strongly influence numerical stability.</li>
+<li>Quaternion normalization and convention management are essential for attitude estimators.</li>
+<li>ESKF/MEKF error injection and covariance reset must be implemented consistently.</li>
+<li>Actual timestamps should be used when propagation intervals vary.</li>
+<li>Multi-rate and asynchronous measurements should be processed according to measurement time.</li>
+<li>Delayed measurements require explicit handling.</li>
+<li>Measurement gating should use statistically meaningful innovation covariance.</li>
+<li>State dimension directly affects computational and verification cost.</li>
+<li>Large estimators may benefit from sparse, square-root, or alternative formulations.</li>
+<li>Units, coordinate frames, sensor alignment, and lever arms are part of the estimator implementation.</li>
+<li>Truth data must remain separated from the navigation estimator in simulation.</li>
+<li>Measurement and estimator-output buses improve integration and traceability.</li>
+<li>Navigation output should include covariance, health, freshness, and validity.</li>
+<li>Real-time estimator design must consider worst-case execution time, not only average runtime.</li>
+<li>Memory use should be predictable and bounded.</li>
+<li>Estimator numerical failures must have defined detection and recovery behaviour.</li>
+<li>Logging innovations and covariance is fundamental for debugging and validation.</li>
+<li>Deterministic replay is extremely valuable for reproducing navigation problems.</li>
+<li>Unit tests, analytical tests, zero-noise tests, and single-sensor tests should precede full Monte Carlo campaigns.</li>
+<li>SIL, processor-in-the-loop, HIL, and closed-loop GNC verification progressively increase implementation realism.</li>
+<li>Filter configuration, calibration, and tuning parameters should be version controlled.</li>
+<li>Practical estimator software should be deterministic, bounded, observable, testable, and recoverable.</li>
+</ul>
+<p>The central principle is</p>
+<div class="equation-box">
+\[
+\boxed{
+\begin{array}{c}
+\text{A mathematically correct estimator is not automatically a reliable navigation system.}\\[4pt]
+\text{Reliable implementation requires correct discretization, stable numerical algebra,}\\
+\text{consistent timing and frames, controlled computation, covariance integrity,}\\
+\text{software health monitoring, and rigorous verification.}
+\end{array}
+}
+\]
+</div>
+<p>The natural next section is <strong>4.2.29 Simulink Implementation of Sensor Fusion</strong>, where these implementation principles move into a structured model-based environment: truth dynamics, sensor-model blocks, measurement buses, estimator subsystems, scheduling, logging, covariance outputs, and closed-loop GNC integration.</p>
+</section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.2.29 Simulink Implementation of Sensor Fusion</h2>
+      <p>
+        After developing continuous-to-discrete conversion, numerical state and covariance propagation,
+        matrix conditioning, Joseph-form covariance updates, timestamp-driven scheduling, multi-rate
+        measurement processing, embedded execution, estimator health monitoring, logging, SIL/HIL
+        verification, and practical flight-software safeguards, the next section places these ideas into
+        a structured model-based implementation environment.
+      </p>
+
+      <a href="simulink-sensor-fusion.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2.29 Simulink Implementation of Sensor Fusion</h3>
+          <p>
+            Truth dynamics, sensor-model blocks, measurement buses, estimator subsystems, prediction and
+            update scheduling, multi-rate processing, logging, state outputs, covariance outputs, and
+            closed-loop GNC integration.
+          </p>
+          <p class="sensor-link-arrow">Continue to Simulink Sensor Fusion &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics. Educational resource for spacecraft dynamics, orbital mechanics, guidance–navigation–control systems, sensor modelling, state estimation, and spacecraft sensor fusion.</p>
+  </footer>
+</body>
+</html>
