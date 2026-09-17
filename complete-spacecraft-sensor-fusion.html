@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.2.32 Complete Spacecraft Sensor-Fusion Architecture | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Complete Spacecraft Sensor-Fusion Architecture</h1>
+    <p class="notes-tagline">
+      End-to-end spacecraft navigation architecture combining truth dynamics, environmental models, sensor physics, hardware interfaces, timing, calibration, preprocessing, measurement validation, attitude and translational estimation, relative navigation, covariance and integrity monitoring, FDIR, mode management, guidance–control interfaces, real-time implementation, verification, and flight validation.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.2.32 Complete Spacecraft Sensor-Fusion Architecture</h2>
+      <p>A spacecraft sensor-fusion system is not simply a Kalman filter connected to several sensors. It is a complete navigation architecture that begins with the physical spacecraft and its environment, passes through sensor hardware and measurement processing, estimates the spacecraft state and associated uncertainty, evaluates the health and integrity of that estimate, and finally provides navigation information to guidance, control, autonomy, and mission-management functions.</p>
+      <p>The complete chain can be represented conceptually as</p>
+      <p>
+        \[
+        \boxed{ \text{Truth Dynamics} \rightarrow \text{Sensors} \rightarrow \text{Signal Processing} \rightarrow \text{Measurement Validation} \rightarrow \text{State Estimation} \rightarrow \text{Navigation Solution} \rightarrow \text{Guidance and Control} }
+        \]
+      </p>
+      <p>However, an operational spacecraft architecture contains many additional paths:</p>
+      <p>
+        \[
+        \boxed{ \begin{aligned} &\text{Environment}\\ &\downarrow\\ &\text{Spacecraft Truth Dynamics}\\ &\downarrow\\ &\text{Sensor Physics}\\ &\downarrow\\ &\text{Sensor Electronics / Interfaces}\\ &\downarrow\\ &\text{Time Synchronization}\\ &\downarrow\\ &\text{Calibration and Preprocessing}\\ &\downarrow\\ &\text{Measurement Validation and FDIR}\\ &\downarrow\\ &\text{Sensor Fusion / State Estimation}\\ &\downarrow\\ &\text{Navigation State + Covariance + Health}\\ &\downarrow\\ &\text{Guidance / Control / Autonomy} \end{aligned} }
+        \]
+      </p>
+      <p>At the same time, information travels in the opposite direction. Mission mode determines which sensors are enabled, guidance determines what navigation accuracy is required, attitude control determines pointing geometry, and estimator health may restrict what guidance or control functions are permitted.</p>
+      <p>Therefore, spacecraft sensor fusion is fundamentally a <strong>closed information architecture</strong>, not a one-way signal-processing chain.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.1 Purpose of the Complete Architecture</h3>
+      <p>The purpose of the complete sensor-fusion architecture is to transform imperfect, asynchronous, noisy, biased, and sometimes unavailable sensor measurements into a navigation solution that is sufficiently accurate, timely, consistent, observable, and reliable for spacecraft operations.</p>
+      <p>The architecture must answer several questions simultaneously:</p>
+      <ul>
+        <li>What is the spacecraft state?</li>
+        <li>How uncertain is that estimate?</li>
+        <li>Which sensors contributed to it?</li>
+        <li>Are those sensors healthy?</li>
+        <li>Are the measurements mutually consistent?</li>
+        <li>Is the state sufficiently observable?</li>
+        <li>Is the navigation solution valid for the present mission mode?</li>
+        <li>Is the information recent enough for control?</li>
+        <li>Can the spacecraft continue operating if one sensor disappears?</li>
+        <li>Should guidance or control be restricted because navigation quality has degraded?</li>
+      </ul>
+      <p>Thus the navigation output is not merely</p>
+      <p>
+        \[
+        \hat{\mathbf x}.
+        \]
+      </p>
+      <p>A more realistic output is</p>
+      <p>
+        \[
+        \boxed{ \mathcal N = \left\{ \hat{\mathbf x}, \mathbf P, t, NavValid, NavMode, SensorHealth, QualityFlags \right\}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> the estimator output is only one part of the navigation product. A flight architecture must also communicate whether that estimate is fresh, valid, sufficiently observable, and suitable for the current operational mode.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.2 The Physical Truth Layer</h3>
+      <p>Every sensor-fusion problem begins with a physical system.</p>
+      <p>Let the true spacecraft state be represented by</p>
+      <p>
+        \[
+        \mathbf x_{true} = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \boldsymbol{\omega}\\ \mathbf b\\ \mathbf p \end{bmatrix},
+        \]
+      </p>
+      <p>where the exact states depend on the mission.</p>
+      <p>Possible states include position, velocity, attitude quaternion, angular velocity, gyro bias, accelerometer bias, clock states, sensor calibration parameters, relative states, environmental parameters, and other quantities required by the estimator.</p>
+      <p>The truth dynamics may be written generally as</p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf x}_{true} = f_{true} ( \mathbf x_{true}, \mathbf u_{actual}, \mathbf d, \mathbf p_{true}, t ). }
+        \]
+      </p>
+      <p>The truth model represents what the spacecraft is physically doing.</p>
+      <p>It must be distinguished from the estimator propagation model.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.3 Truth Model Versus Estimator Model</h3>
+      <p>A critical architectural principle is</p>
+      <p>
+        \[
+        \boxed{ f_{true} \neq f_{est} }
+        \]
+      </p>
+      <p>in realistic verification.</p>
+      <p>The estimator may propagate</p>
+      <p>
+        \[
+        \dot{\hat{\mathbf x}} = f_{est} ( \hat{\mathbf x}, \mathbf u, \mathbf p_{nom} ).
+        \]
+      </p>
+      <p>The real spacecraft contains modeling errors, disturbances, parameter uncertainty, sensor imperfections, actuator uncertainty, and environmental effects that cannot be represented perfectly onboard.</p>
+      <p>If truth and estimator models are identical during simulation, the navigation problem can become artificially easy.</p>
+      <p>The difference between them is one of the reasons process uncertainty</p>
+      <p>
+        \[
+        \mathbf Q
+        \]
+      </p>
+      <p>is required.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.4 Environment Layer</h3>
+      <p>Sensors do not observe spacecraft states in isolation. Their measurements depend on the surrounding physical environment.</p>
+      <p>Relevant environmental quantities may include</p>
+      <p>
+        \[
+        \boxed{ \text{Gravity} + \text{Magnetic Field} + \text{Sun Direction} + \text{Atmosphere} + \text{Celestial Geometry} + \text{Target Geometry} + \text{RF Environment}. }
+        \]
+      </p>
+      <p>For example, a magnetometer requires a magnetic-field model, a Sun sensor depends on Sun-spacecraft geometry, a star tracker requires star visibility, GNSS depends on transmitting satellite geometry and signal availability, and optical relative-navigation sensors depend on target illumination and line of sight.</p>
+      <p>Consequently,</p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Measurement} = f( \text{Spacecraft State}, \text{Environment}, \text{Sensor Physics} ). }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.5 Reference Frames</h3>
+      <p>Before measurements can be fused, every quantity must have an unambiguous reference frame.</p>
+      <p>Typical frames can include inertial, orbital/local, Earth-fixed, spacecraft body, sensor, camera, antenna, target, and relative-navigation frames.</p>
+      <p>A sensor measurement obtained in sensor frame <code>S</code> may require transformation into body frame <code>B</code>:</p>
+      <p>
+        \[
+        \mathbf v^B = \mathbf C_S^B\mathbf v^S.
+        \]
+      </p>
+      <p>If the mounting transformation is wrong, the estimator may interpret a frame error as a physical state error.</p>
+      <p>Therefore every sensor interface should explicitly define:</p>
+      <p>
+        \[
+        \boxed{ \text{Frame} + \text{Origin} + \text{Axis Convention} + \text{Rotation Convention} + \text{Units}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.6 Sensor Layer</h3>
+      <p>The sensor layer converts physical quantities into measurements.</p>
+      <p>A general sensor model is</p>
+      <p>
+        \[
+        \boxed{ \mathbf z = h(\mathbf x) + \mathbf b + \mathbf n + \boldsymbol{\epsilon}. }
+        \]
+      </p>
+      <p>Here,</p>
+      <p>
+        \[
+        h(\mathbf x)
+        \]
+      </p>
+      <p>represents the ideal measurement relationship,</p>
+      <p>
+        \[
+        \mathbf b
+        \]
+      </p>
+      <p>represents bias,</p>
+      <p>
+        \[
+        \mathbf n
+        \]
+      </p>
+      <p>represents stochastic noise, and</p>
+      <p>
+        \[
+        \boldsymbol{\epsilon}
+        \]
+      </p>
+      <p>collects calibration, alignment, scale-factor, timing, nonlinear, or other imperfections.</p>
+      <p>Different spacecraft sensors observe different parts of the state and therefore contribute different information to the fused solution.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.7 Inertial Measurement Unit</h3>
+      <p>An IMU commonly contains gyroscopes and accelerometers.</p>
+      <p>The gyroscope measurement can be represented as</p>
+      <p>
+        \[
+        \boldsymbol{\omega}_m = \boldsymbol{\omega} + \mathbf b_g + \mathbf n_g.
+        \]
+      </p>
+      <p>The accelerometer measurement can be represented as</p>
+      <p>
+        \[
+        \mathbf f_m = \mathbf f + \mathbf b_a + \mathbf n_a.
+        \]
+      </p>
+      <p>More complete models may include scale factors, axis non-orthogonality, temperature dependence, quantization, saturation, random walk, bias instability, and mounting misalignment.</p>
+      <p>The important architectural characteristic of an IMU is that it usually provides <strong>high-rate propagation information</strong>, but its errors accumulate with time.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \text{High Rate} + \text{Excellent Short-Term Continuity} + \text{Long-Term Drift}. }
+        \]
+      </p>
+      <p>This makes inertial sensing particularly valuable when combined with absolute or externally referenced measurements.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.8 GNSS Measurements</h3>
+      <p>Where GNSS signals are available and suitable for the mission, GNSS can provide absolute navigation information.</p>
+      <p>Depending on architecture, the estimator may use a processed navigation solution,</p>
+      <p>
+        \[
+        \mathbf z_{GNSS} = \begin{bmatrix} \mathbf r_{GNSS}\\ \mathbf v_{GNSS} \end{bmatrix},
+        \]
+      </p>
+      <p>or more fundamental measurements such as pseudorange and Doppler.</p>
+      <p>The distinction leads naturally to loose and tight coupling.</p>
+      <p>GNSS can constrain long-term inertial drift, while the IMU provides high-rate propagation between GNSS measurements.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.9 Star Tracker</h3>
+      <p>A star tracker provides an externally referenced attitude measurement.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        q_m = q_{true}\otimes\delta q.
+        \]
+      </p>
+      <p>It can strongly constrain attitude drift accumulated through gyro propagation.</p>
+      <p>However, practical architecture must consider acquisition time, field of view, update rate, blinding, lost-in-space conditions, processing latency, measurement validity, and quaternion conventions.</p>
+      <p>A common conceptual relationship is therefore</p>
+      <p>
+        \[
+        \boxed{ \text{Gyroscope} \rightarrow \text{High-Rate Attitude Propagation} }
+        \]
+      </p>
+      <p>combined with</p>
+      <p>
+        \[
+        \boxed{ \text{Star Tracker} \rightarrow \text{Absolute Attitude Correction}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.10 Sun Sensors</h3>
+      <p>Sun sensors provide direction information relative to the Sun.</p>
+      <p>A normalized measurement may be represented as</p>
+      <p>
+        \[
+        \mathbf s_m^B \approx \mathbf C_I^B\mathbf s^I + \mathbf n_s.
+        \]
+      </p>
+      <p>Sun sensors may provide coarse or precise attitude information depending on the sensor type.</p>
+      <p>Their usefulness depends on visibility and geometry, so eclipse conditions and field-of-view constraints must be incorporated into the architecture.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.11 Magnetometer</h3>
+      <p>A magnetometer measures the local magnetic-field vector:</p>
+      <p>
+        \[
+        \mathbf B_m^B = \mathbf C_I^B\mathbf B^I + \mathbf b_m + \mathbf n_m.
+        \]
+      </p>
+      <p>When combined with an environmental magnetic-field model, it can contribute attitude information.</p>
+      <p>Magnetometers are also sensitive to spacecraft-generated magnetic disturbances, calibration errors, hard-iron and soft-iron effects, and mounting uncertainty.</p>
+      <p>Therefore the measurement must be calibrated and validated before fusion.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.12 Camera Measurements</h3>
+      <p>Cameras can provide angular, feature, landmark, centroid, line-of-sight, or relative-pose information.</p>
+      <p>A fundamental pinhole projection is</p>
+      <p>
+        \[
+        u=f_x\frac{X}{Z}+c_x,
+        \]
+      </p>
+      <p>
+        \[
+        v=f_y\frac{Y}{Z}+c_y.
+        \]
+      </p>
+      <p>The estimator generally should not treat the image itself as a state measurement without appropriate processing.</p>
+      <p>The processing chain may instead be</p>
+      <p>
+        \[
+        \boxed{ \text{Image} \rightarrow \text{Calibration} \rightarrow \text{Feature Detection} \rightarrow \text{Association} \rightarrow \text{Geometric Measurement} \rightarrow \text{Fusion}. }
+        \]
+      </p>
+      <p>Camera performance depends strongly on geometry, illumination, calibration, target appearance, feature quality, processing latency, and field of view.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.13 LiDAR and Range Sensors</h3>
+      <p>LiDAR may provide range, range-rate, point-cloud, bearing, or relative-pose information depending on the hardware and processing architecture.</p>
+      <p>A basic range measurement is</p>
+      <p>
+        \[
+        \rho_m = \|\mathbf r_{target}-\mathbf r_{sensor}\| + n_\rho.
+        \]
+      </p>
+      <p>More advanced processing may produce</p>
+      <p>
+        \[
+        \mathbf z_{LiDAR} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf q_{rel} \end{bmatrix}.
+        \]
+      </p>
+      <p>The measurement covariance should reflect actual geometric and processing uncertainty rather than treating every LiDAR solution as equally accurate.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.14 Other Navigation Sensors</h3>
+      <p>A complete architecture may also accommodate horizon sensors, optical navigation sensors, laser rangefinders, radar, RF ranging, inter-satellite links, Doppler measurements, celestial-navigation measurements, altimeters, or mission-specific payload-derived navigation information.</p>
+      <p>The architecture should therefore be modular.</p>
+      <p>A sensor should ideally enter through a standardized interface containing</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_j,\; \mathbf R_j,\; t_j,\; valid_j,\; health_j,\; frame_j,\; mode_j. }
+        \]
+      </p>
+      <p>This prevents the estimator from being tightly coupled to a particular hardware implementation unless such coupling is deliberately required.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.15 Sensor Hardware Interface Layer</h3>
+      <p>Before estimation begins, raw measurements pass through physical and software interfaces.</p>
+      <p>These may include serial links, CAN, SpaceWire, Ethernet, SPI, UART, custom buses, or other spacecraft communication interfaces.</p>
+      <p>The navigation architecture must handle more than the numerical measurement value.</p>
+      <p>It must also manage timestamps, packet validity, sequence counters, status words, sensor modes, CRC or communication errors, stale data, missing packets, and initialization state.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Packet} \neq \text{Measurement Value Alone}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.16 Time as Part of the Measurement</h3>
+      <p>Every measurement must be associated with the time at which it represents the physical state.</p>
+      <p>A measurement can be written more correctly as</p>
+      <p>
+        \[
+        \boxed{ \mathbf z(t_m) }
+        \]
+      </p>
+      <p>rather than simply <code>\mathbf z</code>.</p>
+      <p>If it arrives at</p>
+      <p>
+        \[
+        t_a=t_m+\tau,
+        \]
+      </p>
+      <p>the estimator must distinguish measurement time from arrival time.</p>
+      <p>This becomes especially important when combining high-rate IMU data with slower cameras, GNSS receivers, star trackers, or LiDAR systems.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.17 Time Synchronization</h3>
+      <p>Sensor clocks may not be perfectly synchronized.</p>
+      <p>Possible timing errors include clock offset, drift, jitter, processing latency, communication delay, timestamp quantization, and scheduling uncertainty.</p>
+      <p>A timing error</p>
+      <p>
+        \[
+        \delta t
+        \]
+      </p>
+      <p>can become a state error.</p>
+      <p>Approximately,</p>
+      <p>
+        \[
+        \delta\mathbf r \approx \mathbf v\,\delta t,
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \delta\boldsymbol{\theta} \approx \boldsymbol{\omega}\,\delta t.
+        \]
+      </p>
+      <p>Therefore timing is part of navigation accuracy.</p>
+      <p><strong>Why this matters:</strong> timing errors are state errors in disguise. Even a precise sensor can degrade navigation if its data are associated with the wrong epoch, especially during rapid translation or rotation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.18 Multi-Rate Architecture</h3>
+      <p>Spacecraft sensors generally operate at different rates:</p>
+      <p>
+        \[
+        f_{IMU}\neq f_{GNSS}\neq f_{camera}\neq f_{LiDAR}\neq f_{star}.
+        \]
+      </p>
+      <p>The estimator must therefore support asynchronous updates.</p>
+      <p>Propagation may occur at a high rate:</p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k+1}^{-} = f( \hat{\mathbf x}_{k}^{+}, \mathbf u_k ),
+        \]
+      </p>
+      <p>while a sensor update is performed only when its measurement becomes available.</p>
+      <p>Thus the correct concept is</p>
+      <p>
+        \[
+        \boxed{ \text{Continuous/High-Rate Propagation} + \text{Event-Driven Measurement Updates}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.19 Calibration Layer</h3>
+      <p>Raw sensor outputs should normally pass through calibration before fusion.</p>
+      <p>A generic calibrated measurement may be written as</p>
+      <p>
+        \[
+        \mathbf z_{cal} = \mathbf C_{align} \mathbf S^{-1} ( \mathbf z_{raw}-\mathbf b ).
+        \]
+      </p>
+      <p>Calibration can account for bias, scale factor, non-orthogonality, mounting alignment, boresight error, lever arms, temperature effects, camera intrinsics, camera distortion, and other sensor-specific effects.</p>
+      <p>A poorly calibrated measurement can be precise but wrong.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.20 Preprocessing Layer</h3>
+      <p>Preprocessing converts sensor-specific raw information into estimator-ready measurements.</p>
+      <p>Possible operations include filtering, coordinate transformation, unit conversion, feature extraction, centroiding, image processing, point-cloud processing, synchronization, compensation, interpolation, quality assessment, and packet validation.</p>
+      <p>A useful architectural separation is</p>
+      <p>
+        \[
+        \boxed{ \text{Raw Sensor Data} \rightarrow \text{Sensor-Specific Processing} \rightarrow \text{Estimator Measurement}. }
+        \]
+      </p>
+      <p>This prevents sensor-specific implementation details from unnecessarily contaminating the estimator core.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.21 Measurement Model Layer</h3>
+      <p>For every sensor,</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_j = h_j(\mathbf x) + \mathbf v_j. }
+        \]
+      </p>
+      <p>For nonlinear estimators, the measurement Jacobian may be</p>
+      <p>
+        \[
+        \mathbf H_j = \frac{\partial h_j}{\partial\mathbf x}.
+        \]
+      </p>
+      <p>The measurement model is the mathematical bridge between the physical quantity measured by a sensor and the state being estimated.</p>
+      <p>Incorrect measurement models can produce apparently reasonable but systematically biased navigation solutions.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.22 Measurement Covariance</h3>
+      <p>Each measurement should be accompanied by an uncertainty representation</p>
+      <p>
+        \[
+        \mathbf R_j.
+        \]
+      </p>
+      <p>This covariance determines how strongly the estimator should trust the measurement relative to its predicted state.</p>
+      <p>It should represent the uncertainty of the <strong>actual estimator input</strong>, not merely a sensor datasheet number copied without considering preprocessing.</p>
+      <p>For example, a pose solution derived from an image may contain uncertainty from pixel noise, feature extraction, calibration, geometry, and pose-solution conditioning.</p>
+      <p><strong>Practical interpretation:</strong> covariance should describe the uncertainty of the quantity actually entering the estimator after calibration and preprocessing. Using a raw datasheet noise number for a processed pose, feature, or fused sensor product can make the filter systematically overconfident.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.23 Measurement Validity</h3>
+      <p>Before fusion, every measurement should pass basic validity checks.</p>
+      <p>A measurement can conceptually have</p>
+      <p>
+        \[
+        valid_j\in\{0,1\}.
+        \]
+      </p>
+      <p>Validity may depend on hardware status, field of view, signal strength, feature count, geometry, range, timestamp age, saturation, processing convergence, quality flags, or communication integrity.</p>
+      <p>Invalid data should not automatically reach the estimator merely because a packet was received.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.24 Plausibility Checking</h3>
+      <p>Measurements should also be checked against physically reasonable limits.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        z_{min}\le z_m\le z_{max}.
+        \]
+      </p>
+      <p>Rate-of-change limits may also be applied:</p>
+      <p>
+        \[
+        |\dot z_m|\le\dot z_{max}.
+        \]
+      </p>
+      <p>These checks can detect obvious corruption before statistical innovation testing.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.25 Innovation Generation</h3>
+      <p>For a predicted state</p>
+      <p>
+        \[
+        \hat{\mathbf x}^{-},
+        \]
+      </p>
+      <p>the predicted measurement is</p>
+      <p>
+        \[
+        \hat{\mathbf z} = h(\hat{\mathbf x}^{-}).
+        \]
+      </p>
+      <p>The innovation is</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\nu} = \mathbf z-\hat{\mathbf z}. }
+        \]
+      </p>
+      <p>This quantity represents the disagreement between the incoming sensor information and the estimator prediction.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.26 Innovation Covariance</h3>
+      <p>The expected innovation covariance is</p>
+      <p>
+        \[
+        \boxed{ \mathbf S = \mathbf H\mathbf P^{-}\mathbf H^T+\mathbf R. }
+        \]
+      </p>
+      <p>A large innovation is not automatically bad.</p>
+      <p>Its significance depends on how uncertain the predicted state and measurement are.</p>
+      <p>This is why innovation magnitude should normally be interpreted together with <code>\mathbf S</code>.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.27 Statistical Measurement Gating</h3>
+      <p>The Normalized Innovation Squared is</p>
+      <p>
+        \[
+        \boxed{ \epsilon_\nu = \boldsymbol{\nu}^T \mathbf S^{-1} \boldsymbol{\nu}. }
+        \]
+      </p>
+      <p>A measurement can be compared against a statistical threshold</p>
+      <p>
+        \[
+        \epsilon_\nu\le\gamma.
+        \]
+      </p>
+      <p>Measurements outside the gate may be rejected, down-weighted, flagged, or passed to fault-management logic depending on the architecture.</p>
+      <p>A single rejected measurement need not imply sensor failure. Persistent inconsistency is generally more informative.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.28 Outlier Rejection</h3>
+      <p>Real sensors can occasionally produce outliers.</p>
+      <p>Therefore the architecture should distinguish</p>
+      <p>
+        \[
+        \boxed{ \text{Normal Measurement} \neq \text{Outlier} \neq \text{Persistent Sensor Fault}. }
+        \]
+      </p>
+      <p>Outlier protection prevents one abnormal measurement from causing a disproportionate navigation-state correction.</p>
+      <p>Repeated outliers may instead indicate calibration problems, timing errors, geometry problems, or hardware degradation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.29 Navigation State Propagation</h3>
+      <p>Between measurement updates, the estimator propagates its state:</p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k+1}^{-} = f( \hat{\mathbf x}_{k}^{+}, \mathbf u_k ).
+        \]
+      </p>
+      <p>For an EKF-type formulation, covariance propagation can be written</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_{k+1}^{-} = \mathbf F_k \mathbf P_k^{+} \mathbf F_k^T + \mathbf Q_k. }
+        \]
+      </p>
+      <p>Propagation provides continuity even when external measurements are temporarily unavailable.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.30 Measurement Update</h3>
+      <p>When a valid measurement becomes available,</p>
+      <p>
+        \[
+        \mathbf K = \mathbf P^{-}\mathbf H^T \left( \mathbf H\mathbf P^{-}\mathbf H^T+\mathbf R \right)^{-1},
+        \]
+      </p>
+      <p>followed by</p>
+      <p>
+        \[
+        \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + \mathbf K\boldsymbol{\nu}.
+        \]
+      </p>
+      <p>The covariance is then updated consistently.</p>
+      <p>This illustrates the central principle of sensor fusion:</p>
+      <p>
+        \[
+        \boxed{ \text{Model Prediction} + \text{Measurement Information} \rightarrow \text{Improved State Estimate}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.31 Attitude Estimation Branch</h3>
+      <p>Attitude estimation may combine gyroscopes with star trackers, Sun sensors, magnetometers, horizon sensors, cameras, or other attitude references.</p>
+      <p>A typical architecture is</p>
+      <p>
+        \[
+        \boxed{ \text{Gyro} \rightarrow \text{Attitude Propagation} }
+        \]
+      </p>
+      <p>with external measurements providing corrections.</p>
+      <p>Possible estimated states include</p>
+      <p>
+        \[
+        \mathbf x_{att} = \begin{bmatrix} \delta\boldsymbol{\theta}\\ \mathbf b_g \end{bmatrix}.
+        \]
+      </p>
+      <p>For quaternion-based systems, the architecture must preserve quaternion normalization and handle the attitude error using an appropriate multiplicative representation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.32 Translational Navigation Branch</h3>
+      <p>Translational navigation estimates position and velocity.</p>
+      <p>A generic state is</p>
+      <p>
+        \[
+        \mathbf x_{trans} = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}.
+        \]
+      </p>
+      <p>Depending on the spacecraft and operating environment, measurements may come from GNSS, inertial sensing, ranging systems, optical navigation, radar, altimeters, inter-satellite measurements, or other navigation sources.</p>
+      <p>The architecture may estimate translation independently or jointly with attitude.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.33 Coupling Between Attitude and Translation</h3>
+      <p>Attitude and translation are not always independent.</p>
+      <p>For example, accelerometer measurements must be transformed using attitude:</p>
+      <p>
+        \[
+        \mathbf a^I = \mathbf C_B^I\mathbf f^B+\mathbf g^I.
+        \]
+      </p>
+      <p>An attitude error therefore produces an acceleration-direction error.</p>
+      <p>Similarly, camera or LiDAR measurements depend on sensor pointing.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Attitude Error} \rightarrow \text{Measurement Geometry Error} \rightarrow \text{Translation Error}. }
+        \]
+      </p>
+      <p>The architecture must decide whether to maintain separate estimators or a coupled state estimator.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.34 Absolute and Relative Navigation</h3>
+      <p>Some spacecraft operations require both absolute and relative navigation.</p>
+      <p>Absolute navigation may estimate</p>
+      <p>
+        \[
+        \mathbf r,\mathbf v,q,\boldsymbol{\omega},
+        \]
+      </p>
+      <p>with respect to an inertial, Earth-fixed, or orbital reference.</p>
+      <p>Relative navigation may estimate</p>
+      <p>
+        \[
+        \mathbf r_{rel}, \mathbf v_{rel}, q_{rel}, \boldsymbol{\omega}_{rel}
+        \]
+      </p>
+      <p>between two objects.</p>
+      <p>The two solutions can coexist within the same navigation architecture.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.35 General RPO Navigation Architecture</h3>
+      <p>For general rendezvous and proximity operations, sensor usefulness changes with geometry, range, illumination, visibility, and required accuracy.</p>
+      <p>A conceptual progression can be</p>
+      <p>
+        \[
+        \boxed{ \text{Absolute Navigation} \rightarrow \text{Long-Range Relative Information} \rightarrow \text{Optical/Relative Navigation} \rightarrow \text{Precision Relative Navigation}. }
+        \]
+      </p>
+      <p>This should not be interpreted as a universal sensor sequence. Actual missions select sensors according to their operational environment and design.</p>
+      <p>The important architecture principle is that the estimator must support changing measurement availability while maintaining a continuous, uncertainty-aware navigation solution.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.36 Sensor Handover</h3>
+      <p>Sensor handover occurs when one measurement source becomes less useful and another becomes more informative.</p>
+      <p>A robust handover should avoid</p>
+      <p>
+        \[
+        \text{State Jump}, \qquad \text{Covariance Discontinuity}, \qquad \text{False Innovation Rejection}.
+        \]
+      </p>
+      <p>Ideally,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}(t^-)\approx\hat{\mathbf x}(t^+) }
+        \]
+      </p>
+      <p>while the information sources contributing to that estimate change.</p>
+      <p>Overlap between sensors can be valuable because it allows consistency to be checked before one source becomes dominant.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.37 Estimator Handover</h3>
+      <p>Sensor handover and estimator handover are not identical.</p>
+      <p>A system may keep one estimator and change its measurement set.</p>
+      <p>Alternatively, different mission phases may use different estimators.</p>
+      <p>If estimator handover is required, state, covariance, frame conventions, timestamps, bias states, validity, and uncertainty must all be transferred consistently.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Estimator Handover} > \text{Copy State Vector Only}. }
+        \]
+      </p>
+      <p><strong>Handover requirement:</strong> continuity must be preserved in both the state and its uncertainty. Transferring only the state vector while discarding covariance, bias-state knowledge, frame definitions, or time history can create an apparently smooth but statistically inconsistent transition.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.38 Centralized Architecture</h3>
+      <p>A centralized estimator receives multiple measurement sources and estimates a common state.</p>
+      <p>
+        \[
+        \boxed{ z_1,z_2,\ldots,z_n \rightarrow \text{Central Estimator} \rightarrow \hat x,P. }
+        \]
+      </p>
+      <p>Advantages include direct use of cross-state correlations and a conceptually unified solution.</p>
+      <p>Disadvantages may include computational concentration, interface complexity, larger state dimension, and stronger coupling among sensor implementations.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.39 Decentralized Architecture</h3>
+      <p>In a decentralized architecture, local estimators process subsets of information.</p>
+      <p>
+        \[
+        Sensor_i \rightarrow LocalFilter_i.
+        \]
+      </p>
+      <p>Their outputs are subsequently combined or used independently.</p>
+      <p>This can improve modularity, fault isolation, processing distribution, and graceful degradation.</p>
+      <p>However, correlations between local estimates must be handled carefully.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.40 Federated Architecture</h3>
+      <p>A federated system contains multiple local filters whose information is combined by a master fusion process.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{ccc} Filter_1 & Filter_2 & Filter_3\\ \downarrow & \downarrow & \downarrow\\ & Master\ Fusion & \end{array} }
+        \]
+      </p>
+      <p>The architecture must define information sharing, covariance treatment, reset or feedback behavior, and cross-correlation assumptions.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.41 Cascaded Architecture</h3>
+      <p>In a cascaded architecture, one estimator's output becomes another estimator's input.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Processing} \rightarrow \text{Local Pose Estimate} \rightarrow \text{Navigation Filter}. }
+        \]
+      </p>
+      <p>The important requirement is to propagate uncertainty correctly.</p>
+      <p>Treating an estimated quantity as a perfect measurement can make the downstream filter overconfident.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.42 Loose, Tight, and Deep Coupling</h3>
+      <p>Fusion depth can also be classified independently of centralized or distributed organization.</p>
+      <p><strong>Loose coupling</strong> uses processed sensor solutions.</p>
+      <p><strong>Tight coupling</strong> uses more fundamental measurements.</p>
+      <p><strong>Deep coupling</strong> allows the navigation estimator and sensor signal-processing functions to interact more directly.</p>
+      <p>Increasing coupling can retain more information but usually increases implementation complexity and dependency between subsystems.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.43 Navigation Mode Management</h3>
+      <p>A complete navigation architecture generally requires explicit modes.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        NavMode \in \{ Initialization, Nominal, Relative, Degraded, Reacquisition, Safe \}.
+        \]
+      </p>
+      <p>The exact modes are mission dependent.</p>
+      <p>Mode management determines which sensors are expected, which measurement models are active, which thresholds apply, and what navigation quality is required.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.44 Mode Transition Logic</h3>
+      <p>Mode transitions should depend on measurable conditions rather than arbitrary time alone.</p>
+      <p>Inputs may include sensor availability, range, geometry, covariance, innovation statistics, estimator convergence, mission phase, health flags, and navigation quality.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ NavMode_{k+1} = g( NavMode_k, SensorHealth, P, NIS, Geometry, MissionState ). }
+        \]
+      </p>
+      <p>Hysteresis and dwell times can prevent rapid switching between modes.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.45 Covariance as an Operational Output</h3>
+      <p>Covariance is not merely an internal Kalman-filter matrix.</p>
+      <p>
+        \[
+        \mathbf P = E[ (\mathbf x-\hat{\mathbf x}) (\mathbf x-\hat{\mathbf x})^T ].
+        \]
+      </p>
+      <p>Its diagonal elements provide state uncertainty:</p>
+      <p>
+        \[
+        \sigma_i=\sqrt{P_{ii}}.
+        \]
+      </p>
+      <p>Guidance and autonomy can use this uncertainty to decide whether a maneuver or mission transition is safe to perform.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Navigation State Without Navigation Uncertainty Is Incomplete}. }
+        \]
+      </p>
+      <p><strong>Operational significance:</strong> covariance can directly support autonomy. A maneuver may be geometrically feasible but still be disallowed if the relevant state uncertainty exceeds the navigation requirement.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.46 Navigation Integrity</h3>
+      <p>Accuracy answers:</p>
+      <blockquote>How close is the estimate to truth?</blockquote>
+      <p>Integrity addresses:</p>
+      <blockquote>Can the system recognize when the navigation solution should not be trusted?</blockquote>
+      <p>A navigation architecture should therefore monitor covariance, innovation behavior, sensor consistency, stale data, estimator numerical state, sensor health, and observability-related degradation.</p>
+      <p>Integrity becomes especially important for autonomous spacecraft.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.47 Navigation Validity</h3>
+      <p>A navigation-valid flag may be defined conceptually as</p>
+      <p>
+        \[
+        NavValid = f( P, SensorHealth, EstimatorHealth, MeasurementAge, Consistency, Mode ).
+        \]
+      </p>
+      <p>This prevents downstream systems from treating every numerical state estimate as equally trustworthy.</p>
+      <p>A filter can continue producing numbers even when the underlying information is inadequate.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Estimator Running} \neq \text{Navigation Valid}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.48 Sensor Health Monitoring</h3>
+      <p>Each sensor may have a health state such as</p>
+      <p>
+        \[
+        Health_j \in \{ Healthy, Suspect, Degraded, Failed \}.
+        \]
+      </p>
+      <p>Health assessment can use hardware status, communication integrity, measurement availability, innovation statistics, signal quality, internal diagnostics, and consistency with other sensors.</p>
+      <p>Sensor health should influence fusion logic.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.49 FDIR Integration</h3>
+      <p>Fault Detection, Isolation, and Recovery should operate alongside sensor fusion.</p>
+      <p>
+        \[
+        \boxed{ \text{Detect} \rightarrow \text{Isolate} \rightarrow \text{Recover/Reconfigure}. }
+        \]
+      </p>
+      <p>Detection identifies abnormal behavior.</p>
+      <p>Isolation identifies the likely source.</p>
+      <p>Recovery modifies the architecture, for example by excluding a sensor, switching modes, increasing uncertainty, enabling another sensor, or restricting spacecraft operations.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.50 Redundancy</h3>
+      <p>Redundancy can improve reliability but only when the redundant information is sufficiently independent.</p>
+      <p>Two sensors may appear redundant while sharing the same power source, clock, processor, algorithm, environmental sensitivity, or common calibration error.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Multiple Sensors} \neq \text{Independent Redundancy}. }
+        \]
+      </p>
+      <p>Common-mode failures must be considered at system level.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.51 Graceful Degradation</h3>
+      <p>A robust navigation system should not necessarily transition immediately from fully operational to completely unavailable when one sensor fails.</p>
+      <p>Instead,</p>
+      <p>
+        \[
+        \boxed{ Nominal \rightarrow Degraded \rightarrow Restricted \rightarrow Unavailable }
+        \]
+      </p>
+      <p>may represent a more realistic hierarchy.</p>
+      <p>During degraded operation, covariance may increase, accuracy may decrease, some mission operations may be prohibited, and remaining sensors may carry greater responsibility.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.52 Sensor Dropout</h3>
+      <p>When a sensor becomes unavailable, the estimator should stop incorporating its measurements but continue propagation where possible.</p>
+      <p>During prolonged loss,</p>
+      <p>
+        \[
+        \mathbf P(t)\uparrow
+        \]
+      </p>
+      <p>for states that are no longer adequately observed.</p>
+      <p>This covariance growth is expected and useful because it communicates the loss of information.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.53 Sensor Reacquisition</h3>
+      <p>When the sensor returns, its first measurement should not automatically be treated as perfectly valid.</p>
+      <p>Reacquisition may require hardware confirmation, quality checks, timestamp verification, innovation testing, several consistent measurements, or a temporary widened uncertainty model.</p>
+      <p>The objective is</p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Return} \rightarrow \text{Validate} \rightarrow \text{Reintegrate} }
+        \]
+      </p>
+      <p>rather than immediate unconditional fusion.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.54 Observability</h3>
+      <p>A state can only be estimated if the available measurements and dynamics provide information about it.</p>
+      <p>For a linearized system, observability can be examined through</p>
+      <p>
+        \[
+        \mathcal O = \begin{bmatrix} H\\ HF\\ HF^2\\ \vdots \end{bmatrix}.
+        \]
+      </p>
+      <p>Poor observability can arise from sensor loss, unfavorable geometry, insufficient excitation, or measurement-model structure.</p>
+      <p>No amount of filter tuning can create information that the sensor system does not contain.</p>
+      <p><strong>Design implication:</strong> weak observability should be addressed through sensor geometry, excitation, measurement selection, or state definition—not merely by increasing filter gain or retuning noise matrices.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.55 Geometry-Dependent Observability</h3>
+      <p>Observability can vary throughout a mission.</p>
+      <p>A bearing-only measurement may constrain some directions much more strongly than others.</p>
+      <p>Range measurements may have different sensitivity.</p>
+      <p>Optical pose quality can depend strongly on viewpoint.</p>
+      <p>GNSS accuracy changes with transmitting-satellite geometry.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Accuracy} + \text{Geometry} \rightarrow \text{Navigation Information}. }
+        \]
+      </p>
+      <p>Sensor selection should consider geometry, not merely datasheet precision.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.56 Navigation–Guidance Interface</h3>
+      <p>Guidance requires an estimated state:</p>
+      <p>
+        \[
+        \hat{\mathbf x}_{nav} \rightarrow \text{Guidance}.
+        \]
+      </p>
+      <p>But a mature interface should also provide timestamp, covariance or uncertainty metrics, navigation mode, validity, and health information.</p>
+      <p>Guidance should know whether the navigation state is sufficiently reliable for the requested operation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.57 Navigation–Control Interface</h3>
+      <p>Control may require attitude, angular velocity, position, velocity, relative state, and sometimes estimated disturbances or biases.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \mathbf e_r = \mathbf r_{ref}-\hat{\mathbf r},
+        \]
+      </p>
+      <p>
+        \[
+        \mathbf e_v = \mathbf v_{ref}-\hat{\mathbf v}.
+        \]
+      </p>
+      <p>Navigation error therefore directly becomes control error.</p>
+      <p>A controller cannot distinguish perfectly between physical state error and navigation-estimation error.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.58 Control-to-Navigation Feedback</h3>
+      <p>The relationship is bidirectional.</p>
+      <p>Control commands change spacecraft motion, which changes future measurements.</p>
+      <p>
+        \[
+        \boxed{ Navigation \rightarrow Guidance \rightarrow Control \rightarrow Spacecraft \rightarrow Sensors \rightarrow Navigation. }
+        \]
+      </p>
+      <p>This is the complete closed-loop GNC chain.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.59 Actuator Interaction</h3>
+      <p>Actuator behavior can influence sensor fusion indirectly.</p>
+      <p>Thruster firing, reaction-wheel operation, structural vibration, magnetic torquers, gimbals, mechanisms, and other actuators can change dynamics or disturb sensors.</p>
+      <p>For example, a magnetic torquer may interfere with magnetometer measurements.</p>
+      <p>A thruster maneuver may require different process-noise assumptions.</p>
+      <p>Thus estimator mode and actuator mode may need coordination.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.60 Maneuver Awareness</h3>
+      <p>The estimator should know when commanded dynamics change substantially.</p>
+      <p>During a maneuver,</p>
+      <p>
+        \[
+        \mathbf u\neq0.
+        \]
+      </p>
+      <p>If the estimator ignores known control input, prediction error may increase unnecessarily.</p>
+      <p>Therefore commanded or reconstructed actuator information may be incorporated into state propagation.</p>
+      <p>Uncertainty should still represent the difference between commanded and actual actuation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.61 Navigation Initialization</h3>
+      <p>Before nominal fusion begins, the estimator requires an initial state</p>
+      <p>
+        \[
+        \hat{\mathbf x}_0
+        \]
+      </p>
+      <p>and covariance</p>
+      <p>
+        \[
+        \mathbf P_0.
+        \]
+      </p>
+      <p>Initialization may use stored orbital information, GNSS, star-tracker attitude, coarse attitude sensors, ground-provided states, relative-navigation acquisition, or other mission-specific information.</p>
+      <p>The covariance must represent how uncertain that initialization actually is.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.62 Alignment and Bias Initialization</h3>
+      <p>Some states require time to become observable.</p>
+      <p>Gyro bias, accelerometer bias, alignment error, or other calibration states may not be immediately known.</p>
+      <p>The estimator may therefore pass through</p>
+      <p>
+        \[
+        \boxed{ Initialization \rightarrow Alignment \rightarrow Convergence \rightarrow Navigation Valid. }
+        \]
+      </p>
+      <p>Declaring navigation valid before these states have converged can create hidden systematic error.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.63 Process Noise</h3>
+      <p>Process noise</p>
+      <p>
+        \[
+        \mathbf Q
+        \]
+      </p>
+      <p>represents uncertainty in state propagation.</p>
+      <p>It can account for unmodeled disturbances, bias evolution, uncertain accelerations, model truncation, actuator uncertainty, or other dynamic effects.</p>
+      <p>Too little process noise can make the estimator overconfident.</p>
+      <p>Too much can make it excessively responsive to measurement noise.</p>
+      <p>Therefore <code>\mathbf Q</code> should have physical justification.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.64 Measurement Noise</h3>
+      <p>Measurement covariance</p>
+      <p>
+        \[
+        \mathbf R
+        \]
+      </p>
+      <p>represents expected measurement uncertainty.</p>
+      <p>Different sensors should naturally have different <code>\mathbf R_j</code>.</p>
+      <p>Moreover, measurement quality may change with geometry, signal strength, range, feature quality, illumination, or sensor mode.</p>
+      <p>Thus some systems use</p>
+      <p>
+        \[
+        \boxed{ \mathbf R_j=\mathbf R_j(\text{quality},\text{geometry},\text{mode}). }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.65 Adaptive Sensor Weighting</h3>
+      <p>When measurement quality changes significantly, fixed weighting may be insufficient.</p>
+      <p>An adaptive architecture can modify measurement covariance or sensor usage based on quality metrics.</p>
+      <p>However, adaptation must itself be bounded and verified.</p>
+      <p>Arbitrary covariance inflation can hide modeling errors instead of solving them.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.66 Numerical Robustness</h3>
+      <p>A flight estimator must remain numerically valid.</p>
+      <p>Checks may include</p>
+      <p>
+        \[
+        \|q\|\approx1,
+        \]
+      </p>
+      <p>
+        \[
+        \mathbf P=\mathbf P^T,
+        \]
+      </p>
+      <p>
+        \[
+        \mathbf P\succeq0,
+        \]
+      </p>
+      <p>and absence of</p>
+      <p>
+        \[
+        NaN,\qquad Inf.
+        \]
+      </p>
+      <p>Covariance symmetry, positive semi-definiteness, matrix conditioning, quaternion normalization, and stable matrix factorization should be treated as architecture requirements rather than debugging details.</p>
+      <p><strong>Implementation interpretation:</strong> these checks should be monitored continuously or at least exercised through verification. Numerical invalidity can silently corrupt an otherwise correct estimator long before a visible divergence appears.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.67 Navigation Data Products</h3>
+      <p>The navigation subsystem may publish several data products rather than one state vector.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \boxed{ \begin{aligned} &\text{Attitude Solution}\\ &\text{Angular Rate}\\ &\text{Absolute Position/Velocity}\\ &\text{Relative Position/Velocity}\\ &\text{Bias Estimates}\\ &\text{Covariance}\\ &\text{Sensor Health}\\ &\text{Navigation Validity}\\ &\text{Navigation Mode}\\ &\text{Timestamp}. \end{aligned} }
+        \]
+      </p>
+      <p>Different spacecraft subsystems may subscribe to different products.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.68 Interface Control</h3>
+      <p>Every navigation interface should specify units, coordinate frame, timestamp convention, update rate, latency, covariance convention, validity flags, numerical representation, data type, initialization behavior, and behavior during sensor failure.</p>
+      <p>This belongs in an Interface Control Document.</p>
+      <p>Many apparent “filter problems” are actually interface problems.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.69 Latency Budget</h3>
+      <p>The age of navigation information matters.</p>
+      <p>The total navigation latency may be decomposed as</p>
+      <p>
+        \[
+        \boxed{ \tau_{nav} = \tau_{sensor} + \tau_{interface} + \tau_{processing} + \tau_{estimator} + \tau_{communication}. }
+        \]
+      </p>
+      <p>A highly accurate but old state can be less useful to control than a slightly noisier but timely state.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.70 Computational Architecture</h3>
+      <p>Sensor fusion must fit within onboard computational constraints.</p>
+      <p>Relevant quantities include estimator execution time, CPU utilization, memory, bus load, sensor-processing load, scheduling jitter, worst-case execution time, and numerical precision.</p>
+      <p>The algorithm must complete within its allocated execution window:</p>
+      <p>
+        \[
+        t_{exec}<T_{budget}.
+        \]
+      </p>
+      <p>A mathematically superior estimator that cannot meet real-time constraints is not an operational solution.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.71 Software Architecture</h3>
+      <p>A modular software architecture may separate</p>
+      <p>
+        \[
+        \boxed{ \begin{aligned} &\text{Sensor Drivers}\\ &\downarrow\\ &\text{Sensor Preprocessing}\\ &\downarrow\\ &\text{Measurement Manager}\\ &\downarrow\\ &\text{Estimator Core}\\ &\downarrow\\ &\text{Navigation Health Monitor}\\ &\downarrow\\ &\text{Navigation Output Manager}. \end{aligned} }
+        \]
+      </p>
+      <p>This separation improves testability, maintainability, fault isolation, and reuse.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.72 Measurement Manager</h3>
+      <p>The measurement manager is an important architectural component between sensor processing and the estimator.</p>
+      <p>It can handle measurement queues, timestamp ordering, sensor availability, quality flags, stale-data rejection, frame checking, measurement selection, gating status, and mode-dependent enable/disable logic.</p>
+      <p>Thus the estimator core does not need to implement every hardware-specific rule itself.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.73 Health and FDIR Parallel Path</h3>
+      <p>Health monitoring should not necessarily be buried inside the estimator.</p>
+      <p>A useful architecture is</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{ccc} \text{Sensor Data} & \rightarrow & \text{Estimator} \\ \downarrow && \downarrow \\ \text{Health/FDIR} & \leftrightarrow & \text{Navigation Integrity} \end{array} }
+        \]
+      </p>
+      <p>This allows sensor hardware information and estimator residual information to contribute jointly to fault decisions.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.74 Navigation Performance Monitoring</h3>
+      <p>The system can continuously monitor quantities such as</p>
+      <p>
+        \[
+        \operatorname{trace}(P), \qquad \sigma_r, \qquad \sigma_v, \qquad \sigma_\theta, \qquad NIS,
+        \]
+      </p>
+      <p>measurement age, rejection rate, sensor count, and estimator status.</p>
+      <p>These become operational health indicators.</p>
+      <p>The navigation system therefore estimates not only the spacecraft state but also the quality of its own knowledge.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.75 Navigation Requirements</h3>
+      <p>The architecture should ultimately be derived from requirements.</p>
+      <p>Typical requirements may specify position uncertainty, velocity uncertainty, attitude knowledge, rate knowledge, update rate, latency, availability, integrity, convergence time, recovery time, and fault tolerance.</p>
+      <p>Therefore the design process should follow</p>
+      <p>
+        \[
+        \boxed{ \text{Mission Requirement} \rightarrow \text{Navigation Requirement} \rightarrow \text{Sensor Requirement} \rightarrow \text{Fusion Architecture}. }
+        \]
+      </p>
+      <p>Starting with a preferred filter and searching afterward for a requirement is the reverse of the desired engineering process.</p>
+      <p><strong>System-engineering interpretation:</strong> the filter architecture should be a consequence of mission information needs. Requirements determine what must be estimated, which sensors are necessary, how quickly the solution must be delivered, and what degraded behavior is acceptable.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.76 Accuracy, Precision, Consistency, Availability, and Integrity</h3>
+      <p>These terms should remain distinct.</p>
+      <p><strong>Accuracy</strong> concerns closeness to truth.</p>
+      <p><strong>Precision</strong> concerns measurement or estimate dispersion.</p>
+      <p><strong>Consistency</strong> concerns whether actual error agrees statistically with reported uncertainty.</p>
+      <p><strong>Availability</strong> concerns whether a usable navigation solution exists.</p>
+      <p><strong>Integrity</strong> concerns whether the system can recognize when that solution should not be trusted.</p>
+      <p>A complete navigation system must consider all five.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.77 Verification Architecture</h3>
+      <p>The same modularity used for flight architecture should be reflected in verification.</p>
+      <p>A useful sequence is</p>
+      <p>
+        \[
+        \boxed{ \text{Unit Test} \rightarrow \text{Sensor Model Test} \rightarrow \text{Estimator Test} \rightarrow \text{Integrated Navigation Test} \rightarrow \text{Closed-Loop GNC Test}. }
+        \]
+      </p>
+      <p>Each level should isolate a different class of problem.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.78 Deterministic Verification</h3>
+      <p>The first integrated tests should normally be deterministic.</p>
+      <p>Known truth and controlled sensor inputs make it easier to identify frame, sign, timing, initialization, propagation, and measurement-model errors.</p>
+      <p>A deterministic nominal case provides the baseline against which more complicated uncertainty tests can be interpreted.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.79 Monte Carlo Verification</h3>
+      <p>After deterministic behavior is established, uncertainty should be randomized.</p>
+      <p>Relevant quantities may include</p>
+      <p>
+        \[
+        \boxed{ \text{Bias} + \text{Noise} + \text{Misalignment} + \text{Timing} + \text{Initialization} + \text{Dropout} + \text{Model Error}. }
+        \]
+      </p>
+      <p>Monte Carlo verification evaluates the distribution of navigation outcomes rather than one favorable realization.</p>
+      <p>Important outputs include RMSE, peak error, convergence time, covariance coverage, NIS, NEES, availability, failure rates, and mission-level success criteria.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.80 SIL, PIL, and HIL</h3>
+      <p>The complete architecture should progressively move from mathematical simulation toward flight-representative implementation.</p>
+      <p>
+        \[
+        \boxed{ MIL \rightarrow SIL \rightarrow PIL \rightarrow HIL \rightarrow \text{Flight Validation}. }
+        \]
+      </p>
+      <p>Software-in-the-loop verifies implementation logic.</p>
+      <p>Processor-in-the-loop introduces flight-representative computation.</p>
+      <p>Hardware-in-the-loop introduces physical interfaces, timing, buses, sensor emulators, processors, and other hardware effects.</p>
+      <p>Each stage removes another idealization.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.81 Recorded-Data Replay</h3>
+      <p>Recorded sensor data can be replayed through the estimator:</p>
+      <p>
+        \[
+        \boxed{ \text{Recorded Measurements} \rightarrow \text{Estimator} \rightarrow \text{Navigation Output}. }
+        \]
+      </p>
+      <p>This is valuable for regression testing because the same input can be applied to different software versions.</p>
+      <p>It also helps connect simulation-based development with experimental or flight data.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.82 Flight Validation</h3>
+      <p>Ultimately, real sensor and spacecraft behavior determines whether the assumptions used during design were valid.</p>
+      <p>Flight validation examines real timing, calibration, noise, bias, thermal behavior, geometry, dropouts, environmental effects, and interface behavior.</p>
+      <p>Simulation therefore does not disappear after flight begins.</p>
+      <p>Instead,</p>
+      <p>
+        \[
+        \boxed{ \text{Flight Data} \rightarrow \text{Model Improvement} \rightarrow \text{Updated Verification}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.83 Traceability</h3>
+      <p>Every navigation requirement should be traceable through the architecture.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \boxed{ \text{Mission Need} \rightarrow \text{Navigation Requirement} \rightarrow \text{Sensor Capability} \rightarrow \text{Estimator Function} \rightarrow \text{Verification Test} \rightarrow \text{Evidence}. }
+        \]
+      </p>
+      <p>Traceability prevents the navigation architecture from becoming a collection of algorithms without a clear engineering justification.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.84 Complete End-to-End Spacecraft Sensor-Fusion Flow</h3>
+      <p>The complete architecture can now be assembled:</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Environment + Spacecraft Truth Dynamics}\\ \downarrow\\ \text{Physical Sensors}\\ \downarrow\\ \text{Sensor Electronics and Interfaces}\\ \downarrow\\ \text{Timestamping and Synchronization}\\ \downarrow\\ \text{Calibration}\\ \downarrow\\ \text{Sensor-Specific Preprocessing}\\ \downarrow\\ \text{Coordinate / Frame Transformation}\\ \downarrow\\ \text{Measurement Construction}\\ \downarrow\\ \text{Measurement Quality Assessment}\\ \downarrow\\ \text{Plausibility Checking}\\ \downarrow\\ \text{Measurement Manager}\\ \downarrow\\ \text{Innovation + Statistical Gating}\\ \downarrow\\ \text{Sensor Fusion / State Estimation}\\ \downarrow\\ \hat{\mathbf x},\mathbf P\\ \downarrow\\ \text{Consistency + Integrity Monitoring}\\ \downarrow\\ \text{Navigation Mode + NavValid + Sensor Health}\\ \downarrow\\ \text{Guidance}\\ \downarrow\\ \text{Control}\\ \downarrow\\ \text{Actuators}\\ \downarrow\\ \text{Spacecraft Dynamics} \end{array} }
+        \]
+      </p>
+      <p>Running in parallel are</p>
+      <p>
+        \[
+        \boxed{ \text{FDIR} + \text{Mode Management} + \text{Health Monitoring} + \text{Interface Monitoring} + \text{Performance Monitoring}. }
+        \]
+      </p>
+      <p>This is the complete spacecraft sensor-fusion system.</p>
+      <p><strong>Architecture interpretation:</strong> this end-to-end chain is the point at which sensor fusion stops being an isolated estimation topic and becomes part of the full GNC system. Every upstream assumption can affect navigation, and every navigation-quality decision can constrain downstream guidance and control.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.85 Complete Information Flow</h3>
+      <p>The architecture contains several distinct kinds of information.</p>
+      <h4>Measurement information</h4>
+      <p>
+        \[
+        \mathbf z_j,\mathbf R_j,t_j.
+        \]
+      </p>
+      <h4>State information</h4>
+      <p>
+        \[
+        \hat{\mathbf x},\mathbf P.
+        \]
+      </p>
+      <h4>Sensor-health information</h4>
+      <p>
+        \[
+        Health_j,\quad valid_j.
+        \]
+      </p>
+      <h4>Estimator-health information</h4>
+      <p>
+        \[
+        NIS,\quad covariance\ status,\quad convergence.
+        \]
+      </p>
+      <h4>Operational information</h4>
+      <p>
+        \[
+        NavMode,\quad NavValid.
+        \]
+      </p>
+      <h4>GNC information</h4>
+      <p>
+        \[
+        \mathbf x_{ref},\quad \hat{\mathbf x},\quad \mathbf u_{cmd}.
+        \]
+      </p>
+      <p>A mature architecture keeps these information types distinguishable rather than hiding everything inside a single estimator output.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.86 What Sensor Fusion Does Not Do</h3>
+      <p>Sensor fusion cannot compensate for every system deficiency.</p>
+      <p>It cannot create observability where the measurements contain no information.</p>
+      <p>It cannot make an incorrectly calibrated sensor correct simply by adding more sensors.</p>
+      <p>It cannot eliminate timing errors that are not modeled.</p>
+      <p>It cannot guarantee robustness from a single nominal simulation.</p>
+      <p>It cannot make an unrealistic covariance trustworthy.</p>
+      <p>It cannot replace sensor qualification, system verification, or flight validation.</p>
+      <p>Most importantly,</p>
+      <p>
+        \[
+        \boxed{ \text{More Sensors} \neq \text{Automatically Better Navigation}. }
+        \]
+      </p>
+      <p>Performance depends on measurement quality, independence, geometry, timing, calibration, observability, fusion design, and verification.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.87 Fundamental Design Principle</h3>
+      <p>The architecture should not ask only:</p>
+      <blockquote>Which estimator should be used?</blockquote>
+      <p>The more complete engineering questions are:</p>
+      <blockquote>What states must be known?</blockquote>
+      <blockquote>Which physical measurements make those states observable?</blockquote>
+      <blockquote>At what accuracy and rate?</blockquote>
+      <blockquote>In which frames?</blockquote>
+      <blockquote>With what latency?</blockquote>
+      <blockquote>Under which operating conditions?</blockquote>
+      <blockquote>What happens when measurements disappear?</blockquote>
+      <blockquote>How is uncertainty represented?</blockquote>
+      <blockquote>How is bad information detected?</blockquote>
+      <blockquote>How does the navigation system tell guidance and control that its information is degraded?</blockquote>
+      <p>Only after these questions are understood should the estimator architecture be finalized.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Fusion} = \text{Physics} + \text{Sensors} + \text{Timing} + \text{Estimation} + \text{Statistics} + \text{Software} + \text{FDIR} + \text{GNC Integration}. }
+        \]
+      </p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.2.32.88 Key Takeaways</h3>
+      <p>A complete spacecraft sensor-fusion architecture begins with the <strong>physical spacecraft and environment</strong>, not with the filter.</p>
+      <p>Sensors observe different physical quantities and provide information at different rates, in different coordinate frames, with different noise, bias, calibration, latency, availability, and geometric characteristics.</p>
+      <p>Before fusion, measurements require</p>
+      <p>
+        \[
+        \boxed{ \text{Timestamping} + \text{Calibration} + \text{Preprocessing} + \text{Frame Transformation} + \text{Validation}. }
+        \]
+      </p>
+      <p>The estimator then combines model prediction with valid measurement information to obtain</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x},\mathbf P. }
+        \]
+      </p>
+      <p>But these are not sufficient by themselves.</p>
+      <p>An operational navigation solution should also communicate</p>
+      <p>
+        \[
+        \boxed{ NavValid + NavMode + SensorHealth + Quality + Timestamp. }
+        \]
+      </p>
+      <p>Attitude, translational, absolute, and relative navigation may be implemented as coupled, centralized, decentralized, federated, or cascaded estimation functions depending on mission requirements.</p>
+      <p>Sensor availability can change. The architecture must therefore support <strong>handover, dropout, reacquisition, degraded modes, redundancy, and graceful degradation</strong>.</p>
+      <p>FDIR operates alongside the estimator to detect abnormal measurements, isolate faults, and reconfigure the navigation system when necessary.</p>
+      <p>Covariance is an operational quantity. It tells the spacecraft how uncertain its knowledge is and therefore contributes directly to autonomous decision-making.</p>
+      <p>The navigation system must interface correctly with guidance and control:</p>
+      <p>
+        \[
+        \boxed{ \text{Navigation} \rightarrow \text{Guidance} \rightarrow \text{Control} \rightarrow \text{Actuation} \rightarrow \text{Dynamics} \rightarrow \text{Sensors} \rightarrow \text{Navigation}. }
+        \]
+      </p>
+      <p>The complete architecture must also satisfy real-time computation, timing, communication, numerical stability, interface, software, and hardware constraints.</p>
+      <p>Finally, the architecture must be verified progressively through deterministic simulation, uncertainty analysis, Monte Carlo testing, SIL, PIL, HIL, recorded-data replay, and ultimately representative or flight data.</p>
+      <p>The central conclusion of <strong>4.2 Sensor Fusion Basics</strong> is therefore:</p>
+      <p>
+        \[
+        \boxed{ \begin{aligned} \text{Reliable Spacecraft Navigation} =&\; \text{Correct Sensor Physics}\\ &+ \text{Correct Measurement Models}\\ &+ \text{Time and Frame Consistency}\\ &+ \text{Multi-Sensor Information Fusion}\\ &+ \text{Realistic Uncertainty}\\ &+ \text{Observability}\\ &+ \text{Integrity and FDIR}\\ &+ \text{Robust Software Implementation}\\ &+ \text{GNC Integration}\\ &+ \text{Progressive Verification and Validation}. \end{aligned} }
+        \]
+      </p>
+      <p>This closes <strong>4.2 Sensor Fusion Basics</strong>. The natural next step is <strong>4.3 Estimation Algorithms</strong>, where the focus shifts from the overall sensor-fusion system architecture to the mathematical algorithms used to estimate the state and its uncertainty.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.3 Estimation Algorithms</h2>
+      <p>
+        Section 4.2 has now assembled the complete sensor-fusion picture: physical sensor behaviour, timing, calibration,
+        preprocessing, measurement models, estimation, covariance, validation, observability, FDIR, mode management,
+        GNC interfaces, implementation, Monte Carlo verification, SIL/HIL, and the complete navigation architecture.
+      </p>
+      <p>
+        The next major topic moves from the overall sensor-fusion architecture to the mathematical estimation methods used
+        to reconstruct state and uncertainty from models and measurements.
+      </p>
+      <a href="estimation-algorithms.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3 Estimation Algorithms</h3>
+          <p>
+            State-estimation methods for GNC, including observer concepts, recursive estimators, nonlinear estimation,
+            uncertainty propagation, and algorithm selection for practical navigation problems.
+          </p>
+          <p class="sensor-link-arrow">Continue to Estimation Algorithms &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics. Educational resource for spacecraft dynamics, orbital mechanics, guidance–navigation–control systems, sensor modelling, state estimation, sensor fusion, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
