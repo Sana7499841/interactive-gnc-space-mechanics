@@ -1,0 +1,5166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.2.23 Relative Navigation Sensor Fusion for RPO | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .concept-note { margin:1.5rem 0 0; padding:1.1rem 1.25rem; border-left:4px solid #9bb8d3; background:#f5f8fb; border-radius:10px; }
+    .concept-note h4 { margin-top:0; margin-bottom:.45rem; }
+    .concept-note p { margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Relative Navigation Sensor Fusion for RPO</h1>
+    <p class="notes-tagline">
+      GNSS, inter-spacecraft navigation, camera, LiDAR, IMU, line-of-sight, relative range,
+      range rate, relative position, velocity, attitude, pose estimation, observability, timing,
+      handover, integrity, Monte Carlo verification, and general rendezvous and proximity operations.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+
+    <section class="notes-section-card">
+
+      <h2>4.2.23 Relative Navigation Sensor Fusion for RPO</h2>
+
+<p>
+        Relative navigation is the process of estimating the motion of one spacecraft with respect to another spacecraft or target object rather than estimating only its absolute orbit.
+      </p>
+      <p>
+        This is fundamental for general <strong>rendezvous and proximity operations (RPO)</strong>, formation flying, inspection, servicing, docking, cooperative navigation, and close-proximity autonomous operations.
+      </p>
+      <p>
+        In absolute navigation, the main quantities of interest are usually
+      </p>
+      <p>
+        \[
+        \mathbf r, \qquad \mathbf v, \qquad \mathbf q,
+        \]
+      </p>
+      <p>
+        representing spacecraft position, velocity, and attitude with respect to a global reference frame.
+      </p>
+      <p>
+        In relative navigation, the primary states become quantities such as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel}, \qquad \mathbf v_{rel}, \qquad \mathbf q_{rel}, \qquad \boldsymbol\omega_{rel} }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <ul>
+        <li>\(\mathbf r_{rel}\) = relative position,</li>
+        <li>\(\mathbf v_{rel}\) = relative velocity,</li>
+        <li>\(\mathbf q_{rel}\) = relative attitude,</li>
+        <li>\(\boldsymbol\omega_{rel}\) = relative angular velocity.</li>
+      </ul>
+      <p>
+        For close-range operations, the estimator may also determine the complete relative pose:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Relative Pose} = \text{Relative Position} + \text{Relative Orientation} }
+        \]
+      </p>
+      <p>
+        Different sensors contribute different pieces of this information.
+      </p>
+      <p>
+        Typical relative-navigation sensors include:
+      </p>
+      <ul>
+        <li>GNSS,</li>
+        <li>inter-spacecraft ranging,</li>
+        <li>optical cameras,</li>
+        <li>LiDAR,</li>
+        <li>IMUs,</li>
+        <li>star trackers,</li>
+        <li>radio-frequency ranging systems,</li>
+        <li>bearing sensors,</li>
+        <li>pose-estimation algorithms.</li>
+      </ul>
+      <p>
+        The central sensor-fusion idea is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Relative-Dynamics Propagation} + \text{Relative Sensor Measurements} \rightarrow \text{Continuous Relative-State Estimate} }
+        \]
+      </p>
+      <p>
+        The estimator should exploit each sensor according to:
+      </p>
+      <ul>
+        <li>what it measures,</li>
+        <li>its uncertainty,</li>
+        <li>its update rate,</li>
+        <li>its geometry,</li>
+        <li>its field of view,</li>
+        <li>its range of operation,</li>
+        <li>its observability,</li>
+        <li>its current validity.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.1 What Is Relative Navigation?</h3>
+      <p>
+        Suppose two spacecraft are present:
+      </p>
+      <ul>
+        <li>a chaser spacecraft,</li>
+        <li>a target spacecraft.</li>
+      </ul>
+      <p>
+        Let their inertial positions be
+      </p>
+      <p>
+        \[
+        \mathbf r_C
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \mathbf r_T.
+        \]
+      </p>
+      <p>
+        A simple inertial relative position is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel} = \mathbf r_C-\mathbf r_T. }
+        \]
+      </p>
+      <p>
+        Similarly,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf v_{rel} = \mathbf v_C-\mathbf v_T. }
+        \]
+      </p>
+      <p>
+        These equations define the basic relative state in a common inertial frame.
+      </p>
+      <p>
+        However, RPO guidance and sensing often use a target-centered orbital frame rather than the inertial frame.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.2 Relative Position Depends on the Chosen Frame</h3>
+      <p>
+        A relative vector can be expressed in different frames.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \mathbf r_{rel}^{I}
+        \]
+      </p>
+      <p>
+        may represent relative position in an inertial frame, while
+      </p>
+      <p>
+        \[
+        \mathbf r_{rel}^{H}
+        \]
+      </p>
+      <p>
+        may represent the same vector in a Hill or LVLH frame.
+      </p>
+      <p>
+        The transformation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel}^{H} = \mathbf C_{HI} \mathbf r_{rel}^{I}. }
+        \]
+      </p>
+      <p>
+        The same physical geometry can therefore have different numerical components depending on the chosen frame.
+      </p>
+      <p>
+        Frame consistency is essential throughout:
+      </p>
+      <ul>
+        <li>dynamics,</li>
+        <li>measurement models,</li>
+        <li>guidance,</li>
+        <li>covariance,</li>
+        <li>plotting.</li>
+      </ul>
+      <div class="concept-note">
+        <h4>Why frame choice matters</h4>
+        <p>The same physical relative geometry can have different numerical components in inertial, Hill/LVLH, body, or sensor frames. Dynamics, measurements, covariance, and guidance must therefore use explicit and consistent frame definitions.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.3 Hill or LVLH Frame</h3>
+      <p>
+        A commonly used target-centered orbital frame contains three axes approximately associated with:
+      </p>
+      <ul>
+        <li>radial direction,</li>
+        <li>along-track direction,</li>
+        <li>cross-track direction.</li>
+      </ul>
+      <p>
+        The precise naming convention must be stated explicitly because different organizations use different axis labels.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Target Orbit} \rightarrow \text{Local Relative-Navigation Frame}. }
+        \]
+      </p>
+      <p>
+        This frame is useful because small relative motions around a reference orbit have intuitive orbital interpretations.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.4 Relative State Vector</h3>
+      <p>
+        A simple translational relative state can be written
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{rel} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        This gives six states.
+      </p>
+      <p>
+        For full relative navigation, the state may be expanded:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{rel} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol\omega_{rel} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Additional states may include:
+      </p>
+      <ul>
+        <li>sensor biases,</li>
+        <li>camera alignment,</li>
+        <li>LiDAR alignment,</li>
+        <li>timing offsets,</li>
+        <li>scale factors,</li>
+        <li>target angular motion,</li>
+        <li>target feature states.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.5 Relative Dynamics</h3>
+      <p>
+        The estimator requires a model describing how the relative state evolves.
+      </p>
+      <p>
+        At a general level,
+      </p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf x}_{rel} = f( \mathbf x_{rel}, \mathbf u, t ) + \mathbf w. }
+        \]
+      </p>
+      <p>
+        Here
+      </p>
+      <ul>
+        <li>\(f(\cdot)\) is the relative-motion model,</li>
+        <li>\(\mathbf u\) represents known control inputs,</li>
+        <li>\(\mathbf w\) represents process uncertainty.</li>
+      </ul>
+      <p>
+        The fidelity of the dynamics model can vary with range and mission phase.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.6 Linearized Relative Orbital Motion</h3>
+      <p>
+        For nearby spacecraft in a nearly circular reference orbit, a linearized model such as the Clohessy-Wiltshire/Hill equations may be used.
+      </p>
+      <p>
+        A common form is
+      </p>
+      <p>
+        \[
+        \boxed{ \ddot{x}-2n\dot{y}-3n^2x=u_x }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \ddot{y}+2n\dot{x}=u_y }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \ddot{z}+n^2z=u_z }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <p>
+        \[
+        n
+        \]
+      </p>
+      <p>
+        is the reference orbital mean motion.
+      </p>
+      <p>
+        These equations describe the coupling inherent in relative orbital dynamics.
+      </p>
+      <div class="concept-note">
+        <h4>When the Hill/CW model is appropriate</h4>
+        <p>The Clohessy-Wiltshire/Hill equations are a local linear approximation for nearby motion about a nearly circular reference orbit; they are not a universal relative-dynamics model.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.7 Why Relative Motion Is Coupled</h3>
+      <p>
+        Relative position does not generally evolve as simple Cartesian straight-line motion.
+      </p>
+      <p>
+        For example, radial displacement can influence along-track relative motion.
+      </p>
+      <p>
+        This means
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Relative Orbital Motion} \neq \text{Independent Motion Along Three Axes}. }
+        \]
+      </p>
+      <p>
+        The estimator must therefore propagate the proper relative dynamics rather than independently integrating each Cartesian component.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.8 Nonlinear Relative Dynamics</h3>
+      <p>
+        For larger separations, eccentric orbits, perturbations, or high-accuracy requirements, nonlinear dynamics may be preferable.
+      </p>
+      <p>
+        The two absolute spacecraft states can be propagated independently:
+      </p>
+      <p>
+        \[
+        \ddot{\mathbf r}_C = \mathbf a_C
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \ddot{\mathbf r}_T = \mathbf a_T.
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \boxed{ \ddot{\mathbf r}_{rel} = \mathbf a_C-\mathbf a_T. }
+        \]
+      </p>
+      <p>
+        The acceleration difference may include:
+      </p>
+      <ul>
+        <li>gravity,</li>
+        <li>higher-order gravity,</li>
+        <li>atmospheric drag,</li>
+        <li>solar radiation pressure,</li>
+        <li>third-body effects,</li>
+        <li>thrust.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.9 Process Noise in Relative Dynamics</h3>
+      <p>
+        Relative-motion models are never perfect.
+      </p>
+      <p>
+        Therefore process noise may represent uncertainty due to:
+      </p>
+      <ul>
+        <li>unknown target manoeuvres,</li>
+        <li>unmodeled thrust,</li>
+        <li>environmental perturbations,</li>
+        <li>actuator uncertainty,</li>
+        <li>imperfect mass properties,</li>
+        <li>dynamics approximations.</li>
+      </ul>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf Q_{rel} \rightarrow \text{Uncertainty in Relative-State Propagation}. }
+        \]
+      </p>
+      <p>
+        The process-noise model may change with mission phase.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.10 Cooperative and Non-Cooperative Targets</h3>
+      <p>
+        Relative-navigation architecture depends strongly on whether the target cooperates.
+      </p>
+      <p>
+        A <strong>cooperative target</strong> may provide:
+      </p>
+      <ul>
+        <li>GNSS data,</li>
+        <li>inter-spacecraft communication,</li>
+        <li>known markers,</li>
+        <li>transponders,</li>
+        <li>attitude information.</li>
+      </ul>
+      <p>
+        A <strong>non-cooperative target</strong> may provide no navigation data.
+      </p>
+      <p>
+        Then relative navigation must rely on sensing such as:
+      </p>
+      <ul>
+        <li>camera,</li>
+        <li>LiDAR,</li>
+        <li>radar,</li>
+        <li>passive optical measurements.</li>
+      </ul>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Target Cooperation} \rightarrow \text{Available Measurement Set}. }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Cooperation changes the sensing problem</h4>
+        <p>A cooperative target can provide navigation information directly, while a non-cooperative target must be inferred from externally observed geometry. This changes both observability and sensor architecture.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.11 Relative GNSS</h3>
+      <p>
+        If both spacecraft receive GNSS, their absolute navigation solutions can be differenced:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel} = \mathbf r_C^{GNSS} - \mathbf r_T^{GNSS} }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf v_{rel} = \mathbf v_C^{GNSS} - \mathbf v_T^{GNSS}. }
+        \]
+      </p>
+      <p>
+        This is conceptually straightforward for cooperative vehicles.
+      </p>
+      <p>
+        However, the quality of the relative solution depends on the error structure of both GNSS solutions.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.12 Common-Mode GNSS Errors</h3>
+      <p>
+        Some GNSS errors may be correlated between nearby spacecraft.
+      </p>
+      <p>
+        Suppose
+      </p>
+      <p>
+        \[
+        \mathbf r_C^{GNSS} = \mathbf r_C + \mathbf e_C
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \mathbf r_T^{GNSS} = \mathbf r_T + \mathbf e_T.
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \hat{\mathbf r}_{rel} = \mathbf r_{rel} + (\mathbf e_C-\mathbf e_T).
+        \]
+      </p>
+      <p>
+        If part of the errors is common,
+      </p>
+      <p>
+        \[
+        \mathbf e_C\approx\mathbf e_T,
+        \]
+      </p>
+      <p>
+        that portion may cancel when differenced.
+      </p>
+      <p>
+        This is one reason relative GNSS can outperform two completely independent absolute solutions in some configurations.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.13 Inter-Satellite Navigation</h3>
+      <p>
+        Cooperative spacecraft may exchange navigation information through an inter-spacecraft communication link.
+      </p>
+      <p>
+        Each spacecraft can transmit quantities such as:
+      </p>
+      <ul>
+        <li>position,</li>
+        <li>velocity,</li>
+        <li>attitude,</li>
+        <li>clock information,</li>
+        <li>covariance,</li>
+        <li>GNSS observables.</li>
+      </ul>
+      <p>
+        The receiving spacecraft can then form relative states.
+      </p>
+      <p>
+        A generic architecture is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Target Navigation Data} + \text{Chaser Navigation Data} \rightarrow \text{Relative Navigation}. }
+        \]
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.14 Covariance of Differenced Navigation States</h3>
+      <p>
+        If
+      </p>
+      <p>
+        \[
+        \mathbf r_{rel} = \mathbf r_C-\mathbf r_T,
+        \]
+      </p>
+      <p>
+        then the relative covariance is not always simply
+      </p>
+      <p>
+        \[
+        \mathbf P_C+\mathbf P_T.
+        \]
+      </p>
+      <p>
+        More generally,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P_{rel} = \mathbf P_C + \mathbf P_T - \mathbf P_{CT} - \mathbf P_{TC}. }
+        \]
+      </p>
+      <p>
+        The cross-covariance terms matter when the two solutions share common information.
+      </p>
+      <p>
+        Ignoring correlation can produce an incorrect relative uncertainty.
+      </p>
+      <div class="concept-note">
+        <h4>Why cross-covariance matters</h4>
+        <p>Shared measurements, clocks, models, or reference data can correlate the two absolute navigation solutions. Ignoring these correlations can make relative covariance misleading.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.15 Inter-Spacecraft Range</h3>
+      <p>
+        A direct ranging sensor measures the distance between spacecraft.
+      </p>
+      <p>
+        For relative position
+      </p>
+      <p>
+        \[
+        \mathbf r_{rel},
+        \]
+      </p>
+      <p>
+        the ideal range is
+      </p>
+      <p>
+        \[
+        \boxed{ \rho = \|\mathbf r_{rel}\|. }
+        \]
+      </p>
+      <p>
+        The measurement model is
+      </p>
+      <p>
+        \[
+        \boxed{ z_\rho = \|\mathbf r_{rel}\| + v_\rho. }
+        \]
+      </p>
+      <p>
+        Range provides only one scalar quantity.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.16 What Range Does Not Tell Us</h3>
+      <p>
+        A single range measurement constrains the target to the surface of a sphere centered on the observer.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Range Alone} \neq \text{Full Relative Position}. }
+        \]
+      </p>
+      <p>
+        At one instant, range gives no direct information about direction.
+      </p>
+      <p>
+        Full three-dimensional state information must come from:
+      </p>
+      <ul>
+        <li>dynamics over time,</li>
+        <li>additional sensors,</li>
+        <li>additional geometry.</li>
+      </ul>
+      <div class="concept-note">
+        <h4>Range is a one-dimensional constraint</h4>
+        <p>A single range value defines a sphere of possible target locations. Direction requires additional geometry, dynamics, or sensing.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.17 Range Measurement Jacobian</h3>
+      <p>
+        For
+      </p>
+      <p>
+        \[
+        \rho = \sqrt{x^2+y^2+z^2},
+        \]
+      </p>
+      <p>
+        the derivative with respect to relative position is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf H_\rho = \frac{\mathbf r_{rel}^T} {\|\mathbf r_{rel}\|}. }
+        \]
+      </p>
+      <p>
+        This is the line-of-sight unit vector.
+      </p>
+      <p>
+        Thus range primarily constrains the component of relative position along the current line of sight.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.18 Range Rate</h3>
+      <p>
+        Range rate measures how quickly separation changes.
+      </p>
+      <p>
+        The ideal relation is
+      </p>
+      <p>
+        \[
+        \boxed{ \dot{\rho} = \frac{ \mathbf r_{rel}^T \mathbf v_{rel} }{ \|\mathbf r_{rel}\| }. }
+        \]
+      </p>
+      <p>
+        Equivalently,
+      </p>
+      <p>
+        \[
+        \boxed{ \dot{\rho} = \mathbf u_{LOS}^T \mathbf v_{rel} }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <p>
+        \[
+        \mathbf u_{LOS} = \frac{\mathbf r_{rel}} {\|\mathbf r_{rel}\|}.
+        \]
+      </p>
+      <p>
+        Range rate therefore measures the relative-velocity component along the line of sight.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.19 Range Rate Does Not Give Full Relative Velocity</h3>
+      <p>
+        Because
+      </p>
+      <p>
+        \[
+        \dot{\rho} = \mathbf u_{LOS}^T\mathbf v_{rel},
+        \]
+      </p>
+      <p>
+        range rate constrains only one projection of the velocity.
+      </p>
+      <p>
+        Tangential relative motion may not be directly observable from one instantaneous range-rate measurement.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Range + Range Rate} \neq \text{Instantaneous Full 6-DOF Translational State}. }
+        \]
+      </p>
+      <p>
+        Dynamics and measurement geometry provide the remaining information.
+      </p>
+      <div class="concept-note">
+        <h4>Range rate is directional</h4>
+        <p>Range rate constrains only the line-of-sight component of relative velocity. Tangential motion requires additional information.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.20 Line-of-Sight Measurements</h3>
+      <p>
+        Optical sensors often measure the direction to the target rather than direct range.
+      </p>
+      <p>
+        The normalized line-of-sight vector is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf u_{LOS} = \frac{ \mathbf r_{rel} }{ \|\mathbf r_{rel}\| }. }
+        \]
+      </p>
+      <p>
+        A camera may encode this direction using:
+      </p>
+      <ul>
+        <li>azimuth/elevation,</li>
+        <li>pixel coordinates,</li>
+        <li>unit-vector components.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.21 Bearing-Only Navigation</h3>
+      <p>
+        If a camera supplies line-of-sight direction but no range, the navigation problem becomes bearing-only.
+      </p>
+      <p>
+        The measurement contains angular information but no direct scale.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Bearing} \rightarrow \text{Direction} }
+        \]
+      </p>
+      <p>
+        but not
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Bearing} \rightarrow \text{Instantaneous Range}. }
+        \]
+      </p>
+      <p>
+        Range can become observable through dynamics and changing viewing geometry.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.22 Why Motion Helps Bearing-Only Navigation</h3>
+      <p>
+        Suppose the observer moves relative to the target.
+      </p>
+      <p>
+        The line-of-sight direction changes over time:
+      </p>
+      <p>
+        \[
+        \mathbf u_{LOS}(t_1), \quad \mathbf u_{LOS}(t_2), \quad \mathbf u_{LOS}(t_3).
+        \]
+      </p>
+      <p>
+        These changing directions provide triangulation-like information.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Observer Motion} \rightarrow \text{Changing LOS Geometry} \rightarrow \text{Range Observability}. }
+        \]
+      </p>
+      <p>
+        This is one example of manoeuvre-dependent observability.
+      </p>
+      <div class="concept-note">
+        <h4>Motion creates bearing-only observability</h4>
+        <p>Changing line-of-sight geometry over time provides information about range and relative motion. Nearly constant LOS can leave scale weakly observable.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.23 Camera Measurements</h3>
+      <p>
+        A camera provides image-plane measurements.
+      </p>
+      <p>
+        For a pinhole model,
+      </p>
+      <p>
+        \[
+        \boxed{ u = f_x\frac{X_C}{Z_C} + c_x }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ v = f_y\frac{Y_C}{Z_C} + c_y }
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <p>
+        \[
+        [X_C,Y_C,Z_C]^T
+        \]
+      </p>
+      <p>
+        is the target point expressed in the camera frame.
+      </p>
+      <p>
+        The camera measurement is therefore fundamentally geometric.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.24 Camera Intrinsic Parameters</h3>
+      <p>
+        The image model depends on camera intrinsics such as:
+      </p>
+      <ul>
+        <li>focal length,</li>
+        <li>principal point,</li>
+        <li>pixel scaling,</li>
+        <li>distortion.</li>
+      </ul>
+      <p>
+        These can be represented through an intrinsic matrix
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf K = \begin{bmatrix} f_x&0&c_x\\ 0&f_y&c_y\\ 0&0&1 \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Calibration error in \(\mathbf K\) can produce systematic navigation bias.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.25 Camera Extrinsic Calibration</h3>
+      <p>
+        The camera is mounted somewhere on the spacecraft.
+      </p>
+      <p>
+        The target vector must therefore be transformed between:
+      </p>
+      <ul>
+        <li>navigation frame,</li>
+        <li>body frame,</li>
+        <li>camera frame.</li>
+      </ul>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r^C = \mathbf C_{CB} \mathbf r^B. }
+        \]
+      </p>
+      <p>
+        An incorrect camera-to-body alignment matrix produces systematic line-of-sight error.
+      </p>
+      <div class="concept-note">
+        <h4>Extrinsic calibration is part of the measurement model</h4>
+        <p>A camera measurement lives in the camera frame. The camera-to-body transform must therefore be calibrated and applied consistently.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.26 Camera Lever Arm</h3>
+      <p>
+        The camera optical center may not coincide with the spacecraft navigation reference point.
+      </p>
+      <p>
+        Let
+      </p>
+      <p>
+        \[
+        \mathbf l_{BC}^{B}
+        \]
+      </p>
+      <p>
+        be the camera lever arm.
+      </p>
+      <p>
+        Then the target-relative vector from the camera differs from that at the spacecraft center.
+      </p>
+      <p>
+        This becomes increasingly important when:
+      </p>
+      <ul>
+        <li>separation becomes small,</li>
+        <li>lever arm is large,</li>
+        <li>angular rates are high,</li>
+        <li>precision requirements are tight.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.27 Feature-Based Optical Navigation</h3>
+      <p>
+        A camera may estimate relative pose from detected target features.
+      </p>
+      <p>
+        The processing chain may be
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Image} \rightarrow \text{Feature Detection} \rightarrow \text{Feature Association} \rightarrow \text{Geometric Measurement} \rightarrow \text{Navigation Update}. }
+        \]
+      </p>
+      <p>
+        Typical features can include:
+      </p>
+      <ul>
+        <li>corners,</li>
+        <li>fiducials,</li>
+        <li>structural points,</li>
+        <li>natural visual features.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.28 Feature Association</h3>
+      <p>
+        A detected image point is useful only if the estimator knows what physical target feature it corresponds to.
+      </p>
+      <p>
+        Incorrect association can produce a large measurement error.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Correct Feature Detection} \neq \text{Correct Feature Association}. }
+        \]
+      </p>
+      <p>
+        Robust relative navigation therefore requires both.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.29 Perspective-n-Point Pose Estimation</h3>
+      <p>
+        If known 3-D target points
+      </p>
+      <p>
+        \[
+        \mathbf P_i
+        \]
+      </p>
+      <p>
+        are matched to their image projections
+      </p>
+      <p>
+        \[
+        \mathbf p_i,
+        \]
+      </p>
+      <p>
+        the camera can solve a Perspective-n-Point problem.
+      </p>
+      <p>
+        The result estimates:
+      </p>
+      <ul>
+        <li>relative translation,</li>
+        <li>relative orientation.</li>
+      </ul>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Known 3-D Features} + \text{2-D Image Measurements} \rightarrow \text{Relative Pose}. }
+        \]
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.30 Relative Pose</h3>
+      <p>
+        Relative pose contains six physical degrees of freedom:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Pose} = \begin{bmatrix} \text{3-D Position}\\ \text{3-D Orientation} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        It is therefore richer than relative position alone.
+      </p>
+      <p>
+        Close-proximity operations often require pose because guidance may need to know not only where the target is, but how it is oriented.
+      </p>
+      <div class="concept-note">
+        <h4>Pose means translation plus orientation</h4>
+        <p>For close operations, relative position alone may be insufficient; relative orientation is also needed to describe the target geometry completely.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.31 Relative Quaternion</h3>
+      <p>
+        Let
+      </p>
+      <p>
+        \[
+        \mathbf q_C
+        \]
+      </p>
+      <p>
+        be the chaser attitude and
+      </p>
+      <p>
+        \[
+        \mathbf q_T
+        \]
+      </p>
+      <p>
+        the target attitude.
+      </p>
+      <p>
+        A relative quaternion may be defined as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf q_{rel} = \mathbf q_C \otimes \mathbf q_T^{-1} }
+        \]
+      </p>
+      <p>
+        or the opposite order depending on convention.
+      </p>
+      <p>
+        The convention must be documented explicitly.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.32 Relative Angular Velocity</h3>
+      <p>
+        Relative angular velocity describes how the target and chaser orientations change with respect to one another.
+      </p>
+      <p>
+        The exact expression depends on the reference frames.
+      </p>
+      <p>
+        A conceptual representation is
+      </p>
+      <p>
+        \[
+        \boxed{ \boldsymbol\omega_{rel} = \boldsymbol\omega_C - \mathbf C_{CT}\boldsymbol\omega_T. }
+        \]
+      </p>
+      <p>
+        All terms must be expressed in the same frame before subtraction.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.33 Pose Estimation From Camera Measurements</h3>
+      <p>
+        A pose estimator may produce
+      </p>
+      <p>
+        \[
+        \hat{\mathbf r}_{rel}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \hat{\mathbf q}_{rel}
+        \]
+      </p>
+      <p>
+        directly from images.
+      </p>
+      <p>
+        These can then be treated as measurements in a recursive filter.
+      </p>
+      <p>
+        Alternatively, the filter may use lower-level image features directly.
+      </p>
+      <p>
+        These represent two different levels of integration.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.34 High-Level Versus Low-Level Vision Fusion</h3>
+      <p>
+        A high-level architecture uses
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera} \rightarrow \text{Pose Solver} \rightarrow (\mathbf r,\mathbf q) \rightarrow \text{Navigation Filter}. }
+        \]
+      </p>
+      <p>
+        A lower-level architecture uses
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera Pixels/Features} \rightarrow \text{Navigation Filter}. }
+        \]
+      </p>
+      <p>
+        The lower-level approach preserves more raw measurement information but is more complex.
+      </p>
+      <div class="concept-note">
+        <h4>High-level versus low-level vision fusion</h4>
+        <p>High-level pose fusion is modular and simpler; low-level feature fusion preserves more raw information but couples perception more tightly to navigation.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.35 LiDAR Measurements</h3>
+      <p>
+        LiDAR measures distance using emitted and returned light.
+      </p>
+      <p>
+        Depending on the sensor, it may provide:
+      </p>
+      <ul>
+        <li>single range,</li>
+        <li>multiple beams,</li>
+        <li>point clouds,</li>
+        <li>depth images,</li>
+        <li>target surface geometry.</li>
+      </ul>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{LiDAR} \rightarrow \text{Direct Geometric Range Information}. }
+        \]
+      </p>
+      <p>
+        This complements camera bearing measurements.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.36 Camera and LiDAR Complementarity</h3>
+      <p>
+        A camera provides rich angular and appearance information but may have weak direct range observability.
+      </p>
+      <p>
+        LiDAR provides strong range information but may have less visual texture information.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera} + \text{LiDAR} \rightarrow \text{Improved Relative Geometry}. }
+        \]
+      </p>
+      <p>
+        This is a natural multi-sensor fusion combination.
+      </p>
+      <div class="concept-note">
+        <h4>Why camera and LiDAR are complementary</h4>
+        <p>Cameras provide strong angular and appearance information while LiDAR provides direct depth and surface geometry. Their sensitivities complement each other.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.37 LiDAR Point Cloud</h3>
+      <p>
+        A scanning LiDAR may produce points
+      </p>
+      <p>
+        \[
+        \mathbf p_i^L
+        \]
+      </p>
+      <p>
+        in the LiDAR frame.
+      </p>
+      <p>
+        If a target model is available, the observed point cloud can be aligned with that model.
+      </p>
+      <p>
+        The alignment can estimate
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel} \quad\text{and}\quad \mathbf q_{rel}. }
+        \]
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.38 Point-Cloud Registration</h3>
+      <p>
+        Point-cloud registration seeks the rigid transform
+      </p>
+      <p>
+        \[
+        \mathbf R, \mathbf t
+        \]
+      </p>
+      <p>
+        that aligns measured points with a target model.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf p_i^{meas} \approx \mathbf R\mathbf p_i^{model} + \mathbf t. }
+        \]
+      </p>
+      <p>
+        Algorithms such as iterative closest point or other registration methods may be used.
+      </p>
+      <p>
+        The output can become a pose measurement for the navigation filter.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.39 LiDAR Limitations</h3>
+      <p>
+        LiDAR performance can depend on:
+      </p>
+      <ul>
+        <li>target reflectivity,</li>
+        <li>range,</li>
+        <li>incidence angle,</li>
+        <li>field of view,</li>
+        <li>surface geometry,</li>
+        <li>sensor resolution,</li>
+        <li>sunlight/background illumination,</li>
+        <li>scan pattern.</li>
+      </ul>
+      <p>
+        Therefore LiDAR measurement covariance should not necessarily be constant over all ranges and geometries.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.40 Range-Dependent Sensor Performance</h3>
+      <p>
+        Many relative-navigation sensors change quality with distance.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R = \mathbf R(\rho,\text{geometry},\text{quality}) }
+        \]
+      </p>
+      <p>
+        rather than
+      </p>
+      <p>
+        \[
+        \mathbf R=\text{constant}.
+        \]
+      </p>
+      <p>
+        A camera may have excellent angular resolution at long range but weak range information.
+      </p>
+      <p>
+        A LiDAR may become highly useful at closer range.
+      </p>
+      <p>
+        Sensor-fusion architecture should reflect these changing strengths.
+      </p>
+      <div class="concept-note">
+        <h4>Measurement covariance should follow operating conditions</h4>
+        <p>Relative-navigation sensor quality often varies with distance, geometry, illumination, incidence angle, and tracking quality, so a constant covariance may be unrealistic.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.41 IMU Role in Relative Navigation</h3>
+      <p>
+        An IMU primarily measures the chaser spacecraft's own motion.
+      </p>
+      <p>
+        It does not directly measure target relative position.
+      </p>
+      <p>
+        However, it can propagate:
+      </p>
+      <ul>
+        <li>attitude,</li>
+        <li>angular rate,</li>
+        <li>translational acceleration.</li>
+      </ul>
+      <p>
+        Thus it supports short-term relative-state propagation between external relative-navigation measurements.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.42 Why IMU Alone Cannot Determine Relative Position</h3>
+      <p>
+        An IMU tells the chaser how it is moving dynamically.
+      </p>
+      <p>
+        It does not inherently tell the chaser where the target is.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{IMU Alone} \not\rightarrow \text{Target Relative Position}. }
+        \]
+      </p>
+      <p>
+        An external reference such as camera, LiDAR, range, GNSS, or radio measurement is required to anchor the relative state.
+      </p>
+      <div class="concept-note">
+        <h4>Why the IMU needs an external relative reference</h4>
+        <p>The IMU measures chaser motion but not target location. An external relative measurement is needed to anchor the target state.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.43 Relative-Navigation Error State</h3>
+      <p>
+        A general translational error state can be written
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = \begin{bmatrix} \delta\mathbf r_{rel}\\ \delta\mathbf v_{rel} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        A more complete state may include
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = \begin{bmatrix} \delta\mathbf r_{rel}\\ \delta\mathbf v_{rel}\\ \delta\boldsymbol\theta_{rel}\\ \delta\mathbf b_a\\ \delta\mathbf b_g \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Calibration and timing states can be added if observable.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.44 Relative EKF Architecture</h3>
+      <p>
+        A typical EKF sequence is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Propagate Relative State} \rightarrow \text{Propagate Covariance} \rightarrow \text{Predict Sensor Measurement} \rightarrow \text{Compute Innovation} \rightarrow \text{Update State} }
+        \]
+      </p>
+      <p>
+        This is the same Bayesian recursive structure used elsewhere in navigation.
+      </p>
+      <p>
+        What changes are:
+      </p>
+      <ul>
+        <li>the state,</li>
+        <li>the dynamics,</li>
+        <li>the measurement model.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.45 Measurement Function</h3>
+      <p>
+        For a sensor measurement,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h(\mathbf x_k) + \mathbf v_k. }
+        \]
+      </p>
+      <p>
+        Different sensors use different \(h(\cdot)\).
+      </p>
+      <p>
+        Examples include:
+      </p>
+      <p>
+        \[
+        h_{range}(\mathbf x) = \|\mathbf r_{rel}\|
+        \]
+      </p>
+      <p>
+        \[
+        h_{LOS}(\mathbf x) = \frac{\mathbf r_{rel}} {\|\mathbf r_{rel}\|}
+        \]
+      </p>
+      <p>
+        \[
+        h_{camera}(\mathbf x) = \pi(\mathbf r_{rel},\mathbf q_{rel})
+        \]
+      </p>
+      <p>
+        where \(\pi\) represents perspective projection.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.46 Innovation</h3>
+      <p>
+        For every measurement,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_k = \mathbf z_k - h(\hat{\mathbf x}_k^-). }
+        \]
+      </p>
+      <p>
+        The innovation represents disagreement between:
+      </p>
+      <ul>
+        <li>the sensor,</li>
+        <li>the predicted relative state.</li>
+      </ul>
+      <p>
+        It is one of the most important diagnostic quantities in a relative-navigation estimator.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.47 Innovation Covariance</h3>
+      <p>
+        The expected uncertainty of the innovation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf S_k = \mathbf H_k \mathbf P_k^- \mathbf H_k^T + \mathbf R_k. }
+        \]
+      </p>
+      <p>
+        Thus a residual should never be interpreted only by its raw magnitude.
+      </p>
+      <p>
+        The same one-meter residual can mean very different things when expected uncertainty is:
+      </p>
+      <p>
+        \[
+        0.01~\text{m}
+        \]
+      </p>
+      <p>
+        versus
+      </p>
+      <p>
+        \[
+        10~\text{m}.
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Residual magnitude must be interpreted with uncertainty</h4>
+        <p>Innovation covariance combines state prediction uncertainty and sensor uncertainty, so the same raw residual can be normal in one condition and abnormal in another.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.48 Innovation Gating</h3>
+      <p>
+        Normalized Innovation Squared is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NIS} = \mathbf r^T \mathbf S^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>
+        This can be used to reject abnormal:
+      </p>
+      <ul>
+        <li>camera features,</li>
+        <li>LiDAR poses,</li>
+        <li>GNSS states,</li>
+        <li>ranges,</li>
+        <li>range rates,</li>
+        <li>line-of-sight measurements.</li>
+      </ul>
+      <p>
+        Measurement gating is essential because one false relative-navigation measurement can produce a large navigation correction.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.49 Sensor-Specific Gating</h3>
+      <p>
+        Different sensors may require different gating strategies.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>pixel reprojection error for camera features,</li>
+        <li>point-cloud fit residual for LiDAR,</li>
+        <li>NIS for filter innovations,</li>
+        <li>quality indicators for GNSS,</li>
+        <li>signal-strength or lock checks for ranging.</li>
+      </ul>
+      <p>
+        Therefore measurement validation can contain both
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Sensor-Level Checks} }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Estimator-Level Statistical Checks}. }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Validation should occur at more than one level</h4>
+        <p>Sensor-specific checks test the measurement process itself, while estimator-level gates test consistency with the predicted relative state.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.50 Outliers in Camera Navigation</h3>
+      <p>
+        Camera outliers can arise from:
+      </p>
+      <ul>
+        <li>false feature detections,</li>
+        <li>incorrect feature association,</li>
+        <li>background objects,</li>
+        <li>glare,</li>
+        <li>target occlusion,</li>
+        <li>motion blur.</li>
+      </ul>
+      <p>
+        One false feature should not necessarily invalidate the entire camera.
+      </p>
+      <p>
+        Robust algorithms may reject individual feature measurements before pose estimation or filtering.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.51 LiDAR Outliers</h3>
+      <p>
+        LiDAR outliers may arise from:
+      </p>
+      <ul>
+        <li>multipath-like reflections,</li>
+        <li>spurious returns,</li>
+        <li>low reflectivity,</li>
+        <li>edge effects,</li>
+        <li>background objects,</li>
+        <li>partial target visibility.</li>
+      </ul>
+      <p>
+        Robust point-cloud processing should prevent such returns from dominating pose estimation.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.52 RANSAC-Type Robust Estimation</h3>
+      <p>
+        For vision measurements containing many candidate features, robust consensus methods can be used to identify a geometrically consistent subset.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Candidate Measurements} \rightarrow \text{Find Consistent Subset} \rightarrow \text{Estimate Geometry}. }
+        \]
+      </p>
+      <p>
+        This preprocessing improves the quality of measurements entering the navigation filter.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.53 Measurement Dropouts</h3>
+      <p>
+        Relative-navigation sensors may temporarily become unavailable.
+      </p>
+      <p>
+        Causes include:
+      </p>
+      <ul>
+        <li>target outside field of view,</li>
+        <li>eclipse,</li>
+        <li>optical blinding,</li>
+        <li>communication loss,</li>
+        <li>LiDAR range limits,</li>
+        <li>GNSS loss,</li>
+        <li>target occlusion.</li>
+      </ul>
+      <p>
+        During dropout,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Prediction Continues} }
+        \]
+      </p>
+      <p>
+        but uncertainty generally increases.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.54 Covariance During Dropout</h3>
+      <p>
+        When measurements disappear,
+      </p>
+      <p>
+        \[
+        \mathbf P
+        \]
+      </p>
+      <p>
+        should reflect the loss of information.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Dropout} \rightarrow \text{Covariance Growth}. }
+        \]
+      </p>
+      <p>
+        If covariance remains artificially small while measurements are absent, the estimator is overconfident.
+      </p>
+      <div class="concept-note">
+        <h4>Dropout should increase uncertainty</h4>
+        <p>When measurements disappear, information is lost and covariance should grow in the directions that are no longer constrained.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.55 Sensor Reacquisition</h3>
+      <p>
+        When a sensor returns, the predicted relative state may differ substantially from the measurement.
+      </p>
+      <p>
+        The estimator should check:
+      </p>
+      <ul>
+        <li>measurement validity,</li>
+        <li>innovation magnitude,</li>
+        <li>field-of-view consistency,</li>
+        <li>geometry,</li>
+        <li>covariance.</li>
+      </ul>
+      <p>
+        Large residuals may require staged recovery rather than one aggressive correction.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.56 Time Synchronization</h3>
+      <p>
+        Relative motion can make timing errors particularly significant.
+      </p>
+      <p>
+        Suppose a range measurement corresponds to time
+      </p>
+      <p>
+        \[
+        t_m
+        \]
+      </p>
+      <p>
+        but is applied at
+      </p>
+      <p>
+        \[
+        t_k.
+        \]
+      </p>
+      <p>
+        With timing error
+      </p>
+      <p>
+        \[
+        \Delta t=t_k-t_m,
+        \]
+      </p>
+      <p>
+        an approximate position discrepancy is
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf r \approx \mathbf v_{rel}\Delta t. }
+        \]
+      </p>
+      <p>
+        Thus faster closing motion increases sensitivity to latency.
+      </p>
+      <div class="concept-note">
+        <h4>Timing error becomes geometric error</h4>
+        <p>Applying a measurement at the wrong epoch compares the estimator against stale geometry. Faster relative motion increases the resulting state error.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.57 Camera Latency</h3>
+      <p>
+        Optical processing can include:
+      </p>
+      <ul>
+        <li>image exposure,</li>
+        <li>image transfer,</li>
+        <li>feature extraction,</li>
+        <li>pose estimation.</li>
+      </ul>
+      <p>
+        The measurement may therefore be significantly older than its arrival time.
+      </p>
+      <p>
+        The relevant timestamp is the image exposure epoch.
+      </p>
+      <p>
+        Using packet-arrival time can create a systematic relative-state error during motion.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.58 LiDAR Latency</h3>
+      <p>
+        Scanning LiDAR presents another timing challenge.
+      </p>
+      <p>
+        A point cloud may be acquired over a finite scan interval rather than at one exact instant.
+      </p>
+      <p>
+        If relative motion is significant during the scan,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{One Point Cloud} \neq \text{One Perfect Instantaneous Geometry}. }
+        \]
+      </p>
+      <p>
+        Motion compensation may be required for high-accuracy estimation.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.59 Out-of-Sequence Measurements</h3>
+      <p>
+        A delayed relative measurement may correspond to a state in the past.
+      </p>
+      <p>
+        A consistent architecture may:
+      </p>
+      <ol>
+        <li>store historical states,</li>
+        <li>return to the measurement time,</li>
+        <li>apply the measurement,</li>
+        <li>propagate the corrected state to the present.</li>
+      </ol>
+      <p>
+        This is especially important when measurement latency is comparable to the dynamics time scale.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.60 Multi-Rate Relative Sensor Fusion</h3>
+      <p>
+        Relative-navigation sensors operate at different rates.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>IMU: high rate,</li>
+        <li>camera: intermediate rate,</li>
+        <li>LiDAR: lower or variable rate,</li>
+        <li>GNSS: another rate,</li>
+        <li>ranging system: independent rate.</li>
+      </ul>
+      <p>
+        The filter therefore naturally becomes event driven:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Propagate Continuously} + \text{Update Whenever a Valid Measurement Arrives}. }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Asynchronous fusion is natural</h4>
+        <p>IMU, camera, LiDAR, GNSS, and ranging measurements rarely share one rate, so event-driven updates preserve their real timing.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.61 Sequential Sensor Updates</h3>
+      <p>
+        Suppose camera and range measurements arrive at slightly different times.
+      </p>
+      <p>
+        They should not necessarily be forced into one combined update.
+      </p>
+      <p>
+        Instead:
+      </p>
+      <p>
+        \[
+        \boxed{ t_1:\text{Camera Update} }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ t_2:\text{Range Update}. }
+        \]
+      </p>
+      <p>
+        Sequential processing preserves actual measurement timing.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.62 Simultaneous Measurement Stacking</h3>
+      <p>
+        If independent sensors genuinely correspond to the same epoch, measurements can be stacked:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z = \begin{bmatrix} \mathbf z_{cam}\\ \mathbf z_{range}\\ \mathbf z_{lidar} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \mathbf R
+        \]
+      </p>
+      <p>
+        must represent their measurement covariance, including cross-correlations if present.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.63 Sensor Correlation</h3>
+      <p>
+        Two sensors may share common errors.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>camera and LiDAR may share body alignment uncertainty,</li>
+        <li>two GNSS solutions may share common GNSS errors,</li>
+        <li>camera pose and feature measurements may originate from the same image.</li>
+      </ul>
+      <p>
+        Treating correlated information as independent can produce overconfidence.
+      </p>
+      <div class="concept-note">
+        <h4>Shared errors can cause overconfidence</h4>
+        <p>Treating correlated sensors as independent can count some information twice and shrink covariance unrealistically.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.64 Measurement Covariance</h3>
+      <p>
+        Each sensor has its own covariance:
+      </p>
+      <p>
+        \[
+        \mathbf R_{GNSS}, \quad \mathbf R_{cam}, \quad \mathbf R_{LiDAR}, \quad R_{\rho}, \quad R_{\dot{\rho}}.
+        \]
+      </p>
+      <p>
+        These should reflect actual current measurement quality.
+      </p>
+      <p>
+        In many RPO sensors,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R = \mathbf R( \rho, \text{geometry}, \text{illumination}, \text{quality} ) }
+        \]
+      </p>
+      <p>
+        is more realistic than a constant matrix.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.65 Range-Dependent Camera Accuracy</h3>
+      <p>
+        For a camera with approximately fixed angular resolution,
+      </p>
+      <p>
+        \[
+        \sigma_\theta
+        \]
+      </p>
+      <p>
+        may remain relatively similar while equivalent lateral-position uncertainty increases with range.
+      </p>
+      <p>
+        Approximately,
+      </p>
+      <p>
+        \[
+        \boxed{ \sigma_{cross} \approx \rho\sigma_\theta. }
+        \]
+      </p>
+      <p>
+        Thus a small angular error can correspond to a large cross-track position error at long distance.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.66 Why Range Helps Camera Navigation</h3>
+      <p>
+        A camera may provide highly accurate direction:
+      </p>
+      <p>
+        \[
+        \mathbf u_{LOS}.
+        \]
+      </p>
+      <p>
+        A range sensor provides
+      </p>
+      <p>
+        \[
+        \rho.
+        \]
+      </p>
+      <p>
+        Together,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel} = \rho\mathbf u_{LOS}. }
+        \]
+      </p>
+      <p>
+        Thus combining direction and range can directly reconstruct relative position.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.67 Sensor Geometry</h3>
+      <p>
+        Sensor geometry strongly affects estimation quality.
+      </p>
+      <p>
+        For example:
+      </p>
+      <ul>
+        <li>range measures radial direction strongly,</li>
+        <li>LOS measures angular directions strongly,</li>
+        <li>multiple bearings from changing viewpoints improve scale,</li>
+        <li>multiple range directions improve three-dimensional position.</li>
+      </ul>
+      <p>
+        This is why covariance often becomes anisotropic.
+      </p>
+      <div class="concept-note">
+        <h4>Geometry determines which directions are well known</h4>
+        <p>Each sensor constrains different directions in state space, which is why relative-position uncertainty can be highly anisotropic.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.68 Anisotropic Relative Uncertainty</h3>
+      <p>
+        Relative-position covariance
+      </p>
+      <p>
+        \[
+        \mathbf P_r
+        \]
+      </p>
+      <p>
+        may contain very different uncertainty levels along different directions.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \sigma_x \neq \sigma_y \neq \sigma_z.
+        \]
+      </p>
+      <p>
+        A single scalar position accuracy can therefore hide important geometry.
+      </p>
+      <p>
+        The complete covariance ellipsoid is more informative.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.69 Relative-Position Error Ellipsoid</h3>
+      <p>
+        If
+      </p>
+      <p>
+        \[
+        \mathbf P_r
+        \]
+      </p>
+      <p>
+        has eigenvalues
+      </p>
+      <p>
+        \[
+        \lambda_1,\lambda_2,\lambda_3,
+        \]
+      </p>
+      <p>
+        then principal uncertainty lengths scale as
+      </p>
+      <p>
+        \[
+        \boxed{ \sqrt{\lambda_1}, \quad \sqrt{\lambda_2}, \quad \sqrt{\lambda_3}. }
+        \]
+      </p>
+      <p>
+        The eigenvectors identify the directions of greatest and least uncertainty.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.70 Observability in Relative Navigation</h3>
+      <p>
+        Observability asks whether the unknown relative states can be reconstructed from:
+      </p>
+      <ul>
+        <li>dynamics,</li>
+        <li>measurements,</li>
+        <li>sensor geometry,</li>
+        <li>motion over time.</li>
+      </ul>
+      <p>
+        A state may be mathematically present in the filter but remain weakly observable.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{State Included} \neq \text{State Observable}. }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Including a state does not make it observable</h4>
+        <p>Biases, timing offsets, and calibration parameters converge only when dynamics, measurements, and motion make them distinguishable.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.71 Range-Only Observability</h3>
+      <p>
+        Range-only navigation can become observable over time when orbital dynamics cause the range geometry to change.
+      </p>
+      <p>
+        However, observability may be weak for certain trajectories.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Range History} + \text{Relative Dynamics} \rightarrow \text{Potential 3-D State Information}. }
+        \]
+      </p>
+      <p>
+        The quality depends strongly on trajectory geometry.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.72 Bearing-Only Observability</h3>
+      <p>
+        Bearing-only relative navigation is also highly geometry dependent.
+      </p>
+      <p>
+        If line-of-sight direction changes very little,
+      </p>
+      <p>
+        \[
+        \dot{\mathbf u}_{LOS} \approx0,
+        \]
+      </p>
+      <p>
+        range may remain weakly observable.
+      </p>
+      <p>
+        A manoeuvre that changes the viewing geometry can significantly improve observability.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.73 Manoeuvre-Dependent Observability</h3>
+      <p>
+        A deliberate manoeuvre may generate useful geometric diversity.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Manoeuvre} \rightarrow \text{Changing Measurement Sensitivity} \rightarrow \text{Improved Observability}. }
+        \]
+      </p>
+      <p>
+        This concept applies to:
+      </p>
+      <ul>
+        <li>range-only estimation,</li>
+        <li>bearing-only estimation,</li>
+        <li>calibration estimation,</li>
+        <li>timing estimation.</li>
+      </ul>
+      <div class="concept-note">
+        <h4>Guidance can improve observability</h4>
+        <p>A deliberate manoeuvre can change measurement geometry and strengthen previously weak state directions.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.74 Relative Attitude Observability</h3>
+      <p>
+        Relative attitude may be estimated from:
+      </p>
+      <ul>
+        <li>target features,</li>
+        <li>target geometry,</li>
+        <li>fiducial markers,</li>
+        <li>target attitude broadcasts,</li>
+        <li>multiple vectors.</li>
+      </ul>
+      <p>
+        If the visible target geometry is symmetric, some orientations may be ambiguous.
+      </p>
+      <p>
+        Therefore target shape itself can influence relative-attitude observability.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.75 Symmetry Ambiguity</h3>
+      <p>
+        Suppose the target looks identical after a certain rotation.
+      </p>
+      <p>
+        Then optical measurements may not distinguish the two orientations.
+      </p>
+      <p>
+        This produces a multi-hypothesis or ambiguous pose problem.
+      </p>
+      <p>
+        A Gaussian single-mode estimator may not represent this ambiguity well.
+      </p>
+      <p>
+        Additional information or temporal tracking may be needed.
+      </p>
+      <div class="concept-note">
+        <h4>Symmetry can create multiple pose hypotheses</h4>
+        <p>If different target orientations generate nearly identical measurements, a single Gaussian estimate may hide the ambiguity.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.76 Target Model Knowledge</h3>
+      <p>
+        Pose estimation often assumes knowledge of the target:
+      </p>
+      <ul>
+        <li>dimensions,</li>
+        <li>feature coordinates,</li>
+        <li>CAD geometry,</li>
+        <li>fiducial locations.</li>
+      </ul>
+      <p>
+        Model error can become navigation error.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Target Geometry Error} \rightarrow \text{Pose Measurement Bias}. }
+        \]
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.77 Target Motion</h3>
+      <p>
+        A target may be:
+      </p>
+      <ul>
+        <li>attitude stabilized,</li>
+        <li>slowly rotating,</li>
+        <li>tumbling,</li>
+        <li>manoeuvring.</li>
+      </ul>
+      <p>
+        The relative-navigation dynamics should reflect the expected target behaviour.
+      </p>
+      <p>
+        For tumbling targets, relative attitude and angular velocity may need explicit estimation.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.78 Tumbling-Target State</h3>
+      <p>
+        A state may include
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x = [ \mathbf r_{rel}, \mathbf v_{rel}, \mathbf q_T, \boldsymbol\omega_T ]^T. }
+        \]
+      </p>
+      <p>
+        This allows the estimator to predict future target orientation between visual measurements.
+      </p>
+      <p>
+        However, it increases model complexity.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.79 Target Angular Dynamics</h3>
+      <p>
+        A rigid-body target may approximately satisfy
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf J_T \dot{\boldsymbol\omega}_T + \boldsymbol\omega_T \times (\mathbf J_T\boldsymbol\omega_T) = \mathbf T_T. }
+        \]
+      </p>
+      <p>
+        For a passive object,
+      </p>
+      <p>
+        \[
+        \mathbf T_T
+        \]
+      </p>
+      <p>
+        may be small but not necessarily zero.
+      </p>
+      <p>
+        If target inertia is uncertain, process noise may represent the mismatch.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.80 Relative-Attitude Error Representation</h3>
+      <p>
+        As with spacecraft attitude estimation, relative quaternion error should normally be treated multiplicatively.
+      </p>
+      <p>
+        Define
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf q_{rel} = \mathbf q_{rel,true} \otimes \hat{\mathbf q}_{rel}^{-1}. }
+        \]
+      </p>
+      <p>
+        For small error,
+      </p>
+      <p>
+        \[
+        \delta\mathbf q_{rel} \approx \begin{bmatrix} 1\\ \frac12\delta\boldsymbol\theta_{rel} \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        This gives a three-dimensional relative-attitude error state.
+      </p>
+      <div class="concept-note">
+        <h4>Relative attitude should respect rotation geometry</h4>
+        <p>Multiplicative quaternion error with a three-component local attitude error avoids treating four constrained quaternion components as independent.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.81 Pose Error State</h3>
+      <p>
+        A close-range pose error state may therefore be
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x_{pose} = \begin{bmatrix} \delta\mathbf r_{rel}\\ \delta\boldsymbol\theta_{rel} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        For dynamic tracking, relative velocity and angular-rate errors may also be included.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.82 Relative Navigation and EKF</h3>
+      <p>
+        An EKF is commonly suitable when:
+      </p>
+      <ul>
+        <li>the state remains approximately Gaussian,</li>
+        <li>nonlinearities are moderate,</li>
+        <li>initial uncertainty is not excessively large.</li>
+      </ul>
+      <p>
+        Camera and range models are nonlinear, but can be linearized around the current estimate.
+      </p>
+      <p>
+        The filter then uses
+      </p>
+      <p>
+        \[
+        \mathbf H_k = \frac{\partial h}{\partial\mathbf x} \bigg|_{\hat{\mathbf x}_k^-}.
+        \]
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.83 When an UKF May Be Useful</h3>
+      <p>
+        An Unscented Kalman Filter can be useful when nonlinear measurement transformations are strong.
+      </p>
+      <p>
+        Examples include:
+      </p>
+      <ul>
+        <li>bearing measurements,</li>
+        <li>nonlinear pose models,</li>
+        <li>large relative uncertainty.</li>
+      </ul>
+      <p>
+        The UKF propagates sigma points instead of relying only on first-order Jacobians.
+      </p>
+      <p>
+        It does not eliminate poor observability or incorrect measurement models, but it can better approximate nonlinear uncertainty transformation.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.84 Particle Filters for Multi-Modal Relative Navigation</h3>
+      <p>
+        If the posterior is strongly non-Gaussian or multi-modal, a particle filter may be useful.
+      </p>
+      <p>
+        Examples include:
+      </p>
+      <ul>
+        <li>ambiguous optical pose,</li>
+        <li>uncertain feature association,</li>
+        <li>bearing-only initialization,</li>
+        <li>multiple geometric hypotheses.</li>
+      </ul>
+      <p>
+        A Gaussian EKF cannot naturally represent several separated hypotheses.
+      </p>
+      <div class="concept-note">
+        <h4>Why particle filters can help</h4>
+        <p>When multiple distinct poses or ranges remain plausible, particle methods can represent hypotheses that a single Gaussian EKF cannot.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.85 Relative-State Initialization</h3>
+      <p>
+        The estimator requires an initial estimate
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}_{rel,0}
+        \]
+      </p>
+      <p>
+        and covariance
+      </p>
+      <p>
+        \[
+        \mathbf P_{rel,0}.
+        \]
+      </p>
+      <p>
+        Initialization may come from:
+      </p>
+      <ul>
+        <li>GNSS differencing,</li>
+        <li>ground-provided ephemerides,</li>
+        <li>coarse ranging,</li>
+        <li>camera detection,</li>
+        <li>LiDAR detection,</li>
+        <li>previous navigation history.</li>
+      </ul>
+      <p>
+        The covariance should represent the actual uncertainty of that source.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.86 Bearing-Only Initialization</h3>
+      <p>
+        Bearing-only initialization is difficult because range may be unknown.
+      </p>
+      <p>
+        The initial state may therefore have:
+      </p>
+      <ul>
+        <li>relatively accurate LOS direction,</li>
+        <li>very large range uncertainty.</li>
+      </ul>
+      <p>
+        This produces a highly elongated uncertainty region.
+      </p>
+      <p>
+        Using an isotropic covariance would misrepresent the actual information.
+      </p>
+      <div class="concept-note">
+        <h4>Bearing-only uncertainty is anisotropic</h4>
+        <p>LOS direction may be known accurately while range remains poorly known, so the covariance should be elongated rather than isotropic.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.87 Range-Only Initialization</h3>
+      <p>
+        Range-only initialization gives a known radial distance but weak direction information.
+      </p>
+      <p>
+        Thus the uncertainty geometry differs fundamentally from bearing-only initialization.
+      </p>
+      <p>
+        This reinforces a general principle:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Covariance Should Represent Sensor Geometry}. }
+        \]
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.88 Sensor Handover Across Range</h3>
+      <p>
+        Different sensors may dominate at different separation ranges.
+      </p>
+      <p>
+        A general architecture may transition between:
+      </p>
+      <ul>
+        <li>long-range GNSS or inter-spacecraft navigation,</li>
+        <li>intermediate optical navigation,</li>
+        <li>closer-range LiDAR or detailed vision.</li>
+      </ul>
+      <p>
+        This is not necessarily a hard switch.
+      </p>
+      <p>
+        Sensors can overlap so that one measurement source is validated before another is removed.
+      </p>
+      <div class="concept-note">
+        <h4>Sensor handover is an information transition</h4>
+        <p>Different sensors become useful at different ranges. Overlap allows cross-checking before reliance shifts to the newly active sensor.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.89 Why Overlapping Sensor Regions Are Useful</h3>
+      <p>
+        If sensor A becomes unavailable exactly when sensor B becomes active, there is no opportunity to cross-check them.
+      </p>
+      <p>
+        An overlap region allows:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Sensor A} + \text{Sensor B} \rightarrow \text{Consistency Check}. }
+        \]
+      </p>
+      <p>
+        This supports:
+      </p>
+      <ul>
+        <li>calibration,</li>
+        <li>fault detection,</li>
+        <li>smooth transition,</li>
+        <li>confidence assessment.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.90 Sensor-Handover Transients</h3>
+      <p>
+        When a new sensor becomes active, its:
+      </p>
+      <ul>
+        <li>bias,</li>
+        <li>alignment,</li>
+        <li>covariance,</li>
+        <li>latency,</li>
+      </ul>
+      <p>
+        may differ from the previous sensor.
+      </p>
+      <p>
+        The estimator should avoid a discontinuous state jump simply because the measurement source changed.
+      </p>
+      <p>
+        Handover should be validated using innovations and covariance consistency.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.91 Long-Range Relative Navigation</h3>
+      <p>
+        At longer range, practical information may come from:
+      </p>
+      <ul>
+        <li>relative GNSS,</li>
+        <li>absolute GNSS differencing,</li>
+        <li>RF ranging,</li>
+        <li>bearing measurements,</li>
+        <li>inter-spacecraft communication.</li>
+      </ul>
+      <p>
+        The target may occupy only a few camera pixels, making detailed pose estimation impossible.
+      </p>
+      <p>
+        Thus long-range navigation may focus primarily on
+      </p>
+      <p>
+        \[
+        \mathbf r_{rel}, \qquad \mathbf v_{rel}.
+        \]
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.92 Intermediate-Range Navigation</h3>
+      <p>
+        As distance decreases, optical measurements become more informative.
+      </p>
+      <p>
+        Camera line of sight can provide increasingly precise angular information.
+      </p>
+      <p>
+        Depending on target size and camera resolution, target geometry may begin to support:
+      </p>
+      <ul>
+        <li>range estimation,</li>
+        <li>relative attitude,</li>
+        <li>pose estimation.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.93 Close-Range Navigation</h3>
+      <p>
+        At close range, the estimator may use:
+      </p>
+      <ul>
+        <li>detailed camera features,</li>
+        <li>LiDAR point clouds,</li>
+        <li>range,</li>
+        <li>relative pose.</li>
+      </ul>
+      <p>
+        The required state may expand from simple relative translation to full 6-DOF relative pose.
+      </p>
+      <p>
+        Measurement models also become more sensitive to:
+      </p>
+      <ul>
+        <li>sensor alignment,</li>
+        <li>lever arms,</li>
+        <li>target geometry.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.94 Field of View</h3>
+      <p>
+        Optical sensors operate only when the target lies inside their field of view.
+      </p>
+      <p>
+        A measurement validity condition may involve
+      </p>
+      <p>
+        \[
+        \boxed{ |\alpha| < \alpha_{FOV} }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ |\beta| < \beta_{FOV}. }
+        \]
+      </p>
+      <p>
+        Navigation and pointing are therefore coupled: losing pointing can cause loss of navigation measurements.
+      </p>
+      <div class="concept-note">
+        <h4>Pointing and navigation are coupled</h4>
+        <p>A healthy optical sensor can lose measurements if the target exits the field of view, so attitude control and guidance influence navigation availability.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.95 Target Visibility</h3>
+      <p>
+        Target visibility can be affected by:
+      </p>
+      <ul>
+        <li>spacecraft attitude,</li>
+        <li>lighting,</li>
+        <li>eclipse,</li>
+        <li>Sun angle,</li>
+        <li>occlusion,</li>
+        <li>target rotation,</li>
+        <li>sensor pointing.</li>
+      </ul>
+      <p>
+        Therefore optical measurement availability is inherently state dependent.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.96 Lighting Conditions</h3>
+      <p>
+        Passive cameras depend on illumination.
+      </p>
+      <p>
+        Possible challenges include:
+      </p>
+      <ul>
+        <li>low illumination,</li>
+        <li>high contrast,</li>
+        <li>glare,</li>
+        <li>Sun intrusion,</li>
+        <li>Earth background,</li>
+        <li>shadow transitions.</li>
+      </ul>
+      <p>
+        Measurement covariance or validity may therefore depend on image-quality metrics.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.97 Motion Blur</h3>
+      <p>
+        During high angular or translational motion, image features may blur.
+      </p>
+      <p>
+        Approximate image displacement during exposure is related to
+      </p>
+      <p>
+        \[
+        \boxed{ \Delta p \propto \dot{p}T_{exp}. }
+        \]
+      </p>
+      <p>
+        Long exposure improves brightness but increases blur.
+      </p>
+      <p>
+        This creates a tradeoff between:
+      </p>
+      <ul>
+        <li>sensitivity,</li>
+        <li>motion robustness.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.98 LiDAR Field of Regard</h3>
+      <p>
+        LiDAR also has geometric limitations.
+      </p>
+      <p>
+        The target must remain within:
+      </p>
+      <ul>
+        <li>angular scan limits,</li>
+        <li>minimum range,</li>
+        <li>maximum range.</li>
+      </ul>
+      <p>
+        Close-range navigation should therefore consider sensor geometry together with guidance trajectory.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.99 Sensor Saturation and Minimum Range</h3>
+      <p>
+        Some range sensors become unreliable below a minimum distance.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \rho<\rho_{\min} }
+        \]
+      </p>
+      <p>
+        may invalidate the sensor.
+      </p>
+      <p>
+        A sensor that works well at intermediate range may not necessarily work at extremely close range.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.100 Navigation Accuracy Versus Range</h3>
+      <p>
+        Relative-navigation requirements may become more stringent as separation decreases.
+      </p>
+      <p>
+        For example, the acceptable relative-position uncertainty at long range may be much larger than at close range.
+      </p>
+      <p>
+        Thus performance requirements may be phase dependent:
+      </p>
+      <p>
+        \[
+        \boxed{ \sigma_r < \sigma_{r,\mathrm{req}}(\rho). }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Requirements can tighten with separation</h4>
+        <p>Long-range operations can often tolerate larger uncertainty than close-range operations, so requirements should state their applicable range or phase.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.101 Relative Position Error</h3>
+      <p>
+        Define
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf r_{rel} = \mathbf r_{rel,true} - \hat{\mathbf r}_{rel}. }
+        \]
+      </p>
+      <p>
+        A scalar error is
+      </p>
+      <p>
+        \[
+        \boxed{ e_r = \| \delta\mathbf r_{rel} \|. }
+        \]
+      </p>
+      <p>
+        It is also important to examine components in the operational relative frame.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.102 Relative Velocity Error</h3>
+      <p>
+        Similarly,
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf v_{rel} = \mathbf v_{rel,true} - \hat{\mathbf v}_{rel}. }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ e_v = \| \delta\mathbf v_{rel} \|. }
+        \]
+      </p>
+      <p>
+        Relative velocity is especially important because it determines closing behaviour and future separation.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.103 Relative Attitude Error</h3>
+      <p>
+        Using the relative quaternion error
+      </p>
+      <p>
+        \[
+        \delta\mathbf q,
+        \]
+      </p>
+      <p>
+        the principal attitude error can be calculated as
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\theta = 2\cos^{-1} (|\delta q_0|). }
+        \]
+      </p>
+      <p>
+        This provides a coordinate-independent scalar measure of relative orientation error.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.104 Pose Error</h3>
+      <p>
+        Pose performance should normally be evaluated separately for translation and rotation:
+      </p>
+      <p>
+        \[
+        \boxed{ e_{pose} \rightarrow \{ e_r, e_\theta \}. }
+        \]
+      </p>
+      <p>
+        Combining meters and degrees into one arbitrary scalar can hide important behaviour unless a physically meaningful weighting is defined.
+      </p>
+      <div class="concept-note">
+        <h4>Translation and rotation should remain distinct</h4>
+        <p>Meters and degrees describe different physical errors; reporting them separately avoids hiding whether translation or orientation dominates.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.105 Relative Navigation Covariance</h3>
+      <p>
+        Relative navigation should publish covariance together with the state.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \mathbf P_r, \quad \mathbf P_v, \quad \mathbf P_\theta.
+        \]
+      </p>
+      <p>
+        The covariance communicates not only the best estimate, but how much confidence the estimator has in that estimate.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.106 \(3\sigma\) Relative Error Envelopes</h3>
+      <p>
+        For state component \(i\),
+      </p>
+      <p>
+        \[
+        \boxed{ \pm3\sqrt{P_{ii}} }
+        \]
+      </p>
+      <p>
+        provides a useful covariance envelope.
+      </p>
+      <p>
+        In simulation, actual truth error can be plotted against these bounds.
+      </p>
+      <p>
+        A consistent estimator should show statistically plausible coverage over many runs.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.107 Relative Navigation NEES</h3>
+      <p>
+        For truth error
+      </p>
+      <p>
+        \[
+        \delta\mathbf x
+        \]
+      </p>
+      <p>
+        and covariance
+      </p>
+      <p>
+        \[
+        \mathbf P,
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NEES} = \delta\mathbf x^T \mathbf P^{-1} \delta\mathbf x. }
+        \]
+      </p>
+      <p>
+        This evaluates whether the relative-state covariance is credible.
+      </p>
+      <p>
+        Good RMSE alone is not sufficient.
+      </p>
+      <div class="concept-note">
+        <h4>NEES evaluates consistency, not just accuracy</h4>
+        <p>A filter can have low RMSE and still be overconfident. NEES compares actual state error against claimed covariance.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.108 Sensor NIS</h3>
+      <p>
+        For each sensor,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{NIS}_i = \mathbf r_i^T \mathbf S_i^{-1} \mathbf r_i. }
+        \]
+      </p>
+      <p>
+        Separate NIS monitoring may be maintained for:
+      </p>
+      <ul>
+        <li>GNSS,</li>
+        <li>range,</li>
+        <li>camera,</li>
+        <li>LiDAR,</li>
+        <li>other measurements.</li>
+      </ul>
+      <p>
+        This helps diagnose which measurement source is inconsistent.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.109 Innovation Whiteness</h3>
+      <p>
+        A correctly modeled innovation should ideally have little predictable temporal structure.
+      </p>
+      <p>
+        If camera residuals repeatedly oscillate or drift, possible causes include:
+      </p>
+      <ul>
+        <li>timing errors,</li>
+        <li>misalignment,</li>
+        <li>target-model errors,</li>
+        <li>unmodeled dynamics.</li>
+      </ul>
+      <p>
+        Thus innovation autocorrelation can provide useful diagnostic information.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.110 Relative-Navigation Integrity</h3>
+      <p>
+        Accuracy asks:
+      </p>
+      <blockquote>How close is the estimated relative state to truth?</blockquote>
+      <p>
+        Integrity asks:
+      </p>
+      <blockquote>Can the system identify when the relative state should not be trusted?</blockquote>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Good Relative Navigation} = \text{Accuracy} + \text{Consistency} + \text{Fault Awareness}. }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>Integrity adds the question of trust</h4>
+        <p>Relative navigation should not only estimate the state; it should also indicate when the solution is no longer credible enough for downstream use.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.111 Relative Navigation Validity</h3>
+      <p>
+        The estimator may publish
+      </p>
+      <p>
+        \[
+        \boxed{ \texttt{RELNAV\_VALID} \in \{0,1\}. }
+        \]
+      </p>
+      <p>
+        Validity can depend on:
+      </p>
+      <ul>
+        <li>covariance,</li>
+        <li>sensor availability,</li>
+        <li>innovation statistics,</li>
+        <li>observability,</li>
+        <li>numerical health,</li>
+        <li>time since last valid update.</li>
+      </ul>
+      <p>
+        A filter can continue running internally while its relative solution is declared invalid.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.112 Sensor Validity Flags</h3>
+      <p>
+        Individual sensors may also have flags:
+      </p>
+      <p>
+        \[
+        \texttt{GNSS\_VALID},
+        \]
+      </p>
+      <p>
+        \[
+        \texttt{CAM\_VALID},
+        \]
+      </p>
+      <p>
+        \[
+        \texttt{LIDAR\_VALID},
+        \]
+      </p>
+      <p>
+        \[
+        \texttt{RANGE\_VALID}.
+        \]
+      </p>
+      <p>
+        This supports graceful degradation when one sensor fails.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.113 Degraded Relative Navigation</h3>
+      <p>
+        Suppose the LiDAR becomes unavailable but the camera remains valid.
+      </p>
+      <p>
+        The estimator may continue with larger range uncertainty.
+      </p>
+      <p>
+        Similarly, if the camera is lost but range remains valid, direction uncertainty may grow.
+      </p>
+      <p>
+        Therefore degraded navigation should reflect the actual information lost, not simply declare all relative navigation unavailable immediately.
+      </p>
+      <div class="concept-note">
+        <h4>Degraded operation should reflect information actually lost</h4>
+        <p>Losing one sensor does not necessarily remove all relative information; covariance should show which state directions became weaker.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.114 Sensor Fault Isolation</h3>
+      <p>
+        A sensor may repeatedly fail innovation tests.
+      </p>
+      <p>
+        If the behaviour persists, the system may isolate that sensor.
+      </p>
+      <p>
+        A conceptual chain is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Abnormal Residual} \rightarrow \text{Persistent Evidence} \rightarrow \text{Sensor Isolation} \rightarrow \text{Degraded Fusion}. }
+        \]
+      </p>
+      <p>
+        This connects relative navigation with FDIR.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.115 Redundant Sensors</h3>
+      <p>
+        Redundant sensors can improve:
+      </p>
+      <ul>
+        <li>availability,</li>
+        <li>fault tolerance,</li>
+        <li>geometry.</li>
+      </ul>
+      <p>
+        Examples include:
+      </p>
+      <ul>
+        <li>multiple cameras,</li>
+        <li>multiple range sensors,</li>
+        <li>multiple GNSS antennas.</li>
+      </ul>
+      <p>
+        But redundancy is most valuable when failure modes are sufficiently independent.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.116 Redundant Camera Geometry</h3>
+      <p>
+        Two cameras with different viewing directions can improve:
+      </p>
+      <ul>
+        <li>field-of-view coverage,</li>
+        <li>triangulation,</li>
+        <li>fault detection.</li>
+      </ul>
+      <p>
+        Stereo geometry can also provide direct depth information.
+      </p>
+      <p>
+        This is another example of sensor geometry creating observability.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.117 Stereo Vision</h3>
+      <p>
+        For a stereo baseline \(b\), focal length \(f\), and disparity \(d\),
+      </p>
+      <p>
+        \[
+        \boxed{ Z \approx \frac{fb}{d}. }
+        \]
+      </p>
+      <p>
+        Thus depth can be reconstructed geometrically.
+      </p>
+      <p>
+        Depth uncertainty grows rapidly as disparity becomes small, which commonly occurs at long range.
+      </p>
+      <div class="concept-note">
+        <h4>Stereo depth degrades at long range</h4>
+        <p>As disparity becomes small, small pixel errors produce increasingly large depth errors, making stereo performance strongly range dependent.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.118 Target-Feature Geometry</h3>
+      <p>
+        Feature placement affects pose-estimation quality.
+      </p>
+      <p>
+        Features clustered in a small image region provide weaker pose geometry than features spread across the visible target.
+      </p>
+      <p>
+        Similarly, nearly coplanar or symmetric feature arrangements can weaken some pose directions.
+      </p>
+      <p>
+        Thus feature geometry should be treated as part of measurement quality.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.119 Initialization From Detection</h3>
+      <p>
+        Before tracking can begin, the target must first be detected.
+      </p>
+      <p>
+        A general pipeline is
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Search} \rightarrow \text{Detect Target} \rightarrow \text{Initialize Relative State} \rightarrow \text{Begin Recursive Tracking}. }
+        \]
+      </p>
+      <p>
+        Detection and tracking are different estimation problems.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.120 Lost-Track Recovery</h3>
+      <p>
+        If optical tracking is lost, the filter may continue propagating the target state.
+      </p>
+      <p>
+        When the target is detected again, the search region can be predicted using the propagated covariance.
+      </p>
+      <p>
+        Thus covariance supports not only estimation but also sensor tasking.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.121 Covariance-Based Search Region</h3>
+      <p>
+        If predicted image location is
+      </p>
+      <p>
+        \[
+        \hat{\mathbf p}
+        \]
+      </p>
+      <p>
+        with image covariance
+      </p>
+      <p>
+        \[
+        \mathbf P_p,
+        \]
+      </p>
+      <p>
+        the camera processing algorithm can search a bounded uncertainty region around \(\hat{\mathbf p}\).
+      </p>
+      <p>
+        This is more efficient than searching the entire image.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.122 Sensor Fusion and Target Tracking</h3>
+      <p>
+        Navigation and target tracking should not necessarily be treated as independent software functions.
+      </p>
+      <p>
+        The navigation estimate predicts:
+      </p>
+      <ul>
+        <li>target image position,</li>
+        <li>expected range,</li>
+        <li>expected target orientation.</li>
+      </ul>
+      <p>
+        These predictions can aid sensor processing.
+      </p>
+      <p>
+        Sensor processing then returns better measurements to navigation.
+      </p>
+      <p>
+        This creates a feedback loop between perception and estimation.
+      </p>
+      <div class="concept-note">
+        <h4>Perception and estimation can help each other</h4>
+        <p>The estimator predicts where the target should appear; sensor processing uses that prediction and returns measurements that improve the estimator.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.123 Relative-Navigation Monte Carlo Testing</h3>
+      <p>
+        Monte Carlo testing should vary:
+      </p>
+      <ul>
+        <li>initial relative position,</li>
+        <li>initial relative velocity,</li>
+        <li>attitude error,</li>
+        <li>sensor noise,</li>
+        <li>camera alignment,</li>
+        <li>LiDAR alignment,</li>
+        <li>timing offset,</li>
+        <li>measurement dropouts,</li>
+        <li>target-motion uncertainty,</li>
+        <li>feature-detection error,</li>
+        <li>GNSS uncertainty,</li>
+        <li>ranging noise.</li>
+      </ul>
+      <p>
+        This reveals statistical performance across realistic conditions.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.124 Monte Carlo Performance Measures</h3>
+      <p>
+        For run \(j\), record
+      </p>
+      <p>
+        \[
+        \delta\mathbf r_{rel}^{(j)}(t),
+        \]
+      </p>
+      <p>
+        \[
+        \delta\mathbf v_{rel}^{(j)}(t),
+        \]
+      </p>
+      <p>
+        \[
+        \delta\boldsymbol\theta_{rel}^{(j)}(t).
+        \]
+      </p>
+      <p>
+        Then compute quantities such as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathrm{RMSE}, \quad P_{95}, \quad P_{99}, \quad e_{\max}. }
+        \]
+      </p>
+      <p>
+        Consistency metrics should be evaluated as well.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.125 Phase-Dependent Performance Assessment</h3>
+      <p>
+        RPO relative-navigation performance should generally be assessed by operational phase or separation range.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Long Range} \neq \text{Intermediate Range} \neq \text{Close Range}. }
+        \]
+      </p>
+      <p>
+        Different phases can use different sensors, dynamics, and accuracy requirements.
+      </p>
+      <p>
+        One mission-wide RMSE can hide poor performance during a critical phase.
+      </p>
+      <div class="concept-note">
+        <h4>One mission-wide RMSE can hide phase weakness</h4>
+        <p>Long-, intermediate-, and close-range operations can use different sensors and requirements, so performance should be assessed by phase.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.126 Sensor-Handover Monte Carlo Testing</h3>
+      <p>
+        Monte Carlo cases should include transitions such as:
+      </p>
+      <ul>
+        <li>GNSS to optical navigation,</li>
+        <li>camera to camera + LiDAR,</li>
+        <li>sensor dropout and recovery.</li>
+      </ul>
+      <p>
+        Metrics should include:
+      </p>
+      <ul>
+        <li>state discontinuity,</li>
+        <li>covariance consistency,</li>
+        <li>maximum transient error,</li>
+        <li>recovery time.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.127 Measurement Latency Testing</h3>
+      <p>
+        Artificial latency should be introduced independently for:
+      </p>
+      <ul>
+        <li>camera,</li>
+        <li>LiDAR,</li>
+        <li>GNSS,</li>
+        <li>range sensors.</li>
+      </ul>
+      <p>
+        The navigation error can then be evaluated as a function of
+      </p>
+      <p>
+        \[
+        \Delta t.
+        \]
+      </p>
+      <p>
+        This validates timestamp handling rather than only sensor accuracy.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.128 Alignment-Error Testing</h3>
+      <p>
+        Inject camera or LiDAR alignment error:
+      </p>
+      <p>
+        \[
+        \delta\boldsymbol\alpha.
+        \]
+      </p>
+      <p>
+        Then examine:
+      </p>
+      <ul>
+        <li>innovation mean,</li>
+        <li>relative-position bias,</li>
+        <li>relative-attitude bias,</li>
+        <li>filter consistency.</li>
+      </ul>
+      <p>
+        Persistent structured residuals often reveal alignment errors.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.129 Target-Model Error Testing</h3>
+      <p>
+        If vision or LiDAR uses a target geometry model, perturb:
+      </p>
+      <ul>
+        <li>dimensions,</li>
+        <li>feature locations,</li>
+        <li>surface geometry.</li>
+      </ul>
+      <p>
+        Then evaluate how these errors influence pose estimates.
+      </p>
+      <p>
+        This helps separate sensor error from model error.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.130 Sensor Dropout Testing</h3>
+      <p>
+        For each sensor:
+      </p>
+      <ol>
+        <li>establish nominal fusion,</li>
+        <li>remove the sensor,</li>
+        <li>propagate using remaining information,</li>
+        <li>observe covariance growth,</li>
+        <li>restore the sensor,</li>
+        <li>evaluate reacquisition.</li>
+      </ol>
+      <p>
+        This tests graceful degradation and recovery.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.131 Outlier Injection Testing</h3>
+      <p>
+        Inject isolated bad measurements such as:
+      </p>
+      <ul>
+        <li>false camera feature,</li>
+        <li>erroneous range,</li>
+        <li>incorrect LiDAR pose,</li>
+        <li>GNSS position jump.</li>
+      </ul>
+      <p>
+        Evaluate whether the measurement is:
+      </p>
+      <ul>
+        <li>detected,</li>
+        <li>rejected,</li>
+        <li>prevented from corrupting the state.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.132 Persistent Bias Testing</h3>
+      <p>
+        Persistent bias is more difficult than a single outlier.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \boxed{ z_\rho = \rho+b_\rho+v_\rho. }
+        \]
+      </p>
+      <p>
+        If \(b_\rho\) is small, each measurement may still pass an innovation gate.
+      </p>
+      <p>
+        Long-term residual monitoring or redundancy may therefore be necessary.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.133 Sensor Failure Versus Geometry Loss</h3>
+      <p>
+        A measurement can become unusable even when the sensor itself is healthy.
+      </p>
+      <p>
+        Examples include:
+      </p>
+      <ul>
+        <li>camera loses target outside field of view,</li>
+        <li>LiDAR target outside range,</li>
+        <li>GNSS geometry becomes poor.</li>
+      </ul>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Unavailable} \neq \text{Sensor Hardware Failure}. }
+        \]
+      </p>
+      <p>
+        This distinction matters for FDIR and mode logic.
+      </p>
+      <div class="concept-note">
+        <h4>Unavailability is not the same as hardware failure</h4>
+        <p>A healthy sensor may temporarily provide no useful measurement because of range, geometry, field of view, or illumination.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.134 Relative Navigation Numerical Health</h3>
+      <p>
+        The filter should monitor:
+      </p>
+      <p>
+        \[
+        \mathbf P=\mathbf P^T
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \lambda_i(\mathbf P)\ge0.
+        \]
+      </p>
+      <p>
+        For quaternion states,
+      </p>
+      <p>
+        \[
+        \|\mathbf q\|\approx1.
+        \]
+      </p>
+      <p>
+        The implementation should also detect:
+      </p>
+      <ul>
+        <li>NaN,</li>
+        <li>Inf,</li>
+        <li>invalid matrix factorization,</li>
+        <li>impossible geometry.</li>
+      </ul>
+      <p>
+        Numerical health is part of navigation health.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.135 Joseph Covariance Update</h3>
+      <p>
+        A robust covariance correction is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P^+ = (\mathbf I-\mathbf K\mathbf H) \mathbf P^- (\mathbf I-\mathbf K\mathbf H)^T + \mathbf K\mathbf R\mathbf K^T. }
+        \]
+      </p>
+      <p>
+        This is particularly useful when measurement models and state dimensions become large.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.136 Relative-Navigation Output</h3>
+      <p>
+        A relative-navigation system may publish
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}_{rel}, \quad \hat{\mathbf v}_{rel}, \quad \hat{\mathbf q}_{rel}, \quad \hat{\boldsymbol\omega}_{rel}, \quad \mathbf P. }
+        \]
+      </p>
+      <p>
+        It may also publish:
+      </p>
+      <ul>
+        <li>sensor validity,</li>
+        <li>navigation validity,</li>
+        <li>measurement quality,</li>
+        <li>estimator health.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.137 Relative State for Guidance</h3>
+      <p>
+        Guidance uses the estimated relative state:
+      </p>
+      <p>
+        \[
+        \hat{\mathbf r}_{rel}, \qquad \hat{\mathbf v}_{rel}.
+        \]
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Relative-Navigation Error} \rightarrow \text{Guidance Input Error}. }
+        \]
+      </p>
+      <p>
+        The guidance system never sees the unknown true relative state directly.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.138 Relative Attitude for Close Operations</h3>
+      <p>
+        For close-proximity tasks, guidance and control may also require
+      </p>
+      <p>
+        \[
+        \hat{\mathbf q}_{rel}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \hat{\boldsymbol\omega}_{rel}.
+        \]
+      </p>
+      <p>
+        This allows the chaser to reason about both:
+      </p>
+      <ul>
+        <li>translational geometry,</li>
+        <li>target orientation.</li>
+      </ul>
+      <p>
+        Pose accuracy may therefore become more important as separation decreases.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.139 Navigation and Collision Avoidance</h3>
+      <p>
+        Reliable relative-state knowledge is also important for maintaining safe separation.
+      </p>
+      <p>
+        A covariance-aware system can consider not only estimated position, but uncertainty around that estimate.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Estimated Separation} + \text{Relative Uncertainty} \rightarrow \text{Better Safety Assessment}. }
+        \]
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.140 Covariance and Safety Margins</h3>
+      <p>
+        Suppose the estimated range is
+      </p>
+      <p>
+        \[
+        \hat{\rho}.
+        \]
+      </p>
+      <p>
+        A safety assessment based only on \(\hat{\rho}\) ignores uncertainty.
+      </p>
+      <p>
+        A more meaningful interpretation considers:
+      </p>
+      <p>
+        \[
+        \hat{\rho}
+        \]
+      </p>
+      <p>
+        together with the projected range uncertainty
+      </p>
+      <p>
+        \[
+        \sigma_\rho.
+        \]
+      </p>
+      <p>
+        Thus a nominally acceptable distance with large uncertainty may deserve more caution than the same distance with small uncertainty.
+      </p>
+      <div class="concept-note">
+        <h4>Safety should consider uncertainty, not only nominal separation</h4>
+        <p>Two cases with the same estimated range can have different risk when their relative covariance differs.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.141 Relative Navigation and Guidance Handover</h3>
+      <p>
+        As operations progress, guidance may use different navigation modes.
+      </p>
+      <p>
+        For example, a system may transition from:
+      </p>
+      <ul>
+        <li>absolute/relative GNSS,</li>
+        <li>to optical relative navigation,</li>
+        <li>to detailed pose sensing.</li>
+      </ul>
+      <p>
+        Navigation should therefore supply a consistent state representation so that guidance is not forced to interpret unrelated sensor outputs directly.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.142 Common Relative-State Interface</h3>
+      <p>
+        A useful architecture publishes one fused relative state:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{rel} }
+        \]
+      </p>
+      <p>
+        regardless of which sensors currently contribute.
+      </p>
+      <p>
+        Then:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Changes} \rightarrow \text{Estimator Handles Them} }
+        \]
+      </p>
+      <p>
+        while
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Guidance Receives a Consistent Interface}. }
+        \]
+      </p>
+      <p>
+        This reduces coupling between guidance software and individual sensors.
+      </p>
+      <div class="concept-note">
+        <h4>A common interface decouples guidance from sensors</h4>
+        <p>Guidance benefits from receiving one fused relative state and covariance while sensor-specific logic remains inside the estimator.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.143 Navigation Modes</h3>
+      <p>
+        The estimator may operate in modes such as:
+      </p>
+      <ul>
+        <li>GNSS-dominant,</li>
+        <li>optical-dominant,</li>
+        <li>LiDAR-aided,</li>
+        <li>inertial propagation,</li>
+        <li>degraded relative navigation.</li>
+      </ul>
+      <p>
+        Mode changes should depend on:
+      </p>
+      <ul>
+        <li>measurement availability,</li>
+        <li>covariance,</li>
+        <li>geometry,</li>
+        <li>mission conditions.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.144 Avoiding Hard Sensor Switching When Possible</h3>
+      <p>
+        An abrupt switch from one independent navigation solution to another can produce a state jump.
+      </p>
+      <p>
+        A fused estimator can instead gradually change information weighting.
+      </p>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Smooth Sensor Fusion} > \text{Blind Hard Switching} }
+        \]
+      </p>
+      <p>
+        when overlapping valid measurements are available.
+      </p>
+      <div class="concept-note">
+        <h4>Smooth fusion avoids unnecessary state jumps</h4>
+        <p>When valid sensors overlap, information weighting can shift gradually instead of abruptly switching between independent solutions.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.145 Relative-Navigation Accuracy Requirements</h3>
+      <p>
+        A position requirement may be expressed as
+      </p>
+      <p>
+        \[
+        \boxed{ e_{r,95} < r_{req}. }
+        \]
+      </p>
+      <p>
+        Velocity requirement:
+      </p>
+      <p>
+        \[
+        \boxed{ e_{v,95} < v_{req}. }
+        \]
+      </p>
+      <p>
+        Attitude requirement:
+      </p>
+      <p>
+        \[
+        \boxed{ e_{\theta,95} < \theta_{req}. }
+        \]
+      </p>
+      <p>
+        The probability level, frame, phase, and range should be defined explicitly.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.146 Requirement Dependence on Separation</h3>
+      <p>
+        Requirements may vary with range:
+      </p>
+      <p>
+        \[
+        \boxed{ r_{req} = r_{req}(\rho) }
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{ v_{req} = v_{req}(\rho). }
+        \]
+      </p>
+      <p>
+        Close-range operations may require tighter relative-state knowledge than distant operations.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.147 Performance Should Include Availability</h3>
+      <p>
+        A highly accurate estimator that is valid only occasionally may not be useful operationally.
+      </p>
+      <p>
+        Therefore relative-navigation performance should include:
+      </p>
+      <ul>
+        <li>accuracy,</li>
+        <li>availability,</li>
+        <li>continuity,</li>
+        <li>consistency,</li>
+        <li>recovery.</li>
+      </ul>
+      <p>
+        These properties complement standard RMSE metrics.
+      </p>
+      <div class="concept-note">
+        <h4>Performance is broader than accuracy</h4>
+        <p>Availability, continuity, consistency, and recovery determine whether the system remains operationally useful.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.148 Relative Navigation Availability</h3>
+      <p>
+        Define
+      </p>
+      <p>
+        \[
+        \boxed{ A_{rel} = \frac{ T_{\text{valid relative navigation}} }{ T_{\text{operation}} }. }
+        \]
+      </p>
+      <p>
+        Validity should be linked to:
+      </p>
+      <ul>
+        <li>accuracy requirements,</li>
+        <li>covariance limits,</li>
+        <li>health.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.149 Continuity</h3>
+      <p>
+        Continuity asks whether a valid navigation solution remains continuously available throughout a required interval.
+      </p>
+      <p>
+        An estimator that repeatedly drops valid/invalid may be difficult for downstream guidance even if its average accuracy is good.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.150 Recovery Time</h3>
+      <p>
+        After a sensor outage or fault,
+      </p>
+      <p>
+        \[
+        \boxed{ T_{\mathrm{recover}} }
+        \]
+      </p>
+      <p>
+        measures the time required for:
+      </p>
+      <ul>
+        <li>state error,</li>
+        <li>covariance,</li>
+        <li>validity,</li>
+      </ul>
+      <p>
+        to return to acceptable values.
+      </p>
+      <p>
+        Recovery should be tested as explicitly as nominal accuracy.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.151 Closed-Loop Validation</h3>
+      <p>
+        Standalone estimation tests are necessary but not sufficient.
+      </p>
+      <p>
+        The relative-navigation solution ultimately affects guidance commands, which change relative motion, which changes future sensor geometry.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Navigation} \rightarrow \text{Guidance} \rightarrow \text{Vehicle Motion} \rightarrow \text{Measurements} \rightarrow \text{Navigation}. }
+        \]
+      </p>
+      <p>
+        This closed loop should eventually be validated.
+      </p>
+      <div class="concept-note">
+        <h4>Closed-loop testing is essential</h4>
+        <p>Navigation errors affect guidance, guidance changes the trajectory, and the new trajectory changes future sensing geometry.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.152 Sensor Geometry Can Be Changed by Guidance</h3>
+      <p>
+        Guidance can intentionally improve navigation geometry.
+      </p>
+      <p>
+        For example, a manoeuvre may create:
+      </p>
+      <ul>
+        <li>stronger bearing parallax,</li>
+        <li>better range geometry,</li>
+        <li>improved target visibility.</li>
+      </ul>
+      <p>
+        This demonstrates that navigation and guidance need not be completely independent disciplines.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.153 Active Perception</h3>
+      <p>
+        When vehicle motion is intentionally selected to improve sensing, the concept is sometimes called active perception or information-aware guidance.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Choose Motion} \rightarrow \text{Improve Future Measurements} \rightarrow \text{Reduce State Uncertainty}. }
+        \]
+      </p>
+      <p>
+        This is an advanced extension of relative navigation.
+      </p>
+      <div class="concept-note">
+        <h4>Active perception uses motion as a sensing tool</h4>
+        <p>A trajectory can be chosen partly to improve observability, reduce ambiguity, or keep the target in a useful sensor region.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.154 Sensor Tasking</h3>
+      <p>
+        Sensors themselves can also be actively managed.
+      </p>
+      <p>
+        Examples include:
+      </p>
+      <ul>
+        <li>camera pointing,</li>
+        <li>exposure control,</li>
+        <li>LiDAR scan-region selection,</li>
+        <li>GNSS antenna selection.</li>
+      </ul>
+      <p>
+        The estimator can provide predicted target location and uncertainty to assist sensor tasking.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.155 Camera Search Window From Prediction</h3>
+      <p>
+        If the predicted target image location is
+      </p>
+      <p>
+        \[
+        \hat{\mathbf p}
+        \]
+      </p>
+      <p>
+        and covariance is
+      </p>
+      <p>
+        \[
+        \mathbf P_p,
+        \]
+      </p>
+      <p>
+        the image-processing algorithm can search within an uncertainty window.
+      </p>
+      <p>
+        As covariance increases, the required search region grows.
+      </p>
+      <p>
+        Thus estimator uncertainty has direct computational implications.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.156 Relative Navigation for Non-Cooperative Targets</h3>
+      <p>
+        For a non-cooperative target, the navigation system cannot rely on transmitted target state.
+      </p>
+      <p>
+        The estimator must infer the state from measurements such as:
+      </p>
+      <ul>
+        <li>camera LOS,</li>
+        <li>target features,</li>
+        <li>LiDAR geometry,</li>
+        <li>range.</li>
+      </ul>
+      <p>
+        This generally makes:
+      </p>
+      <ul>
+        <li>initialization harder,</li>
+        <li>observability more dependent on motion,</li>
+        <li>fault detection more dependent on sensor redundancy.</li>
+      </ul>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.157 Relative Navigation for Cooperative Targets</h3>
+      <p>
+        A cooperative target can make relative navigation much easier by providing:
+      </p>
+      <ul>
+        <li>known markers,</li>
+        <li>ranging transponders,</li>
+        <li>GNSS state,</li>
+        <li>attitude telemetry,</li>
+        <li>timing information.</li>
+      </ul>
+      <p>
+        Sensor fusion can still be useful because transmitted information may be delayed, noisy, or temporarily unavailable.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.158 Communication Delay</h3>
+      <p>
+        If target state is communicated,
+      </p>
+      <p>
+        \[
+        \mathbf x_T(t_m)
+        \]
+      </p>
+      <p>
+        may arrive at time
+      </p>
+      <p>
+        \[
+        t_k>t_m.
+        \]
+      </p>
+      <p>
+        Using the old target state directly produces relative-state timing error.
+      </p>
+      <p>
+        The target state should ideally be propagated to the current epoch before differencing.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.159 Clock Synchronization Between Spacecraft</h3>
+      <p>
+        Inter-spacecraft measurements can depend on time synchronization.
+      </p>
+      <p>
+        A clock offset
+      </p>
+      <p>
+        \[
+        \Delta t
+        \]
+      </p>
+      <p>
+        can affect:
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>range rate,</li>
+        <li>communicated states.</li>
+      </ul>
+      <p>
+        Some systems may therefore estimate clock bias as part of the relative-navigation state.
+      </p>
+      <div class="concept-note">
+        <h4>Clock error can become a navigation state</h4>
+        <p>If inter-spacecraft measurements or communicated states depend strongly on timing, relative clock bias may need to be estimated.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.160 Range Bias</h3>
+      <p>
+        A ranging sensor may contain a systematic bias:
+      </p>
+      <p>
+        \[
+        \boxed{ z_\rho = \rho + b_\rho + v_\rho. }
+        \]
+      </p>
+      <p>
+        If \(b_\rho\) is stable and observable, it may be estimated.
+      </p>
+      <p>
+        Otherwise it should be represented in the measurement uncertainty or calibration.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.161 Camera Alignment Bias</h3>
+      <p>
+        A small camera alignment error
+      </p>
+      <p>
+        \[
+        \delta\boldsymbol\alpha_C
+        \]
+      </p>
+      <p>
+        can produce systematic bearing residuals.
+      </p>
+      <p>
+        If not modeled, the navigation filter may incorrectly attribute that residual to relative position.
+      </p>
+      <p>
+        This can bias the estimated trajectory.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.162 LiDAR Alignment Bias</h3>
+      <p>
+        The same issue exists for LiDAR.
+      </p>
+      <p>
+        A sensor-to-body rotation error changes the reported direction of measured points.
+      </p>
+      <p>
+        Thus camera and LiDAR calibration should be treated as part of the navigation measurement model.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.163 Online Calibration</h3>
+      <p>
+        Under suitable observability, the estimator may augment its state with calibration parameters:
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = [ \delta\mathbf x_{nav}, \delta\boldsymbol\alpha_C, \delta\boldsymbol\alpha_L, b_\rho, \ldots ]^T. }
+        \]
+      </p>
+      <p>
+        Adding calibration states is useful only when the measurements and motion provide enough information to estimate them.
+      </p>
+      <div class="concept-note">
+        <h4>Online calibration requires observability</h4>
+        <p>Adding alignment or range-bias states helps only if the motion and measurements distinguish them from navigation error.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.164 Too Many States Can Hurt the Estimator</h3>
+      <p>
+        Adding every possible uncertainty as a state is not automatically better.
+      </p>
+      <p>
+        Poorly observable states can:
+      </p>
+      <ul>
+        <li>increase covariance,</li>
+        <li>create strong correlations,</li>
+        <li>slow convergence,</li>
+        <li>reduce numerical conditioning.</li>
+      </ul>
+      <p>
+        Thus:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{More States} \neq \text{Automatically Better Estimation}. }
+        \]
+      </p>
+      <div class="concept-note">
+        <h4>State augmentation has a cost</h4>
+        <p>Each extra state adds covariance and correlation terms; weakly observable states can slow convergence and worsen conditioning.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.165 Relative Navigation With Model Uncertainty</h3>
+      <p>
+        The target may execute unexpected motion.
+      </p>
+      <p>
+        Rather than immediately declaring sensor failure, the estimator should distinguish between:
+      </p>
+      <ul>
+        <li>model mismatch,</li>
+        <li>measurement fault.</li>
+      </ul>
+      <p>
+        Unexpected target acceleration may appear as a persistent innovation pattern.
+      </p>
+      <p>
+        Increasing process noise may sometimes be appropriate if target manoeuvres are physically plausible.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.166 Unknown Target Manoeuvre</h3>
+      <p>
+        Suppose the target experiences acceleration
+      </p>
+      <p>
+        \[
+        \mathbf a_T^{unknown}.
+        \]
+      </p>
+      <p>
+        Then the relative-dynamics model contains an unmodeled term.
+      </p>
+      <p>
+        One approach is to represent this with process noise:
+      </p>
+      <p>
+        \[
+        \mathbf Q_{target}.
+        \]
+      </p>
+      <p>
+        Another is to augment acceleration as a state.
+      </p>
+      <p>
+        The appropriate choice depends on manoeuvre characteristics.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.167 Constant-Acceleration Augmentation</h3>
+      <p>
+        A target acceleration state can be added:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x = [ \mathbf r_{rel}, \mathbf v_{rel}, \mathbf a_{rel} ]^T. }
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \dot{\mathbf a}_{rel}
+        \]
+      </p>
+      <p>
+        may be modeled as process noise.
+      </p>
+      <p>
+        This can improve tracking of smoothly manoeuvring targets at the cost of additional uncertainty and state dimension.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.168 Relative Navigation and Target Classification</h3>
+      <p>
+        For some advanced systems, sensor processing may first determine what kind of target geometry is visible.
+      </p>
+      <p>
+        However, classification and navigation should be distinguished.
+      </p>
+      <p>
+        Navigation asks:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Where is the target and how is it moving?} }
+        \]
+      </p>
+      <p>
+        Classification asks:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{What type of object is the target?} }
+        \]
+      </p>
+      <p>
+        They may share sensor data but solve different problems.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.169 Measurement Quality Metrics</h3>
+      <p>
+        Sensors may provide internal quality metrics such as:
+      </p>
+      <ul>
+        <li>number of tracked camera features,</li>
+        <li>reprojection error,</li>
+        <li>point-cloud registration error,</li>
+        <li>GNSS DOP,</li>
+        <li>range signal-to-noise ratio.</li>
+      </ul>
+      <p>
+        These can help determine measurement covariance dynamically.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.170 Dynamic Measurement Covariance</h3>
+      <p>
+        Instead of fixed
+      </p>
+      <p>
+        \[
+        \mathbf R,
+        \]
+      </p>
+      <p>
+        one may use
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf R_k = f( \text{range}, \text{feature count}, \text{geometry}, \text{quality} ). }
+        \]
+      </p>
+      <p>
+        This allows the estimator to trust measurements according to their actual current quality.
+      </p>
+      <p>
+        But the mapping must be calibrated carefully.
+      </p>
+      <div class="concept-note">
+        <h4>Dynamic covariance should be calibrated</h4>
+        <p>Quality-dependent covariance can improve fusion, but the mapping from quality metrics to uncertainty should be statistically validated.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.171 Overconfident Camera Measurement</h3>
+      <p>
+        If a vision algorithm reports extremely small covariance despite poor feature geometry, the filter may overcorrect toward a poor pose solution.
+      </p>
+      <p>
+        Therefore:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Accuracy} \neq \text{Algorithm Confidence Output Automatically}. }
+        \]
+      </p>
+      <p>
+        The reported covariance should be validated statistically.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.172 Overconfident LiDAR Pose</h3>
+      <p>
+        The same issue applies to point-cloud registration.
+      </p>
+      <p>
+        A low fitting residual does not always mean full pose is well determined.
+      </p>
+      <p>
+        For example, a nearly planar target surface may constrain some pose directions much better than others.
+      </p>
+      <p>
+        The measurement covariance should reflect that anisotropy.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.173 Information Contribution</h3>
+      <p>
+        The information matrix associated with a measurement is approximately
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T \mathbf R^{-1} \mathbf H. }
+        \]
+      </p>
+      <p>
+        This shows that measurement usefulness depends on both:
+      </p>
+      <ul>
+        <li>noise covariance,</li>
+        <li>state sensitivity.</li>
+      </ul>
+      <p>
+        A precise sensor can still provide little information about a state direction to which it is insensitive.
+      </p>
+      <div class="concept-note">
+        <h4>Precision and sensitivity are both required</h4>
+        <p>A precise sensor contributes little information about a state direction to which its measurement is insensitive.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.174 Fusion Is Not Averaging</h3>
+      <p>
+        Sensor fusion should not be thought of as averaging camera, GNSS, and LiDAR estimates.
+      </p>
+      <p>
+        The estimator uses each sensor according to its measurement model:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Fusion} = \text{Model-Based Combination of Information}. }
+        \]
+      </p>
+      <p>
+        Different sensors can measure completely different quantities and still constrain the same underlying state.
+      </p>
+      <div class="concept-note">
+        <h4>Fusion is model-based information combination</h4>
+        <p>Camera, LiDAR, range, GNSS, and IMU can measure different quantities yet constrain one common relative state through their measurement models.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.175 Why Multiple Sensor Types Are Valuable</h3>
+      <p>
+        A robust RPO navigation suite combines complementary observables.
+      </p>
+      <p>
+        For example:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Range} \rightarrow \text{Radial Information} }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Camera} \rightarrow \text{Angular Information} }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \text{LiDAR} \rightarrow \text{Detailed Geometry} }
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{ \text{IMU} \rightarrow \text{High-Rate Propagation}. }
+        \]
+      </p>
+      <p>
+        Together they can provide stronger observability than any single sensor.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.176 General Sensor-Fusion Architecture</h3>
+      <p>
+        A representative architecture is
+      </p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Dynamics / IMU}\\ \downarrow\\ \text{Relative-State Prediction}\\ \downarrow\\ \hat{\mathbf x}_{rel}^{-}\\ \downarrow\\ \text{Predict Sensor Measurements}\\ \downarrow\\ \text{Form Innovations}\\ \downarrow\\ \text{Validate / Gate}\\ \downarrow\\ \text{Kalman or Nonlinear Update}\\ \downarrow\\ \hat{\mathbf x}_{rel}^{+} \end{array} }
+        \]
+      </p>
+      <p>
+        with independent sensor measurements arriving asynchronously.
+      </p>
+      <div class="concept-note">
+        <h4>Architecture principle</h4>
+        <p>The estimator propagates the relative state, predicts what each sensor should observe, validates innovations, and corrects only with credible information.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.177 Flight-Software Processing Sequence</h3>
+      <p>
+        A practical sequence can be:
+      </p>
+      <ol>
+        <li>read propagation data,</li>
+        <li>propagate relative state,</li>
+        <li>propagate covariance,</li>
+        <li>check newly arrived sensor measurements,</li>
+        <li>transform all measurements into consistent frames,</li>
+        <li>compensate known timing and lever arms,</li>
+        <li>validate sensor-specific quality,</li>
+        <li>predict each measurement,</li>
+        <li>form innovation,</li>
+        <li>compute innovation covariance,</li>
+        <li>gate the measurement,</li>
+        <li>perform correction,</li>
+        <li>update validity and health,</li>
+        <li>publish relative state and covariance.</li>
+      </ol>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.178 Published Relative-Navigation Solution</h3>
+      <p>
+        The estimator may publish
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r}_{rel}, \quad \hat{\mathbf v}_{rel}, \quad \hat{\mathbf q}_{rel}, \quad \hat{\boldsymbol\omega}_{rel}, \quad \mathbf P_{rel}. }
+        \]
+      </p>
+      <p>
+        It may also publish sensor-health information and confidence metrics.
+      </p>
+      <p>
+        Downstream guidance should use both state and uncertainty.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.179 Practical Design Philosophy</h3>
+      <p>
+        A robust relative-navigation system should:
+      </p>
+      <ol>
+        <li>define all coordinate frames explicitly,</li>
+        <li>propagate physically consistent relative dynamics,</li>
+        <li>model each sensor according to what it actually measures,</li>
+        <li>maintain realistic covariance,</li>
+        <li>use true measurement timestamps,</li>
+        <li>account for sensor alignment,</li>
+        <li>account for lever arms where relevant,</li>
+        <li>support asynchronous measurements,</li>
+        <li>use measurement-quality indicators,</li>
+        <li>perform innovation gating,</li>
+        <li>handle sensor dropouts,</li>
+        <li>increase covariance when information is lost,</li>
+        <li>recover safely after reacquisition,</li>
+        <li>account for changing sensor geometry,</li>
+        <li>monitor observability,</li>
+        <li>handle phase-dependent sensor combinations,</li>
+        <li>test systematic biases,</li>
+        <li>validate covariance with NIS and NEES,</li>
+        <li>test performance statistically,</li>
+        <li>publish navigation validity.</li>
+      </ol>
+      <div class="concept-note">
+        <h4>Design philosophy</h4>
+        <p>Robust relative navigation depends on frame discipline, timing, realistic covariance, sensor validity, observability, recovery, and statistical verification as much as on the filter equations.</p>
+      </div>
+
+    </section>
+
+    <section class="notes-section-card">
+
+<h3>4.2.23.180 Key Takeaways</h3>
+      <h4>1. Relative navigation estimates one spacecraft with respect to another.</h4>
+      <p>
+        \[
+        \boxed{ \mathbf r_{rel}, \quad \mathbf v_{rel}, \quad \mathbf q_{rel}. }
+        \]
+      </p>
+      <h4>2. Relative state depends on coordinate frame.</h4>
+      <p>
+        Inertial, Hill/LVLH, body, and sensor frames must not be mixed.
+      </p>
+      <h4>3. Relative orbital dynamics are coupled.</h4>
+      <p>
+        The three position axes should not automatically be treated as independent Cartesian motion.
+      </p>
+      <h4>4. Cooperative targets can provide GNSS, telemetry, ranging, or navigation information directly.</h4>
+      <h4>5. Non-cooperative targets depend more strongly on camera, LiDAR, range, and other external sensing.</h4>
+      <h4>6. Range measures scalar separation.</h4>
+      <p>
+        \[
+        \boxed{ \rho = \|\mathbf r_{rel}\|. }
+        \]
+      </p>
+      <h4>7. Range rate measures line-of-sight velocity.</h4>
+      <p>
+        \[
+        \boxed{ \dot\rho = \mathbf u_{LOS}^T \mathbf v_{rel}. }
+        \]
+      </p>
+      <h4>8. A camera typically measures angular geometry rather than direct range.</h4>
+      <h4>9. Bearing-only navigation requires motion or other measurements to recover scale robustly.</h4>
+      <h4>10. LiDAR contributes direct range and surface geometry.</h4>
+      <h4>11. Camera and LiDAR provide complementary information.</h4>
+      <p>
+        \[
+        \boxed{ \text{Angular / Visual Information} + \text{Range / Depth Information} \rightarrow \text{Improved Relative Pose}. }
+        \]
+      </p>
+      <h4>12. IMU provides high-rate propagation but does not itself determine target location.</h4>
+      <h4>13. Relative pose contains both translation and orientation.</h4>
+      <p>
+        \[
+        \boxed{ \text{Pose} = \text{Position} + \text{Attitude}. }
+        \]
+      </p>
+      <h4>14. Sensor geometry strongly controls observability.</h4>
+      <h4>15. Range-only and bearing-only problems can become observable through time-varying geometry.</h4>
+      <h4>16. Manoeuvres can improve observability.</h4>
+      <p>
+        \[
+        \boxed{ \text{Motion} \rightarrow \text{Geometry Change} \rightarrow \text{More Information}. }
+        \]
+      </p>
+      <h4>17. Measurement covariance should often depend on range and geometry.</h4>
+      <h4>18. Different sensors naturally dominate at different distances.</h4>
+      <h4>19. Overlapping sensor regions help validate handovers.</h4>
+      <h4>20. Optical and LiDAR measurements require careful sensor alignment and lever-arm treatment.</h4>
+      <h4>21. Timing errors directly become relative-state errors.</h4>
+      <p>
+        \[
+        \boxed{ \delta\mathbf r \approx \mathbf v_{rel}\Delta t. }
+        \]
+      </p>
+      <h4>22. Reacquisition after dropout should be statistically validated.</h4>
+      <h4>23. Sensor availability and sensor failure are not the same.</h4>
+      <p>
+        A healthy camera can lose the target because of field of view or lighting.
+      </p>
+      <h4>24. Relative navigation should provide covariance as well as state.</h4>
+      <h4>25. NIS evaluates measurement consistency.</h4>
+      <p>
+        \[
+        \boxed{ \mathrm{NIS} = \mathbf r^T \mathbf S^{-1} \mathbf r. }
+        \]
+      </p>
+      <h4>26. NEES evaluates state-covariance consistency when truth is known.</h4>
+      <p>
+        \[
+        \boxed{ \mathrm{NEES} = \delta\mathbf x^T \mathbf P^{-1} \delta\mathbf x. }
+        \]
+      </p>
+      <h4>27. Monte Carlo testing should include initial errors, sensor noise, geometry, timing, alignment, dropout, and target dynamics.</h4>
+      <h4>28. Relative-navigation performance should be evaluated by operational phase and separation range.</h4>
+      <h4>29. A running filter is not necessarily a valid navigation solution.</h4>
+      <h4>30. Relative-navigation integrity requires knowing when the estimate should not be trusted.</h4>
+      <h4>31. Guidance should receive a consistent fused relative-state interface rather than directly interpreting multiple sensor outputs.</h4>
+      <h4>32. Navigation and guidance interact because manoeuvres change future sensor geometry and observability.</h4>
+      <h4>33. The central engineering principle is</h4>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Relative dynamics predict how the chaser and target geometry evolves,}\\[4pt] \text{while GNSS, ranging, camera, LiDAR, IMU, and other sensors}\\[4pt] \text{constrain different components of the relative state.}\\[4pt] \text{A robust estimator combines these complementary measurements}\\[4pt] \text{according to their geometry, uncertainty, timing, and validity.} \end{array} }
+        \]
+      </p>
+      <p>
+        The next logical section after <strong>4.2.23 Relative Navigation Sensor Fusion for RPO</strong> should move from general sensor-fusion applications into the next topic already defined in your <strong>4.2 Sensor Fusion</strong> roadmap, while keeping RPO treatment general rather than referring to any particular mission or implementation.
+      </p>
+
+    </section>
+
+    <section class="notes-section-card">
+
+      <h2>Next: Continue Through the 4.2 Sensor Fusion Roadmap</h2>
+
+      <p>
+        This section completes the general relative-navigation sensor-fusion treatment.
+        Continue through the Sensor Fusion roadmap for the next numbered topic in the overall 4.2 sequence.
+      </p>
+
+      <a href="vision-lidar-fusion.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.2 Sensor Fusion</h3>
+          <p>Return to the main Sensor Fusion roadmap to continue to the next numbered topic after 4.2.23.</p>
+          <p class="sensor-link-arrow">Continue through Sensor Fusion &rarr;</p>
+        </div>
+      </a>
+
+    </section>
+
+  </main>
+  <footer class="site-footer">
+    <p>© 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics. Educational resource for spacecraft dynamics, orbital mechanics, guidance–navigation–control systems, sensor modelling, state estimation, and spacecraft sensor fusion.</p>
+  </footer>
+</body>
+</html>
