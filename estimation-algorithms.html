@@ -1,152 +1,2446 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <title>Estimation Algorithms | Interactive GNC & Space Mechanics</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.3 Estimation Algorithms | Interactive GNC &amp; Space Mechanics</title>
+
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" type="image/png" href="favicon1.png">
+
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
 </head>
 
 <body>
-  <!-- Green hero header for Theory Notes subpages -->
+
   <header class="notes-hero">
     <h1>Estimation Algorithms</h1>
+
     <p class="notes-tagline">
-      Core batch and recursive estimation methods used in GNC and orbit determination.
+      Mathematical methods for estimating unknown spacecraft states and parameters
+      from imperfect observations using least squares, nonlinear optimisation,
+      recursive estimation, smoothing, sensitivity analysis, covariance propagation,
+      and orbit determination.
     </p>
 
-<nav class="pill-nav">
-  <a href="index.html" class="pill">Home</a>
-  <a href="tools.html" class="pill">Tools</a>
-  <a href="notes.html" class="pill active">Theory Notes</a>
-  <a href="references.html" class="pill">References</a>
-  <a href="problems.html" class="pill">Problem Bank</a>
-  <a href="about.html" class="pill">About</a>
-</nav>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
   </header>
 
   <main class="page-main">
-    <!-- Intro card -->
-    <section class="notes-intro-card">
-      <h2>4.3 Estimation Algorithms</h2>
+
+    <section class="notes-section-card">
+      <h3>4.3 Estimation Algorithms</h3>
       <p>
-        This page is a checklist of estimation methods. Later you can expand each block
-        into short cheat sheets linked to problems and tools.
+        Spacecraft guidance, navigation, control, and orbit determination frequently require knowledge of quantities that cannot be measured directly. Sensors may provide range, Doppler, angular direction, acceleration, angular rate, position, image features, or relative pose, but the quantities required by the GNC system may include position, velocity, attitude, angular velocity, sensor bias, aerodynamic coefficients, ballistic coefficient, maneuver parameters, or other unknown dynamic quantities.
+      </p>
+      <p>
+        The purpose of estimation is therefore to determine unknown states or parameters from incomplete and imperfect observations.
+      </p>
+      <p>
+        A general estimation problem may be written as
+      </p>
+      <p>
+        \[
+        \mathbf z = h(\mathbf x,\boldsymbol{\theta})+\mathbf v
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <p>
+        \[
+        \mathbf z
+        \]
+      </p>
+      <p>
+        is the measurement vector,
+      </p>
+      <p>
+        \[
+        \mathbf x
+        \]
+      </p>
+      <p>
+        contains unknown states,
+      </p>
+      <p>
+        \[
+        \boldsymbol{\theta}
+        \]
+      </p>
+      <p>
+        contains unknown model or calibration parameters,
+      </p>
+      <p>
+        \[
+        h(\cdot)
+        \]
+      </p>
+      <p>
+        is the measurement model, and
+      </p>
+      <p>
+        \[
+        \mathbf v
+        \]
+      </p>
+      <p>
+        represents measurement uncertainty.
+      </p>
+      <p>
+        The estimator attempts to determine
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \hat{\boldsymbol{\theta}}
+        \]
+      </p>
+      <p>
+        such that the predicted measurements are consistent with the actual observations.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Measurements}} + \boxed{\text{Mathematical Model}} + \boxed{\text{Uncertainty}} \rightarrow \boxed{\text{Estimation Algorithm}} \rightarrow \boxed{\hat{\mathbf x},\hat{\boldsymbol{\theta}}}
+        \]
+      </p>
+      <p>
+        Section 4.2 focused mainly on how sensors, spacecraft models, filters, timing, measurement validation, and sensor-fusion architectures are combined to produce a navigation solution. This section instead focuses on the underlying mathematical question:
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Given observations and a model, how do we solve for unknown states and parameters?} }
+        \]
+      </p>
+      <p>
+        The main topics include least-squares estimation, nonlinear estimation, recursive estimation, maximum-likelihood and MAP estimation, smoothing, State Transition Matrices, sensitivity analysis, covariance propagation, parameter estimation, orbit determination, maneuver estimation, numerical conditioning, and estimator design.
+      </p>
+      <hr>
+      <h3>What Is an Estimation Problem?</h3>
+      <p>
+        An estimation problem begins with one or more unknown quantities.
+      </p>
+      <p>
+        These may be combined into a general unknown vector
+      </p>
+      <p>
+        \[
+        \boldsymbol{\xi} = \begin{bmatrix} \mathbf x\\ \boldsymbol{\theta} \end{bmatrix}
+        \]
+      </p>
+      <p>
+        where <code>\mathbf x</code> represents the dynamic state and <code>\boldsymbol{\theta}</code> represents unknown parameters.
+      </p>
+      <p>
+        For a translational spacecraft problem,
+      </p>
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}
+        \]
+      </p>
+      <p>
+        while the parameter vector might contain
+      </p>
+      <p>
+        \[
+        \boldsymbol{\theta} = \begin{bmatrix} C_D\\ C_R\\ BC\\ \mathbf b_g\\ \mathbf b_a\\ \cdots \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        The measurements can be collected as
+      </p>
+      <p>
+        \[
+        \mathbf z = \begin{bmatrix} \mathbf z_1\\ \mathbf z_2\\ \vdots\\ \mathbf z_N \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        For a candidate value of the unknown state or parameter vector, the model predicts corresponding measurements,
+      </p>
+      <p>
+        \[
+        \hat{\mathbf z} = h(\boldsymbol{\xi}).
+        \]
+      </p>
+      <p>
+        The difference between measured and predicted quantities is the residual:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf z - h(\boldsymbol{\xi}) }
+        \]
+      </p>
+      <p>
+        The estimation problem then becomes the problem of finding the unknown quantities that make these residuals sufficiently small.
+      </p>
+      <p>
+        A generic formulation is
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol{\xi}} = \arg\min_{\boldsymbol{\xi}} J(\boldsymbol{\xi}) }
+        \]
+      </p>
+      <p>
+        where <code>J</code> is the selected cost function.
+      </p>
+      <p>
+        This is an important viewpoint because many estimation methods can be interpreted as different ways of defining or solving this optimization problem.
+      </p>
+      <hr>
+      <h3>Unknown State, Measurement, and Estimated State</h3>
+      <p>
+        The following quantities should be clearly distinguished:
+      </p>
+      <p>
+        \[
+        \boxed{\text{True State}} \qquad \boxed{\text{Measurement}} \qquad \boxed{\text{Estimated State}}
+        \]
+      </p>
+      <p>
+        The true state is the actual physical state of the spacecraft.
+      </p>
+      <p>
+        A measurement is a sensor observation related to that state.
+      </p>
+      <p>
+        The estimated state is the value reconstructed from the available observations.
+      </p>
+      <p>
+        In general,
+      </p>
+      <p>
+        \[
+        \mathbf z \neq \mathbf x.
+        \]
+      </p>
+      <p>
+        For example, a ground station may measure only range,
+      </p>
+      <p>
+        \[
+        \rho = \left\| \mathbf r_{sc} - \mathbf r_{station} \right\|.
+        \]
+      </p>
+      <p>
+        The unknown spacecraft state may be
+      </p>
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        Thus a single range measurement does not directly provide all position and velocity components.
+      </p>
+      <p>
+        Instead,
+      </p>
+      <p>
+        \[
+        \rho=h(\mathbf x)
+        \]
+      </p>
+      <p>
+        and the state must be reconstructed from a sequence of measurements combined with the spacecraft dynamics.
+      </p>
+      <p>
+        The same idea appears throughout spacecraft navigation.
+      </p>
+      <p>
+        A camera may measure line-of-sight direction rather than full relative position.
+      </p>
+      <p>
+        A Doppler measurement primarily contains information about line-of-sight velocity.
+      </p>
+      <p>
+        A GNSS receiver may process pseudorange and Doppler observations.
+      </p>
+      <p>
+        A star tracker provides attitude information.
+      </p>
+      <p>
+        A LiDAR may provide range or relative pose.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Measurement} \neq \text{Complete State} }
+        \]
+      </p>
+      <p>
+        and an estimation algorithm is required to recover the unknown state from the information contained in those measurements.
+      </p>
+      <hr>
+      <h3>State Estimation</h3>
+      <p>
+        State estimation determines quantities describing the current condition of the spacecraft.
+      </p>
+      <p>
+        Examples include
+      </p>
+      <p>
+        \[
+        \mathbf r, \qquad \mathbf v, \qquad \mathbf q, \qquad \boldsymbol{\omega}.
+        \]
+      </p>
+      <p>
+        A translational state may be written as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix} }
+        \]
+      </p>
+      <p>
+        while an attitude-navigation state could contain
+      </p>
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} \mathbf q\\ \boldsymbol{\omega} \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        For relative navigation during rendezvous and proximity operations, the estimated state may contain
+      </p>
+      <p>
+        \[
+        \mathbf x_{rel} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel}\\ \mathbf q_{rel}\\ \boldsymbol{\omega}_{rel} \end{bmatrix}.
+        \]
+      </p>
+      <hr>
+      <h3>Parameter Estimation</h3>
+      <p>
+        Parameter estimation determines quantities that influence the mathematical model but are not necessarily conventional vehicle states.
+      </p>
+      <p>
+        Typical examples include
+      </p>
+      <ul>
+        <li>drag coefficient <code>C_D</code>,</li>
+        <li>solar radiation pressure coefficient <code>C_R</code>,</li>
+        <li>ballistic coefficient,</li>
+        <li>sensor bias,</li>
+        <li>sensor scale factor,</li>
+        <li>sensor mounting misalignment,</li>
+        <li>clock bias,</li>
+        <li>clock drift,</li>
+        <li>thruster scale factor,</li>
+        <li>maneuver magnitude,</li>
+        <li>empirical acceleration.</li>
+      </ul>
+      <p>
+        A parameter vector may be written as
+      </p>
+      <p>
+        \[
+        \boldsymbol{\theta} = \begin{bmatrix} C_D\\ C_R\\ BC\\ b_g\\ b_a \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        In some applications, state and parameter estimation are performed simultaneously using an augmented state:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol{\theta} \end{bmatrix} }
+        \]
+      </p>
+      <p>
+        This allows quantities such as sensor bias or ballistic coefficient to be inferred indirectly through their effect on the measurements.
+      </p>
+      <hr>
+      <h3>Static and Dynamic Estimation</h3>
+      <p>
+        Estimation problems can also be divided into static and dynamic problems.
+      </p>
+      <h4>Static Estimation</h4>
+      <p>
+        In static estimation, the unknown quantity is treated as constant during the estimation interval.
+      </p>
+      <p>
+        A linear measurement model may be written as
+      </p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>
+        Several measurements can then be processed simultaneously to determine the best estimate of <code>\mathbf x</code>.
+      </p>
+      <p>
+        Static estimation is commonly used for
+      </p>
+      <ul>
+        <li>calibration,</li>
+        <li>fixed-parameter estimation,</li>
+        <li>sensor alignment,</li>
+        <li>static positioning,</li>
+        <li>model fitting.</li>
+      </ul>
+      <h4>Dynamic Estimation</h4>
+      <p>
+        For spacecraft applications, the state usually evolves with time.
+      </p>
+      <p>
+        A general continuous nonlinear system is
+      </p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf x} = f(\mathbf x,\mathbf u,t) }
+        \]
+      </p>
+      <p>
+        and a corresponding discrete representation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{k+1} = f_k(\mathbf x_k,\mathbf u_k) + \mathbf w_k. }
+        \]
+      </p>
+      <p>
+        Measurements are obtained at particular times:
+      </p>
+      <p>
+        \[
+        \mathbf z_k = h_k(\mathbf x_k)+\mathbf v_k.
+        \]
+      </p>
+      <p>
+        Dynamic estimation must therefore account for two sources of information:
+      </p>
+      <p>
+        \[
+        \boxed{\text{Spacecraft Dynamics}}
+        \]
+      </p>
+      <p>
+        and
+      </p>
+      <p>
+        \[
+        \boxed{\text{Measurements}}.
+        \]
+      </p>
+      <p>
+        This is one of the foundations of orbit determination and onboard navigation.
+      </p>
+      <hr>
+      <h3>Batch and Sequential Estimation</h3>
+      <p>
+        Another important distinction is between batch and sequential estimation.
+      </p>
+      <h4>Batch Estimation</h4>
+      <p>
+        Batch estimation processes a complete collection of measurements together.
+      </p>
+      <p>
+        Suppose measurements
+      </p>
+      <p>
+        \[
+        \mathbf z_1, \mathbf z_2, \ldots, \mathbf z_N
+        \]
+      </p>
+      <p>
+        have been collected.
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \boxed{ \{\mathbf z_1,\mathbf z_2,\ldots,\mathbf z_N\} \rightarrow \hat{\mathbf x} }
+        \]
+      </p>
+      <p>
+        A typical objective function is
+      </p>
+      <p>
+        \[
+        J(\mathbf x) = \sum_{i=1}^{N} \mathbf r_i^T \mathbf W_i \mathbf r_i.
+        \]
+      </p>
+      <p>
+        Batch methods are especially useful for
+      </p>
+      <ul>
+        <li>orbit determination over an observation arc,</li>
+        <li>post-flight trajectory reconstruction,</li>
+        <li>calibration,</li>
+        <li>parameter estimation,</li>
+        <li>scientific data processing.</li>
+      </ul>
+      <h4>Sequential Estimation</h4>
+      <p>
+        Sequential estimation incorporates measurements one at a time as they become available.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Previous Estimate}} + \boxed{\text{New Measurement}} \rightarrow \boxed{\text{Updated Estimate}}.
+        \]
+      </p>
+      <p>
+        In Bayesian form,
+      </p>
+      <p>
+        \[
+        p(\mathbf x_k|Z_k) \propto p(\mathbf z_k|\mathbf x_k) p(\mathbf x_k|Z_{k-1}),
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <p>
+        \[
+        Z_k = \{\mathbf z_1,\mathbf z_2,\ldots,\mathbf z_k\}.
+        \]
+      </p>
+      <p>
+        Sequential methods are well suited to real-time onboard navigation.
+      </p>
+      <p>
+        Detailed Kalman-filter-based recursive methods are already developed in Section 4.2. Here, the goal is to understand their relation to the broader mathematical estimation problem.
+      </p>
+      <hr>
+      <h3>Residuals</h3>
+      <p>
+        One of the most important quantities in estimation is the residual.
+      </p>
+      <p>
+        For a nonlinear measurement model,
+      </p>
+      <p>
+        \[
+        \mathbf z = h(\mathbf x)+\mathbf v,
+        \]
+      </p>
+      <p>
+        the predicted measurement is
+      </p>
+      <p>
+        \[
+        \hat{\mathbf z} = h(\hat{\mathbf x}).
+        \]
+      </p>
+      <p>
+        The residual is therefore
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf z - \hat{\mathbf z} }
+        \]
+      </p>
+      <p>
+        or
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf z - h(\hat{\mathbf x}). }
+        \]
+      </p>
+      <p>
+        Residuals indicate how well the current model and estimated state reproduce the observations.
+      </p>
+      <p>
+        They are central to
+      </p>
+      <ul>
+        <li>least squares,</li>
+        <li>nonlinear corrections,</li>
+        <li>differential correction,</li>
+        <li>maximum-likelihood estimation,</li>
+        <li>parameter estimation,</li>
+        <li>orbit determination.</li>
+      </ul>
+      <p>
+        However, a small residual does not automatically prove that all estimated quantities are accurate.
+      </p>
+      <p>
+        A solution may fit the data while still containing
+      </p>
+      <ul>
+        <li>highly correlated parameters,</li>
+        <li>weakly observable states,</li>
+        <li>poorly conditioned directions,</li>
+        <li>model compensation effects.</li>
+      </ul>
+      <p>
+        Therefore residuals must be interpreted together with covariance, sensitivity, geometry, and conditioning.
+      </p>
+      <hr>
+      <h3>Estimation Error</h3>
+      <p>
+        If the true state is known, such as in simulation, the estimation error is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf e = \mathbf x - \hat{\mathbf x}. }
+        \]
+      </p>
+      <p>
+        This quantity can be evaluated directly during Monte Carlo analysis or truth-model simulation.
+      </p>
+      <p>
+        In actual flight, the true state is usually unavailable, so the estimator generally cannot calculate <code>\mathbf e</code> exactly.
+      </p>
+      <p>
+        This is why covariance and statistical consistency measures are used to describe estimation uncertainty.
+      </p>
+      <hr>
+      <h2>Least-Squares Estimation</h2>
+      <p>
+        Least squares is one of the most fundamental estimation methods.
+      </p>
+      <p>
+        Consider the linear model
+      </p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>
+        The residual is
+      </p>
+      <p>
+        \[
+        \mathbf r = \mathbf z-\mathbf H\mathbf x.
+        \]
+      </p>
+      <p>
+        Ordinary least squares selects the state that minimizes the sum of squared residuals:
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \arg\min_{\mathbf x} \left( \mathbf z-\mathbf H\mathbf x \right)^T \left( \mathbf z-\mathbf H\mathbf x \right). }
+        \]
+      </p>
+      <p>
+        The cost function is
+      </p>
+      <p>
+        \[
+        J(\mathbf x) = (\mathbf z-\mathbf H\mathbf x)^T (\mathbf z-\mathbf H\mathbf x).
+        \]
+      </p>
+      <p>
+        Differentiating with respect to <code>\mathbf x</code> and setting the derivative to zero gives the normal equations:
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\mathbf H\hat{\mathbf x} = \mathbf H^T\mathbf z. }
+        \]
+      </p>
+      <p>
+        If the inverse exists,
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = (\mathbf H^T\mathbf H)^{-1} \mathbf H^T\mathbf z. }
+        \]
+      </p>
+      <p>
+        Least squares is especially useful when the number of measurements exceeds the number of unknowns.
+      </p>
+      <p>
+        That is,
+      </p>
+      <p>
+        \[
+        m>n
+        \]
+      </p>
+      <p>
+        for
+      </p>
+      <p>
+        \[
+        \mathbf H\in\mathbb R^{m\times n}.
+        \]
+      </p>
+      <p>
+        This is known as an overdetermined estimation problem.
+      </p>
+      <hr>
+      <h3>Weighted Least Squares</h3>
+      <p>
+        Not all measurements have equal accuracy.
+      </p>
+      <p>
+        Suppose the measurement covariance is
+      </p>
+      <p>
+        \[
+        \mathbf R.
+        \]
+      </p>
+      <p>
+        A measurement with lower uncertainty should normally receive more weight.
+      </p>
+      <p>
+        Define the weighting matrix as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf W = \mathbf R^{-1}. }
+        \]
+      </p>
+      <p>
+        Weighted least squares minimizes
+      </p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = (\mathbf z-\mathbf H\mathbf x)^T \mathbf W (\mathbf z-\mathbf H\mathbf x). }
+        \]
+      </p>
+      <p>
+        The corresponding normal equation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\mathbf W\mathbf H\hat{\mathbf x} = \mathbf H^T\mathbf W\mathbf z. }
+        \]
+      </p>
+      <p>
+        The formal solution is
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = (\mathbf H^T\mathbf W\mathbf H)^{-1} \mathbf H^T\mathbf W\mathbf z. }
+        \]
+      </p>
+      <p>
+        This gives the important relationship
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Lower measurement uncertainty} \Rightarrow \text{greater influence on the solution}. }
+        \]
+      </p>
+      <hr>
+      <h3>A Priori Information</h3>
+      <p>
+        Sometimes an estimate of the state already exists before new measurements are processed.
+      </p>
+      <p>
+        Suppose
+      </p>
+      <p>
+        \[
+        \mathbf x_0
+        \]
+      </p>
+      <p>
+        is the prior estimate and
+      </p>
+      <p>
+        \[
+        \mathbf P_0
+        \]
+      </p>
+      <p>
+        is its uncertainty.
+      </p>
+      <p>
+        Then the estimation cost may include both the measurement residual and deviation from the prior:
+      </p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = (\mathbf z-h(\mathbf x))^T \mathbf R^{-1} (\mathbf z-h(\mathbf x)) + (\mathbf x-\mathbf x_0)^T \mathbf P_0^{-1} (\mathbf x-\mathbf x_0). }
+        \]
+      </p>
+      <p>
+        The first term represents information from the measurements.
+      </p>
+      <p>
+        The second term represents prior knowledge.
+      </p>
+      <p>
+        This structure appears in constrained least squares, MAP estimation, recursive estimation, and sequential orbit determination.
+      </p>
+      <hr>
+      <h2>Nonlinear Estimation</h2>
+      <p>
+        Spacecraft estimation problems are frequently nonlinear.
+      </p>
+      <p>
+        A general nonlinear measurement equation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z = h(\mathbf x)+\mathbf v. }
+        \]
+      </p>
+      <p>
+        For example, range between a spacecraft and a tracking station is
+      </p>
+      <p>
+        \[
+        \rho = \left\| \mathbf r-\mathbf r_s \right\|.
+        \]
+      </p>
+      <p>
+        This relationship is nonlinear in <code>\mathbf r</code>.
+      </p>
+      <p>
+        A nonlinear measurement model is commonly linearized around a nominal estimate <code>\mathbf x_0</code>:
+      </p>
+      <p>
+        \[
+        h(\mathbf x_0+\Delta\mathbf x) \approx h(\mathbf x_0) + \mathbf H\Delta\mathbf x
+        \]
+      </p>
+      <p>
+        where
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf H = \left. \frac{\partial h}{\partial\mathbf x} \right|_{\mathbf x_0}. }
+        \]
+      </p>
+      <p>
+        The matrix <code>\mathbf H</code> is the measurement Jacobian.
+      </p>
+      <p>
+        The estimator then solves for a correction
+      </p>
+      <p>
+        \[
+        \Delta\mathbf x
+        \]
+      </p>
+      <p>
+        rather than solving directly for the full state.
+      </p>
+      <p>
+        The estimate is updated using
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \Delta\mathbf x. }
+        \]
+      </p>
+      <hr>
+      <h2>Nonlinear Least Squares and Differential Correction</h2>
+      <p>
+        For nonlinear estimation, define
+      </p>
+      <p>
+        \[
+        \mathbf r(\mathbf x) = \mathbf z-h(\mathbf x).
+        \]
+      </p>
+      <p>
+        A common cost function is
+      </p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = \frac12 \mathbf r^T \mathbf W \mathbf r. }
+        \]
+      </p>
+      <p>
+        Linearizing the residual gives
+      </p>
+      <p>
+        \[
+        \mathbf r(\mathbf x+\Delta\mathbf x) \approx \mathbf r(\mathbf x) - \mathbf H\Delta\mathbf x.
+        \]
+      </p>
+      <p>
+        The correction is then obtained approximately from
+      </p>
+      <p>
+        \[
+        \boxed{ (\mathbf H^T\mathbf W\mathbf H) \Delta\mathbf x = \mathbf H^T\mathbf W\mathbf r. }
+        \]
+      </p>
+      <p>
+        The new estimate becomes
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \Delta\mathbf x. }
+        \]
+      </p>
+      <p>
+        This process is repeated until convergence.
+      </p>
+      <p>
+        Typical convergence conditions include
+      </p>
+      <p>
+        \[
+        \|\Delta\mathbf x\|<\epsilon_x,
+        \]
+      </p>
+      <p>
+        or
+      </p>
+      <p>
+        \[
+        |J^{(i+1)}-J^{(i)}|<\epsilon_J.
+        \]
+      </p>
+      <p>
+        This iterative approach forms the basis of classical differential correction used in orbit determination.
+      </p>
+      <hr>
+      <h2>Maximum Likelihood Estimation</h2>
+      <p>
+        Estimation can also be interpreted probabilistically.
+      </p>
+      <p>
+        The likelihood function is
+      </p>
+      <p>
+        \[
+        p(\mathbf z|\mathbf x).
+        \]
+      </p>
+      <p>
+        It represents the probability of observing the measurements given a candidate state.
+      </p>
+      <p>
+        The maximum likelihood estimate is
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{ML} = \arg\max_{\mathbf x} p(\mathbf z|\mathbf x). }
+        \]
+      </p>
+      <p>
+        For Gaussian measurement noise,
+      </p>
+      <p>
+        \[
+        \mathbf v \sim \mathcal N(\mathbf 0,\mathbf R),
+        \]
+      </p>
+      <p>
+        the likelihood is proportional to
+      </p>
+      <p>
+        \[
+        p(\mathbf z|\mathbf x) \propto \exp \left[ -\frac12 \mathbf r^T \mathbf R^{-1} \mathbf r \right].
+        \]
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \arg\max_{\mathbf x}p(\mathbf z|\mathbf x) = \arg\min_{\mathbf x} \mathbf r^T\mathbf R^{-1}\mathbf r. }
+        \]
+      </p>
+      <p>
+        This establishes the important relationship
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Gaussian Maximum Likelihood} \Longleftrightarrow \text{Weighted Least Squares}. }
+        \]
+      </p>
+      <hr>
+      <h2>Maximum A Posteriori Estimation</h2>
+      <p>
+        Maximum a posteriori estimation adds prior knowledge.
+      </p>
+      <p>
+        Using Bayes&#x27; theorem,
+      </p>
+      <p>
+        \[
+        p(\mathbf x|\mathbf z) \propto p(\mathbf z|\mathbf x) p(\mathbf x).
+        \]
+      </p>
+      <p>
+        The MAP estimate is
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{MAP} = \arg\max_{\mathbf x} p(\mathbf x|\mathbf z). }
+        \]
+      </p>
+      <p>
+        For Gaussian likelihood and Gaussian prior distributions, the MAP cost becomes
+      </p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = (\mathbf z-h(\mathbf x))^T \mathbf R^{-1} (\mathbf z-h(\mathbf x)) + (\mathbf x-\mathbf x_0)^T \mathbf P_0^{-1} (\mathbf x-\mathbf x_0). }
+        \]
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{\text{MAP}} = \boxed{\text{Measurement Information}} + \boxed{\text{Prior Information}}.
+        \]
+      </p>
+      <hr>
+      <h2>Dynamic State Estimation</h2>
+      <p>
+        For dynamic systems,
+      </p>
+      <p>
+        \[
+        \dot{\mathbf x} = f(\mathbf x,t).
+        \]
+      </p>
+      <p>
+        If the initial condition is
+      </p>
+      <p>
+        \[
+        \mathbf x(t_0)=\mathbf x_0,
+        \]
+      </p>
+      <p>
+        then the propagated state can be written conceptually as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x(t) = \phi(t,t_0,\mathbf x_0). }
+        \]
+      </p>
+      <p>
+        A measurement at time <code>t_i</code> is
+      </p>
+      <p>
+        \[
+        \mathbf z_i = h_i[\mathbf x(t_i)] + \mathbf v_i.
+        \]
+      </p>
+      <p>
+        Substituting the propagated state gives
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z_i = h_i[ \phi(t_i,t_0,\mathbf x_0) ] + \mathbf v_i. }
+        \]
+      </p>
+      <p>
+        The unknown initial state can therefore be estimated from measurements collected over time.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\mathbf x_0} \rightarrow \boxed{\text{Propagate}} \rightarrow \boxed{\mathbf x(t_i)} \rightarrow \boxed{\text{Predict Observation}} \rightarrow \boxed{\text{Residual}} \rightarrow \boxed{\text{State Correction}}.
+        \]
+      </p>
+      <p>
+        This is the central architecture of batch orbit determination.
+      </p>
+      <hr>
+      <h2>State Transition Matrix</h2>
+      <p>
+        The State Transition Matrix describes how a small perturbation in the state evolves with time.
+      </p>
+      <p>
+        For a perturbation
+      </p>
+      <p>
+        \[
+        \delta\mathbf x(t_0),
+        \]
+      </p>
+      <p>
+        the propagated perturbation is
+      </p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x(t) = \mathbf\Phi(t,t_0) \delta\mathbf x(t_0). }
+        \]
+      </p>
+      <p>
+        For the nonlinear system
+      </p>
+      <p>
+        \[
+        \dot{\mathbf x} = f(\mathbf x,t),
+        \]
+      </p>
+      <p>
+        define
+      </p>
+      <p>
+        \[
+        \mathbf A(t) = \frac{\partial f}{\partial\mathbf x}.
+        \]
+      </p>
+      <p>
+        Then the STM satisfies
+      </p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf\Phi} = \mathbf A(t)\mathbf\Phi. }
+        \]
+      </p>
+      <p>
+        The initial condition is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf\Phi(t_0,t_0) = \mathbf I. }
+        \]
+      </p>
+      <p>
+        The STM is fundamental to
+      </p>
+      <ul>
+        <li>trajectory sensitivity,</li>
+        <li>covariance propagation,</li>
+        <li>batch orbit determination,</li>
+        <li>differential correction,</li>
+        <li>maneuver estimation,</li>
+        <li>targeting,</li>
+        <li>state sensitivity analysis.</li>
+      </ul>
+      <hr>
+      <h2>Sensitivity Matrices</h2>
+      <p>
+        Suppose the spacecraft dynamics depend on an uncertain parameter vector
+      </p>
+      <p>
+        \[
+        \mathbf p.
+        \]
+      </p>
+      <p>
+        Then
+      </p>
+      <p>
+        \[
+        \dot{\mathbf x} = f(\mathbf x,\mathbf p,t).
+        \]
+      </p>
+      <p>
+        The sensitivity of the state to the parameter is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf S_p = \frac{\partial\mathbf x}{\partial\mathbf p}. }
+        \]
+      </p>
+      <p>
+        A small parameter perturbation produces approximately
+      </p>
+      <p>
+        \[
+        \delta\mathbf x = \mathbf S_p\delta\mathbf p.
+        \]
+      </p>
+      <p>
+        The measurement variation may then be written as
+      </p>
+      <p>
+        \[
+        \delta\mathbf z = \mathbf H_x\delta\mathbf x + \mathbf H_p\delta\mathbf p.
+        \]
+      </p>
+      <p>
+        These sensitivity matrices describe how unknown states and parameters influence measurable quantities.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Unknown Parameter}} \rightarrow \boxed{\text{Dynamic Effect}} \rightarrow \boxed{\text{Trajectory Change}} \rightarrow \boxed{\text{Measurement Change}}.
+        \]
+      </p>
+      <p>
+        If a parameter produces almost no observable change in the measurements, it will be difficult to estimate.
+      </p>
+      <hr>
+      <h2>Covariance of an Estimate</h2>
+      <p>
+        An estimated value alone is insufficient.
+      </p>
+      <p>
+        Its uncertainty must also be represented.
+      </p>
+      <p>
+        The estimation-error covariance is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P = E \left[ (\mathbf x-\hat{\mathbf x}) (\mathbf x-\hat{\mathbf x})^T \right]. }
+        \]
+      </p>
+      <p>
+        For a linear weighted least-squares problem,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P_{\hat{x}} \approx (\mathbf H^T\mathbf W\mathbf H)^{-1}. }
+        \]
+      </p>
+      <p>
+        The diagonal terms represent variances.
+      </p>
+      <p>
+        The off-diagonal terms represent correlations.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \mathbf P = \begin{bmatrix} \sigma_x^2 & P_{xy}\\ P_{yx} & \sigma_y^2 \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        Strong correlations can indicate that the available measurements have difficulty separating two unknown quantities.
+      </p>
+      <hr>
+      <h2>Covariance Propagation</h2>
+      <p>
+        Using the STM,
+      </p>
+      <p>
+        \[
+        \delta\mathbf x(t) = \mathbf\Phi(t,t_0)\delta\mathbf x_0.
+        \]
+      </p>
+      <p>
+        The corresponding covariance propagation is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P(t) = \mathbf\Phi(t,t_0) \mathbf P_0 \mathbf\Phi^T(t,t_0) }
+        \]
+      </p>
+      <p>
+        for a deterministic linearized system.
+      </p>
+      <p>
+        More generally, if
+      </p>
+      <p>
+        \[
+        \delta\mathbf y = \mathbf S\delta\mathbf x,
+        \]
+      </p>
+      <p>
+        then
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf P_y = \mathbf S \mathbf P_x \mathbf S^T. }
+        \]
+      </p>
+      <p>
+        This relation is widely used for
+      </p>
+      <ul>
+        <li>trajectory dispersion,</li>
+        <li>navigation uncertainty,</li>
+        <li>sensor-error propagation,</li>
+        <li>parameter uncertainty,</li>
+        <li>error budgeting,</li>
+        <li>targeting uncertainty.</li>
+      </ul>
+      <hr>
+      <h2>Geometry, Identifiability, and Estimability</h2>
+      <p>
+        An estimation algorithm cannot recover information that is not present in the measurements.
+      </p>
+      <p>
+        Suppose
+      </p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>
+        The matrix <code>\mathbf H</code> describes the measurement sensitivity to the unknown state.
+      </p>
+      <p>
+        If two columns of <code>\mathbf H</code> are very similar, two unknowns may affect the measurements in almost the same way.
+      </p>
+      <p>
+        The estimator may then have difficulty distinguishing them.
+      </p>
+      <p>
+        The information or normal matrix is
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf N = \mathbf H^T \mathbf W \mathbf H. }
+        \]
+      </p>
+      <p>
+        Its structure can reveal
+      </p>
+      <ul>
+        <li>weak estimation directions,</li>
+        <li>state correlation,</li>
+        <li>parameter correlation,</li>
+        <li>insufficient geometry,</li>
+        <li>poor numerical conditioning.</li>
+      </ul>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{More Measurements} \not\Rightarrow \text{Better Estimation} }
+        \]
+      </p>
+      <p>
+        unless those measurements add independent information.
+      </p>
+      <hr>
+      <h2>Observability and Identifiability</h2>
+      <p>
+        These two ideas are related but not identical.
+      </p>
+      <h3>Observability</h3>
+      <p>
+        Observability asks whether the dynamic state can be reconstructed from the available measurements over time.
+      </p>
+      <p>
+        It depends on
+      </p>
+      <ul>
+        <li>system dynamics,</li>
+        <li>sensor geometry,</li>
+        <li>measurement model,</li>
+        <li>spacecraft motion.</li>
+      </ul>
+      <h3>Identifiability</h3>
+      <p>
+        Identifiability asks whether an unknown parameter can be uniquely determined from the available observations.
+      </p>
+      <p>
+        Suppose
+      </p>
+      <p>
+        \[
+        z = \theta_1\theta_2.
+        \]
+      </p>
+      <p>
+        A single measurement of <code>z</code> may not uniquely determine both <code>\theta_1</code> and <code>\theta_2</code>.
+      </p>
+      <p>
+        Different parameter combinations may produce the same observation.
+      </p>
+      <p>
+        This problem appears in
+      </p>
+      <ul>
+        <li>ballistic-coefficient estimation,</li>
+        <li>drag-model estimation,</li>
+        <li>calibration,</li>
+        <li>bias estimation,</li>
+        <li>maneuver reconstruction,</li>
+        <li>target dynamic-parameter estimation.</li>
+      </ul>
+      <hr>
+      <h2>Smoothing</h2>
+      <p>
+        Filtering and smoothing use measurements differently.
+      </p>
+      <p>
+        A filter estimates the current state using measurements available up to the current time:
+      </p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k|k}.
+        \]
+      </p>
+      <p>
+        A smoother estimates an earlier state using measurements that become available later:
+      </p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k|N}, \qquad N>k. }
+        \]
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Filtering} = \text{Past + Current Data} }
+        \]
+      </p>
+      <p>
+        whereas
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Smoothing} = \text{Past + Current + Future Data}. }
+        \]
+      </p>
+      <p>
+        Smoothing can improve reconstructed trajectories because future measurements provide additional information about earlier states.
+      </p>
+      <p>
+        Applications include
+      </p>
+      <ul>
+        <li>precise orbit reconstruction,</li>
+        <li>post-flight trajectory analysis,</li>
+        <li>parameter estimation,</li>
+        <li>scientific data processing,</li>
+        <li>maneuver reconstruction.</li>
+      </ul>
+      <p>
+        Common forms include
+      </p>
+      <ul>
+        <li>fixed-interval smoothing,</li>
+        <li>fixed-lag smoothing,</li>
+        <li>Rauch–Tung–Striebel smoothing.</li>
+      </ul>
+      <hr>
+      <h2>Orbit Determination</h2>
+      <p>
+        Orbit determination is a major application of estimation theory.
+      </p>
+      <p>
+        Define the spacecraft state at a reference epoch as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0 = \begin{bmatrix} \mathbf r_0\\ \mathbf v_0 \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        The state is propagated using a force model:
+      </p>
+      <p>
+        \[
+        \mathbf x(t) = \phi(t,t_0,\mathbf x_0,\boldsymbol{\theta}).
+        \]
+      </p>
+      <p>
+        The force model may include
+      </p>
+      <ul>
+        <li>central gravity,</li>
+        <li>higher-order gravity harmonics,</li>
+        <li>third-body gravity,</li>
+        <li>atmospheric drag,</li>
+        <li>solar radiation pressure,</li>
+        <li>maneuvers,</li>
+        <li>empirical accelerations.</li>
+      </ul>
+      <p>
+        Measurements are obtained at times
+      </p>
+      <p>
+        \[
+        t_1,t_2,\ldots,t_N.
+        \]
+      </p>
+      <p>
+        Each measurement is represented as
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf z_i = h_i[\mathbf x(t_i)] + \mathbf v_i. }
+        \]
+      </p>
+      <p>
+        Possible observation types include
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>range rate,</li>
+        <li>Doppler,</li>
+        <li>azimuth,</li>
+        <li>elevation,</li>
+        <li>right ascension,</li>
+        <li>declination,</li>
+        <li>GNSS observables,</li>
+        <li>optical measurements,</li>
+        <li>line-of-sight vectors,</li>
+        <li>inter-satellite range,</li>
+        <li>inter-satellite range rate.</li>
+      </ul>
+      <p>
+        The orbit determination problem is therefore
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Tracking Measurements} \rightarrow \text{Estimate Initial Orbit and Dynamic Parameters}. }
+        \]
+      </p>
+      <hr>
+      <h2>Batch Orbit Determination</h2>
+      <p>
+        Batch orbit determination estimates the state using a complete observation arc.
+      </p>
+      <p>
+        Start from an initial guess
+      </p>
+      <p>
+        \[
+        \mathbf x_0^{(0)}.
+        \]
+      </p>
+      <p>
+        Propagate the orbit.
+      </p>
+      <p>
+        Predict all observations.
+      </p>
+      <p>
+        Compute
+      </p>
+      <p>
+        \[
+        \Delta\mathbf z = \mathbf z_{obs} - \mathbf z_{pred}.
+        \]
+      </p>
+      <p>
+        Linearize the measurements with respect to the initial state:
+      </p>
+      <p>
+        \[
+        \Delta\mathbf z \approx \mathbf H \Delta\mathbf x_0.
+        \]
+      </p>
+      <p>
+        Solve
+      </p>
+      <p>
+        \[
+        \boxed{ \Delta\mathbf x_0 = (\mathbf H^T\mathbf W\mathbf H)^{-1} \mathbf H^T\mathbf W \Delta\mathbf z. }
+        \]
+      </p>
+      <p>
+        Update
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0^{(i+1)} = \mathbf x_0^{(i)} + \Delta\mathbf x_0. }
+        \]
+      </p>
+      <p>
+        Then propagate again and repeat until convergence.
+      </p>
+      <p>
+        The complete loop is
+      </p>
+      <p>
+        \[
+        \boxed{\text{Initial Orbit Guess}} \rightarrow \boxed{\text{Propagate Orbit}} \rightarrow \boxed{\text{Predict Measurements}} \rightarrow \boxed{\text{Compute Residuals}} \rightarrow \boxed{\text{Estimate Correction}} \rightarrow \boxed{\text{Update Orbit}} \rightarrow \boxed{\text{Repeat}}.
+        \]
+      </p>
+      <hr>
+      <h2>Sequential Orbit Determination</h2>
+      <p>
+        Sequential OD updates the estimated orbit whenever a new tracking measurement becomes available.
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Previous Orbit Estimate}} + \boxed{\text{New Observation}} \rightarrow \boxed{\text{Updated Orbit Estimate}}.
+        \]
+      </p>
+      <p>
+        Sequential OD is useful for
+      </p>
+      <ul>
+        <li>real-time tracking,</li>
+        <li>autonomous onboard navigation,</li>
+        <li>rendezvous,</li>
+        <li>formation flying,</li>
+        <li>continuous orbit maintenance.</li>
+      </ul>
+      <p>
+        The specific recursive filters used for this task are developed in Section 4.2.
+      </p>
+      <hr>
+      <h2>Maneuver Estimation</h2>
+      <p>
+        Spacecraft maneuvers may not be known perfectly.
+      </p>
+      <p>
+        An impulsive maneuver can be written as
+      </p>
+      <p>
+        \[
+        \Delta\mathbf v = \begin{bmatrix} \Delta v_x\\ \Delta v_y\\ \Delta v_z \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        If the maneuver is uncertain, the unknown parameter vector may be
+      </p>
+      <p>
+        \[
+        \boldsymbol{\theta}_m = \begin{bmatrix} t_m\\ \Delta v_x\\ \Delta v_y\\ \Delta v_z \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        The estimator attempts to determine these quantities from the observed change in trajectory.
+      </p>
+      <p>
+        For a finite burn, estimated parameters may include
+      </p>
+      <ul>
+        <li>ignition time,</li>
+        <li>burn duration,</li>
+        <li>thrust magnitude,</li>
+        <li>thrust direction,</li>
+        <li>scale factor,</li>
+        <li>misalignment.</li>
+      </ul>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Unknown Maneuver}} \rightarrow \boxed{\text{Trajectory Change}} \rightarrow \boxed{\text{Measurement Change}} \rightarrow \boxed{\text{Maneuver Estimate}}.
+        \]
+      </p>
+      <hr>
+      <h2>Augmented-State Estimation</h2>
+      <p>
+        Unknown model parameters can be incorporated directly into the estimated state.
+      </p>
+      <p>
+        Suppose
+      </p>
+      <p>
+        \[
+        \mathbf x
+        \]
+      </p>
+      <p>
+        is the dynamic state and
+      </p>
+      <p>
+        \[
+        \boldsymbol{\theta}
+        \]
+      </p>
+      <p>
+        contains unknown parameters.
+      </p>
+      <p>
+        Define
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol{\theta} \end{bmatrix}. }
+        \]
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        \mathbf x_a = \begin{bmatrix} \mathbf r\\ \mathbf v\\ BC\\ b_a \end{bmatrix}.
+        \]
+      </p>
+      <p>
+        A constant parameter may use
+      </p>
+      <p>
+        \[
+        \dot{\theta}=0,
+        \]
+      </p>
+      <p>
+        while a slowly varying parameter may use
+      </p>
+      <p>
+        \[
+        \dot{\theta}=w_\theta.
+        \]
+      </p>
+      <p>
+        The estimator can then estimate both trajectory and unknown model parameters simultaneously.
+      </p>
+      <hr>
+      <h2>Example: Ballistic-Coefficient Estimation</h2>
+      <p>
+        Ballistic coefficient is a good example of parameter estimation.
+      </p>
+      <p>
+        A common definition is
+      </p>
+      <p>
+        \[
+        \boxed{ BC = \frac{m}{C_DA}. }
+        \]
+      </p>
+      <p>
+        Atmospheric drag acceleration can be approximated as
+      </p>
+      <p>
+        \[
+        \mathbf a_D = -\frac12 \rho \frac{C_DA}{m} v_{rel}^2 \hat{\mathbf v}_{rel}.
+        \]
+      </p>
+      <p>
+        Using <code>BC</code>,
+      </p>
+      <p>
+        \[
+        \boxed{ \mathbf a_D = -\frac12 \frac{\rho v_{rel}^2}{BC} \hat{\mathbf v}_{rel}. }
+        \]
+      </p>
+      <p>
+        Changing <code>BC</code> changes the predicted drag acceleration.
+      </p>
+      <p>
+        This changes the propagated orbit.
+      </p>
+      <p>
+        That changes the predicted observations.
+      </p>
+      <p>
+        Therefore,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Ballistic Coefficient}} \rightarrow \boxed{\text{Drag Acceleration}} \rightarrow \boxed{\text{Orbit Evolution}} \rightarrow \boxed{\text{Measurements}}.
+        \]
+      </p>
+      <p>
+        If sufficient information is present in the observations, the ballistic coefficient can be inferred indirectly even though no onboard sensor directly measures it.
+      </p>
+      <hr>
+      <h2>Numerical Conditioning</h2>
+      <p>
+        The formal least-squares solution contains
+      </p>
+      <p>
+        \[
+        (\mathbf H^T\mathbf W\mathbf H)^{-1}.
+        \]
+      </p>
+      <p>
+        In practical numerical software, explicitly calculating this inverse is generally avoided.
+      </p>
+      <p>
+        More robust methods include
+      </p>
+      <ul>
+        <li>QR decomposition,</li>
+        <li>Cholesky factorization,</li>
+        <li>Singular Value Decomposition,</li>
+        <li>square-root least squares,</li>
+        <li>regularization.</li>
+      </ul>
+      <p>
+        These techniques become important when
+      </p>
+      <ul>
+        <li>the problem contains many measurements,</li>
+        <li>parameters are strongly correlated,</li>
+        <li>measurement sensitivities differ greatly in magnitude,</li>
+        <li>the system is nearly rank deficient.</li>
+      </ul>
+      <hr>
+      <h2>Condition Number</h2>
+      <p>
+        The condition number provides one indication of numerical sensitivity.
+      </p>
+      <p>
+        For a suitable nonsingular matrix,
+      </p>
+      <p>
+        \[
+        \boxed{ \kappa(\mathbf H) = \|\mathbf H\| \|\mathbf H^{-1}\|. }
+        \]
+      </p>
+      <p>
+        A relatively small condition number indicates a better-conditioned problem.
+      </p>
+      <p>
+        A very large condition number indicates that small changes in measurement data may create relatively large changes in the estimated solution.
+      </p>
+      <p>
+        Poor conditioning may result from
+      </p>
+      <ul>
+        <li>poor geometry,</li>
+        <li>redundant parameters,</li>
+        <li>highly correlated states,</li>
+        <li>weak sensitivity,</li>
+        <li>poor numerical scaling.</li>
+      </ul>
+      <hr>
+      <h2>Scaling of Estimation Variables</h2>
+      <p>
+        Spacecraft estimation problems frequently involve variables with very different numerical magnitudes.
+      </p>
+      <p>
+        For example,
+      </p>
+      <p>
+        \[
+        r \sim 10^6 \text{ m},
+        \]
+      </p>
+      <p>
+        while a sensor bias may be
+      </p>
+      <p>
+        \[
+        b_g \sim 10^{-5}\text{ rad/s}.
+        \]
+      </p>
+      <p>
+        Solving directly with variables that differ by many orders of magnitude can degrade numerical conditioning.
+      </p>
+      <p>
+        Scaled variables may therefore be introduced:
+      </p>
+      <p>
+        \[
+        \tilde{\mathbf x} = \mathbf D^{-1}\mathbf x
+        \]
+      </p>
+      <p>
+        where <code>\mathbf D</code> is a scaling matrix.
+      </p>
+      <p>
+        Scaling does not change the physical estimation problem, but it can substantially improve numerical robustness.
+      </p>
+      <hr>
+      <h2>General Estimation Workflow</h2>
+      <p>
+        A practical estimation problem usually follows a sequence such as
+      </p>
+      <p>
+        \[
+        \boxed{\text{Define Unknowns}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Define Dynamic Model}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Define Measurement Model}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Characterize Measurement Uncertainty}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Compute Predicted Measurements}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Form Residuals}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Compute Sensitivities}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Solve for State / Parameter Correction}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Update Estimate}}
+        \]
+      </p>
+      <p>
+        \[
+        \downarrow
+        \]
+      </p>
+      <p>
+        \[
+        \boxed{\text{Check Convergence and Uncertainty}}.
+        \]
+      </p>
+      <p>
+        This workflow applies, with different mathematical implementations, to a wide range of spacecraft-estimation problems.
+      </p>
+      <hr>
+      <h2>Connection Between Sections 4.1, 4.2, and 4.3</h2>
+      <p>
+        The first three sections of the navigation part of the website now form a clear progression.
+      </p>
+      <h4>Section 4.1 — Sensor Models</h4>
+      <p>
+        asks:
+      </p>
+      <p>
+        <strong>What does each sensor measure, and what imperfections are present in that measurement?</strong>
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\text{True Physical State}} \rightarrow \boxed{\text{Sensor Model}} \rightarrow \boxed{\text{Measurement}}.
+        \]
+      </p>
+      <h4>Section 4.2 — Sensor Fusion</h4>
+      <p>
+        asks:
+      </p>
+      <p>
+        <strong>How do multiple sensors, spacecraft models, filters, timing, validation logic, and navigation architectures work together to produce a state estimate?</strong>
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Multiple Measurements}} + \boxed{\text{Spacecraft Model}} \rightarrow \boxed{\text{Sensor Fusion}} \rightarrow \boxed{\hat{\mathbf x},\mathbf P}.
+        \]
+      </p>
+      <p>
+        Your 4.2 already explicitly develops the recursive-filter families and related implementation topics, including KF, EKF, ESKF, MEKF, UKF, information/federated filters, and particle filters.
+      </p>
+      <h4>Section 4.3 — Estimation Algorithms</h4>
+      <p>
+        asks:
+      </p>
+      <p>
+        <strong>How are unknown states and parameters mathematically reconstructed from observations?</strong>
+      </p>
+      <p>
+        Conceptually,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Observations}} + \boxed{\text{Dynamic / Measurement Models}} + \boxed{\text{Uncertainty}} \rightarrow \boxed{\text{Inverse Estimation Problem}} \rightarrow \boxed{\hat{\mathbf x},\hat{\boldsymbol{\theta}}}.
+        \]
+      </p>
+      <p>
+        Therefore the progression becomes
+      </p>
+      <p>
+        \[
+        \boxed{\text{Sensor Physics}} \rightarrow \boxed{\text{Sensor Measurements}} \rightarrow \boxed{\text{Sensor Fusion}} \rightarrow \boxed{\text{Estimation Mathematics}} \rightarrow \boxed{\text{Navigation Solution}}.
+        \]
+      </p>
+      <hr>
+      <h2>Explore Estimation Algorithm Topics</h2>
+      <p>
+        I would divide the individual 4.3 pages into five groups.
+      </p>
+      <h3>Foundations of Estimation</h3>
+      <h4>4.3.1 Estimation Problem Formulation</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>unknown state and parameter vectors,</li>
+        <li>observation equations,</li>
+        <li>residuals,</li>
+        <li>objective functions,</li>
+        <li>deterministic and stochastic formulations,</li>
+        <li>overdetermined and underdetermined systems,</li>
+        <li>prior information,</li>
+        <li>state estimation versus parameter estimation,</li>
+        <li>batch versus sequential processing,</li>
+        <li>identifiability.</li>
+      </ul>
+      <h4>4.3.2 Linear and Weighted Least Squares</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>linear measurement model,</li>
+        <li>residual minimization,</li>
+        <li>normal equations,</li>
+        <li>ordinary least squares,</li>
+        <li>weighted least squares,</li>
+        <li>measurement covariance,</li>
+        <li>a priori constraints,</li>
+        <li>covariance of the estimate,</li>
+        <li>design matrices.</li>
+      </ul>
+      <h4>4.3.3 Batch Dynamic State Estimation</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>measurements at multiple epochs,</li>
+        <li>trajectory propagation,</li>
+        <li>initial-state estimation,</li>
+        <li>dynamic sensitivity,</li>
+        <li>STM connection,</li>
+        <li>batch correction process,</li>
+        <li>observation arcs.</li>
+      </ul>
+      <hr>
+      <h3>Recursive and Nonlinear Estimation</h3>
+      <h4>4.3.4 Recursive Estimation from the Least-Squares and Bayesian Viewpoints</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>information accumulation,</li>
+        <li>recursive least squares,</li>
+        <li>Bayesian recursion,</li>
+        <li>relationship between batch and sequential estimation,</li>
+        <li>connection with Kalman filtering,</li>
+        <li>information form.</li>
+      </ul>
+      <p>
+        This should explain the mathematics behind recursive estimation without repeating the complete Kalman Filter chapter from 4.2.
+      </p>
+      <h4>4.3.5 Nonlinear Least Squares and Differential Corrections</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>nonlinear residuals,</li>
+        <li>linearization,</li>
+        <li>Jacobians,</li>
+        <li>Gauss–Newton,</li>
+        <li>iterative differential correction,</li>
+        <li>convergence criteria,</li>
+        <li>Levenberg–Marquardt,</li>
+        <li>initial-guess sensitivity.</li>
+      </ul>
+      <h4>4.3.6 Maximum Likelihood and MAP Estimation</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>likelihood,</li>
+        <li>log-likelihood,</li>
+        <li>Gaussian likelihood,</li>
+        <li>relationship between MLE and weighted least squares,</li>
+        <li>prior probability,</li>
+        <li>posterior probability,</li>
+        <li>MAP estimation,</li>
+        <li>regularization interpretation.</li>
+      </ul>
+      <h4>4.3.7 Smoothing and Retrodiction</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>filtering versus smoothing,</li>
+        <li>fixed-interval smoothing,</li>
+        <li>fixed-lag smoothing,</li>
+        <li>RTS smoother,</li>
+        <li>forward/backward processing,</li>
+        <li>offline trajectory reconstruction,</li>
+        <li>orbit reconstruction.</li>
+      </ul>
+      <hr>
+      <h3>Sensitivity, Covariance, and Parameters</h3>
+      <h4>4.3.8 State Transition and Sensitivity Matrices</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>STM definition,</li>
+        <li>variational equations,</li>
+        <li>linearized state perturbation,</li>
+        <li>parameter sensitivity,</li>
+        <li>measurement sensitivity,</li>
+        <li>trajectory sensitivity,</li>
+        <li>relation to OD.</li>
+      </ul>
+      <h4>4.3.9 Covariance Analysis and Error Propagation</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>a priori covariance,</li>
+        <li>a posteriori covariance,</li>
+        <li>STM covariance propagation,</li>
+        <li>sensitivity-based covariance mapping,</li>
+        <li>error ellipsoids,</li>
+        <li>state correlation,</li>
+        <li>error budgets,</li>
+        <li>contribution analysis.</li>
+      </ul>
+      <h4>4.3.10 Parameter and Augmented-State Estimation</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>state versus parameter,</li>
+        <li>augmented states,</li>
+        <li>constant parameters,</li>
+        <li>random-walk parameters,</li>
+        <li>sensor bias estimation,</li>
+        <li>drag coefficient,</li>
+        <li>ballistic coefficient,</li>
+        <li>calibration parameters,</li>
+        <li>nuisance parameters,</li>
+        <li>state-parameter correlation.</li>
+      </ul>
+      <hr>
+      <h3>Orbit Determination</h3>
+      <h4>4.3.11 Orbit Determination Fundamentals</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>reference-epoch state,</li>
+        <li>observation arc,</li>
+        <li>force models,</li>
+        <li>orbit propagation,</li>
+        <li>initial orbit,</li>
+        <li>measurement prediction,</li>
+        <li>OD architecture.</li>
+      </ul>
+      <h4>4.3.12 Orbit-Determination Measurement Models</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>range,</li>
+        <li>range rate,</li>
+        <li>Doppler,</li>
+        <li>azimuth/elevation,</li>
+        <li>RA/Dec,</li>
+        <li>line-of-sight,</li>
+        <li>GNSS observations,</li>
+        <li>optical observations,</li>
+        <li>measurement partial derivatives.</li>
+      </ul>
+      <h4>4.3.13 Batch Orbit Determination</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>differential correction,</li>
+        <li>STM-based design matrix,</li>
+        <li>residual stacking,</li>
+        <li>weighted solution,</li>
+        <li>iterative orbit correction,</li>
+        <li>convergence,</li>
+        <li>post-fit residuals.</li>
+      </ul>
+      <h4>4.3.14 Sequential Orbit Determination</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>real-time OD,</li>
+        <li>recursive state updating,</li>
+        <li>process noise,</li>
+        <li>maneuver handling,</li>
+        <li>state augmentation,</li>
+        <li>onboard OD.</li>
+      </ul>
+      <h4>4.3.15 Maneuver and Dynamic-Parameter Estimation</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>impulsive maneuver estimation,</li>
+        <li>burn-time estimation,</li>
+        <li>finite-burn parameters,</li>
+        <li>empirical accelerations,</li>
+        <li>thrust magnitude uncertainty,</li>
+        <li>thrust-direction uncertainty,</li>
+        <li>drag/SRP parameter estimation.</li>
+      </ul>
+      <hr>
+      <h3>Estimation Quality and Numerical Solution</h3>
+      <h4>4.3.16 Geometry, Identifiability and Estimability</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>measurement geometry,</li>
+        <li>rank,</li>
+        <li>null space,</li>
+        <li>parameter correlation,</li>
+        <li>weak estimation directions,</li>
+        <li>estimability,</li>
+        <li>observability versus identifiability,</li>
+        <li>excitation.</li>
+      </ul>
+      <h4>4.3.17 Numerical Conditioning and Robust Solution Methods</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>normal equations,</li>
+        <li>QR,</li>
+        <li>Cholesky,</li>
+        <li>SVD,</li>
+        <li>square-root least squares,</li>
+        <li>condition number,</li>
+        <li>scaling,</li>
+        <li>regularization,</li>
+        <li>rank deficiency.</li>
+      </ul>
+      <h4>4.3.18 Estimator Design Workflow and Algorithm Selection</h4>
+      <p>
+        Develop:
+      </p>
+      <ul>
+        <li>static versus dynamic problem,</li>
+        <li>batch versus sequential,</li>
+        <li>linear versus nonlinear,</li>
+        <li>Gaussian versus non-Gaussian,</li>
+        <li>online versus offline,</li>
+        <li>state versus parameter estimation,</li>
+        <li>smoothing requirement,</li>
+        <li>computational resources,</li>
+        <li>measurement availability,</li>
+        <li>estimator-selection workflow.</li>
+      </ul>
+      <hr>
+      <h3>Compact Chapter Summary</h3>
+      <p>
+        The core idea of Section 4.3 can be summarized as
+      </p>
+      <p>
+        \[
+        \boxed{ \text{Measurements} \rightarrow \text{Residuals} \rightarrow \text{Sensitivities} \rightarrow \text{Optimization / Inference} \rightarrow \text{Estimated States and Parameters} }
+        \]
+      </p>
+      <p>
+        or, for a dynamic spacecraft problem,
+      </p>
+      <p>
+        \[
+        \boxed{\text{Initial State + Parameters}} \rightarrow \boxed{\text{Propagate Dynamics}} \rightarrow \boxed{\text{Predict Measurements}} \rightarrow \boxed{\text{Compare with Observations}} \rightarrow \boxed{\text{Correct Unknowns}} \rightarrow \boxed{\text{Repeat Until Converged}}.
+        \]
+      </p>
+      <p>
+        That gives <strong>4.3 Estimation Algorithms</strong> a clear identity: it becomes the mathematical bridge between measurements and the unknown physical quantities that spacecraft GNC needs.
       </p>
     </section>
 
-    <!-- 4.3.1 Linear Estimation Framework -->
     <section class="notes-section-card">
-      <h3>4.3.1 Linear Estimation Framework</h3>
-      <ul>
-        <li>State-space models with process and measurement noise</li>
-        <li>Covariance propagation and error dynamics</li>
-        <li>Innovation / residual definition</li>
-        <li>Observability and detectability</li>
-      </ul>
+      <h2>Explore Estimation Algorithm Topics</h2>
+      <p>The following sections develop the mathematical foundations, numerical methods, dynamic estimation tools, and orbit-determination applications introduced in Section 4.3.</p>
+      <h3>Foundations of Estimation</h3>
+      <a href="estimation-problem-formulation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.1 Estimation Problem Formulation</h3>
+          <p>Unknown states and parameters, observation equations, residuals, cost functions, prior information, batch versus sequential processing, and identifiability.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="linear-weighted-least-squares.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.2 Linear and Weighted Least Squares</h3>
+          <p>Linear measurement models, residual minimization, normal equations, weighted least squares, design matrices, covariance, and a priori constraints.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="batch-dynamic-state-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.3 Batch Dynamic State Estimation</h3>
+          <p>Measurements over multiple epochs, trajectory propagation, initial-state estimation, dynamic sensitivities, State Transition Matrices, and batch correction.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <h3>Recursive and Nonlinear Estimation</h3>
+      <a href="recursive-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.4 Recursive Estimation from Least-Squares and Bayesian Viewpoints</h3>
+          <p>Information accumulation, recursive least squares, Bayesian recursion, the relationship between batch and sequential estimation, and links to Kalman filtering.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="nonlinear-least-squares.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.5 Nonlinear Least Squares and Differential Corrections</h3>
+          <p>Nonlinear residuals, Jacobians, Gauss–Newton iteration, differential correction, convergence, Levenberg–Marquardt, and initial-guess sensitivity.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="maximum-likelihood-map.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.6 Maximum Likelihood and MAP Estimation</h3>
+          <p>Likelihood, log-likelihood, Gaussian measurement models, MLE, MAP estimation, prior information, and the connection to weighted least squares.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="smoothing-retrodiction.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.7 Smoothing and Retrodiction</h3>
+          <p>Filtering versus smoothing, fixed-interval and fixed-lag methods, RTS smoothing, forward/backward processing, and trajectory reconstruction.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <h3>Sensitivity, Covariance, and Parameters</h3>
+      <a href="state-transition-sensitivity.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.8 State Transition and Sensitivity Matrices</h3>
+          <p>STM definition, variational equations, state perturbations, parameter sensitivities, measurement sensitivities, and trajectory sensitivity.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="covariance-error-propagation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.9 Covariance Analysis and Error Propagation</h3>
+          <p>A priori and a posteriori covariance, STM propagation, covariance mapping, correlations, uncertainty ellipsoids, and error budgets.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="parameter-augmented-state-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.10 Parameter and Augmented-State Estimation</h3>
+          <p>Static and slowly varying parameters, augmented states, sensor biases, ballistic coefficient, calibration parameters, nuisance parameters, and correlation.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <h3>Orbit Determination</h3>
+      <a href="orbit-determination-fundamentals.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.11 Orbit Determination Fundamentals</h3>
+          <p>Reference-epoch states, force models, orbit propagation, observation arcs, measurement prediction, and the general orbit-determination architecture.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="orbit-determination-measurements.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.12 Orbit-Determination Measurement Models</h3>
+          <p>Range, range rate, Doppler, azimuth/elevation, RA/Dec, line of sight, GNSS, optical observations, and measurement partial derivatives.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="batch-orbit-determination.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.13 Batch Orbit Determination</h3>
+          <p>Differential correction, STM-based design matrices, residual stacking, weighted solutions, iteration, convergence, and post-fit residuals.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="sequential-orbit-determination.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.14 Sequential Orbit Determination</h3>
+          <p>Real-time recursive orbit updates, process noise, maneuvers, state augmentation, onboard OD, and continuous tracking.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="maneuver-dynamic-parameter-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.15 Maneuver and Dynamic-Parameter Estimation</h3>
+          <p>Impulsive and finite-burn estimation, burn timing, thrust magnitude and direction, empirical accelerations, drag, and SRP parameter estimation.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <h3>Estimation Quality and Numerical Solution</h3>
+      <a href="geometry-identifiability-estimability.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.16 Geometry, Identifiability and Estimability</h3>
+          <p>Measurement geometry, rank, null spaces, parameter correlations, weak estimation directions, excitation, and estimability.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="numerical-conditioning-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.17 Numerical Conditioning and Robust Solution Methods</h3>
+          <p>Normal equations, QR, Cholesky, SVD, square-root least squares, condition number, scaling, regularization, and rank deficiency.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
+      <a href="estimator-design-workflow.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.18 Estimator Design Workflow and Algorithm Selection</h3>
+          <p>Choosing among static, dynamic, batch, sequential, linear, nonlinear, probabilistic, smoothing, and parameter-estimation approaches.</p>
+          <p class="sensor-link-arrow">Explore Topic &rarr;</p>
+        </div>
+      </a>
     </section>
 
-    <!-- 4.3.2 Batch Least Squares Methods -->
-    <section class="notes-section-card">
-      <h3>4.3.2 Batch Least Squares Methods</h3>
-      <ul>
-        <li>Batch estimator formulation and normal equations</li>
-        <li>Weighted Least Squares and a priori constraints</li>
-        <li>Sensitivity (design) matrix and Jacobians</li>
-        <li>Batch covariance estimation and smoothing idea</li>
-      </ul>
-    </section>
-
-    <!-- 4.3.3 Sequential (Recursive) Estimation -->
-    <section class="notes-section-card">
-      <h3>4.3.3 Sequential (Recursive) Estimation</h3>
-      <ul>
-        <li>Classical Kalman Filter (KF) structure</li>
-        <li>Time update (prediction) and measurement update (correction)</li>
-        <li>Innovation statistics and consistency checks</li>
-        <li>Numerically stable forms (Joseph update, square-root filters)</li>
-      </ul>
-    </section>
-
-    <!-- 4.3.4 Extended Kalman Filter (EKF) -->
-    <section class="notes-section-card">
-      <h3>4.3.4 Extended Kalman Filter (EKF)</h3>
-      <ul>
-        <li>Linearization of nonlinear dynamics and measurements</li>
-        <li>Jacobian computation and error-state models</li>
-        <li>Iterated EKF concepts</li>
-      </ul>
-    </section>
-
-    <!-- 4.3.5 Unscented Kalman Filter (UKF) -->
-    <section class="notes-section-card">
-      <h3>4.3.5 Unscented Kalman Filter (UKF)</h3>
-      <ul>
-        <li>Sigma-point selection and unscented transform</li>
-        <li>Prediction and update with sigma points</li>
-        <li>Comparison with EKF and attitude (quaternion) UKF use</li>
-      </ul>
-    </section>
-
-    <!-- 4.3.6 Nonlinear Least Squares -->
-    <section class="notes-section-card">
-      <h3>4.3.6 Nonlinear Least Squares</h3>
-      <ul>
-        <li>Gauss–Newton method</li>
-        <li>Levenberg–Marquardt method</li>
-        <li>Maximum Likelihood Estimation link</li>
-      </ul>
-    </section>
-
-    <!-- 4.3.7 Smoothers -->
-    <section class="notes-section-card">
-      <h3>4.3.7 Smoothers</h3>
-      <ul>
-        <li>Fixed-interval smoother (RTS)</li>
-        <li>Fixed-lag smoothing</li>
-        <li>Use with batch and sequential estimators</li>
-      </ul>
-    </section>
-
-    <!-- 4.3.8 Particle Filters -->
-    <section class="notes-section-card">
-      <h3>4.3.8 Particle Filters</h3>
-      <ul>
-        <li>Sequential Monte Carlo idea</li>
-        <li>Importance sampling and resampling</li>
-        <li>Non-Gaussian / strongly nonlinear applications</li>
-      </ul>
-    </section>
-
-    <!-- 4.3.9 Covariance Analysis & Error Propagation -->
-    <section class="notes-section-card">
-      <h3>4.3.9 Covariance Analysis &amp; Error Propagation</h3>
-      <ul>
-        <li>Sensitivity matrices and perturbation covariance</li>
-        <li>Error budgets and process noise tuning</li>
-        <li>Bias estimation and correlation effects</li>
-      </ul>
-    </section>
-
-    <!-- 4.3.10 Orbit Determination Algorithms -->
-    <section class="notes-section-card">
-      <h3>4.3.10 Orbit Determination Algorithms</h3>
-      <ul>
-        <li>State Transition Matrix (STM) in estimation</li>
-        <li>Range, range-rate, and Doppler tracking models</li>
-        <li>Angle-only and mixed measurement solutions</li>
-        <li>Consider covariance and maneuver estimation concepts</li>
-      </ul>
-    </section>
   </main>
 
   <footer class="site-footer">
-   <p>
-  © 2026 Upasana Panigrahi — Interactive GNC & Space Mechanics.  
-  Educational resource for spacecraft dynamics, orbital mechanics,
-  and guidance–navigation–control systems.
-  </p>
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      and orbit determination.
+    </p>
   </footer>
+
 </body>
 </html>
-
