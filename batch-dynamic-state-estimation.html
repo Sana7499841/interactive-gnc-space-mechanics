@@ -1,0 +1,2415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.3.3 Batch Dynamic State Estimation | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      margin: 1rem 0 1.4rem;
+    }
+    .table-wrap table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .table-wrap th,
+    .table-wrap td {
+      border: 1px solid #d8dee6;
+      padding: 0.75rem 0.85rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    .table-wrap th {
+      font-weight: 700;
+      background: #f7f9fb;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="notes-hero">
+    <h1>Batch Dynamic State Estimation</h1>
+    <p class="notes-tagline">
+      Dynamic estimation over an observation arc using trajectory propagation,
+      reference-epoch state estimation, State Transition Matrices, measurement
+      sensitivities, weighted batch correction, covariance, parameter estimation,
+      residual analysis, numerical conditioning, and iterative differential correction.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+      <h2>4.3.3 Batch Dynamic State Estimation</h2>
+      <p>Linear and weighted least squares assume that all observations can be related directly to a common unknown vector through a model such as</p>
+      <p>
+        \[
+        \boxed{ \mathbf z=\mathbf H\mathbf x+\mathbf v }
+        \]
+      </p>
+      <p>For many spacecraft problems, however, measurements are collected at different times while the spacecraft state evolves continuously.</p>
+      <p>A measurement at time</p>
+      <p>
+        \[
+        t_k
+        \]
+      </p>
+      <p>depends on the spacecraft state</p>
+      <p>
+        \[
+        \mathbf x(t_k),
+        \]
+      </p>
+      <p>but the estimator may wish to determine the state at a common reference epoch</p>
+      <p>
+        \[
+        t_0.
+        \]
+      </p>
+      <p>The dynamic model connects these states:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x(t_k) = \phi(t_k,t_0,\mathbf x_0,\boldsymbol{\theta}) }
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \mathbf x_0=\mathbf x(t_0)
+        \]
+      </p>
+      <p>is the unknown reference-epoch state.</p>
+      <p>Batch dynamic state estimation therefore combines:</p>
+      <p>
+        \[
+        \boxed{ \text{Measurements at Multiple Epochs} + \text{Dynamic Propagation} + \text{Measurement Models} + \text{Sensitivity Propagation} + \text{Least Squares} }
+        \]
+      </p>
+      <p>to estimate a common initial or reference-epoch state.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Reference State Guess} \rightarrow \text{Propagate Trajectory} \rightarrow \text{Predict Measurements} \rightarrow \text{Form Residuals} \rightarrow \text{Compute Dynamic Sensitivities} \rightarrow \text{Solve Batch Correction} \rightarrow \text{Update Reference State} }
+        \]
+      </p>
+      <p>This is a fundamental architecture in spacecraft orbit determination, trajectory reconstruction, parameter estimation, maneuver reconstruction, and offline navigation analysis.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.1 Why Static Least Squares Is Not Enough</h3>
+      <p>In static least squares, observations are written as</p>
+      <p>
+        \[
+        \mathbf z=\mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>The same unknown vector <code>\mathbf x</code> appears directly in every observation equation.</p>
+      <p>In a spacecraft problem, however,</p>
+      <p>
+        \[
+        \mathbf x(t_1), \quad \mathbf x(t_2), \quad \ldots, \quad \mathbf x(t_N)
+        \]
+      </p>
+      <p>are generally different because the vehicle moves.</p>
+      <p>Therefore, a measurement at <code>t_1</code> depends on</p>
+      <p>
+        \[
+        \mathbf x(t_1),
+        \]
+      </p>
+      <p>while a measurement at <code>t_N</code> depends on</p>
+      <p>
+        \[
+        \mathbf x(t_N).
+        \]
+      </p>
+      <p>The states are nevertheless related by the spacecraft dynamics.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Dynamic Estimation} = \text{Least Squares} + \text{State Propagation Through Time}. }
+        \]
+      </p>
+      <p>The estimator exploits this relationship so that measurements collected across an observation arc can all provide information about one common reference state.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.2 Reference-Epoch State</h3>
+      <p>Choose a reference time</p>
+      <p>
+        \[
+        t_0.
+        \]
+      </p>
+      <p>The unknown state at this epoch is</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0 = \mathbf x(t_0). }
+        \]
+      </p>
+      <p>For an orbital problem,</p>
+      <p>
+        \[
+        \mathbf x_0 = \begin{bmatrix} \mathbf r_0\\ \mathbf v_0 \end{bmatrix}.
+        \]
+      </p>
+      <p>The objective may be to estimate</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_0. }
+        \]
+      </p>
+      <p>Once <code>\mathbf x_0</code> is known, the dynamic model can propagate the trajectory to any measurement epoch.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Reference-Epoch State} \rightarrow \text{Entire Predicted Trajectory}. }
+        \]
+      </p>
+      <p>This allows observations at many different times to constrain the same unknown state.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.3 Initial State versus Reference State</h3>
+      <p>The words <strong>initial state</strong> and <strong>reference state</strong> are often used similarly but should be interpreted carefully.</p>
+      <p>If</p>
+      <p>
+        \[
+        t_0
+        \]
+      </p>
+      <p>is the beginning of the observation arc, then</p>
+      <p>
+        \[
+        \mathbf x_0
+        \]
+      </p>
+      <p>is both the initial state and reference-epoch state.</p>
+      <p>However, the reference epoch does not necessarily have to coincide with the first observation.</p>
+      <p>It may instead be chosen</p>
+      <ul>
+        <li>at the midpoint of the observation arc,</li>
+        <li>at a mission-defined epoch,</li>
+        <li>at maneuver time,</li>
+        <li>at a convenient numerical reference time.</li>
+      </ul>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Reference Epoch} \neq \text{Necessarily First Measurement Epoch}. }
+        \]
+      </p>
+      <p>Choosing the reference epoch near the center of the observation arc can sometimes improve numerical conditioning because sensitivities do not need to propagate as far in only one time direction.</p>
+      <p><strong>Engineering interpretation:</strong> Choosing the reference epoch is partly a modelling decision and partly a numerical one. The same physical trajectory can be represented at different epochs, but covariance, state correlation, and the magnitude of propagated sensitivities can change with that choice.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.4 Dynamic State Model</h3>
+      <p>The spacecraft state evolves according to a dynamic model:</p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf x} = f(\mathbf x,\mathbf u,\boldsymbol{\theta},t). }
+        \]
+      </p>
+      <p>For orbital translational dynamics,</p>
+      <p>
+        \[
+        \dot{\mathbf r} = \mathbf v
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \dot{\mathbf v} = \mathbf a(\mathbf r,\mathbf v,\boldsymbol{\theta},t).
+        \]
+      </p>
+      <p>The acceleration may include terms such as</p>
+      <ul>
+        <li>central-body gravity,</li>
+        <li>higher-order gravity,</li>
+        <li>third-body gravity,</li>
+        <li>atmospheric drag,</li>
+        <li>solar radiation pressure,</li>
+        <li>thrust,</li>
+        <li>empirical accelerations.</li>
+      </ul>
+      <p>The propagation model determines the predicted trajectory from the reference state.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0 \rightarrow f(\cdot) \rightarrow \mathbf x(t_k). }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.5 State-Flow Mapping</h3>
+      <p>The propagated state may be represented conceptually as</p>
+      <p>
+        \[
+        \boxed{ \mathbf x(t_k) = \phi(t_k,t_0,\mathbf x_0,\boldsymbol{\theta}) }
+        \]
+      </p>
+      <p>where <code>\phi</code> is the nonlinear state-flow mapping.</p>
+      <p>This notation means:</p>
+      <blockquote>
+        <p>Starting from <code>\mathbf x_0</code> at <code>t_0</code>, integrate the dynamics until <code>t_k</code>.</p>
+      </blockquote>
+      <p>For a nonlinear spacecraft model, <code>\phi</code> is usually evaluated numerically rather than expressed in closed form.</p>
+      <p>The batch estimator repeatedly performs this propagation during its iterations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.6 Measurements at Multiple Epochs</h3>
+      <p>Suppose observations are obtained at</p>
+      <p>
+        \[
+        t_1,t_2,\ldots,t_N.
+        \]
+      </p>
+      <p>At epoch <code>t_k</code>,</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h_k(\mathbf x_k,\boldsymbol{\theta}) + \mathbf v_k }
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \mathbf x_k=\mathbf x(t_k).
+        \]
+      </p>
+      <p>Substituting the propagated state gives</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h_k [ \phi(t_k,t_0,\mathbf x_0,\boldsymbol{\theta}), \boldsymbol{\theta} ] + \mathbf v_k. }
+        \]
+      </p>
+      <p>Therefore every observation depends indirectly on the same unknown reference state.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.7 Observation Arc</h3>
+      <p>The time interval over which measurements are collected is called the <strong>observation arc</strong>.</p>
+      <p>If measurements span</p>
+      <p>
+        \[
+        t_1
+        \]
+      </p>
+      <p>to</p>
+      <p>
+        \[
+        t_N,
+        \]
+      </p>
+      <p>then</p>
+      <p>
+        \[
+        \boxed{ [t_1,t_N] }
+        \]
+      </p>
+      <p>defines the measurement arc.</p>
+      <p>Observation-arc design affects estimation quality.</p>
+      <p>A longer arc may improve state separation because trajectory effects accumulate over time.</p>
+      <p>However, a longer arc may also increase sensitivity to</p>
+      <ul>
+        <li>force-model errors,</li>
+        <li>unmodeled maneuvers,</li>
+        <li>environmental uncertainty,</li>
+        <li>parameter variation.</li>
+      </ul>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Longer Arc} \neq \text{Automatically Better Dynamic Estimation}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> Observation-arc duration should be selected together with model fidelity and the estimation objective. A short arc may not reveal enough dynamic signature, while a very long arc may allow unmodelled physics to dominate the residuals.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.8 Predicted Trajectory</h3>
+      <p>Given a current reference-state estimate</p>
+      <p>
+        \[
+        \mathbf x_0^{(i)},
+        \]
+      </p>
+      <p>the trajectory is propagated:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_k^{(i)} = \phi ( t_k,t_0,\mathbf x_0^{(i)},\boldsymbol{\theta}^{(i)} ). }
+        \]
+      </p>
+      <p>This produces predicted states at every observation epoch.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0^{(i)} \rightarrow \mathbf x_1^{(i)} \rightarrow \mathbf x_2^{(i)} \rightarrow \cdots \rightarrow \mathbf x_N^{(i)}. }
+        \]
+      </p>
+      <p>These predicted states are then passed through the measurement models.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.9 Predicted Measurements</h3>
+      <p>At each observation epoch,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}_k = h_k ( \mathbf x_k^{(i)}, \boldsymbol{\theta}^{(i)} ). }
+        \]
+      </p>
+      <p>Thus the batch estimator generates one predicted observation for every actual measurement.</p>
+      <p>The process is</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0^{(i)} \rightarrow \mathbf x_k^{(i)} \rightarrow \hat{\mathbf z}_k. }
+        \]
+      </p>
+      <p>The predicted observation must correspond to the same</p>
+      <ul>
+        <li>physical quantity,</li>
+        <li>reference frame,</li>
+        <li>units,</li>
+        <li>epoch,</li>
+        <li>convention</li>
+      </ul>
+      <p>as the measured observation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.10 Measurement Residual at Each Epoch</h3>
+      <p>The residual at time <code>t_k</code> is</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_k = \mathbf z_k-\hat{\mathbf z}_k. }
+        \]
+      </p>
+      <p>Equivalently,</p>
+      <p>
+        \[
+        \mathbf r_k = \mathbf z_k - h_k ( \mathbf x_k^{(i)}, \boldsymbol{\theta}^{(i)} ).
+        \]
+      </p>
+      <p>These residuals indicate how well the current propagated trajectory explains the observation set.</p>
+      <p>The complete estimation objective seeks a change in the reference state that improves all of these residuals simultaneously.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.11 Pre-Fit Residuals</h3>
+      <p>Before the reference-state correction is applied, the residuals are often called <strong>pre-fit residuals</strong>:</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{k,\text{pre}} = \mathbf z_k-\hat{\mathbf z}_k^{-}. }
+        \]
+      </p>
+      <p>They indicate the mismatch produced by the current reference trajectory.</p>
+      <p>Large pre-fit residuals may be caused by</p>
+      <ul>
+        <li>initial-state error,</li>
+        <li>parameter error,</li>
+        <li>measurement bias,</li>
+        <li>model error,</li>
+        <li>maneuver mismatch,</li>
+        <li>poor initial guess.</li>
+      </ul>
+      <p>The estimator then determines a correction that reduces the weighted residuals.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.12 State Perturbation at the Reference Epoch</h3>
+      <p>Suppose the true reference state differs from the nominal estimate by</p>
+      <p>
+        \[
+        \delta\mathbf x_0.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0 = \mathbf x_0^{*} + \delta\mathbf x_0 }
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \mathbf x_0^{*}
+        \]
+      </p>
+      <p>is the current nominal or reference trajectory state.</p>
+      <p>The goal of differential correction is to estimate</p>
+      <p>
+        \[
+        \delta\mathbf x_0.
+        \]
+      </p>
+      <p>Then the reference state is updated:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0^{new} = \mathbf x_0^{old} + \delta\hat{\mathbf x}_0. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.13 Why Sensitivities Are Needed</h3>
+      <p>The estimator must answer:</p>
+      <blockquote>
+        <p>If I change the reference state slightly, how will a later measurement change?</p>
+      </blockquote>
+      <p>This requires the chain</p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x_0 \rightarrow \delta\mathbf x_k \rightarrow \delta\mathbf z_k. }
+        \]
+      </p>
+      <p>The first relationship is provided by the <strong>State Transition Matrix</strong>.</p>
+      <p>The second is provided by the measurement Jacobian.</p>
+      <p>Together, they create the dynamic design matrix.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.14 State Transition Matrix</h3>
+      <p>The State Transition Matrix is</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_k,t_0) = \frac{\partial\mathbf x(t_k)} {\partial\mathbf x(t_0)}. }
+        \]
+      </p>
+      <p>For a small reference-state perturbation,</p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x_k \approx \boldsymbol{\Phi}(t_k,t_0) \delta\mathbf x_0. }
+        \]
+      </p>
+      <p>This tells us how an error or perturbation at the reference epoch propagates to a later epoch.</p>
+      <p>The STM is therefore the fundamental bridge between dynamic propagation and least-squares estimation.</p>
+      <p><strong>Engineering interpretation:</strong> The STM is local to the nominal trajectory about which the dynamics are linearized. In a nonlinear problem it should therefore be recomputed after the trajectory is updated rather than assumed fixed for every iteration.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.15 Physical Meaning of the STM</h3>
+      <p>Suppose one component of the reference state changes slightly.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \delta x_0.
+        \]
+      </p>
+      <p>The resulting state change at time <code>t_k</code> is determined by the corresponding column of</p>
+      <p>
+        \[
+        \boldsymbol{\Phi}(t_k,t_0).
+        \]
+      </p>
+      <p>Thus:</p>
+      <ul>
+        <li>each column describes sensitivity to one initial-state component,</li>
+        <li>each row describes the effect on one propagated-state component.</li>
+      </ul>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Initial-State Perturbation} \xrightarrow{\boldsymbol{\Phi}} \text{Later-State Perturbation}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.16 Variational Equations</h3>
+      <p>For</p>
+      <p>
+        \[
+        \dot{\mathbf x} = f(\mathbf x,t),
+        \]
+      </p>
+      <p>define the dynamic Jacobian</p>
+      <p>
+        \[
+        \boxed{ \mathbf A(t) = \frac{\partial f}{\partial\mathbf x}. }
+        \]
+      </p>
+      <p>The STM satisfies</p>
+      <p>
+        \[
+        \boxed{ \dot{\boldsymbol{\Phi}} = \mathbf A(t) \boldsymbol{\Phi}. }
+        \]
+      </p>
+      <p>with initial condition</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_0,t_0) = \mathbf I. }
+        \]
+      </p>
+      <p>These are called the <strong>variational equations</strong>.</p>
+      <p>In nonlinear dynamic estimation, the nominal state and STM are often integrated simultaneously.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.17 Simultaneous Propagation of State and STM</h3>
+      <p>The integration system may be written as</p>
+      <p>
+        \[
+        \boxed{ \begin{cases} \dot{\mathbf x}=f(\mathbf x,t),\\ \dot{\boldsymbol{\Phi}} = \mathbf A(t)\boldsymbol{\Phi}. \end{cases} }
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        \mathbf x(t_0)=\mathbf x_0
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boldsymbol{\Phi}(t_0,t_0)=\mathbf I.
+        \]
+      </p>
+      <p>This produces both</p>
+      <p>
+        \[
+        \mathbf x(t_k)
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boldsymbol{\Phi}(t_k,t_0)
+        \]
+      </p>
+      <p>at every measurement epoch.</p>
+      <p>This is a common implementation pattern in batch orbit determination and trajectory estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.18 Measurement Jacobian at the Observation Epoch</h3>
+      <p>The measurement sensitivity to the state at <code>t_k</code> is</p>
+      <p>
+        \[
+        \boxed{ \mathbf H_k = \left. \frac{\partial h_k} {\partial\mathbf x} \right|_{\mathbf x_k}. }
+        \]
+      </p>
+      <p>For a small perturbation,</p>
+      <p>
+        \[
+        \delta\mathbf z_k \approx \mathbf H_k \delta\mathbf x_k.
+        \]
+      </p>
+      <p>However, the batch estimator is solving for</p>
+      <p>
+        \[
+        \delta\mathbf x_0,
+        \]
+      </p>
+      <p>not directly for</p>
+      <p>
+        \[
+        \delta\mathbf x_k.
+        \]
+      </p>
+      <p>Therefore the STM must be introduced.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.19 Dynamic Measurement Sensitivity</h3>
+      <p>Using</p>
+      <p>
+        \[
+        \delta\mathbf x_k = \boldsymbol{\Phi}_{k,0} \delta\mathbf x_0,
+        \]
+      </p>
+      <p>we obtain</p>
+      <p>
+        \[
+        \delta\mathbf z_k \approx \mathbf H_k \boldsymbol{\Phi}_{k,0} \delta\mathbf x_0.
+        \]
+      </p>
+      <p>Define the effective dynamic design matrix</p>
+      <p>
+        \[
+        \boxed{ \mathbf H_k^{(0)} = \mathbf H_k \boldsymbol{\Phi}(t_k,t_0). }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf z_k \approx \mathbf H_k^{(0)} \delta\mathbf x_0. }
+        \]
+      </p>
+      <p>This is one of the central equations of batch dynamic estimation.</p>
+      <p><strong>Engineering interpretation:</strong> The product \(\mathbf H_k\boldsymbol{\Phi}_{k,0}\) is what allows a measurement at a later epoch to contribute information about the state at the reference epoch. It is the dynamic counterpart of the static least-squares design matrix.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.20 Chain-Rule Interpretation</h3>
+      <p>The same result follows from the chain rule:</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial h_k} {\partial\mathbf x_0} = \frac{\partial h_k} {\partial\mathbf x_k} \frac{\partial\mathbf x_k} {\partial\mathbf x_0}. }
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial h_k} {\partial\mathbf x_0} = \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </p>
+      <p>This equation tells us exactly how a measurement at a later time depends on the reference state.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Reference-State Sensitivity} = \text{Measurement Sensitivity} \times \text{Dynamic Sensitivity}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.21 Linearized Residual Equation</h3>
+      <p>Let the pre-fit residual be</p>
+      <p>
+        \[
+        \mathbf r_k.
+        \]
+      </p>
+      <p>After a small reference-state correction</p>
+      <p>
+        \[
+        \delta\mathbf x_0,
+        \]
+      </p>
+      <p>the residual is approximately</p>
+      <p>
+        \[
+        \mathbf r_k^{new} \approx \mathbf r_k - \mathbf H_k^{(0)} \delta\mathbf x_0.
+        \]
+      </p>
+      <p>Equivalently,</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_k \approx \mathbf H_k^{(0)} \delta\mathbf x_0 + \mathbf v_k. }
+        \]
+      </p>
+      <p>This has exactly the same structure as a linear least-squares problem.</p>
+      <p>Therefore dynamic batch estimation converts a nonlinear trajectory problem into an iterative sequence of linear least-squares corrections.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.22 Stacking Measurements Across the Arc</h3>
+      <p>All residuals can be stacked:</p>
+      <p>
+        \[
+        \boxed{ \mathbf r = \begin{bmatrix} \mathbf r_1\\ \mathbf r_2\\ \vdots\\ \mathbf r_N \end{bmatrix}. }
+        \]
+      </p>
+      <p>Similarly, stack the dynamic design matrices:</p>
+      <p>
+        \[
+        \boxed{ \mathbf H = \begin{bmatrix} \mathbf H_1^{(0)}\\ \mathbf H_2^{(0)}\\ \vdots\\ \mathbf H_N^{(0)} \end{bmatrix}. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \mathbf r \approx \mathbf H \delta\mathbf x_0 + \mathbf v. }
+        \]
+      </p>
+      <p>The dynamic problem has now been converted into the same algebraic form as linear weighted least squares.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.23 Stacked Measurement Covariance</h3>
+      <p>If measurement errors at different epochs are independent,</p>
+      <p>
+        \[
+        \mathbf R = \begin{bmatrix} \mathbf R_1&0&\cdots&0\\ 0&\mathbf R_2&\cdots&0\\ \vdots&\vdots&\ddots&\vdots\\ 0&0&\cdots&\mathbf R_N \end{bmatrix}.
+        \]
+      </p>
+      <p>The batch weight matrix is</p>
+      <p>
+        \[
+        \boxed{ \mathbf W = \mathbf R^{-1}. }
+        \]
+      </p>
+      <p>If measurement errors are correlated across epochs, the off-diagonal covariance blocks should be included.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Batch Weighting Must Reflect Both Measurement Accuracy and Correlation}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> When heterogeneous measurements are stacked, the covariance matrix also makes quantities with different units statistically comparable. Raw residual magnitude alone is not a meaningful basis for weighting metres, radians, and metres per second together.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.24 Batch Weighted Cost Function</h3>
+      <p>The correction is obtained by minimizing</p>
+      <p>
+        \[
+        \boxed{ J(\delta\mathbf x_0) = \sum_{k=1}^{N} \mathbf r_k^T \mathbf R_k^{-1} \mathbf r_k }
+        \]
+      </p>
+      <p>or, in stacked form,</p>
+      <p>
+        \[
+        \boxed{ J = ( \mathbf r-\mathbf H\delta\mathbf x_0 )^T \mathbf R^{-1} ( \mathbf r-\mathbf H\delta\mathbf x_0 ). }
+        \]
+      </p>
+      <p>The estimator finds the reference-state correction that minimizes the weighted mismatch over the complete observation arc.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.25 Batch Normal Equations</h3>
+      <p>The weighted normal equations are</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T \mathbf R^{-1} \mathbf H \, \delta\hat{\mathbf x}_0 = \mathbf H^T \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>If the information matrix is nonsingular,</p>
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x}_0 = ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1} \mathbf H^T \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>The updated reference state is</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0^{new} = \mathbf x_0^{old} + \delta\hat{\mathbf x}_0. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.26 Why the Batch Problem Is Iterative</h3>
+      <p>Even though each correction step looks linear, the complete problem is usually nonlinear because</p>
+      <p>
+        \[
+        \mathbf x_k = \phi(t_k,t_0,\mathbf x_0)
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \mathbf z_k = h_k(\mathbf x_k).
+        \]
+      </p>
+      <p>Therefore after updating</p>
+      <p>
+        \[
+        \mathbf x_0,
+        \]
+      </p>
+      <p>the estimator must</p>
+      <ol>
+        <li>propagate the trajectory again,</li>
+        <li>recompute predicted observations,</li>
+        <li>recompute residuals,</li>
+        <li>recompute STMs,</li>
+        <li>recompute measurement Jacobians,</li>
+        <li>rebuild the design matrix,</li>
+        <li>solve a new correction.</li>
+      </ol>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Propagate} \rightarrow \text{Linearize} \rightarrow \text{Correct} \rightarrow \text{Repeat}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.27 Differential Correction</h3>
+      <p>This iterative process is often called <strong>differential correction</strong>.</p>
+      <p>At iteration <code>i</code>,</p>
+      <p>
+        \[
+        \mathbf x_0^{(i)}
+        \]
+      </p>
+      <p>is propagated.</p>
+      <p>The residual vector is</p>
+      <p>
+        \[
+        \mathbf r^{(i)}.
+        \]
+      </p>
+      <p>A correction is solved:</p>
+      <p>
+        \[
+        \delta\mathbf x_0^{(i)}.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0^{(i+1)} = \mathbf x_0^{(i)} + \delta\mathbf x_0^{(i)}. }
+        \]
+      </p>
+      <p>The cycle continues until convergence.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.28 Complete Differential-Correction Loop</h3>
+      <p>The complete loop is</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Initial Reference-State Guess}\\ \downarrow\\ \text{Propagate Dynamics}\\ \downarrow\\ \text{Predict Measurements}\\ \downarrow\\ \text{Compute Residuals}\\ \downarrow\\ \text{Propagate STM / Sensitivities}\\ \downarrow\\ \text{Build Dynamic Design Matrix}\\ \downarrow\\ \text{Solve Weighted LS Correction}\\ \downarrow\\ \text{Update Reference State}\\ \downarrow\\ \text{Check Convergence}\\ \downarrow\\ \text{Repeat if Required} \end{array} }
+        \]
+      </p>
+      <p>This is the basic architecture of a batch dynamic estimator.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.29 Convergence Criteria</h3>
+      <p>Several convergence criteria may be used.</p>
+      <h4>Correction magnitude</h4>
+      <p>
+        \[
+        \boxed{ \| \delta\mathbf x_0^{(i)} \| < \epsilon_x. }
+        \]
+      </p>
+      <h4>Cost-function change</h4>
+      <p>
+        \[
+        \boxed{ | J^{(i+1)}-J^{(i)} | < \epsilon_J. }
+        \]
+      </p>
+      <h4>Relative change</h4>
+      <p>
+        \[
+        \boxed{ \frac{ \| \delta\mathbf x_0 \| }{ \| \mathbf x_0 \| } < \epsilon_r. }
+        \]
+      </p>
+      <h4>Residual stabilization</h4>
+      <p>The residual statistics may stop changing meaningfully.</p>
+      <p>In practice, several criteria may be used together.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.30 Why Small Corrections Matter</h3>
+      <p>A very small correction indicates that relinearizing around the updated trajectory is unlikely to change the solution significantly.</p>
+      <p>However,</p>
+      <p>
+        \[
+        \boxed{ \text{Small Correction} \neq \text{Automatically Correct Physical Solution}. }
+        \]
+      </p>
+      <p>The estimator may converge to</p>
+      <ul>
+        <li>a local minimum,</li>
+        <li>a biased solution,</li>
+        <li>a weakly identifiable parameter set,</li>
+        <li>a model-compensation solution.</li>
+      </ul>
+      <p>Therefore convergence must be accompanied by residual, covariance, and physical checks.</p>
+      <p><strong>Engineering interpretation:</strong> A converged correction only indicates that the local numerical iteration has stabilized. Residual structure, covariance, rank, parameter correlation, and physical plausibility must still be checked before accepting the solution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.31 Effect of the Initial Guess</h3>
+      <p>Because batch dynamic estimation is nonlinear, the initial reference-state guess matters.</p>
+      <p>A poor initial state may cause</p>
+      <ul>
+        <li>inaccurate linearization,</li>
+        <li>very large residuals,</li>
+        <li>divergence,</li>
+        <li>slow convergence,</li>
+        <li>convergence to an incorrect local solution.</li>
+      </ul>
+      <p>Therefore the initial guess should ideally lie within a region where the linearized sensitivities reasonably represent the nonlinear system.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Good Initial Guess} \rightarrow \text{Valid Local Linearization} \rightarrow \text{Reliable Differential Correction}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.32 A Priori State Information</h3>
+      <p>Suppose an a priori reference state is</p>
+      <p>
+        \[
+        \bar{\mathbf x}_0
+        \]
+      </p>
+      <p>with covariance</p>
+      <p>
+        \[
+        \mathbf P_0.
+        \]
+      </p>
+      <p>The batch objective can include this prior:</p>
+      <p>
+        \[
+        \boxed{ \begin{aligned} J ={}& (\mathbf x_0-\bar{\mathbf x}_0)^T \mathbf P_0^{-1} (\mathbf x_0-\bar{\mathbf x}_0) \\ &+ \sum_{k=1}^{N} \mathbf r_k^T \mathbf R_k^{-1} \mathbf r_k. \end{aligned} }
+        \]
+      </p>
+      <p>This allows the estimator to combine</p>
+      <p>
+        \[
+        \boxed{ \text{Prior State Information} + \text{Observation-Arc Information}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.33 Prior-Constrained Batch Normal Equations</h3>
+      <p>For a correction formulation, the normal matrix becomes</p>
+      <p>
+        \[
+        \boxed{ \mathbf N = \mathbf P_0^{-1} + \mathbf H^T \mathbf R^{-1} \mathbf H. }
+        \]
+      </p>
+      <p>The right-hand side includes both measurement and prior contributions.</p>
+      <p>The solution covariance is approximately</p>
+      <p>
+        \[
+        \boxed{ \mathbf P = \mathbf N^{-1}. }
+        \]
+      </p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Posterior Information} = \text{Prior Information} + \text{Batch Measurement Information}. }
+        \]
+      </p>
+      <p>This is the dynamic counterpart of the prior-constrained WLS relationship introduced in Section 4.3.2.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.34 Estimate Covariance</h3>
+      <p>After convergence, the reference-state covariance is approximately</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_0^{+} \approx ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1} }
+        \]
+      </p>
+      <p>for the no-prior full-rank case.</p>
+      <p>With prior information,</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_0^{+} = \left( \mathbf P_0^{-1} + \mathbf H^T \mathbf R^{-1} \mathbf H \right)^{-1}. }
+        \]
+      </p>
+      <p>This covariance quantifies the uncertainty in the estimated state at the reference epoch.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.35 Covariance at Other Epochs</h3>
+      <p>Once the reference-state covariance is known, it can be propagated:</p>
+      <p>
+        \[
+        \boxed{ \mathbf P(t_k) = \boldsymbol{\Phi}(t_k,t_0) \mathbf P_0 \boldsymbol{\Phi}^T(t_k,t_0) }
+        \]
+      </p>
+      <p>for the deterministic linearized case.</p>
+      <p>If process noise is included, additional covariance terms are required.</p>
+      <p>Thus the estimated uncertainty can be mapped from the reference epoch to other points along the trajectory.</p>
+      <p><strong>Engineering interpretation:</strong> When process noise is present, deterministic covariance propagation is incomplete because uncertainty is injected along the trajectory. The propagated covariance must then include the accumulated process-noise contribution in addition to the mapped reference covariance.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.36 Parameter Estimation in a Batch Dynamic Problem</h3>
+      <p>The estimator can solve for unknown dynamic parameters as well as the state.</p>
+      <p>Define the augmented unknown vector</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\xi} = \begin{bmatrix} \mathbf x_0\\ \boldsymbol{\theta} \end{bmatrix}. }
+        \]
+      </p>
+      <p>Examples of <code>\boldsymbol{\theta}</code> include</p>
+      <ul>
+        <li>drag coefficient,</li>
+        <li>ballistic coefficient,</li>
+        <li>solar-radiation-pressure coefficient,</li>
+        <li>sensor bias,</li>
+        <li>maneuver components,</li>
+        <li>empirical accelerations.</li>
+      </ul>
+      <p>The batch correction becomes</p>
+      <p>
+        \[
+        \boxed{ \delta\boldsymbol{\xi} = \begin{bmatrix} \delta\mathbf x_0\\ \delta\boldsymbol{\theta} \end{bmatrix}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.37 Parameter Sensitivity</h3>
+      <p>If the dynamics depend on parameter <code>\theta</code>,</p>
+      <p>
+        \[
+        \dot{\mathbf x} = f(\mathbf x,\theta,t),
+        \]
+      </p>
+      <p>define the parameter sensitivity</p>
+      <p>
+        \[
+        \boxed{ \mathbf S_\theta(t) = \frac{\partial\mathbf x(t)} {\partial\theta}. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \delta\mathbf x(t) \approx \boldsymbol{\Phi}(t,t_0) \delta\mathbf x_0 + \mathbf S_\theta(t) \delta\theta.
+        \]
+      </p>
+      <p>The measurement perturbation becomes</p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf z_k \approx \mathbf H_k \boldsymbol{\Phi}_{k,0} \delta\mathbf x_0 + \mathbf H_k \mathbf S_{\theta,k} \delta\theta. }
+        \]
+      </p>
+      <p>This allows states and parameters to be estimated together.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.38 Variational Equation for Parameter Sensitivity</h3>
+      <p>For</p>
+      <p>
+        \[
+        \dot{\mathbf x} = f(\mathbf x,\theta,t),
+        \]
+      </p>
+      <p>the sensitivity satisfies</p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta + \frac{\partial f}{\partial\theta}. }
+        \]
+      </p>
+      <p>A common initial condition is</p>
+      <p>
+        \[
+        \boxed{ \mathbf S_\theta(t_0)=\mathbf0 }
+        \]
+      </p>
+      <p>if the reference state itself does not explicitly depend on <code>\theta</code>.</p>
+      <p>This equation may be integrated alongside the state and STM.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.39 Dynamic Design Matrix with Parameters</h3>
+      <p>For an augmented unknown vector,</p>
+      <p>
+        \[
+        \delta\boldsymbol{\xi} = \begin{bmatrix} \delta\mathbf x_0\\ \delta\boldsymbol{\theta} \end{bmatrix},
+        \]
+      </p>
+      <p>the measurement design block becomes</p>
+      <p>
+        \[
+        \boxed{ \mathbf G_k = \begin{bmatrix} \mathbf H_k\boldsymbol{\Phi}_{k,0} & \mathbf H_k\mathbf S_{\theta,k} + \frac{\partial h_k}{\partial\boldsymbol{\theta}} \end{bmatrix}. }
+        \]
+      </p>
+      <p>This explicitly includes</p>
+      <ul>
+        <li>indirect parameter effects through dynamics,</li>
+        <li>direct parameter effects through the measurement model.</li>
+      </ul>
+      <p>This distinction is important.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.40 Direct and Indirect Parameter Effects</h3>
+      <p>A parameter may influence a measurement in two ways.</p>
+      <h4>Indirectly through dynamics</h4>
+      <p>
+        \[
+        \theta \rightarrow \mathbf x(t) \rightarrow h(\mathbf x).
+        \]
+      </p>
+      <h4>Directly through the observation model</h4>
+      <p>
+        \[
+        \theta \rightarrow h(\mathbf x,\theta).
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial h_k}{\partial\theta_0} = \frac{\partial h_k}{\partial\mathbf x_k} \frac{\partial\mathbf x_k}{\partial\theta} + \left. \frac{\partial h_k}{\partial\theta} \right|_{\text{direct}}. }
+        \]
+      </p>
+      <p>Ignoring one of these paths can produce an incorrect design matrix.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.41 General Orbit-Determination Interpretation</h3>
+      <p>A classical application is orbit determination.</p>
+      <p>The unknown reference state may be</p>
+      <p>
+        \[
+        \mathbf x_0 = \begin{bmatrix} \mathbf r_0\\ \mathbf v_0 \end{bmatrix}.
+        \]
+      </p>
+      <p>Tracking data are collected over an observation arc.</p>
+      <p>The estimator repeatedly:</p>
+      <ol>
+        <li>propagates the orbit,</li>
+        <li>predicts the tracking measurements,</li>
+        <li>forms observed-minus-computed residuals,</li>
+        <li>computes sensitivities,</li>
+        <li>solves a weighted least-squares correction,</li>
+        <li>updates the reference orbit.</li>
+      </ol>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Tracking Data} \rightarrow \text{Batch Dynamic Estimator} \rightarrow \text{Best-Fit Reference Orbit}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.42 General Relative-Navigation Example</h3>
+      <p>Consider a general rendezvous or proximity-navigation problem with relative state</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{\text{rel},0} = \begin{bmatrix} \mathbf r_{\text{rel},0}\\ \mathbf v_{\text{rel},0} \end{bmatrix}. }
+        \]
+      </p>
+      <p>Suppose measurements such as range and line-of-sight direction are obtained at several times.</p>
+      <p>The relative state is propagated:</p>
+      <p>
+        \[
+        \mathbf x_{\text{rel}}(t_k) = \phi_{\text{rel}} ( t_k,t_0,\mathbf x_{\text{rel},0} ).
+        \]
+      </p>
+      <p>Measurements are predicted:</p>
+      <p>
+        \[
+        \hat{\mathbf z}_k = h_k ( \mathbf x_{\text{rel}}(t_k) ).
+        \]
+      </p>
+      <p>Then the estimator uses the accumulated residuals and dynamic sensitivities to correct</p>
+      <p>
+        \[
+        \mathbf x_{\text{rel},0}.
+        \]
+      </p>
+      <p>The important general principle is</p>
+      <p>
+        \[
+        \boxed{ \text{Relative Dynamics} + \text{Measurements Over Time} \rightarrow \text{Improved Relative-State Estimate}. }
+        \]
+      </p>
+      <p>This applies generally and is not specific to any particular RPO implementation.</p>
+      <p><strong>Engineering interpretation:</strong> In relative navigation, changing geometry over the approach or fly-around can be as important as measurement precision. Measurements from different viewing geometries can separate state directions that are weakly constrained at one instant.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.43 Batch Maneuver Estimation</h3>
+      <p>Suppose a trajectory contains an uncertain impulsive maneuver</p>
+      <p>
+        \[
+        \Delta\mathbf v.
+        \]
+      </p>
+      <p>The augmented unknown vector may be</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\xi} = \begin{bmatrix} \mathbf x_0\\ \Delta\mathbf v \end{bmatrix}. }
+        \]
+      </p>
+      <p>Measurements before and after the maneuver can constrain the maneuver magnitude and direction.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Trajectory Before Maneuver} + \text{Trajectory After Maneuver} \rightarrow \widehat{\Delta\mathbf v}. }
+        \]
+      </p>
+      <p>If the maneuver epoch is also uncertain, it may become another estimated parameter.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.44 Measurement Timing</h3>
+      <p>Batch estimation depends on correct measurement epochs.</p>
+      <p>A measurement model must evaluate the state at the correct time:</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}_k = h_k [ \mathbf x(t_k) ]. }
+        \]
+      </p>
+      <p>A timing offset</p>
+      <p>
+        \[
+        \Delta t
+        \]
+      </p>
+      <p>can produce an apparent state or velocity error.</p>
+      <p>For rapidly changing geometry,</p>
+      <p>
+        \[
+        \boxed{ \text{Timestamp Error} \rightarrow \text{Measurement Prediction Error}. }
+        \]
+      </p>
+      <p>Therefore measurement timing must be handled consistently with the trajectory propagation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.45 Reference Frames in Dynamic Batch Estimation</h3>
+      <p>State propagation may occur in one frame while measurements are naturally expressed in another.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \text{ECI} \rightarrow \text{station frame}
+        \]
+      </p>
+      <p>or</p>
+      <p>
+        \[
+        \text{relative orbital frame} \rightarrow \text{camera frame}.
+        \]
+      </p>
+      <p>Therefore the measurement model may include coordinate transformations:</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h_k ( \mathbf C_{AB}(t_k)\mathbf x_k ). }
+        \]
+      </p>
+      <p>Frame transformations may themselves depend on time and estimated quantities.</p>
+      <p>Incorrect transformations can produce systematic residuals that an estimator may attempt to absorb into the state.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.46 Observation Types May Be Mixed</h3>
+      <p>A batch may contain heterogeneous observations such as</p>
+      <ul>
+        <li>range,</li>
+        <li>range rate,</li>
+        <li>Doppler,</li>
+        <li>angles,</li>
+        <li>GNSS measurements,</li>
+        <li>optical line of sight,</li>
+        <li>relative range,</li>
+        <li>relative pose.</li>
+      </ul>
+      <p>The stacked measurement vector may therefore contain different units and dimensions.</p>
+      <p>Covariance weighting is essential:</p>
+      <p>
+        \[
+        \boxed{ J = \sum_k \mathbf r_k^T \mathbf R_k^{-1} \mathbf r_k. }
+        \]
+      </p>
+      <p>Thus every measurement contributes according to its expected uncertainty and sensitivity.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.47 Measurement Availability Can Be Irregular</h3>
+      <p>Measurements do not need to arrive at uniform time intervals.</p>
+      <p>The epochs may be</p>
+      <p>
+        \[
+        t_1,\ t_2,\ t_5,\ t_9,\ldots
+        \]
+      </p>
+      <p>depending on sensor availability.</p>
+      <p>The state simply propagates between available measurement times.</p>
+      <p>Batch estimation naturally handles asynchronous observations as long as each observation is associated with the correct epoch.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.48 Missing Measurements</h3>
+      <p>If no observation exists at a particular time, no measurement residual is added for that epoch.</p>
+      <p>The dynamics still propagate across the gap.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{No Measurement} \neq \text{No State Propagation}. }
+        \]
+      </p>
+      <p>Long measurement gaps may increase sensitivity to model error and reduce estimation accuracy.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.49 Measurement Correlation Across Time</h3>
+      <p>Measurements collected at different epochs may not be statistically independent.</p>
+      <p>Correlation can arise from</p>
+      <ul>
+        <li>common clock error,</li>
+        <li>common sensor bias,</li>
+        <li>common environmental correction,</li>
+        <li>shared calibration error,</li>
+        <li>shared image-processing bias.</li>
+      </ul>
+      <p>Then the stacked covariance matrix may contain off-diagonal blocks:</p>
+      <p>
+        \[
+        \mathbf R = \begin{bmatrix} \mathbf R_{11}&\mathbf R_{12}&\cdots\\ \mathbf R_{21}&\mathbf R_{22}&\cdots\\ \vdots&\vdots&\ddots \end{bmatrix}.
+        \]
+      </p>
+      <p>Ignoring strong temporal correlation may cause the batch estimator to overestimate the amount of independent information available.</p>
+      <p><strong>Engineering interpretation:</strong> Temporal correlation is especially important for high-rate measurements that share the same slowly varying bias or calibration error. Treating every sample as independent can make the formal covariance unrealistically small.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.50 Process Noise in a Batch Problem</h3>
+      <p>The basic deterministic batch formulation assumes the dynamic model is exact between measurements.</p>
+      <p>Real spacecraft dynamics are not exact.</p>
+      <p>Model errors may arise from</p>
+      <ul>
+        <li>force-model uncertainty,</li>
+        <li>unmodeled thrust,</li>
+        <li>atmospheric uncertainty,</li>
+        <li>disturbance forces,</li>
+        <li>actuator error.</li>
+      </ul>
+      <p>These may be represented using process noise:</p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf x} = f(\mathbf x,t) + \mathbf G\mathbf w. }
+        \]
+      </p>
+      <p>A more advanced batch formulation may estimate process-noise effects or introduce dynamic constraints with finite covariance.</p>
+      <p>This leads toward stochastic trajectory estimation and smoothing.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.51 Deterministic Dynamics versus Stochastic Dynamics</h3>
+      <p>In a deterministic batch estimator,</p>
+      <p>
+        \[
+        \mathbf x(t_k)
+        \]
+      </p>
+      <p>is completely determined by</p>
+      <p>
+        \[
+        \mathbf x_0
+        \]
+      </p>
+      <p>and the model.</p>
+      <p>Thus the trajectory must remain exactly on the modeled dynamics.</p>
+      <p>In a stochastic formulation, the trajectory is allowed to deviate from the nominal dynamics according to process uncertainty.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Deterministic Batch} \rightarrow \text{Exact Dynamic Constraint} }
+        \]
+      </p>
+      <p>while</p>
+      <p>
+        \[
+        \boxed{ \text{Stochastic Batch} \rightarrow \text{Dynamic Constraint with Uncertainty}. }
+        \]
+      </p>
+      <p>This distinction becomes important when model error is significant.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.52 Batch State Estimation and Smoothing</h3>
+      <p>Batch estimation uses many observations over an interval.</p>
+      <p>Because later observations can influence an earlier reference state, the method has a close conceptual relationship to smoothing.</p>
+      <p>For example, an observation at <code>t_N</code> can change the estimated state at <code>t_0</code>.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Future Measurements} \rightarrow \text{Improved Earlier-State Estimate}. }
+        \]
+      </p>
+      <p>This is one reason batch estimation can provide very accurate post-processed trajectories.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.53 Batch versus Sequential Estimation</h3>
+      <p>Batch estimation processes an observation set together.</p>
+      <p>Sequential estimation processes observations as they arrive.</p>
+      <p>A simplified comparison is:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Feature</th>
+            <th>Batch Dynamic Estimation</th>
+            <th>Sequential Estimation</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>Measurement use</td>
+              <td>Entire observation arc</td>
+              <td>One measurement or epoch at a time</td>
+            </tr>
+            <tr>
+              <td>Typical use</td>
+              <td>Offline OD, reconstruction, calibration</td>
+              <td>Real-time navigation</td>
+            </tr>
+            <tr>
+              <td>Reprocessing</td>
+              <td>Straightforward</td>
+              <td>Usually requires replay or smoothing</td>
+            </tr>
+            <tr>
+              <td>Initial-state estimation</td>
+              <td>Natural</td>
+              <td>Possible</td>
+            </tr>
+            <tr>
+              <td>Computational load</td>
+              <td>Can be larger</td>
+              <td>Usually distributed over time</td>
+            </tr>
+            <tr>
+              <td>Future-data influence on past state</td>
+              <td>Natural</td>
+              <td>Requires smoother</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Neither is universally better.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.54 Equivalence in Linear Gaussian Problems</h3>
+      <p>Under appropriate linear-Gaussian assumptions, batch and recursive solutions can contain the same information.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Batch Information Accumulation} \Longleftrightarrow \text{Sequential Information Accumulation}. }
+        \]
+      </p>
+      <p>The difference is primarily in how the information is processed and stored.</p>
+      <p>This relationship is explored further in <strong>4.3.4 Recursive Estimation from Least-Squares and Bayesian Viewpoints</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.55 Dynamic Information Matrix</h3>
+      <p>The batch information matrix is</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \sum_{k=1}^{N} \left( \mathbf H_k \boldsymbol{\Phi}_{k,0} \right)^T \mathbf R_k^{-1} \left( \mathbf H_k \boldsymbol{\Phi}_{k,0} \right). }
+        \]
+      </p>
+      <p>This equation is extremely informative.</p>
+      <p>Each measurement contributes information based on</p>
+      <ul>
+        <li>its measurement sensitivity,</li>
+        <li>its uncertainty,</li>
+        <li>the dynamic mapping from reference state to measurement epoch.</li>
+      </ul>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Dynamic Information} = \text{Measurement Sensitivity} + \text{Dynamics} + \text{Geometry} + \text{Measurement Precision}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The eigenstructure of the information matrix indicates which combinations of reference-state components are strongly constrained and which remain weakly determined over the observation arc.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.56 Observability Over an Observation Arc</h3>
+      <p>A state component may not be observable instantaneously but may become observable through dynamics.</p>
+      <p>For example, a measurement may provide position-related information at one instant.</p>
+      <p>Over time, the trajectory evolution may couple that information to velocity.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Dynamic Evolution Can Create Information About Otherwise Weak State Directions}. }
+        \]
+      </p>
+      <p>Observability in a dynamic batch problem depends on the full stacked design matrix, not a single measurement Jacobian.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.57 Rank of the Dynamic Design Matrix</h3>
+      <p>Let</p>
+      <p>
+        \[
+        \mathbf H_B = \begin{bmatrix} \mathbf H_1\boldsymbol{\Phi}_{1,0}\\ \mathbf H_2\boldsymbol{\Phi}_{2,0}\\ \vdots\\ \mathbf H_N\boldsymbol{\Phi}_{N,0} \end{bmatrix}.
+        \]
+      </p>
+      <p>For <code>n</code> unknown reference-state components, a necessary linear condition for unique estimation is</p>
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathbf H_B)=n. }
+        \]
+      </p>
+      <p>If</p>
+      <p>
+        \[
+        \operatorname{rank}(\mathbf H_B)<n,
+        \]
+      </p>
+      <p>some reference-state direction is not independently constrained by the entire observation arc.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.58 Conditioning of the Batch Problem</h3>
+      <p>Even with full rank, the dynamic design matrix may be poorly conditioned.</p>
+      <p>A weak singular value indicates a state or parameter combination that has little effect on the observations.</p>
+      <p>This may produce</p>
+      <ul>
+        <li>large covariance,</li>
+        <li>strong correlations,</li>
+        <li>sensitivity to measurement noise,</li>
+        <li>unstable numerical corrections.</li>
+      </ul>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Full Dynamic Rank} \not\Rightarrow \text{Strong Dynamic Estimability}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.59 Observation Geometry Across Time</h3>
+      <p>Dynamic geometry changes as the spacecraft moves.</p>
+      <p>This can be highly beneficial.</p>
+      <p>Suppose one early observation constrains one direction weakly.</p>
+      <p>Later geometry may rotate the measurement sensitivity and provide information in a different direction.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Changing Geometry Over Time} \rightarrow \text{Improved State Separation}. }
+        \]
+      </p>
+      <p>This is one reason observation-arc design is important.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.60 Parameter Correlation in Dynamic Estimation</h3>
+      <p>Two dynamic parameters may produce similar effects over a short arc.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \frac{\partial\mathbf z} {\partial\theta_1} \approx c \frac{\partial\mathbf z} {\partial\theta_2}.
+        \]
+      </p>
+      <p>A longer or more diverse arc may allow the effects to separate.</p>
+      <p>However, if the signatures remain nearly identical, the parameters remain highly correlated.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Longer Arc Can Improve Identifiability Only If Parameter Signatures Evolve Differently}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.61 Residual Analysis After Convergence</h3>
+      <p>After convergence, compute post-fit residuals:</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{k,\text{post}} = \mathbf z_k - h_k ( \hat{\mathbf x}_k ). }
+        \]
+      </p>
+      <p>Residuals should be examined for</p>
+      <ul>
+        <li>mean bias,</li>
+        <li>RMS magnitude,</li>
+        <li>trends with time,</li>
+        <li>dependence on geometry,</li>
+        <li>dependence on measurement type,</li>
+        <li>outliers,</li>
+        <li>unexplained periodic structure,</li>
+        <li>consistency with assumed covariance.</li>
+      </ul>
+      <p>A small total cost does not guarantee a correct dynamic model.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.62 Residual Time History</h3>
+      <p>Plotting residuals against time can reveal problems that a single RMS number hides.</p>
+      <p>For example,</p>
+      <ul>
+        <li>steadily increasing residuals may indicate model drift,</li>
+        <li>a step may indicate a maneuver or calibration change,</li>
+        <li>periodic residuals may indicate unmodeled dynamics,</li>
+        <li>bias may indicate sensor or model offset.</li>
+      </ul>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Residual Time Structure} \rightarrow \text{Diagnostic Information About Model Deficiency}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.63 Post-Fit Residual Covariance</h3>
+      <p>If the measurement covariance model is appropriate, the post-fit residual scale should be broadly compatible with the assumed measurement uncertainty.</p>
+      <p>A normalized residual may be defined as</p>
+      <p>
+        \[
+        \tilde{\mathbf r}_k = \mathbf R_k^{-1/2} \mathbf r_k.
+        \]
+      </p>
+      <p>Large systematic normalized residuals may indicate</p>
+      <ul>
+        <li>incorrect covariance,</li>
+        <li>outliers,</li>
+        <li>unmodeled bias,</li>
+        <li>dynamic-model deficiency.</li>
+      </ul>
+      <p>Thus residual analysis is also a covariance-model validation tool.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.64 Outliers in Batch Estimation</h3>
+      <p>Because least squares squares the residuals, one large outlier can significantly affect the batch solution.</p>
+      <p>Outliers may arise from</p>
+      <ul>
+        <li>corrupted tracking data,</li>
+        <li>false optical associations,</li>
+        <li>GNSS multipath,</li>
+        <li>sensor dropouts,</li>
+        <li>timing errors,</li>
+        <li>processing faults.</li>
+      </ul>
+      <p>Possible handling methods include</p>
+      <ul>
+        <li>measurement screening,</li>
+        <li>residual gating,</li>
+        <li>robust loss functions,</li>
+        <li>iterative reweighting.</li>
+      </ul>
+      <p>However, measurement rejection should be based on defensible criteria rather than removing observations merely because they disagree with the current model.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.65 Model Fidelity</h3>
+      <p>A dynamic batch estimator can only fit measurements using the physics included in its model.</p>
+      <p>If a real acceleration is omitted, the estimator may attempt to absorb the discrepancy into</p>
+      <ul>
+        <li>initial position,</li>
+        <li>initial velocity,</li>
+        <li>drag parameter,</li>
+        <li>maneuver parameter,</li>
+        <li>empirical acceleration.</li>
+      </ul>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Model Error Can Be Misinterpreted as State or Parameter Error}. }
+        \]
+      </p>
+      <p>This is a major engineering consideration in orbit determination and trajectory reconstruction.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.66 Overfitting with Too Many Parameters</h3>
+      <p>Adding more estimated parameters often reduces residuals.</p>
+      <p>However, this does not automatically improve the physical solution.</p>
+      <p>A large parameter set may introduce</p>
+      <ul>
+        <li>weak observability,</li>
+        <li>strong correlation,</li>
+        <li>large covariance,</li>
+        <li>nonphysical compensation.</li>
+      </ul>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Smaller Residual} \neq \text{Better Physical Model}. }
+        \]
+      </p>
+      <p>Only parameters supported by meaningful measurement sensitivity should be estimated.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.67 Reference-Epoch Choice and Correlation</h3>
+      <p>Choosing the reference epoch can influence parameter correlation.</p>
+      <p>For example, position and velocity errors may become strongly coupled when the reference epoch lies far from the observation data.</p>
+      <p>Placing the reference epoch near the center of the arc can sometimes reduce correlation.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Reference-Epoch Placement} \rightarrow \text{Sensitivity Structure} \rightarrow \text{Numerical Conditioning}. }
+        \]
+      </p>
+      <p>The optimal choice depends on the specific estimation problem.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.68 Numerical Integration Accuracy</h3>
+      <p>Trajectory propagation accuracy affects the predicted observations.</p>
+      <p>If numerical integration error becomes comparable to measurement accuracy, the estimator may interpret integration error as physical state error.</p>
+      <p>Therefore integration settings should be selected so that numerical propagation error is sufficiently below the estimation-error scale of interest.</p>
+      <p>Important considerations include</p>
+      <ul>
+        <li>integration step size,</li>
+        <li>error tolerance,</li>
+        <li>interpolation method,</li>
+        <li>event handling.</li>
+      </ul>
+      <p><strong>Engineering interpretation:</strong> A useful numerical check is to tighten the integration tolerances and confirm that the estimated state, cost, and residual history change negligibly. Otherwise numerical integration error is still contaminating the estimation result.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.69 Interpolation at Measurement Times</h3>
+      <p>Numerical integrators may not naturally produce states exactly at every observation epoch.</p>
+      <p>The state may therefore require interpolation:</p>
+      <p>
+        \[
+        \mathbf x(t_k) = \operatorname{Interp} [ \mathbf x(t_{j}), \mathbf x(t_{j+1}) ].
+        \]
+      </p>
+      <p>The interpolation must be accurate enough for the measurement model.</p>
+      <p>For very high-accuracy estimation, poor interpolation can create artificial residuals.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.70 Finite-Difference Sensitivities</h3>
+      <p>If analytical Jacobians are unavailable, sensitivities can be approximated numerically.</p>
+      <p>For state component <code>x_j</code>,</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial z} {\partial x_j} \approx \frac{ z(x_j+\Delta x_j) - z(x_j-\Delta x_j) }{ 2\Delta x_j }. }
+        \]
+      </p>
+      <p>This requires additional propagations.</p>
+      <p>Finite differences are simple but sensitive to</p>
+      <ul>
+        <li>perturbation size,</li>
+        <li>numerical precision,</li>
+        <li>propagation error.</li>
+      </ul>
+      <p>They should therefore be verified carefully.</p>
+      <p><strong>Engineering interpretation:</strong> The finite-difference perturbation must be large enough to overcome floating-point and propagation noise but small enough to remain in the local linear regime. Comparing forward, backward, and central differences is a useful consistency check.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.71 Analytical versus Numerical Sensitivities</h3>
+      <p>Sensitivity computation can use</p>
+      <ul>
+        <li>analytical derivatives,</li>
+        <li>variational equations,</li>
+        <li>finite differences,</li>
+        <li>automatic differentiation.</li>
+      </ul>
+      <p>Analytical or variational derivatives are often efficient and accurate once implemented correctly.</p>
+      <p>Finite differences are easier to implement but can be computationally expensive and numerically sensitive.</p>
+      <p>Automatic differentiation can provide highly accurate derivatives when compatible with the software architecture.</p>
+      <p>No single approach is universally best.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.72 Numerical Solution of the Batch Normal Equations</h3>
+      <p>The analytical expression</p>
+      <p>
+        \[
+        \delta\hat{\mathbf x}_0 = ( \mathbf H^T\mathbf R^{-1}\mathbf H )^{-1} \mathbf H^T\mathbf R^{-1}\mathbf r
+        \]
+      </p>
+      <p>is useful conceptually.</p>
+      <p>In software, explicit inversion is usually avoided.</p>
+      <p>Possible solvers include</p>
+      <ul>
+        <li>QR factorization,</li>
+        <li>Cholesky factorization,</li>
+        <li>SVD,</li>
+        <li>square-root least squares.</li>
+      </ul>
+      <p>The numerical method should be selected according to</p>
+      <ul>
+        <li>conditioning,</li>
+        <li>problem size,</li>
+        <li>sparsity,</li>
+        <li>rank structure.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.73 Square-Root Batch Estimation</h3>
+      <p>Instead of solving directly with the normal matrix, square-root methods operate on factored forms of the information or covariance.</p>
+      <p>This can improve numerical robustness because it avoids squaring the condition number associated with</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf H.
+        \]
+      </p>
+      <p>Square-root methods are particularly useful in high-precision estimation and poorly conditioned problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.74 Sparse Batch Estimation</h3>
+      <p>Large batch problems may contain many states, parameters, and measurements.</p>
+      <p>Their matrices may be sparse because each observation depends only on a limited subset of variables.</p>
+      <p>Sparse linear algebra can substantially reduce</p>
+      <ul>
+        <li>memory use,</li>
+        <li>computational cost.</li>
+      </ul>
+      <p>This becomes especially important in</p>
+      <ul>
+        <li>long observation arcs,</li>
+        <li>multi-arc estimation,</li>
+        <li>large calibration problems,</li>
+        <li>factor-graph-like formulations.</li>
+      </ul>
+      <p><strong>Engineering interpretation:</strong> Sparse structure becomes especially valuable when states or nuisance parameters are attached to many epochs or arcs. Exploiting sparsity avoids storing and factorizing large dense matrices containing mostly zeros.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.75 Multi-Arc Estimation</h3>
+      <p>Sometimes one continuous dynamic trajectory is not appropriate.</p>
+      <p>The data may be divided into several arcs:</p>
+      <p>
+        \[
+        \text{Arc 1}, \quad \text{Arc 2}, \quad \ldots
+        \]
+      </p>
+      <p>Each arc may have its own initial state while sharing common global parameters.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \boldsymbol{\xi} = \begin{bmatrix} \mathbf x_{0,1}\\ \mathbf x_{0,2}\\ \vdots\\ \boldsymbol{\theta}_{global} \end{bmatrix}.
+        \]
+      </p>
+      <p>This can be useful when</p>
+      <ul>
+        <li>maneuvers separate trajectory segments,</li>
+        <li>dynamic-model fidelity varies,</li>
+        <li>different observation intervals must be processed jointly.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.76 Local versus Global Parameters</h3>
+      <p>In multi-arc estimation, parameters may be classified as:</p>
+      <h4>Local parameters</h4>
+      <p>Specific to one arc.</p>
+      <p>Examples:</p>
+      <ul>
+        <li>arc initial state,</li>
+        <li>local maneuver correction.</li>
+      </ul>
+      <h4>Global parameters</h4>
+      <p>Shared across all arcs.</p>
+      <p>Examples:</p>
+      <ul>
+        <li>sensor calibration,</li>
+        <li>common physical coefficient,</li>
+        <li>station bias.</li>
+      </ul>
+      <p>This structure can improve parameter separation and exploit information from multiple data intervals.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.77 Batch Estimation as an Inverse Problem</h3>
+      <p>The forward problem is</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0,\boldsymbol{\theta} \rightarrow \text{Propagate} \rightarrow \mathbf x(t_k) \rightarrow h_k(\mathbf x(t_k)) \rightarrow \hat{\mathbf z}_k. }
+        \]
+      </p>
+      <p>Batch estimation reverses this:</p>
+      <p>
+        \[
+        \boxed{ \{ \mathbf z_1,\ldots,\mathbf z_N \} \rightarrow \hat{\mathbf x}_0, \hat{\boldsymbol{\theta}}. }
+        \]
+      </p>
+      <p>Because many measurements constrain one dynamic trajectory, batch estimation is a structured inverse problem.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.78 Information Accumulation Over Time</h3>
+      <p>Each measurement contributes an information increment:</p>
+      <p>
+        \[
+        \boxed{ \Delta\boldsymbol{\Lambda}_k = ( \mathbf H_k \boldsymbol{\Phi}_{k,0} )^T \mathbf R_k^{-1} ( \mathbf H_k \boldsymbol{\Phi}_{k,0} ). }
+        \]
+      </p>
+      <p>The total batch information is</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \sum_{k=1}^{N} \Delta\boldsymbol{\Lambda}_k. }
+        \]
+      </p>
+      <p>This provides an intuitive connection between dynamic batch estimation and recursive information filtering.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.79 Effect of Measurement Frequency</h3>
+      <p>Increasing measurement frequency may increase information, but only if the additional measurements contribute sufficiently independent information.</p>
+      <p>Highly correlated or nearly redundant measurements may add less information than expected.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Higher Measurement Rate} \neq \text{Proportionally Higher Estimation Quality}. }
+        \]
+      </p>
+      <p>The useful information depends on geometry, sensitivity, noise, and correlation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.80 Effect of Dynamic Excitation</h3>
+      <p>Some parameters become estimable only when the trajectory provides sufficient excitation.</p>
+      <p>For example, a parameter may influence measurements weakly during nearly constant motion but strongly during a maneuver or changing geometry.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Dynamic Excitation} \rightarrow \text{Parameter Signature} \rightarrow \text{Improved Identifiability}. }
+        \]
+      </p>
+      <p>This is a general principle in dynamic parameter estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.81 Observed-minus-Computed Notation</h3>
+      <p>In orbit determination, residuals are frequently referred to as <strong>observed minus computed</strong>, or O-C:</p>
+      <p>
+        \[
+        \boxed{ O-C = \mathbf z_{\text{obs}} - \mathbf z_{\text{computed}}. }
+        \]
+      </p>
+      <p>This is exactly the residual:</p>
+      <p>
+        \[
+        \mathbf r = \mathbf z-\hat{\mathbf z}.
+        \]
+      </p>
+      <p>The terminology emphasizes that the measurement is compared with a quantity computed from the current reference trajectory.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.82 Batch Estimation Success Criteria</h3>
+      <p>A successful batch solution should generally satisfy several criteria simultaneously.</p>
+      <p>These include</p>
+      <ul>
+        <li>small state corrections,</li>
+        <li>stable cost,</li>
+        <li>physically plausible state,</li>
+        <li>reasonable covariance,</li>
+        <li>acceptable parameter correlations,</li>
+        <li>post-fit residuals consistent with the assumed noise model,</li>
+        <li>no unexplained residual trends,</li>
+        <li>adequate rank and conditioning.</li>
+      </ul>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Convergence} \neq \text{Complete Validation}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.83 Common Failure Modes</h3>
+      <p>Common batch dynamic estimation failures include</p>
+      <ul>
+        <li>poor initial state,</li>
+        <li>incorrect force model,</li>
+        <li>incorrect observation model,</li>
+        <li>incorrect timestamps,</li>
+        <li>frame mismatch,</li>
+        <li>wrong measurement covariance,</li>
+        <li>unmodeled measurement bias,</li>
+        <li>rank deficiency,</li>
+        <li>poor geometry,</li>
+        <li>weak parameter identifiability,</li>
+        <li>excessive parameter estimation,</li>
+        <li>outliers,</li>
+        <li>inaccurate STM propagation,</li>
+        <li>numerical integration error,</li>
+        <li>ill-conditioning.</li>
+      </ul>
+      <p>These problems should be diagnosed systematically rather than simply increasing the number of iterations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.84 Practical Batch Dynamic Estimation Workflow</h3>
+      <p>A disciplined workflow is:</p>
+      <ol>
+        <li>Define the reference epoch.</li>
+        <li>Define the reference-state vector.</li>
+        <li>Define any estimated model parameters.</li>
+        <li>Define units and coordinate frames.</li>
+        <li>Define the dynamic model.</li>
+        <li>Define force and disturbance models.</li>
+        <li>Define measurement models.</li>
+        <li>Associate every observation with the correct epoch.</li>
+        <li>Define measurement covariance.</li>
+        <li>Define prior state and parameter information.</li>
+        <li>Select an initial reference-state guess.</li>
+        <li>Propagate the state trajectory.</li>
+        <li>Propagate the STM.</li>
+        <li>Propagate parameter sensitivities if required.</li>
+        <li>Generate predicted measurements.</li>
+        <li>Compute pre-fit residuals.</li>
+        <li>Compute measurement Jacobians.</li>
+        <li>Form dynamic sensitivity blocks.</li>
+        <li>Stack residuals and design matrices.</li>
+        <li>Construct the covariance/weight matrix.</li>
+        <li>Examine rank and conditioning.</li>
+        <li>Solve the weighted least-squares correction.</li>
+        <li>Update states and parameters.</li>
+        <li>Repropagate the trajectory.</li>
+        <li>Repeat until convergence.</li>
+        <li>Compute post-fit residuals.</li>
+        <li>Compute or approximate solution covariance.</li>
+        <li>Examine parameter correlation.</li>
+        <li>Check residual time histories.</li>
+        <li>Check physical plausibility.</li>
+        <li>Investigate outliers or systematic residual structure.</li>
+        <li>Verify sensitivity to initial guess and modeling assumptions.</li>
+      </ol>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Define Reference State / Parameters}\\ \downarrow\\ \text{Propagate Dynamics}\\ \downarrow\\ \text{Propagate STM / Sensitivities}\\ \downarrow\\ \text{Predict Measurements}\\ \downarrow\\ \text{Compute Residuals}\\ \downarrow\\ \text{Assemble Dynamic Design Matrix}\\ \downarrow\\ \text{Weight by Measurement Uncertainty}\\ \downarrow\\ \text{Solve Batch Correction}\\ \downarrow\\ \text{Update Reference State / Parameters}\\ \downarrow\\ \text{Check Convergence}\\ \downarrow\\ \text{Validate Residuals / Covariance / Physics} \end{array} }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The workflow is iterative at the engineering level as well as inside differential correction. If diagnostics expose weak observability, poor geometry, or model mismatch, the correct response may be to revise the data, parameter set, covariance model, or physics rather than simply running more iterations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.85 Complete Batch Dynamic Estimation Architecture</h3>
+      <p>The complete architecture can be summarized as</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Reference State Guess } \mathbf x_0^{(i)} \\ \downarrow\\ \text{Dynamic Propagation} \\ \mathbf x_k^{(i)} = \phi(t_k,t_0,\mathbf x_0^{(i)}) \\ \downarrow\\ \text{Measurement Prediction} \\ \hat{\mathbf z}_k = h_k(\mathbf x_k^{(i)}) \\ \downarrow\\ \text{Residual} \\ \mathbf r_k = \mathbf z_k-\hat{\mathbf z}_k \\ \downarrow\\ \text{STM Propagation} \\ \boldsymbol{\Phi}_{k,0} \\ \downarrow\\ \text{Dynamic Sensitivity} \\ \mathbf H_k^{(0)} = \mathbf H_k\boldsymbol{\Phi}_{k,0} \\ \downarrow\\ \text{Stack All Epochs} \\ \mathbf r,\mathbf H,\mathbf R \\ \downarrow\\ \text{Weighted LS Correction} \\ \delta\hat{\mathbf x}_0 \\ \downarrow\\ \text{Update} \\ \mathbf x_0^{(i+1)} = \mathbf x_0^{(i)} + \delta\hat{\mathbf x}_0 \\ \downarrow\\ \text{Repropagate Until Converged} \end{array} }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.86 Key Equations</h3>
+      <h4>Dynamic model</h4>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf x} = f(\mathbf x,\boldsymbol{\theta},t) }
+        \]
+      </p>
+      <h4>State-flow mapping</h4>
+      <p>
+        \[
+        \boxed{ \mathbf x(t_k) = \phi(t_k,t_0,\mathbf x_0,\boldsymbol{\theta}) }
+        \]
+      </p>
+      <h4>Measurement model</h4>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h_k(\mathbf x_k,\boldsymbol{\theta}) + \mathbf v_k }
+        \]
+      </p>
+      <h4>Predicted measurement</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}_k = h_k(\hat{\mathbf x}_k,\hat{\boldsymbol{\theta}}) }
+        \]
+      </p>
+      <h4>Residual</h4>
+      <p>
+        \[
+        \boxed{ \mathbf r_k = \mathbf z_k-\hat{\mathbf z}_k }
+        \]
+      </p>
+      <h4>State Transition Matrix</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_k,t_0) = \frac{\partial\mathbf x(t_k)} {\partial\mathbf x(t_0)} }
+        \]
+      </p>
+      <h4>STM propagation</h4>
+      <p>
+        \[
+        \boxed{ \dot{\boldsymbol{\Phi}} = \mathbf A\boldsymbol{\Phi} }
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \boxed{ \mathbf A = \frac{\partial f}{\partial\mathbf x} }
+        \]
+      </p>
+      <h4>Measurement Jacobian</h4>
+      <p>
+        \[
+        \boxed{ \mathbf H_k = \frac{\partial h_k} {\partial\mathbf x_k} }
+        \]
+      </p>
+      <h4>Dynamic measurement sensitivity</h4>
+      <p>
+        \[
+        \boxed{ \mathbf H_k^{(0)} = \mathbf H_k \boldsymbol{\Phi}_{k,0} }
+        \]
+      </p>
+      <h4>Linearized residual equation</h4>
+      <p>
+        \[
+        \boxed{ \mathbf r_k \approx \mathbf H_k^{(0)} \delta\mathbf x_0 + \mathbf v_k }
+        \]
+      </p>
+      <h4>Stacked residual equation</h4>
+      <p>
+        \[
+        \boxed{ \mathbf r \approx \mathbf H \delta\mathbf x_0 + \mathbf v }
+        \]
+      </p>
+      <h4>Batch weighted cost</h4>
+      <p>
+        \[
+        \boxed{ J = ( \mathbf r-\mathbf H\delta\mathbf x_0 )^T \mathbf R^{-1} ( \mathbf r-\mathbf H\delta\mathbf x_0 ) }
+        \]
+      </p>
+      <h4>Batch normal equations</h4>
+      <p>
+        \[
+        \boxed{ \mathbf H^T \mathbf R^{-1} \mathbf H \delta\hat{\mathbf x}_0 = \mathbf H^T \mathbf R^{-1} \mathbf r }
+        \]
+      </p>
+      <h4>Batch correction</h4>
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x}_0 = ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1} \mathbf H^T \mathbf R^{-1} \mathbf r }
+        \]
+      </p>
+      <h4>Reference-state update</h4>
+      <p>
+        \[
+        \boxed{ \mathbf x_0^{(i+1)} = \mathbf x_0^{(i)} + \delta\hat{\mathbf x}_0^{(i)} }
+        \]
+      </p>
+      <h4>Batch information matrix</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \mathbf H^T \mathbf R^{-1} \mathbf H }
+        \]
+      </p>
+      <h4>Reference-state covariance</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P_0^{+} = ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1} }
+        \]
+      </p>
+      <h4>Prior-constrained covariance</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = \left( \mathbf P_0^{-1} + \mathbf H^T \mathbf R^{-1} \mathbf H \right)^{-1} }
+        \]
+      </p>
+      <h4>Covariance propagation</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P(t_k) = \boldsymbol{\Phi}_{k,0} \mathbf P_0 \boldsymbol{\Phi}_{k,0}^{T} }
+        \]
+      </p>
+      <h4>Parameter sensitivity</h4>
+      <p>
+        \[
+        \boxed{ \mathbf S_\theta = \frac{\partial\mathbf x} {\partial\theta} }
+        \]
+      </p>
+      <h4>Parameter-sensitivity dynamics</h4>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf S}_\theta = \mathbf A\mathbf S_\theta + \frac{\partial f} {\partial\theta} }
+        \]
+      </p>
+      <h4>Rank condition</h4>
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathbf H_B)=n }
+        \]
+      </p>
+      <p>for a locally unique unconstrained estimate of <code>n</code> reference-state quantities.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.87 Key Takeaways</h3>
+      <p>Batch dynamic state estimation extends the least-squares framework from static observations to measurements collected along a dynamic trajectory.</p>
+      <p>The central dynamic relationship is</p>
+      <p>
+        \[
+        \boxed{ \mathbf x(t_k) = \phi(t_k,t_0,\mathbf x_0). }
+        \]
+      </p>
+      <p>Every observation is therefore indirectly related to the same reference state.</p>
+      <p>The measurement model is</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h_k(\mathbf x_k) + \mathbf v_k. }
+        \]
+      </p>
+      <p>The key sensitivity relationship is</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial h_k} {\partial\mathbf x_0} = \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </p>
+      <p>This combines</p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Sensitivity} \times \text{Dynamic Sensitivity}. }
+        \]
+      </p>
+      <p>Measurements across the observation arc are stacked into one least-squares system:</p>
+      <p>
+        \[
+        \boxed{ \mathbf r \approx \mathbf H \delta\mathbf x_0 + \mathbf v. }
+        \]
+      </p>
+      <p>The weighted correction is obtained from</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T \mathbf R^{-1} \mathbf H \delta\hat{\mathbf x}_0 = \mathbf H^T \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>Because the dynamic and measurement models are usually nonlinear, the process is iterative:</p>
+      <p>
+        \[
+        \boxed{ \text{Propagate} \rightarrow \text{Predict} \rightarrow \text{Residual} \rightarrow \text{Sensitivity} \rightarrow \text{Correct} \rightarrow \text{Repropagate}. }
+        \]
+      </p>
+      <p>The STM</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_k,t_0) }
+        \]
+      </p>
+      <p>is central because it maps perturbations from the reference epoch to the measurement epoch.</p>
+      <p>The batch information matrix accumulates information from all measurements:</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \sum_k ( \mathbf H_k\boldsymbol{\Phi}_{k,0} )^T \mathbf R_k^{-1} ( \mathbf H_k\boldsymbol{\Phi}_{k,0} ). }
+        \]
+      </p>
+      <p>The quality of the estimate depends not only on the number of observations but on</p>
+      <ul>
+        <li>measurement accuracy,</li>
+        <li>dynamic sensitivity,</li>
+        <li>geometry,</li>
+        <li>observation duration,</li>
+        <li>rank,</li>
+        <li>conditioning,</li>
+        <li>model fidelity,</li>
+        <li>parameter correlation.</li>
+      </ul>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{More Measurements} \neq \text{Automatically Better Dynamic Estimation}. }
+        \]
+      </p>
+      <p>The central engineering principle is</p>
+      <p>
+        \[
+        \boxed{ \text{Batch Dynamic Estimation Uses the Physics of Motion to Turn Measurements Across Time Into Information About a Common Reference State}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.3.88 What Comes Next</h3>
+      <p>Batch dynamic estimation processes the complete observation set together.</p>
+      <p>However, onboard spacecraft navigation often cannot wait until the end of an observation arc.</p>
+      <p>Measurements arrive sequentially:</p>
+      <p>
+        \[
+        \mathbf z_1, \mathbf z_2, \mathbf z_3, \ldots
+        \]
+      </p>
+      <p>and the estimator must update the state as each new measurement becomes available.</p>
+      <p>Instead of repeatedly solving the entire batch problem, previously accumulated information can be carried forward.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Previous Estimate and Information} + \text{New Measurement} \rightarrow \text{Updated Estimate and Information}. }
+        \]
+      </p>
+      <p>This raises the next major question:</p>
+      <p>
+        \[
+        \boxed{ \text{How can the same estimation information be processed recursively rather than as one complete batch?} }
+        \]
+      </p>
+      <p>That leads directly to</p>
+      <p>
+        \[
+        \boxed{ \textbf{4.3.4 Recursive Estimation from Least-Squares and Bayesian Viewpoints} }
+        \]
+      </p>
+      <p>where the next section will develop</p>
+      <ul>
+        <li>recursive least squares,</li>
+        <li>information accumulation,</li>
+        <li>measurement-by-measurement updating,</li>
+        <li>Bayesian recursion,</li>
+        <li>prior and posterior distributions,</li>
+        <li>relation between batch WLS and recursive estimation,</li>
+        <li>information-form interpretation,</li>
+        <li>relationship to Kalman filtering,</li>
+        <li>and why recursive estimation is naturally suited to real-time spacecraft navigation.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.3.4 Recursive Estimation from Least-Squares and Bayesian Viewpoints</h2>
+      <p>
+        Batch dynamic estimation treats the full observation arc as one coupled inverse problem.
+        Real-time spacecraft navigation, however, often requires the estimate to be updated as each
+        new observation arrives instead of waiting for the complete data set.
+      </p>
+      <p>
+        The next section develops recursive least squares, measurement-by-measurement information
+        accumulation, Bayesian prediction and update, prior-to-posterior recursion, the connection
+        between batch weighted least squares and sequential estimation, information-form equations,
+        and the mathematical bridge to Kalman filtering.
+      </p>
+      <a href="recursive-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.4 Recursive Estimation from Least-Squares and Bayesian Viewpoints</h3>
+          <p>
+            Recursive least squares, Bayesian recursion, prior and posterior distributions,
+            sequential information accumulation, measurement-by-measurement updates,
+            equivalence with batch estimation under linear-Gaussian assumptions,
+            information-form interpretation, and the bridge to Kalman filtering.
+          </p>
+          <p class="sensor-link-arrow">Continue to Recursive Estimation &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
