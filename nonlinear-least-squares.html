@@ -1,0 +1,2944 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.3.5 Nonlinear Least Squares and Differential Corrections | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="notes-hero">
+    <h1>Nonlinear Least Squares and Differential Corrections</h1>
+
+    <p class="notes-tagline">
+      Nonlinear estimation through residual minimization, local linearization,
+      Jacobians, Gauss–Newton iteration, differential correction, convergence,
+      damping, Levenberg–Marquardt, trust-region methods, nonlinear geometry,
+      robust estimation, numerical conditioning, and initial-guess sensitivity.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+      <h2>4.3.5 Nonlinear Least Squares and Differential Corrections</h2>
+      <p>Many spacecraft-estimation problems cannot be written globally in the linear form</p>
+      <p>
+        \[
+        \mathbf z=\mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>Instead, the observations depend nonlinearly on the unknown state or parameters:</p>
+      <p>
+        \[
+        \boxed{ \mathbf z = h(\mathbf x,\boldsymbol{\theta}) + \mathbf v }
+        \]
+      </p>
+      <p>Examples include:</p>
+      <ul>
+        <li>range,</li>
+      </ul>
+      <p>
+        \[
+        \rho=\|\mathbf r-\mathbf r_s\|,
+        \]
+      </p>
+      <ul>
+        <li>line-of-sight measurements,</li>
+      </ul>
+      <p>
+        \[
+        \mathbf u_{\mathrm{LOS}} = \frac{\mathbf r}{\|\mathbf r\|},
+        \]
+      </p>
+      <ul>
+        <li>angles such as azimuth and elevation,</li>
+        <li>optical bearing measurements,</li>
+        <li>nonlinear attitude observations,</li>
+        <li>dynamic trajectory measurements,</li>
+        <li>observations depending on uncertain force-model parameters,</li>
+        <li>maneuver reconstruction.</li>
+      </ul>
+      <p>In such problems, the residual</p>
+      <p>
+        \[
+        \mathbf r(\mathbf x) = \mathbf z-h(\mathbf x)
+        \]
+      </p>
+      <p>is itself a nonlinear function of the state.</p>
+      <p>The estimation problem becomes</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \arg\min_{\mathbf x} J(\mathbf x) }
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = \mathbf r(\mathbf x)^T \mathbf R^{-1} \mathbf r(\mathbf x). }
+        \]
+      </p>
+      <p>Unlike linear least squares, the solution normally cannot be obtained from one matrix equation.</p>
+      <p>Instead, nonlinear least squares proceeds iteratively:</p>
+      <p>
+        \[
+        \boxed{ \text{Current Estimate} \rightarrow \text{Linearize} \rightarrow \text{Solve Correction} \rightarrow \text{Update} \rightarrow \text{Relinearize} }
+        \]
+      </p>
+      <p>The basic idea is that although the complete estimation problem is nonlinear, it may be approximated locally by a linear least-squares problem.</p>
+      <p>This leads to methods such as:</p>
+      <ul>
+        <li>Gauss–Newton iteration,</li>
+        <li>differential correction,</li>
+        <li>damped least squares,</li>
+        <li>Levenberg–Marquardt,</li>
+        <li>trust-region methods.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.1 Why Nonlinear Least Squares Is Needed</h3>
+      <p>The linear observation model is</p>
+      <p>
+        \[
+        \mathbf z=\mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>Here, the relationship between observations and unknowns is linear and the design matrix \(\mathbf H\) does not depend on the unknown state.</p>
+      <p>Many physical measurement models instead have the form</p>
+      <p>
+        \[
+        \boxed{ \mathbf z=h(\mathbf x)+\mathbf v. }
+        \]
+      </p>
+      <p>For example, range is</p>
+      <p>
+        \[
+        \rho = \sqrt{ (x-x_s)^2+ (y-y_s)^2+ (z-z_s)^2 }.
+        \]
+      </p>
+      <p>This cannot be written globally as</p>
+      <p>
+        \[
+        \rho = H_xx+H_yy+H_zz.
+        \]
+      </p>
+      <p>Therefore, the closed-form linear least-squares solution</p>
+      <p>
+        \[
+        (\mathbf H^T\mathbf R^{-1}\mathbf H)^{-1} \mathbf H^T\mathbf R^{-1}\mathbf z
+        \]
+      </p>
+      <p>cannot simply be applied directly.</p>
+      <p>Instead,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Problem} \rightarrow \text{Local Linear Approximation} \rightarrow \text{Linear LS Correction}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.2 Nonlinear Observation Model</h3>
+      <p>The general nonlinear observation equation is</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h_k(\mathbf x,\boldsymbol{\theta}) + \mathbf v_k. }
+        \]
+      </p>
+      <p>Here,</p>
+      <ul>
+        <li><code>\mathbf z_k</code> is the observation,</li>
+        <li><code>\mathbf x</code> contains unknown states,</li>
+        <li><code>\boldsymbol{\theta}</code> may contain unknown parameters,</li>
+        <li><code>h_k(\cdot)</code> is a nonlinear measurement function,</li>
+        <li><code>\mathbf v_k</code> is measurement noise.</li>
+      </ul>
+      <p>The predicted measurement for candidate estimate</p>
+      <p>
+        \[
+        \mathbf x^{(i)}
+        \]
+      </p>
+      <p>is</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}^{(i)} = h(\mathbf x^{(i)}). }
+        \]
+      </p>
+      <p>The corresponding residual is</p>
+      <p>
+        \[
+        \boxed{ \mathbf r^{(i)} = \mathbf z-h(\mathbf x^{(i)}). }
+        \]
+      </p>
+      <p>Because \(h\) is nonlinear, the residual changes nonlinearly as the state changes.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.3 Nonlinear Least-Squares Objective</h3>
+      <p>The unweighted nonlinear least-squares problem is</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \arg\min_{\mathbf x} \| \mathbf z-h(\mathbf x) \|^2. }
+        \]
+      </p>
+      <p>Equivalently,</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = [ \mathbf z-h(\mathbf x) ]^T [ \mathbf z-h(\mathbf x) ]. }
+        \]
+      </p>
+      <p>For weighted nonlinear least squares,</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = [ \mathbf z-h(\mathbf x) ]^T \mathbf R^{-1} [ \mathbf z-h(\mathbf x) ]. }
+        \]
+      </p>
+      <p>If multiple observations are available,</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = \sum_{k=1}^{N} \mathbf r_k^T \mathbf R_k^{-1} \mathbf r_k. }
+        \]
+      </p>
+      <p>The goal is to find the state that minimizes this nonlinear cost.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.4 Nonlinear Cost Surface</h3>
+      <p>In a linear least-squares problem, the cost function is quadratic.</p>
+      <p>For nonlinear estimation,</p>
+      <p>
+        \[
+        J(\mathbf x)
+        \]
+      </p>
+      <p>may have a much more complicated shape.</p>
+      <p>It may contain:</p>
+      <ul>
+        <li>curved valleys,</li>
+        <li>shallow directions,</li>
+        <li>multiple local minima,</li>
+        <li>regions of poor sensitivity,</li>
+        <li>highly coupled parameters.</li>
+      </ul>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Measurement Model} \rightarrow \text{Non-Quadratic Cost Surface}. }
+        \]
+      </p>
+      <p>This is why the initial guess becomes important.</p>
+      <p>An iterative optimizer usually sees only local information about the cost surface.</p>
+      <p><strong>Engineering interpretation:</strong> The local curvature of the cost surface determines how reliable a linearized correction will be. A narrow curved valley can produce strong parameter correlation and sensitivity to step length even when a unique minimum exists.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.5 Initial Guess</h3>
+      <p>Nonlinear least squares requires a starting estimate</p>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(0)}. }
+        \]
+      </p>
+      <p>At this state, the measurement model is evaluated and linearized.</p>
+      <p>The quality of the starting point can strongly influence:</p>
+      <ul>
+        <li>convergence speed,</li>
+        <li>whether convergence occurs,</li>
+        <li>which local minimum is reached,</li>
+        <li>validity of the first-order approximation.</li>
+      </ul>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Estimation Requires an Initial Guess}. }
+        \]
+      </p>
+      <p>Unlike linear least squares, there is generally no guarantee that an arbitrary initial estimate will converge to the desired physical solution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.6 State Correction Form</h3>
+      <p>Instead of solving directly for the complete state, nonlinear least squares typically solves for a correction.</p>
+      <p>At iteration \(i\),</p>
+      <p>
+        \[
+        \boxed{ \mathbf x = \mathbf x^{(i)} + \delta\mathbf x. }
+        \]
+      </p>
+      <p>Here,</p>
+      <p>
+        \[
+        \mathbf x^{(i)}
+        \]
+      </p>
+      <p>is the current estimate and</p>
+      <p>
+        \[
+        \delta\mathbf x
+        \]
+      </p>
+      <p>is the unknown correction.</p>
+      <p>The estimator asks:</p>
+      <blockquote>
+        <p>What small change to the current estimate would best reduce the measurement residuals?</p>
+      </blockquote>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.7 Taylor-Series Linearization</h3>
+      <p>Expand the nonlinear observation function around the current estimate:</p>
+      <p>
+        \[
+        h(\mathbf x^{(i)}+\delta\mathbf x) \approx h(\mathbf x^{(i)}) + \mathbf H^{(i)} \delta\mathbf x
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^{(i)} = \left. \frac{\partial h}{\partial\mathbf x} \right|_{\mathbf x^{(i)}}. }
+        \]
+      </p>
+      <p>This is the measurement Jacobian evaluated at the current estimate.</p>
+      <p>Higher-order terms are neglected.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Function} \approx \text{Current Value} + \text{Local Linear Sensitivity}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The neglected Taylor terms are second order and higher in the correction. This is why first-order linearization is most reliable when the current estimate is already reasonably close to the solution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.8 Linearized Residual</h3>
+      <p>At iteration \(i\),</p>
+      <p>
+        \[
+        \mathbf r^{(i)} = \mathbf z-h(\mathbf x^{(i)}).
+        \]
+      </p>
+      <p>After applying correction \(\delta\mathbf x\),</p>
+      <p>
+        \[
+        \mathbf r^{new} = \mathbf z - h(\mathbf x^{(i)}+\delta\mathbf x).
+        \]
+      </p>
+      <p>Using the first-order approximation,</p>
+      <p>
+        \[
+        \mathbf r^{new} \approx \mathbf r^{(i)} - \mathbf H^{(i)} \delta\mathbf x.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \mathbf r^{(i)} \approx \mathbf H^{(i)} \delta\mathbf x + \mathbf v. }
+        \]
+      </p>
+      <p>This is now a linear least-squares problem in the correction \(\delta\mathbf x\).</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.9 Jacobian Matrix</h3>
+      <p>The Jacobian is</p>
+      <p>
+        \[
+        \boxed{ \mathbf H = \frac{\partial h}{\partial\mathbf x}. }
+        \]
+      </p>
+      <p>For</p>
+      <p>
+        \[
+        h: \mathbb R^n\rightarrow\mathbb R^m,
+        \]
+      </p>
+      <p>the Jacobian has size</p>
+      <p>
+        \[
+        \boxed{ \mathbf H\in\mathbb R^{m\times n}. }
+        \]
+      </p>
+      <p>Its element</p>
+      <p>
+        \[
+        H_{ij} = \frac{\partial h_i}{\partial x_j}
+        \]
+      </p>
+      <p>describes how measurement \(i\) changes when state variable \(j\) changes slightly.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Jacobian} = \text{Local Measurement Sensitivity Matrix}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.10 Physical Meaning of the Jacobian</h3>
+      <p>The Jacobian tells the estimator which state corrections can explain the observed residuals.</p>
+      <p>If</p>
+      <p>
+        \[
+        \frac{\partial h_i}{\partial x_j} \approx0,
+        \]
+      </p>
+      <p>measurement \(i\) provides little local information about \(x_j\).</p>
+      <p>If two Jacobian columns are nearly parallel, two unknown quantities produce similar measurement effects and may become strongly correlated.</p>
+      <p>Therefore the Jacobian contains information about:</p>
+      <ul>
+        <li>observability,</li>
+        <li>parameter identifiability,</li>
+        <li>geometry,</li>
+        <li>conditioning,</li>
+        <li>correction direction.</li>
+      </ul>
+      <p><strong>Engineering interpretation:</strong> The Jacobian should therefore be treated as both a solver input and a diagnostic object. Its columns reveal which combinations of state or parameter changes the measurements can distinguish locally.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.11 Example: Range Jacobian</h3>
+      <p>Suppose</p>
+      <p>
+        \[
+        \rho = \|\mathbf r-\mathbf r_s\|.
+        \]
+      </p>
+      <p>Let</p>
+      <p>
+        \[
+        \boldsymbol{\rho} = \mathbf r-\mathbf r_s.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \rho=\|\boldsymbol{\rho}\|.
+        \]
+      </p>
+      <p>The derivative with respect to spacecraft position is</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial\rho}{\partial\mathbf r} = \frac{ \boldsymbol{\rho}^T }{ \|\boldsymbol{\rho}\| }. }
+        \]
+      </p>
+      <p>This is the line-of-sight unit vector expressed as a row.</p>
+      <p>Therefore a range measurement is locally sensitive primarily along the line-of-sight direction.</p>
+      <p>This connects measurement geometry directly to the Jacobian.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.12 Gauss–Newton Correction</h3>
+      <p>Using the linearized residual model,</p>
+      <p>
+        \[
+        \mathbf r^{(i)} \approx \mathbf H^{(i)} \delta\mathbf x,
+        \]
+      </p>
+      <p>weighted least squares gives</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^{T} \mathbf R^{-1} \mathbf H \, \delta\mathbf x = \mathbf H^{T} \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} = ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1} \mathbf H^T \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>The state is then updated:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \delta\hat{\mathbf x}^{(i)}. }
+        \]
+      </p>
+      <p>This is the core <strong>Gauss–Newton iteration</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.13 Why Gauss–Newton Works</h3>
+      <p>The nonlinear cost is</p>
+      <p>
+        \[
+        J(\mathbf x) = \mathbf r(\mathbf x)^T \mathbf R^{-1} \mathbf r(\mathbf x).
+        \]
+      </p>
+      <p>Gauss–Newton approximates this nonlinear cost locally using the first-order residual model.</p>
+      <p>Near the current estimate,</p>
+      <p>
+        \[
+        \mathbf r(\mathbf x+\delta\mathbf x) \approx \mathbf r - \mathbf H\delta\mathbf x.
+        \]
+      </p>
+      <p>This produces a locally quadratic cost in \(\delta\mathbf x\).</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Gauss–Newton} = \text{Repeated Local Weighted Least Squares}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.14 Differential Correction</h3>
+      <p>In orbit determination and trajectory estimation, the iterative Gauss–Newton process is frequently called <strong>differential correction</strong>.</p>
+      <p>The idea is</p>
+      <p>
+        \[
+        \boxed{ \text{Nominal State} + \text{Estimated Differential Correction} \rightarrow \text{Improved Nominal State}. }
+        \]
+      </p>
+      <p>At iteration \(i\),</p>
+      <p>
+        \[
+        \delta\hat{\mathbf x}^{(i)}
+        \]
+      </p>
+      <p>is solved and</p>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \delta\hat{\mathbf x}^{(i)}. }
+        \]
+      </p>
+      <p>Then the trajectory and measurements are recomputed around the new state.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.15 Differential-Correction Loop</h3>
+      <p>A general differential-correction loop is</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Initial Guess}\\ \downarrow\\ \text{Propagate / Evaluate Model}\\ \downarrow\\ \text{Predict Measurements}\\ \downarrow\\ \text{Compute Residuals}\\ \downarrow\\ \text{Compute Jacobian}\\ \downarrow\\ \text{Solve Linearized LS Correction}\\ \downarrow\\ \text{Update State}\\ \downarrow\\ \text{Re-evaluate Nonlinear Model}\\ \downarrow\\ \text{Check Convergence}\\ \downarrow\\ \text{Repeat} \end{array} }
+        \]
+      </p>
+      <p>The repeated relinearization is essential because the Jacobian generally changes with the estimated state.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.16 Weighted Gauss–Newton</h3>
+      <p>With measurement covariance \(\mathbf R\), the correction solves</p>
+      <p>
+        \[
+        \boxed{ \mathbf N \delta\mathbf x = \mathbf b }
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \boxed{ \mathbf N = \mathbf H^T \mathbf R^{-1} \mathbf H }
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boxed{ \mathbf b = \mathbf H^T \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>The matrix \(\mathbf N\) is often called the normal or information matrix.</p>
+      <p>The correction is</p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = \mathbf N^{-1}\mathbf b. }
+        \]
+      </p>
+      <p>In numerical software, one generally solves the linear system without explicitly computing \(\mathbf N^{-1}\).</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.17 Gradient of the Nonlinear Least-Squares Cost</h3>
+      <p>For</p>
+      <p>
+        \[
+        J = \mathbf r^T \mathbf W \mathbf r,
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        \mathbf W=\mathbf R^{-1},
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \mathbf r = \mathbf z-h(\mathbf x),
+        \]
+      </p>
+      <p>the gradient is</p>
+      <p>
+        \[
+        \boxed{ \nabla J = -2 \mathbf H^T \mathbf W \mathbf r. }
+        \]
+      </p>
+      <p>Therefore the stationary condition is</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T \mathbf W \mathbf r = \mathbf0. }
+        \]
+      </p>
+      <p>At the optimum, the weighted residual is locally orthogonal to the state-sensitivity directions.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.18 Exact Hessian</h3>
+      <p>The exact Hessian of the nonlinear least-squares cost contains two types of terms.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \nabla^2J = 2\mathbf H^T\mathbf W\mathbf H + \text{Residual-Weighted Second-Derivative Terms}. }
+        \]
+      </p>
+      <p>The additional terms involve second derivatives of the measurement functions.</p>
+      <p>Newton's method includes them.</p>
+      <p>Gauss–Newton neglects them.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.19 Gauss–Newton Hessian Approximation</h3>
+      <p>Gauss–Newton approximates the Hessian as</p>
+      <p>
+        \[
+        \boxed{ \nabla^2J \approx 2\mathbf H^T\mathbf W\mathbf H. }
+        \]
+      </p>
+      <p>This approximation is especially reasonable when</p>
+      <ul>
+        <li>residuals near the solution are small,</li>
+        <li>the model is only moderately nonlinear,</li>
+        <li>the starting estimate is sufficiently close.</li>
+      </ul>
+      <p>Thus Gauss–Newton avoids computing second derivatives.</p>
+      <p><strong>Engineering interpretation:</strong> Gauss–Newton is particularly effective when the residual at the solution is small because the omitted residual-weighted second-derivative terms then contribute less to the exact Hessian.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.20 Newton versus Gauss–Newton</h3>
+      <p>Newton's method uses the full Hessian:</p>
+      <p>
+        \[
+        \delta\mathbf x = - (\nabla^2J)^{-1} \nabla J.
+        \]
+      </p>
+      <p>Gauss–Newton uses</p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x = ( \mathbf H^T\mathbf W\mathbf H )^{-1} \mathbf H^T\mathbf W\mathbf r. }
+        \]
+      </p>
+      <p>Gauss–Newton is often preferred for nonlinear least-squares problems because the residual structure naturally supplies an approximate Hessian.</p>
+      <p>However, its convergence may be weaker when nonlinearities are severe.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.21 Why Relinearization Is Necessary</h3>
+      <p>The Jacobian is evaluated at</p>
+      <p>
+        \[
+        \mathbf x^{(i)}.
+        \]
+      </p>
+      <p>After the state changes,</p>
+      <p>
+        \[
+        \mathbf x^{(i+1)} = \mathbf x^{(i)} + \delta\mathbf x,
+        \]
+      </p>
+      <p>the original Jacobian may no longer accurately describe measurement sensitivity.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^{(i+1)} \neq \mathbf H^{(i)} }
+        \]
+      </p>
+      <p>in general.</p>
+      <p>The model must be re-evaluated and relinearized.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.22 Local Nature of Linearization</h3>
+      <p>The Taylor approximation</p>
+      <p>
+        \[
+        h(\mathbf x+\delta\mathbf x) \approx h(\mathbf x)+\mathbf H\delta\mathbf x
+        \]
+      </p>
+      <p>is valid only locally.</p>
+      <p>If</p>
+      <p>
+        \[
+        \|\delta\mathbf x\|
+        \]
+      </p>
+      <p>becomes too large, neglected higher-order terms may become important.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Large Correction} \rightarrow \text{Possible Breakdown of First-Order Linearization}. }
+        \]
+      </p>
+      <p>This is one reason damping and trust-region methods are useful.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.23 Convergence</h3>
+      <p>An iterative estimator converges when repeated corrections lead toward a stable solution.</p>
+      <p>A typical sequence is</p>
+      <p>
+        \[
+        \mathbf x^{(0)}, \quad \mathbf x^{(1)}, \quad \mathbf x^{(2)}, \quad \ldots
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        \mathbf x^{(i)} \rightarrow \hat{\mathbf x}.
+        \]
+      </p>
+      <p>Convergence should not be judged from one quantity alone.</p>
+      <p>Useful indicators include:</p>
+      <ul>
+        <li>correction magnitude,</li>
+        <li>cost reduction,</li>
+        <li>residual stabilization,</li>
+        <li>gradient magnitude,</li>
+        <li>physical plausibility.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.24 Correction-Magnitude Convergence Criterion</h3>
+      <p>One criterion is</p>
+      <p>
+        \[
+        \boxed{ \| \delta\mathbf x^{(i)} \| < \epsilon_x. }
+        \]
+      </p>
+      <p>For states with different units and scales, a normalized criterion may be better:</p>
+      <p>
+        \[
+        \boxed{ \| \mathbf S_x^{-1} \delta\mathbf x \| < \epsilon. }
+        \]
+      </p>
+      <p>This avoids allowing one large-scale state component to dominate the test.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.25 Relative Correction Criterion</h3>
+      <p>Another criterion is</p>
+      <p>
+        \[
+        \boxed{ \frac{ \| \delta\mathbf x^{(i)} \| }{ \| \mathbf x^{(i)} \| } < \epsilon_r. }
+        \]
+      </p>
+      <p>This is useful when absolute state scales vary substantially.</p>
+      <p>However, components near zero require care.</p>
+      <p>Component-wise normalized convergence can sometimes be more meaningful.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.26 Cost-Function Convergence</h3>
+      <p>Convergence may also be assessed by</p>
+      <p>
+        \[
+        \boxed{ | J^{(i+1)}-J^{(i)} | < \epsilon_J. }
+        \]
+      </p>
+      <p>or</p>
+      <p>
+        \[
+        \boxed{ \frac{ | J^{(i+1)}-J^{(i)} | }{ J^{(i)} } < \epsilon_{J,r}. }
+        \]
+      </p>
+      <p>A small cost change indicates that additional iterations are producing little improvement.</p>
+      <p>But this does not necessarily guarantee that the correct minimum has been found.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.27 Gradient-Based Convergence</h3>
+      <p>Because</p>
+      <p>
+        \[
+        \nabla J = -2\mathbf H^T\mathbf W\mathbf r,
+        \]
+      </p>
+      <p>a small gradient can indicate a stationary point:</p>
+      <p>
+        \[
+        \boxed{ \| \mathbf H^T \mathbf W \mathbf r \| < \epsilon_g. }
+        \]
+      </p>
+      <p>This is a stronger mathematical criterion than residual magnitude alone.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.28 Maximum-Iteration Limit</h3>
+      <p>Every iterative estimator should include an iteration limit:</p>
+      <p>
+        \[
+        \boxed{ i\le i_{\max}. }
+        \]
+      </p>
+      <p>If the algorithm has not converged by that point, the solution should not simply be declared successful.</p>
+      <p>Possible causes include:</p>
+      <ul>
+        <li>bad initial guess,</li>
+        <li>poor conditioning,</li>
+        <li>wrong measurement model,</li>
+        <li>outliers,</li>
+        <li>parameter correlation,</li>
+        <li>excessive nonlinearity.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.29 Convergence Does Not Prove Correctness</h3>
+      <p>An optimizer may converge to:</p>
+      <ul>
+        <li>the desired physical solution,</li>
+        <li>another local minimum,</li>
+        <li>a weakly identifiable solution,</li>
+        <li>a parameter-compensation solution,</li>
+        <li>a model-biased solution.</li>
+      </ul>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Numerical Convergence} \neq \text{Physical Correctness}. }
+        \]
+      </p>
+      <p>Residuals, covariance, geometry, parameter correlations, and physical plausibility must also be examined.</p>
+      <p><strong>Engineering interpretation:</strong> A converged numerical solution should be accepted only after the residual pattern, covariance, singular values, parameter correlations, and physical feasibility are all checked.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.30 Initial-Guess Sensitivity</h3>
+      <p>The quality of nonlinear estimation can depend strongly on</p>
+      <p>
+        \[
+        \mathbf x^{(0)}.
+        \]
+      </p>
+      <p>If the initial guess is near the correct solution, linearization may be accurate and convergence rapid.</p>
+      <p>If it is far away, the Jacobian may point in a misleading direction.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Initial Guess} \rightarrow \text{Linearization Quality} \rightarrow \text{Convergence Behaviour}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.31 Basin of Attraction</h3>
+      <p>A solution often has a region of initial estimates from which the algorithm converges toward that solution.</p>
+      <p>This region is called a <strong>basin of attraction</strong>.</p>
+      <p>Different local minima may have different basins.</p>
+      <p>Therefore, nonlinear-estimation robustness can be studied by perturbing the initial guess and checking whether convergence repeatedly reaches the same solution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.32 Multiple Local Minima</h3>
+      <p>A nonlinear cost surface may have several minima:</p>
+      <p>
+        \[
+        J(\mathbf x_1^\star), \quad J(\mathbf x_2^\star), \quad \ldots
+        \]
+      </p>
+      <p>The optimizer may converge to whichever minimum is associated with the initial guess and iteration path.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Optimization} \not\Rightarrow \text{Guaranteed Global Minimum}. }
+        \]
+      </p>
+      <p>This is especially important when measurement geometry has ambiguities.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.33 Poorly Conditioned Jacobian</h3>
+      <p>The Jacobian may be full rank but poorly conditioned.</p>
+      <p>If columns of \(\mathbf H\) are nearly dependent,</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf W\mathbf H
+        \]
+      </p>
+      <p>can become nearly singular.</p>
+      <p>Then the computed correction may be very sensitive to small residual changes.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Iteration Quality} \text{ depends on both} \text{Model Nonlinearity} + \text{Local Conditioning}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> Poor conditioning can produce very large corrections in weak directions even when the residual vector changes only slightly. Monitoring singular values is often more informative than checking rank alone.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.34 Step Overshoot</h3>
+      <p>The full Gauss–Newton step may sometimes be too aggressive:</p>
+      <p>
+        \[
+        \mathbf x^{(i+1)} = \mathbf x^{(i)} + \delta\mathbf x.
+        \]
+      </p>
+      <p>If the linear approximation is poor over the full step length, the new state may actually increase the cost.</p>
+      <p>Therefore a smaller step may be used.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.35 Damped Gauss–Newton</h3>
+      <p>Introduce a damping factor</p>
+      <p>
+        \[
+        0<\alpha\le1.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \alpha \delta\mathbf x^{(i)}. }
+        \]
+      </p>
+      <p>For</p>
+      <p>
+        \[
+        \alpha=1,
+        \]
+      </p>
+      <p>the full Gauss–Newton step is taken.</p>
+      <p>For</p>
+      <p>
+        \[
+        \alpha<1,
+        \]
+      </p>
+      <p>the correction is reduced.</p>
+      <p>This can improve robustness when the local linear approximation is valid only over a limited region.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.36 Line Search</h3>
+      <p>Instead of choosing a fixed damping factor, a <strong>line search</strong> determines an acceptable step length.</p>
+      <p>Given a search direction</p>
+      <p>
+        \[
+        \delta\mathbf x,
+        \]
+      </p>
+      <p>evaluate</p>
+      <p>
+        \[
+        J( \mathbf x+\alpha\delta\mathbf x )
+        \]
+      </p>
+      <p>for candidate values of \(\alpha\).</p>
+      <p>The objective is to choose a step that sufficiently decreases the nonlinear cost.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Direction} + \text{Step-Length Selection} \rightarrow \text{Safer State Update}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.37 Why Damping Helps</h3>
+      <p>Without damping, a large Gauss–Newton correction may move outside the local region where</p>
+      <p>
+        \[
+        h(\mathbf x+\delta\mathbf x) \approx h(\mathbf x)+\mathbf H\delta\mathbf x
+        \]
+      </p>
+      <p>is accurate.</p>
+      <p>A reduced step keeps the iteration closer to the region where the Jacobian remains representative.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Damping Trades Convergence Speed for Robustness}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.38 Levenberg–Marquardt Method</h3>
+      <p>Levenberg–Marquardt modifies the Gauss–Newton equations:</p>
+      <p>
+        \[
+        \boxed{ ( \mathbf H^T \mathbf W \mathbf H + \lambda\mathbf I ) \delta\mathbf x = \mathbf H^T \mathbf W \mathbf r. }
+        \]
+      </p>
+      <p>Here,</p>
+      <p>
+        \[
+        \lambda\ge0
+        \]
+      </p>
+      <p>is a damping parameter.</p>
+      <p>When</p>
+      <p>
+        \[
+        \lambda\rightarrow0,
+        \]
+      </p>
+      <p>the method approaches Gauss–Newton.</p>
+      <p>For larger \(\lambda\), the step becomes more conservative and resembles gradient descent.</p>
+      <p><strong>Engineering interpretation:</strong> Levenberg–Marquardt is especially useful when the normal matrix is nearly singular or when the full Gauss–Newton step leaves the region in which the local model is trustworthy.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.39 Interpretation of Levenberg–Marquardt</h3>
+      <p>Gauss–Newton is fast near a good solution but may be unstable far away.</p>
+      <p>Gradient descent is generally more conservative but slower.</p>
+      <p>Levenberg–Marquardt transitions between these behaviours:</p>
+      <p>
+        \[
+        \boxed{ \lambda\text{ small} \rightarrow \text{Gauss–Newton-like} }
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boxed{ \lambda\text{ large} \rightarrow \text{Gradient-descent-like}. }
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Levenberg–Marquardt} = \text{Adaptive Compromise Between Speed and Robustness}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.40 Scaling in Levenberg–Marquardt</h3>
+      <p>Instead of</p>
+      <p>
+        \[
+        \lambda\mathbf I,
+        \]
+      </p>
+      <p>a scaled form may be used:</p>
+      <p>
+        \[
+        \boxed{ ( \mathbf H^T\mathbf W\mathbf H + \lambda\mathbf D ) \delta\mathbf x = \mathbf H^T\mathbf W\mathbf r. }
+        \]
+      </p>
+      <p>The matrix \(\mathbf D\) may reflect parameter scaling or diagonal normal-matrix information.</p>
+      <p>This is important when state components have very different units.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.41 Adapting the Damping Parameter</h3>
+      <p>A typical LM algorithm changes \(\lambda\) according to whether the proposed step improves the nonlinear cost.</p>
+      <p>If the step produces good agreement between predicted and actual cost reduction,</p>
+      <p>
+        \[
+        \lambda
+        \]
+      </p>
+      <p>may be reduced.</p>
+      <p>If the step performs poorly,</p>
+      <p>
+        \[
+        \lambda
+        \]
+      </p>
+      <p>is increased.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Good Local Model} \rightarrow \text{More Gauss–Newton Behaviour} }
+        \]
+      </p>
+      <p>while</p>
+      <p>
+        \[
+        \boxed{ \text{Poor Local Model} \rightarrow \text{More Damping}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.42 Trust-Region Interpretation</h3>
+      <p>Instead of directly damping the normal equations, a trust-region method asks:</p>
+      <blockquote>
+        <p>How far from the current estimate should we trust the local quadratic approximation?</p>
+      </blockquote>
+      <p>The correction may be constrained by</p>
+      <p>
+        \[
+        \boxed{ \| \delta\mathbf x \| \le \Delta. }
+        \]
+      </p>
+      <p>Here,</p>
+      <p>
+        \[
+        \Delta
+        \]
+      </p>
+      <p>is the trust-region radius.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.43 Trust-Region Logic</h3>
+      <p>If the local model predicts the actual nonlinear cost reduction accurately, the trust region may be enlarged.</p>
+      <p>If it predicts poorly, the trust region may be reduced.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Trust-Region Method} \rightarrow \text{Control How Far the Local Linear/Quadratic Model Is Trusted}. }
+        \]
+      </p>
+      <p>Levenberg–Marquardt has a close relationship to trust-region methods.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.44 Actual versus Predicted Cost Reduction</h3>
+      <p>A useful diagnostic compares</p>
+      <p>
+        \[
+        \Delta J_{\text{actual}} = J(\mathbf x^{(i)}) - J(\mathbf x^{(i+1)})
+        \]
+      </p>
+      <p>with the reduction predicted by the local model.</p>
+      <p>Define a ratio</p>
+      <p>
+        \[
+        \boxed{ \rho = \frac{ \Delta J_{\text{actual}} }{ \Delta J_{\text{predicted}} }. }
+        \]
+      </p>
+      <p>If</p>
+      <p>
+        \[
+        \rho\approx1,
+        \]
+      </p>
+      <p>the local approximation is good.</p>
+      <p>If \(\rho\) is small or negative, the proposed local model is unreliable over that step.</p>
+      <p><strong>Engineering interpretation:</strong> The ratio between actual and predicted reduction is a direct test of whether the local quadratic model is representing the true nonlinear cost well over the proposed step.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.45 Nonlinear Weighted Least Squares with Prior Information</h3>
+      <p>Suppose a prior state</p>
+      <p>
+        \[
+        \bar{\mathbf x}
+        \]
+      </p>
+      <p>with covariance</p>
+      <p>
+        \[
+        \mathbf P_0
+        \]
+      </p>
+      <p>is available.</p>
+      <p>The nonlinear objective is</p>
+      <p>
+        \[
+        \boxed{ \begin{aligned} J(\mathbf x) ={}& [ \mathbf z-h(\mathbf x) ]^T \mathbf R^{-1} [ \mathbf z-h(\mathbf x) ] \\ &+ ( \mathbf x-\bar{\mathbf x} )^T \mathbf P_0^{-1} ( \mathbf x-\bar{\mathbf x} ). \end{aligned} }
+        \]
+      </p>
+      <p>Thus nonlinear estimation can incorporate both observations and a priori information.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.46 Linearized Prior-Constrained Correction</h3>
+      <p>Linearization produces</p>
+      <p>
+        \[
+        \boxed{ \left( \mathbf H^T \mathbf R^{-1} \mathbf H + \mathbf P_0^{-1} \right) \delta\mathbf x = \mathbf H^T \mathbf R^{-1} \mathbf r + \mathbf P_0^{-1} ( \bar{\mathbf x} - \mathbf x^{(i)} ). }
+        \]
+      </p>
+      <p>The prior therefore contributes both information and a correction toward the prior state.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.47 Nonlinear Parameter Estimation</h3>
+      <p>The unknown vector may contain both states and physical parameters:</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\xi} = \begin{bmatrix} \mathbf x\\ \boldsymbol{\theta} \end{bmatrix}. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \mathbf z = h(\mathbf x,\boldsymbol{\theta}) + \mathbf v.
+        \]
+      </p>
+      <p>The Jacobian becomes</p>
+      <p>
+        \[
+        \boxed{ \mathbf G = \begin{bmatrix} \frac{\partial h}{\partial\mathbf x} & \frac{\partial h}{\partial\boldsymbol{\theta}} \end{bmatrix}. }
+        \]
+      </p>
+      <p>The correction is</p>
+      <p>
+        \[
+        \delta\boldsymbol{\xi} = \begin{bmatrix} \delta\mathbf x\\ \delta\boldsymbol{\theta} \end{bmatrix}.
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.48 Parameter Identifiability in Nonlinear Estimation</h3>
+      <p>Adding parameters to the unknown vector does not guarantee that they can be estimated.</p>
+      <p>If</p>
+      <p>
+        \[
+        \frac{\partial h}{\partial\theta} \approx0,
+        \]
+      </p>
+      <p>the parameter is locally weakly observable.</p>
+      <p>If</p>
+      <p>
+        \[
+        \frac{\partial h}{\partial\theta_1} \approx c \frac{\partial h}{\partial\theta_2},
+        \]
+      </p>
+      <p>the parameters may be strongly correlated.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Parameter Augmentation} \neq \text{Parameter Identifiability}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.49 Dynamic Nonlinear Least Squares</h3>
+      <p>In spacecraft trajectory estimation, measurements may depend on a propagated state:</p>
+      <p>
+        \[
+        \mathbf x_k = \phi(t_k,t_0,\mathbf x_0,\boldsymbol{\theta}).
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = h_k[ \phi(t_k,t_0,\mathbf x_0,\boldsymbol{\theta}) ] + \mathbf v_k. }
+        \]
+      </p>
+      <p>The nonlinear unknown may therefore be the reference state</p>
+      <p>
+        \[
+        \mathbf x_0
+        \]
+      </p>
+      <p>rather than the instantaneous state at each measurement epoch.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.50 Dynamic Jacobian</h3>
+      <p>Using the chain rule,</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial h_k} {\partial\mathbf x_0} = \frac{\partial h_k} {\partial\mathbf x_k} \frac{\partial\mathbf x_k} {\partial\mathbf x_0}. }
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \mathbf G_k = \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </p>
+      <p>This is the same dynamic sensitivity introduced in batch dynamic state estimation.</p>
+      <p>The nonlinear batch problem is then solved iteratively using differential correction.</p>
+      <p><strong>Engineering interpretation:</strong> For a dynamic trajectory problem, the Jacobian seen by the estimator is therefore not just a sensor derivative; it also includes how a perturbation at the reference epoch propagates through the dynamics to the measurement epoch.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.51 Dynamic Differential Correction</h3>
+      <p>At iteration \(i\):</p>
+      <ol>
+        <li>choose reference state</li>
+      </ol>
+      <p>
+        \[
+        \mathbf x_0^{(i)},
+        \]
+      </p>
+      <ol>
+        <li>propagate the trajectory,</li>
+        <li>calculate predicted observations,</li>
+        <li>form residuals,</li>
+        <li>propagate the STM,</li>
+        <li>form dynamic Jacobians,</li>
+        <li>solve</li>
+      </ol>
+      <p>
+        \[
+        \delta\mathbf x_0^{(i)},
+        \]
+      </p>
+      <ol>
+        <li>update</li>
+      </ol>
+      <p>
+        \[
+        \boxed{ \mathbf x_0^{(i+1)} = \mathbf x_0^{(i)} + \delta\mathbf x_0^{(i)}. }
+        \]
+      </p>
+      <p>This is the classical batch differential-correction structure used in trajectory and orbit estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.52 General Orbit-Determination Example</h3>
+      <p>Suppose the unknown reference state is</p>
+      <p>
+        \[
+        \mathbf x_0 = \begin{bmatrix} \mathbf r_0\\ \mathbf v_0 \end{bmatrix}.
+        \]
+      </p>
+      <p>Tracking observations are available at</p>
+      <p>
+        \[
+        t_1,\ldots,t_N.
+        \]
+      </p>
+      <p>The process is</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_0 \rightarrow \text{Orbit Propagation} \rightarrow \mathbf x(t_k) \rightarrow \text{Measurement Prediction} \rightarrow \text{Residuals}. }
+        \]
+      </p>
+      <p>Because the trajectory and measurement models are nonlinear, the reference orbit is iteratively corrected until the residuals and corrections converge.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.53 General RPO Example</h3>
+      <p>Consider a general rendezvous or proximity-navigation problem with relative state</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{\mathrm{rel}} = \begin{bmatrix} \mathbf r_{\mathrm{rel}}\\ \mathbf v_{\mathrm{rel}} \end{bmatrix}. }
+        \]
+      </p>
+      <p>Suppose a sensor measures range:</p>
+      <p>
+        \[
+        \rho = \|\mathbf r_{\mathrm{rel}}\|.
+        \]
+      </p>
+      <p>Another sensor measures line of sight:</p>
+      <p>
+        \[
+        \mathbf u = \frac{ \mathbf r_{\mathrm{rel}} }{ \|\mathbf r_{\mathrm{rel}}\| }.
+        \]
+      </p>
+      <p>Both measurement equations are nonlinear.</p>
+      <p>Given a nominal relative state</p>
+      <p>
+        \[
+        \mathbf x_{\mathrm{rel}}^{(i)},
+        \]
+      </p>
+      <p>the estimator computes:</p>
+      <p>
+        \[
+        \hat\rho^{(i)}, \qquad \hat{\mathbf u}^{(i)}
+        \]
+      </p>
+      <p>and forms residuals.</p>
+      <p>The measurement models are linearized around the current relative state.</p>
+      <p>The resulting Jacobian is used to solve a correction</p>
+      <p>
+        \[
+        \delta\mathbf x_{\mathrm{rel}}.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{\mathrm{rel}}^{(i+1)} = \mathbf x_{\mathrm{rel}}^{(i)} + \delta\mathbf x_{\mathrm{rel}}. }
+        \]
+      </p>
+      <p>This process is general and not tied to a particular RPO mission architecture.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.54 Why RPO Geometry Can Be Strongly Nonlinear</h3>
+      <p>For line-of-sight measurements,</p>
+      <p>
+        \[
+        \mathbf u = \frac{\mathbf r}{\|\mathbf r\|}.
+        \]
+      </p>
+      <p>As relative range becomes small or geometry changes rapidly, the measurement sensitivity may change substantially with state.</p>
+      <p>Thus the Jacobian must be evaluated at the correct nominal geometry.</p>
+      <p>A Jacobian computed far from the true relative state may poorly approximate the actual measurement response.</p>
+      <p>This makes initial-guess quality and repeated relinearization important.</p>
+      <p><strong>Engineering interpretation:</strong> Changing relative geometry can rapidly rotate the sensitivity directions. In practice, this means a Jacobian that was well conditioned at one configuration may become weak or nearly singular at another.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.55 Angle Wrap and Nonlinear Residuals</h3>
+      <p>Angular measurements create special residual issues.</p>
+      <p>Suppose</p>
+      <p>
+        \[
+        \alpha_{\text{meas}} \approx -\pi
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \alpha_{\text{pred}} \approx +\pi.
+        \]
+      </p>
+      <p>Naively subtracting gives almost</p>
+      <p>
+        \[
+        -2\pi
+        \]
+      </p>
+      <p>even though the physical angular error is small.</p>
+      <p>Therefore angular residuals should be wrapped consistently:</p>
+      <p>
+        \[
+        \boxed{ r_\alpha = \operatorname{wrap} ( \alpha_{\text{meas}} - \alpha_{\text{pred}} ). }
+        \]
+      </p>
+      <p>Residual definition itself is part of nonlinear-estimation design.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.56 Quaternion and Attitude Residuals</h3>
+      <p>Attitude estimation requires similar care.</p>
+      <p>Directly subtracting quaternion components is often not the most meaningful geometric error.</p>
+      <p>Instead, one may define a multiplicative attitude error:</p>
+      <p>
+        \[
+        \delta\mathbf q = \mathbf q_{\text{true}} \otimes \hat{\mathbf q}^{-1}.
+        \]
+      </p>
+      <p>A small rotation-vector representation may then be used for local optimization.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear State Geometry} \rightarrow \text{Choose an Appropriate Local Error Representation}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.57 Constraints in Nonlinear Least Squares</h3>
+      <p>The state may satisfy constraints such as</p>
+      <p>
+        \[
+        g(\mathbf x)=0
+        \]
+      </p>
+      <p>or</p>
+      <p>
+        \[
+        c(\mathbf x)\le0.
+        \]
+      </p>
+      <p>Examples include:</p>
+      <ul>
+        <li>unit quaternion,</li>
+      </ul>
+      <p>
+        \[
+        \|\mathbf q\|=1,
+        \]
+      </p>
+      <ul>
+        <li>positive physical coefficients,</li>
+        <li>geometric bounds,</li>
+        <li>bounded maneuver parameters.</li>
+      </ul>
+      <p>Constraints can be enforced through:</p>
+      <ul>
+        <li>parameterization,</li>
+        <li>constrained optimization,</li>
+        <li>projection,</li>
+        <li>penalty functions,</li>
+        <li>pseudo-measurements.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.58 Parameterization versus Explicit Constraint</h3>
+      <p>Sometimes it is better to choose variables that satisfy the constraint automatically.</p>
+      <p>For example, attitude may be updated using a three-component local rotation vector rather than estimating four unconstrained quaternion components.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Good State Parameterization} \rightarrow \text{Simpler Constraint Handling}. }
+        \]
+      </p>
+      <p>This can improve both numerical stability and physical interpretability.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.59 Numerical Jacobians</h3>
+      <p>If analytical derivatives are difficult, the Jacobian may be approximated numerically.</p>
+      <p>A central difference is</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial h}{\partial x_j} \approx \frac{ h(\mathbf x+\Delta x_j\mathbf e_j) - h(\mathbf x-\Delta x_j\mathbf e_j) }{ 2\Delta x_j }. }
+        \]
+      </p>
+      <p>This requires repeated model evaluations.</p>
+      <p>Numerical differentiation is simple but sensitive to the perturbation size.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.60 Finite-Difference Step Size</h3>
+      <p>If</p>
+      <p>
+        \[
+        \Delta x_j
+        \]
+      </p>
+      <p>is too large, the finite difference is no longer locally linear.</p>
+      <p>If it is too small, subtraction and floating-point errors can dominate.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Finite-Difference Step} \text{ must balance truncation error and numerical error}. }
+        \]
+      </p>
+      <p>Scaling each state variable appropriately is important.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.61 Analytical Jacobians</h3>
+      <p>Analytical derivatives provide explicit formulas for</p>
+      <p>
+        \[
+        \frac{\partial h}{\partial\mathbf x}.
+        \]
+      </p>
+      <p>Advantages include:</p>
+      <ul>
+        <li>high accuracy,</li>
+        <li>low runtime once implemented,</li>
+        <li>clear physical interpretation.</li>
+      </ul>
+      <p>Disadvantages include:</p>
+      <ul>
+        <li>derivation effort,</li>
+        <li>implementation complexity,</li>
+        <li>potential coding errors.</li>
+      </ul>
+      <p>Analytical Jacobians should be independently verified.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.62 Automatic Differentiation</h3>
+      <p>Automatic differentiation evaluates exact derivatives of implemented computations to machine precision, subject to the computational representation.</p>
+      <p>It can reduce the need for manually derived Jacobians while avoiding many finite-difference errors.</p>
+      <p>However, it requires compatible software and careful treatment of discontinuities or non-differentiable operations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.63 Jacobian Verification</h3>
+      <p>A good engineering practice is to compare analytical or automatic derivatives with finite-difference approximations.</p>
+      <p>For column \(j\),</p>
+      <p>
+        \[
+        \mathbf H_{:,j}^{analytic}
+        \]
+      </p>
+      <p>can be compared with</p>
+      <p>
+        \[
+        \mathbf H_{:,j}^{FD}.
+        \]
+      </p>
+      <p>Large differences may indicate:</p>
+      <ul>
+        <li>derivative errors,</li>
+        <li>frame mismatch,</li>
+        <li>sign errors,</li>
+        <li>inappropriate perturbation size.</li>
+      </ul>
+      <p><strong>Engineering interpretation:</strong> Derivative verification should be repeated after major model changes. A Jacobian can be mathematically correct for one frame convention or parameterization and become wrong after seemingly small interface changes.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.64 Measurement Scaling</h3>
+      <p>Suppose the residual vector contains:</p>
+      <ul>
+        <li>metres,</li>
+        <li>metres per second,</li>
+        <li>radians.</li>
+      </ul>
+      <p>Raw residual magnitudes should not be compared directly.</p>
+      <p>Weighted least squares uses</p>
+      <p>
+        \[
+        \mathbf R^{-1}
+        \]
+      </p>
+      <p>to normalize residual significance.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Different Units} \rightarrow \text{Use Physically Meaningful Covariance Weighting}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.65 State Scaling</h3>
+      <p>The state may contain variables with very different numerical magnitudes.</p>
+      <p>For example:</p>
+      <p>
+        \[
+        \mathbf x = \begin{bmatrix} \text{position}\\ \text{velocity}\\ \text{bias}\\ \text{coefficient} \end{bmatrix}.
+        \]
+      </p>
+      <p>Define scaled variables</p>
+      <p>
+        \[
+        \boxed{ \mathbf x = \mathbf S_x \tilde{\mathbf x}. }
+        \]
+      </p>
+      <p>This can improve numerical conditioning of</p>
+      <p>
+        \[
+        \mathbf H^T \mathbf W \mathbf H.
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.66 Rank Deficiency</h3>
+      <p>At a given iteration,</p>
+      <p>
+        \[
+        \operatorname{rank}(\mathbf H)<n
+        \]
+      </p>
+      <p>means the local linearized problem cannot uniquely determine all state directions.</p>
+      <p>This may result from:</p>
+      <ul>
+        <li>poor measurement geometry,</li>
+        <li>parameter redundancy,</li>
+        <li>insufficient measurements,</li>
+        <li>weak excitation.</li>
+      </ul>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Estimator} \text{ still depends on the rank of its local Jacobian}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.67 Changing Rank and Conditioning</h3>
+      <p>In nonlinear estimation, geometry changes with the state.</p>
+      <p>Therefore the Jacobian may be poorly conditioned at one iteration and much better conditioned at another.</p>
+      <p>This means estimability can change along the trajectory.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Geometry} \rightarrow \text{State-Dependent Conditioning}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.68 Singular Value Analysis</h3>
+      <p>For</p>
+      <p>
+        \[
+        \mathbf H = \mathbf U \boldsymbol{\Sigma} \mathbf V^T,
+        \]
+      </p>
+      <p>small singular values reveal locally weak directions.</p>
+      <p>If</p>
+      <p>
+        \[
+        \sigma_{\min} \approx0,
+        \]
+      </p>
+      <p>the local problem may be nearly rank deficient.</p>
+      <p>SVD is therefore useful for diagnosing nonlinear estimator difficulty at each iteration.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.69 Covariance Approximation after Convergence</h3>
+      <p>Near the converged solution,</p>
+      <p>
+        \[
+        \hat{\mathbf x},
+        \]
+      </p>
+      <p>the covariance can often be approximated by</p>
+      <p>
+        \[
+        \boxed{ \mathbf P \approx ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1}. }
+        \]
+      </p>
+      <p>This is a <strong>local linear covariance approximation</strong>.</p>
+      <p>Its quality depends on how accurately the nonlinear posterior is represented by a locally quadratic cost.</p>
+      <p><strong>Engineering interpretation:</strong> This covariance is local to the converged solution and the adopted linearization. It should not be interpreted as a complete description of global uncertainty when the posterior is strongly nonlinear or multimodal.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.70 Limitations of Local Covariance</h3>
+      <p>For strongly nonlinear problems, the true uncertainty distribution may be:</p>
+      <ul>
+        <li>asymmetric,</li>
+        <li>curved,</li>
+        <li>multimodal,</li>
+        <li>non-Gaussian.</li>
+      </ul>
+      <p>Then one covariance matrix may not fully describe the uncertainty.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Local Hessian Covariance} \neq \text{Complete Nonlinear Uncertainty Description}. }
+        \]
+      </p>
+      <p>Monte Carlo or more general probabilistic methods may be needed.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.71 Residual Analysis after Convergence</h3>
+      <p>After convergence,</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{\text{post}} = \mathbf z - h(\hat{\mathbf x}). }
+        \]
+      </p>
+      <p>The residuals should be examined for:</p>
+      <ul>
+        <li>zero-mean behaviour,</li>
+        <li>expected magnitude,</li>
+        <li>time trends,</li>
+        <li>geometry dependence,</li>
+        <li>measurement-type dependence,</li>
+        <li>outliers,</li>
+        <li>periodic structure.</li>
+      </ul>
+      <p>A converged state with structured residuals may indicate model deficiency.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.72 Pre-Fit versus Post-Fit Residuals</h3>
+      <p>At iteration zero,</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{\text{pre}} = \mathbf z-h(\mathbf x^{(0)}). }
+        \]
+      </p>
+      <p>After convergence,</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{\text{post}} = \mathbf z-h(\hat{\mathbf x}). }
+        \]
+      </p>
+      <p>Comparing them shows how much of the original observation mismatch is explained by the estimated correction.</p>
+      <p>However,</p>
+      <p>
+        \[
+        \boxed{ \text{Large Residual Reduction} \neq \text{Guaranteed Physical Validity}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.73 Normalized Residuals</h3>
+      <p>Define</p>
+      <p>
+        \[
+        \boxed{ \tilde{\mathbf r} = \mathbf R^{-1/2} \mathbf r. }
+        \]
+      </p>
+      <p>Normalized residuals account for measurement uncertainty.</p>
+      <p>A raw residual that looks large numerically may be acceptable if the corresponding measurement is noisy.</p>
+      <p>Conversely, a small raw residual may be statistically significant for a highly precise sensor.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.74 Outliers</h3>
+      <p>Squared-error objectives are sensitive to outliers.</p>
+      <p>An unusually large measurement error can dominate</p>
+      <p>
+        \[
+        J.
+        \]
+      </p>
+      <p>Potential sources include:</p>
+      <ul>
+        <li>corrupted tracking measurements,</li>
+        <li>false feature association,</li>
+        <li>multipath,</li>
+        <li>timing faults,</li>
+        <li>sensor saturation,</li>
+        <li>data-processing errors.</li>
+      </ul>
+      <p>Therefore robust outlier handling may be required.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.75 Robust Loss Functions</h3>
+      <p>Instead of minimizing purely quadratic residuals,</p>
+      <p>
+        \[
+        J = \sum_i r_i^2,
+        \]
+      </p>
+      <p>robust estimation may use a loss</p>
+      <p>
+        \[
+        \boxed{ J = \sum_i \rho(r_i). }
+        \]
+      </p>
+      <p>Examples include:</p>
+      <ul>
+        <li>Huber loss,</li>
+        <li>Cauchy loss,</li>
+        <li>Tukey-type loss.</li>
+      </ul>
+      <p>These reduce the influence of extreme residuals.</p>
+      <p>However, robust loss functions change the estimator assumptions and should be justified.</p>
+      <p><strong>Engineering interpretation:</strong> Robust losses intentionally reduce the influence of observations that are inconsistent with the assumed residual model. They should complement, not replace, a physically justified measurement covariance model.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.76 Iteratively Reweighted Least Squares</h3>
+      <p>Some robust estimators can be implemented by repeatedly changing measurement weights.</p>
+      <p>At iteration \(i\),</p>
+      <p>
+        \[
+        \boxed{ \mathbf W^{(i)} = \operatorname{diag} ( w_1^{(i)},\ldots,w_m^{(i)} ). }
+        \]
+      </p>
+      <p>Large residuals may receive reduced weight.</p>
+      <p>Then another weighted least-squares problem is solved.</p>
+      <p>This is called <strong>Iteratively Reweighted Least Squares</strong>, or IRLS.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.77 Robust Weighting versus Measurement Covariance Weighting</h3>
+      <p>These should not be confused.</p>
+      <p>Measurement covariance weighting uses</p>
+      <p>
+        \[
+        \boxed{ \mathbf W=\mathbf R^{-1} }
+        \]
+      </p>
+      <p>based on known or assumed sensor uncertainty.</p>
+      <p>Robust weighting modifies influence based partly on observed residual behaviour.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Covariance Weighting} \neq \text{Outlier-Robust Weighting}. }
+        \]
+      </p>
+      <p>They solve different problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.78 Model Error</h3>
+      <p>A nonlinear estimator may converge while compensating for incorrect dynamics or observation models.</p>
+      <p>If a physical effect is missing, the estimator may distort other state components or parameters to explain the data.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Estimator Flexibility Can Hide Model Deficiency}. }
+        \]
+      </p>
+      <p>Residual structure, parameter plausibility, and independent validation remain essential.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.79 Parameter Compensation</h3>
+      <p>Suppose two parameters affect measurements similarly.</p>
+      <p>The estimator may increase one while decreasing the other and still reduce residuals.</p>
+      <p>Therefore a low cost does not guarantee accurate individual parameter values.</p>
+      <p>This is particularly important in nonlinear parameter estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.80 Over-Parameterization</h3>
+      <p>Adding more parameters usually gives the optimizer more freedom to fit observations.</p>
+      <p>But too many parameters may cause:</p>
+      <ul>
+        <li>rank weakness,</li>
+        <li>parameter correlation,</li>
+        <li>large uncertainty,</li>
+        <li>poor physical interpretation,</li>
+        <li>overfitting.</li>
+      </ul>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{More Estimated Parameters} \neq \text{Better Estimation}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.81 Regularization</h3>
+      <p>A poorly conditioned nonlinear problem can be stabilized through regularization:</p>
+      <p>
+        \[
+        \boxed{ J = \mathbf r^T\mathbf W\mathbf r + \lambda \| \mathbf L\mathbf x \|^2. }
+        \]
+      </p>
+      <p>The corresponding local normal matrix becomes approximately</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\mathbf W\mathbf H + \lambda \mathbf L^T\mathbf L. }
+        \]
+      </p>
+      <p>Regularization adds assumptions or prior preference.</p>
+      <p>It should not be confused with additional measurement information.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.82 Levenberg–Marquardt versus Regularization</h3>
+      <p>Both can produce equations containing an additional diagonal term:</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf W\mathbf H + \lambda\mathbf I.
+        \]
+      </p>
+      <p>However, their interpretations differ.</p>
+      <p>In LM, \(\lambda\) is primarily used to control the optimization step.</p>
+      <p>In regularized estimation, \(\lambda\) expresses a preference or prior penalty on the solution.</p>
+      <p>Thus similar algebra does not always imply identical statistical meaning.</p>
+      <p><strong>Engineering interpretation:</strong> The same algebraic term can therefore have two different meanings: algorithmic damping in an optimizer or statistical/physical preference in an estimator. Keeping those interpretations separate avoids misleading uncertainty claims.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.83 Hard Constraints and Soft Constraints</h3>
+      <p>A hard constraint must be satisfied:</p>
+      <p>
+        \[
+        \boxed{ g(\mathbf x)=0. }
+        \]
+      </p>
+      <p>A soft constraint is represented with finite uncertainty:</p>
+      <p>
+        \[
+        \boxed{ J_c = g(\mathbf x)^T \mathbf R_c^{-1} g(\mathbf x). }
+        \]
+      </p>
+      <p>A hard constraint reduces the feasible solution space.</p>
+      <p>A soft constraint allows controlled deviation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.84 Bounds on Parameters</h3>
+      <p>Some parameters must satisfy physical bounds:</p>
+      <p>
+        \[
+        \theta_{\min} \le \theta \le \theta_{\max}.
+        \]
+      </p>
+      <p>Examples include positive scale parameters or bounded calibration terms.</p>
+      <p>Unconstrained Gauss–Newton may propose physically invalid values.</p>
+      <p>Bound-constrained optimization or transformed variables can prevent this.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.85 Log-Parameter Transformation</h3>
+      <p>For a parameter that must remain positive,</p>
+      <p>
+        \[
+        \theta>0,
+        \]
+      </p>
+      <p>define</p>
+      <p>
+        \[
+        \boxed{ \gamma=\ln\theta. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \theta=e^\gamma
+        \]
+      </p>
+      <p>is automatically positive.</p>
+      <p>This can eliminate explicit positivity constraints, though it changes the parameter sensitivity.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.86 Step Acceptance</h3>
+      <p>A proposed correction should not automatically be accepted merely because it solves the linearized normal equations.</p>
+      <p>Evaluate the actual nonlinear cost:</p>
+      <p>
+        \[
+        J( \mathbf x^{(i)} + \delta\mathbf x ).
+        \]
+      </p>
+      <p>If the cost increases substantially, the step may need to be rejected, shortened, or damped.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Linearized Improvement Prediction} \text{ should be checked against} \text{Actual Nonlinear Improvement}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.87 Monotonic Cost Reduction</h3>
+      <p>Some algorithms are designed so accepted iterations satisfy approximately</p>
+      <p>
+        \[
+        \boxed{ J^{(i+1)} < J^{(i)}. }
+        \]
+      </p>
+      <p>Gauss–Newton without line search does not automatically guarantee this when far from the solution.</p>
+      <p>Damping or trust-region logic can improve this behaviour.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.88 Divergence</h3>
+      <p>An iterative estimator diverges when corrections fail to approach a stable valid solution.</p>
+      <p>Symptoms include:</p>
+      <ul>
+        <li>increasing cost,</li>
+        <li>increasing residuals,</li>
+        <li>growing corrections,</li>
+        <li>nonphysical states,</li>
+        <li>oscillation,</li>
+        <li>numerical failure.</li>
+      </ul>
+      <p>Possible causes include:</p>
+      <ul>
+        <li>poor initial guess,</li>
+        <li>strong nonlinearity,</li>
+        <li>incorrect Jacobian,</li>
+        <li>model error,</li>
+        <li>rank deficiency,</li>
+        <li>outliers.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.89 Oscillatory Iteration</h3>
+      <p>Sometimes the estimate alternates between regions:</p>
+      <p>
+        \[
+        \mathbf x^{(i)} \leftrightarrow \mathbf x^{(i+1)}.
+        \]
+      </p>
+      <p>This can occur when corrections overshoot the solution.</p>
+      <p>Possible remedies include:</p>
+      <ul>
+        <li>damping,</li>
+        <li>line search,</li>
+        <li>LM,</li>
+        <li>scaling,</li>
+        <li>improved initialization.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.90 Stagnation</h3>
+      <p>The estimator may also stagnate:</p>
+      <p>
+        \[
+        \|\delta\mathbf x\| \approx0
+        \]
+      </p>
+      <p>while the residual cost remains unacceptably large.</p>
+      <p>Possible reasons include:</p>
+      <ul>
+        <li>weak sensitivity,</li>
+        <li>local minimum,</li>
+        <li>incorrect model,</li>
+        <li>rank deficiency,</li>
+        <li>active constraints,</li>
+        <li>poor scaling.</li>
+      </ul>
+      <p>Small correction therefore does not automatically mean successful convergence.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.91 Initial-Guess Robustness Testing</h3>
+      <p>A practical way to assess nonlinear robustness is to solve the problem from several plausible initial guesses.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \mathbf x^{(0)}_1, \mathbf x^{(0)}_2, \ldots, \mathbf x^{(0)}_M.
+        \]
+      </p>
+      <p>Then examine whether the solutions converge to the same physical estimate.</p>
+      <p>If different starting points lead to substantially different solutions, the problem may contain multiple minima or weak identifiability.</p>
+      <p><strong>Engineering interpretation:</strong> Initial-guess testing is especially valuable before operational use because a single successful run does not reveal the practical convergence basin of the estimator.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.92 Monte Carlo Initial-Condition Testing</h3>
+      <p>Initial-guess sensitivity can also be evaluated statistically.</p>
+      <p>Draw</p>
+      <p>
+        \[
+        \mathbf x^{(0,j)} \sim p(\mathbf x_0)
+        \]
+      </p>
+      <p>and solve repeatedly.</p>
+      <p>Record:</p>
+      <ul>
+        <li>convergence rate,</li>
+        <li>iterations required,</li>
+        <li>final cost,</li>
+        <li>final estimation error,</li>
+        <li>divergence cases.</li>
+      </ul>
+      <p>This measures the practical convergence basin.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.93 Covariance versus Convergence Basin</h3>
+      <p>Covariance near the optimum describes local uncertainty.</p>
+      <p>The convergence basin describes how far the initial estimate may be from the solution while still converging successfully.</p>
+      <p>These are different concepts:</p>
+      <p>
+        \[
+        \boxed{ \text{Local Covariance} \neq \text{Convergence Basin}. }
+        \]
+      </p>
+      <p>A solution may have a small final covariance but a narrow convergence region.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.94 Nonlinear Observability</h3>
+      <p>In nonlinear systems, observability may depend on the state itself.</p>
+      <p>The local Jacobian may change significantly as the trajectory evolves.</p>
+      <p>Therefore a state may be weakly observable in one geometry and strongly observable in another.</p>
+      <p>Nonlinear observability is therefore generally richer than checking a single constant design matrix.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.95 Geometry Changes During Iteration</h3>
+      <p>Because the estimated state affects the predicted geometry, an update changes not only the residual but also the measurement sensitivity.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \mathbf x^{(i)} \rightarrow \mathbf H^{(i)}
+        \]
+      </p>
+      <p>while</p>
+      <p>
+        \[
+        \mathbf x^{(i+1)} \rightarrow \mathbf H^{(i+1)}.
+        \]
+      </p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{State Update} \rightarrow \text{Geometry Update} \rightarrow \text{Jacobian Update}. }
+        \]
+      </p>
+      <p>This is another reason relinearization is mandatory.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.96 Measurement Selection</h3>
+      <p>Not every observation necessarily contributes useful independent information.</p>
+      <p>Measurements may be excluded because of:</p>
+      <ul>
+        <li>invalid status,</li>
+        <li>known corruption,</li>
+        <li>poor quality flags,</li>
+        <li>unacceptable geometry,</li>
+        <li>timing problems.</li>
+      </ul>
+      <p>However, observations should not be removed simply because they make the residual larger.</p>
+      <p>Selection criteria should be defined independently and validated.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.97 Mixed Measurements</h3>
+      <p>A nonlinear estimator may simultaneously use:</p>
+      <ul>
+        <li>range,</li>
+        <li>range rate,</li>
+        <li>angles,</li>
+        <li>GNSS observations,</li>
+        <li>optical bearings,</li>
+        <li>pose measurements,</li>
+        <li>attitude measurements.</li>
+      </ul>
+      <p>Each has its own nonlinear function</p>
+      <p>
+        \[
+        h_j(\mathbf x).
+        \]
+      </p>
+      <p>The combined residual is</p>
+      <p>
+        \[
+        \boxed{ \mathbf r = \begin{bmatrix} \mathbf r_1\\ \mathbf r_2\\ \vdots \end{bmatrix}. }
+        \]
+      </p>
+      <p>The combined Jacobian is similarly stacked.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.98 Asynchronous Measurements in Batch Nonlinear Estimation</h3>
+      <p>Measurements may occur at irregular times.</p>
+      <p>Each observation uses the state propagated to its own epoch:</p>
+      <p>
+        \[
+        \hat{\mathbf z}_k = h_k( \mathbf x(t_k) ).
+        \]
+      </p>
+      <p>The associated Jacobian must also correspond to the correct measurement epoch.</p>
+      <p>Thus timestamps are part of the nonlinear measurement model.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.99 Numerical Integration Error</h3>
+      <p>For dynamic nonlinear estimation, trajectory propagation is part of the measurement prediction.</p>
+      <p>If integration error is too large, the predicted measurement contains numerical error.</p>
+      <p>The estimator may then attempt to compensate by changing the estimated state.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Propagation Numerical Error} \ll \text{Required Estimation Accuracy} }
+        \]
+      </p>
+      <p>should generally hold.</p>
+      <p><strong>Engineering interpretation:</strong> A practical verification is to tighten the numerical integration tolerances and confirm that the estimated state, cost, and residual history change negligibly.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.100 Interpolation Error</h3>
+      <p>Measurements may occur between integration output points.</p>
+      <p>Then the propagated state may need interpolation.</p>
+      <p>If interpolation is inaccurate, it can generate artificial residuals.</p>
+      <p>This can be especially important for high-precision tracking or fast-changing geometry.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.101 Numerical Linear Solver</h3>
+      <p>The Gauss–Newton correction is often written analytically as</p>
+      <p>
+        \[
+        \delta\mathbf x = ( \mathbf H^T\mathbf W\mathbf H )^{-1} \mathbf H^T\mathbf W\mathbf r.
+        \]
+      </p>
+      <p>In implementation, avoid explicit inversion.</p>
+      <p>Possible methods include:</p>
+      <ul>
+        <li>QR factorization,</li>
+        <li>Cholesky factorization,</li>
+        <li>SVD,</li>
+        <li>square-root least squares.</li>
+      </ul>
+      <p>The solver should be selected according to conditioning and problem structure.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.102 Why Normal Equations Can Be Risky</h3>
+      <p>Forming</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf W\mathbf H
+        \]
+      </p>
+      <p>can worsen conditioning.</p>
+      <p>Approximately,</p>
+      <p>
+        \[
+        \boxed{ \kappa( \mathbf H^T\mathbf H ) \approx \kappa(\mathbf H)^2. }
+        \]
+      </p>
+      <p>Thus QR or SVD may be preferable for weakly conditioned problems.</p>
+      <p>This consideration applies at every nonlinear iteration.</p>
+      <p><strong>Engineering interpretation:</strong> Because the nonlinear problem is re-solved repeatedly, poor numerical conditioning is encountered at every iteration, not just once. A stable linear solver is therefore part of the nonlinear estimator design.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.103 Square-Root Nonlinear Least Squares</h3>
+      <p>Instead of forming the normal matrix, the weighted residual problem can be whitened and solved using square-root methods.</p>
+      <p>If</p>
+      <p>
+        \[
+        \mathbf R=\mathbf L\mathbf L^T,
+        \]
+      </p>
+      <p>define</p>
+      <p>
+        \[
+        \tilde{\mathbf r} = \mathbf L^{-1}\mathbf r
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \tilde{\mathbf H} = \mathbf L^{-1}\mathbf H.
+        \]
+      </p>
+      <p>Then solve</p>
+      <p>
+        \[
+        \boxed{ \min_{\delta\mathbf x} \| \tilde{\mathbf r} - \tilde{\mathbf H}\delta\mathbf x \|^2. }
+        \]
+      </p>
+      <p>This often improves numerical robustness.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.104 Sparse Nonlinear Least Squares</h3>
+      <p>Large estimation problems may have sparse Jacobians.</p>
+      <p>For example, one observation may depend only on a subset of states or parameters.</p>
+      <p>Sparse numerical methods can exploit this structure to reduce:</p>
+      <ul>
+        <li>memory,</li>
+        <li>factorization cost,</li>
+        <li>computational time.</li>
+      </ul>
+      <p>This is important in large trajectory, calibration, or multi-arc problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.105 Nonlinear Least Squares and Factor Graphs</h3>
+      <p>A large estimation problem can also be viewed as a collection of residual factors.</p>
+      <p>Each factor contributes a residual</p>
+      <p>
+        \[
+        \mathbf r_j(\mathbf x)
+        \]
+      </p>
+      <p>and cost</p>
+      <p>
+        \[
+        \mathbf r_j^T \mathbf W_j \mathbf r_j.
+        \]
+      </p>
+      <p>The total cost is</p>
+      <p>
+        \[
+        \boxed{ J = \sum_j \mathbf r_j^T \mathbf W_j \mathbf r_j. }
+        \]
+      </p>
+      <p>This perspective leads naturally toward factor-graph and graph-optimization formulations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.106 Batch versus Recursive Nonlinear Estimation</h3>
+      <p>Batch nonlinear least squares repeatedly optimizes using the complete observation set.</p>
+      <p>Recursive nonlinear estimation processes observations sequentially and usually performs local linearization at each update.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Batch Nonlinear Estimation} \rightarrow \text{Iteratively Optimize an Observation Arc} }
+        \]
+      </p>
+      <p>while</p>
+      <p>
+        \[
+        \boxed{ \text{Recursive Nonlinear Estimation} \rightarrow \text{Propagate and Correct Sequentially}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.107 Iterated Filtering and Gauss–Newton Connection</h3>
+      <p>If a nonlinear recursive estimator repeatedly relinearizes and reprocesses the same measurement, the update increasingly resembles a local Gauss–Newton optimization.</p>
+      <p>Thus nonlinear least squares and iterated filtering are closely related mathematically.</p>
+      <p>The difference is largely in:</p>
+      <ul>
+        <li>information carried forward,</li>
+        <li>optimization window,</li>
+        <li>treatment of dynamics.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.108 Differential Correction versus EKF Linearization</h3>
+      <p>Both use a Jacobian.</p>
+      <p>In differential correction,</p>
+      <p>
+        \[
+        \mathbf H
+        \]
+      </p>
+      <p>is used to solve a batch or local least-squares correction.</p>
+      <p>In an EKF,</p>
+      <p>
+        \[
+        \mathbf H
+        \]
+      </p>
+      <p>is used in a recursive measurement update.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Same Local Linearization Concept} \rightarrow \text{Different Estimation Architecture}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.109 Nonlinear LS versus Maximum Likelihood</h3>
+      <p>Suppose</p>
+      <p>
+        \[
+        \mathbf v \sim \mathcal N(\mathbf0,\mathbf R).
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        p(\mathbf z|\mathbf x) \propto \exp \left[ -\frac12 \mathbf r(\mathbf x)^T \mathbf R^{-1} \mathbf r(\mathbf x) \right].
+        \]
+      </p>
+      <p>Maximizing likelihood is therefore equivalent to minimizing</p>
+      <p>
+        \[
+        \boxed{ J = \mathbf r^T \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear WLS} \Longleftrightarrow \text{Gaussian Maximum Likelihood} }
+        \]
+      </p>
+      <p>under the corresponding assumptions.</p>
+      <p>This leads directly toward Section 4.3.6.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.110 Nonlinear LS versus MAP</h3>
+      <p>If a Gaussian prior is included,</p>
+      <p>
+        \[
+        \mathbf x \sim \mathcal N( \bar{\mathbf x}, \mathbf P_0 ),
+        \]
+      </p>
+      <p>the cost becomes</p>
+      <p>
+        \[
+        \boxed{ J = \mathbf r^T \mathbf R^{-1} \mathbf r + ( \mathbf x-\bar{\mathbf x} )^T \mathbf P_0^{-1} ( \mathbf x-\bar{\mathbf x} ). }
+        \]
+      </p>
+      <p>This corresponds to Gaussian MAP estimation.</p>
+      <p>Therefore the nonlinear least-squares framework is directly connected to probabilistic estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.111 When Gauss–Newton Works Well</h3>
+      <p>Gauss–Newton generally performs well when:</p>
+      <ul>
+        <li>the initial guess is reasonably close,</li>
+        <li>the measurement model is smooth,</li>
+        <li>residuals at the solution are relatively small,</li>
+        <li>the Jacobian has sufficient rank,</li>
+        <li>the problem is reasonably conditioned.</li>
+      </ul>
+      <p>In this region, convergence can be fast.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.112 When Gauss–Newton Struggles</h3>
+      <p>Problems arise when:</p>
+      <ul>
+        <li>initial error is large,</li>
+        <li>measurement equations are strongly nonlinear,</li>
+        <li>Jacobian is poorly conditioned,</li>
+        <li>residuals are large,</li>
+        <li>parameters are strongly correlated,</li>
+        <li>outliers dominate,</li>
+        <li>derivatives are inaccurate.</li>
+      </ul>
+      <p>In such cases damping or more robust optimization methods may be necessary.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.113 Choosing Between Gauss–Newton and Levenberg–Marquardt</h3>
+      <p>Gauss–Newton is attractive when:</p>
+      <ul>
+        <li>the initial state is already good,</li>
+        <li>computation should be efficient,</li>
+        <li>nonlinearity is moderate.</li>
+      </ul>
+      <p>Levenberg–Marquardt is attractive when:</p>
+      <ul>
+        <li>convergence robustness is more important,</li>
+        <li>initial conditions may be less accurate,</li>
+        <li>the local normal matrix is poorly conditioned.</li>
+      </ul>
+      <p>Neither is universally superior.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.114 Diagnosing a Failed Nonlinear Solve</h3>
+      <p>If nonlinear estimation fails, check systematically:</p>
+      <ol>
+        <li>Are measurements and predictions in the same frame?</li>
+        <li>Are units consistent?</li>
+        <li>Are timestamps correct?</li>
+        <li>Is the residual sign correct?</li>
+        <li>Is angle wrapping correct?</li>
+        <li>Is the Jacobian correct?</li>
+        <li>Is the Jacobian properly scaled?</li>
+        <li>Is the problem full rank?</li>
+        <li>Are some parameters strongly correlated?</li>
+        <li>Is the initial guess reasonable?</li>
+        <li>Are there outliers?</li>
+        <li>Is the dynamic model correct?</li>
+        <li>Is the numerical integration accurate?</li>
+        <li>Is the step too large?</li>
+        <li>Is the cost actually decreasing?</li>
+      </ol>
+      <p>Changing the optimizer should not be the first response to a modeling error.</p>
+      <p><strong>Engineering interpretation:</strong> This diagnostic order is important: a more sophisticated optimizer cannot repair an incorrect frame transformation, sign convention, timestamp, Jacobian, or force model.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.115 Practical Nonlinear-Estimation Workflow</h3>
+      <p>A disciplined workflow is:</p>
+      <ol>
+        <li>Define unknown state and parameters.</li>
+        <li>Define coordinate frames and units.</li>
+        <li>Define nonlinear dynamics.</li>
+        <li>Define nonlinear observation models.</li>
+        <li>Define measurement covariance.</li>
+        <li>Define any prior information.</li>
+        <li>Obtain a physically reasonable initial estimate.</li>
+        <li>Propagate the nominal state if dynamic estimation is required.</li>
+        <li>Generate predicted observations.</li>
+        <li>Form pre-fit residuals.</li>
+        <li>Compute measurement Jacobians.</li>
+        <li>Propagate dynamic sensitivities where required.</li>
+        <li>Verify Jacobians numerically.</li>
+        <li>Assemble the weighted design matrix.</li>
+        <li>Check rank.</li>
+        <li>Check conditioning.</li>
+        <li>Apply state and residual scaling.</li>
+        <li>Solve the Gauss–Newton or damped correction.</li>
+        <li>Evaluate the nonlinear cost at the candidate state.</li>
+        <li>Accept, damp, or reject the step.</li>
+        <li>Update the state.</li>
+        <li>Recompute trajectory and measurements.</li>
+        <li>Relinearize.</li>
+        <li>Repeat until convergence.</li>
+        <li>Check correction magnitude.</li>
+        <li>Check cost reduction.</li>
+        <li>Check gradient magnitude.</li>
+        <li>Check iteration count.</li>
+        <li>Compute post-fit residuals.</li>
+        <li>Examine normalized residuals.</li>
+        <li>Examine residual trends.</li>
+        <li>Examine covariance.</li>
+        <li>Examine parameter correlations.</li>
+        <li>Test sensitivity to initial guess.</li>
+        <li>Test alternative initial conditions when appropriate.</li>
+        <li>Assess physical plausibility.</li>
+        <li>Validate against independent data or simulation truth where available.</li>
+      </ol>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Initial Guess}\\ \downarrow\\ \text{Evaluate Nonlinear Model}\\ \downarrow\\ \text{Residuals}\\ \downarrow\\ \text{Jacobian / Sensitivities}\\ \downarrow\\ \text{Check Rank and Conditioning}\\ \downarrow\\ \text{Solve Local LS Correction}\\ \downarrow\\ \text{Apply Damping if Needed}\\ \downarrow\\ \text{Evaluate Actual Cost Reduction}\\ \downarrow\\ \text{Update State}\\ \downarrow\\ \text{Relinearize}\\ \downarrow\\ \text{Convergence Check}\\ \downarrow\\ \text{Residual / Covariance / Physical Validation} \end{array} }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The development workflow should be iterative. If diagnostics reveal weak observability, bad scaling, model mismatch, or sensitivity to initialization, revise the formulation rather than only increasing the iteration count.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.116 Complete Nonlinear Least-Squares Architecture</h3>
+      <p>The complete architecture can be represented as</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Current Estimate} \\ \mathbf x^{(i)} \\ \downarrow\\ \text{Nonlinear Measurement Prediction} \\ \hat{\mathbf z}^{(i)} = h( \mathbf x^{(i)} ) \\ \downarrow\\ \text{Residual} \\ \mathbf r^{(i)} = \mathbf z-\hat{\mathbf z}^{(i)} \\ \downarrow\\ \text{Jacobian} \\ \mathbf H^{(i)} = \left. \frac{\partial h} {\partial\mathbf x} \right|_{\mathbf x^{(i)}} \\ \downarrow\\ \text{Linearized Weighted LS Problem} \\ \mathbf H^T \mathbf R^{-1} \mathbf H \, \delta\mathbf x = \mathbf H^T \mathbf R^{-1} \mathbf r \\ \downarrow\\ \text{Correction} \\ \delta\mathbf x^{(i)} \\ \downarrow\\ \text{Step Control / Damping} \\ \downarrow\\ \text{State Update} \\ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \alpha \delta\mathbf x^{(i)} \\ \downarrow\\ \text{Re-evaluate Nonlinear Model} \\ \downarrow\\ \text{Repeat Until Converged} \end{array} }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.117 Key Equations</h3>
+      <h4>Nonlinear measurement model</h4>
+      <p>
+        \[
+        \boxed{ \mathbf z = h(\mathbf x) + \mathbf v }
+        \]
+      </p>
+      <h4>Residual</h4>
+      <p>
+        \[
+        \boxed{ \mathbf r(\mathbf x) = \mathbf z-h(\mathbf x) }
+        \]
+      </p>
+      <h4>Nonlinear weighted cost</h4>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = \mathbf r(\mathbf x)^T \mathbf R^{-1} \mathbf r(\mathbf x) }
+        \]
+      </p>
+      <h4>State correction form</h4>
+      <p>
+        \[
+        \boxed{ \mathbf x = \mathbf x^{(i)} + \delta\mathbf x }
+        \]
+      </p>
+      <h4>First-order linearization</h4>
+      <p>
+        \[
+        \boxed{ h( \mathbf x^{(i)} + \delta\mathbf x ) \approx h( \mathbf x^{(i)} ) + \mathbf H^{(i)} \delta\mathbf x }
+        \]
+      </p>
+      <h4>Jacobian</h4>
+      <p>
+        \[
+        \boxed{ \mathbf H^{(i)} = \left. \frac{\partial h}{\partial\mathbf x} \right|_{\mathbf x^{(i)}} }
+        \]
+      </p>
+      <h4>Linearized residual</h4>
+      <p>
+        \[
+        \boxed{ \mathbf r^{(i)} \approx \mathbf H^{(i)} \delta\mathbf x + \mathbf v }
+        \]
+      </p>
+      <h4>Gauss–Newton normal equations</h4>
+      <p>
+        \[
+        \boxed{ \mathbf H^T \mathbf R^{-1} \mathbf H \delta\mathbf x = \mathbf H^T \mathbf R^{-1} \mathbf r }
+        \]
+      </p>
+      <h4>Gauss–Newton correction</h4>
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x} = ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1} \mathbf H^T \mathbf R^{-1} \mathbf r }
+        \]
+      </p>
+      <h4>State update</h4>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \delta\hat{\mathbf x}^{(i)} }
+        \]
+      </p>
+      <h4>Damped update</h4>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \alpha \delta\hat{\mathbf x}^{(i)} }
+        \]
+      </p>
+      <h4>Levenberg–Marquardt equation</h4>
+      <p>
+        \[
+        \boxed{ ( \mathbf H^T \mathbf R^{-1} \mathbf H + \lambda\mathbf I ) \delta\mathbf x = \mathbf H^T \mathbf R^{-1} \mathbf r }
+        \]
+      </p>
+      <h4>Trust-region constraint</h4>
+      <p>
+        \[
+        \boxed{ \| \delta\mathbf x \| \le \Delta }
+        \]
+      </p>
+      <h4>Prior-constrained nonlinear cost</h4>
+      <p>
+        \[
+        \boxed{ \begin{aligned} J(\mathbf x) ={}& [ \mathbf z-h(\mathbf x) ]^T \mathbf R^{-1} [ \mathbf z-h(\mathbf x) ] \\ &+ ( \mathbf x-\bar{\mathbf x} )^T \mathbf P_0^{-1} ( \mathbf x-\bar{\mathbf x} ) \end{aligned} }
+        \]
+      </p>
+      <h4>Dynamic measurement sensitivity</h4>
+      <p>
+        \[
+        \boxed{ \frac{\partial h_k} {\partial\mathbf x_0} = \mathbf H_k \boldsymbol{\Phi}_{k,0} }
+        \]
+      </p>
+      <h4>Local covariance approximation</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P \approx ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1} }
+        \]
+      </p>
+      <h4>Finite-difference Jacobian</h4>
+      <p>
+        \[
+        \boxed{ \frac{\partial h} {\partial x_j} \approx \frac{ h(\mathbf x+\Delta x_j\mathbf e_j) - h(\mathbf x-\Delta x_j\mathbf e_j) }{ 2\Delta x_j } }
+        \]
+      </p>
+      <h4>Correction convergence</h4>
+      <p>
+        \[
+        \boxed{ \| \delta\mathbf x \| < \epsilon_x }
+        \]
+      </p>
+      <h4>Cost convergence</h4>
+      <p>
+        \[
+        \boxed{ | J^{(i+1)}-J^{(i)} | < \epsilon_J }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.118 Key Takeaways</h3>
+      <p>Nonlinear least squares begins with the observation model</p>
+      <p>
+        \[
+        \boxed{ \mathbf z = h(\mathbf x)+\mathbf v. }
+        \]
+      </p>
+      <p>The residual is</p>
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf z-h(\mathbf x), }
+        \]
+      </p>
+      <p>and the weighted objective is</p>
+      <p>
+        \[
+        \boxed{ J = \mathbf r^T \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>Because the residual depends nonlinearly on the state, there is generally no single closed-form solution.</p>
+      <p>Instead,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Estimation} = \text{Sequence of Locally Linear Estimation Problems}. }
+        \]
+      </p>
+      <p>The nonlinear model is linearized using the Jacobian:</p>
+      <p>
+        \[
+        \boxed{ \mathbf H = \frac{\partial h}{\partial\mathbf x}. }
+        \]
+      </p>
+      <p>The Gauss–Newton correction is obtained from</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T \mathbf R^{-1} \mathbf H \delta\mathbf x = \mathbf H^T \mathbf R^{-1} \mathbf r. }
+        \]
+      </p>
+      <p>The state is then updated and the entire model is relinearized:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \delta\mathbf x^{(i)}. }
+        \]
+      </p>
+      <p>This iterative process is commonly called <strong>differential correction</strong> in orbit and trajectory estimation.</p>
+      <p>The initial guess matters because the linear approximation is local:</p>
+      <p>
+        \[
+        \boxed{ \text{Poor Initial Guess} \rightarrow \text{Poor Linearization} \rightarrow \text{Possible Divergence}. }
+        \]
+      </p>
+      <p>Damping can improve robustness:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x^{(i+1)} = \mathbf x^{(i)} + \alpha\delta\mathbf x. }
+        \]
+      </p>
+      <p>Levenberg–Marquardt modifies the local system:</p>
+      <p>
+        \[
+        \boxed{ ( \mathbf H^T \mathbf W \mathbf H + \lambda\mathbf I ) \delta\mathbf x = \mathbf H^T \mathbf W \mathbf r. }
+        \]
+      </p>
+      <p>As</p>
+      <p>
+        \[
+        \lambda\rightarrow0,
+        \]
+      </p>
+      <p>it behaves more like Gauss–Newton.</p>
+      <p>As \(\lambda\) increases, the correction becomes more conservative.</p>
+      <p>Trust-region methods express the same basic idea in terms of limiting the region over which the local approximation is trusted.</p>
+      <p>A converged nonlinear solution should still be assessed using:</p>
+      <ul>
+        <li>residuals,</li>
+        <li>normalized residuals,</li>
+        <li>covariance,</li>
+        <li>rank,</li>
+        <li>singular values,</li>
+        <li>parameter correlation,</li>
+        <li>sensitivity to initial conditions,</li>
+        <li>physical plausibility.</li>
+      </ul>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Convergence} \neq \text{Proof of Correctness}. }
+        \]
+      </p>
+      <p>Another central principle is</p>
+      <p>
+        \[
+        \boxed{ \text{A Smaller Residual Can Be Produced by the Wrong State if the Model or Parameterization Is Wrong}. }
+        \]
+      </p>
+      <p>Finally,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Least Squares} \rightarrow \text{Local Linearization} \rightarrow \text{Weighted Correction} \rightarrow \text{Relinearization} }
+        \]
+      </p>
+      <p>provides the mathematical foundation for a large class of spacecraft trajectory, orbit, navigation, calibration, and parameter-estimation problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.5.119 What Comes Next</h3>
+      <p>The nonlinear least-squares formulation has so far been introduced mainly as an optimization problem:</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \arg\min_{\mathbf x} \mathbf r(\mathbf x)^T \mathbf R^{-1} \mathbf r(\mathbf x). }
+        \]
+      </p>
+      <p>But why is this particular cost statistically meaningful?</p>
+      <p>Suppose measurement uncertainty is Gaussian:</p>
+      <p>
+        \[
+        \boxed{ \mathbf v \sim \mathcal N( \mathbf0, \mathbf R ). }
+        \]
+      </p>
+      <p>Then the probability of observing the measurement data given a candidate state is described by a <strong>likelihood function</strong>:</p>
+      <p>
+        \[
+        p(\mathbf z|\mathbf x).
+        \]
+      </p>
+      <p>Maximizing that likelihood produces exactly the weighted least-squares solution under Gaussian assumptions.</p>
+      <p>If prior information is also available,</p>
+      <p>
+        \[
+        p(\mathbf x),
+        \]
+      </p>
+      <p>then estimation becomes</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf x|\mathbf z) \propto p(\mathbf z|\mathbf x) p(\mathbf x). }
+        \]
+      </p>
+      <p>The estimator may then seek either</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{ML} }
+        \]
+      </p>
+      <p>or</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{MAP}. }
+        \]
+      </p>
+      <p>This leads directly to</p>
+      <p>
+        \[
+        \boxed{ \textbf{4.3.6 Maximum Likelihood and MAP Estimation} }
+        \]
+      </p>
+      <p>where the next section should develop:</p>
+      <ul>
+        <li>likelihood,</li>
+        <li>log-likelihood,</li>
+        <li>Gaussian likelihoods,</li>
+        <li>maximum likelihood estimation,</li>
+        <li>maximum a posteriori estimation,</li>
+        <li>prior probability,</li>
+        <li>posterior probability,</li>
+        <li>negative log-likelihood,</li>
+        <li>the connection between WLS and MLE,</li>
+        <li>the connection between prior-constrained WLS and MAP,</li>
+        <li>parameter estimation,</li>
+        <li>covariance and Fisher information,</li>
+        <li>and the distinction between deterministic optimization and probabilistic estimation.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.3.6 Maximum Likelihood and MAP Estimation</h2>
+
+      <p>
+        Nonlinear least squares has been developed as an optimization problem built from
+        nonlinear residuals, local Jacobians, weighted corrections, damping, convergence
+        control, and repeated relinearization.
+      </p>
+
+      <p>
+        The next section gives that objective a probabilistic interpretation. It develops
+        likelihood and log-likelihood, Gaussian measurement models, maximum likelihood
+        estimation, maximum a posteriori estimation, prior and posterior probability,
+        negative log-likelihood, Fisher information, parameter estimation, and the precise
+        relationship between weighted least squares, MLE, and MAP.
+      </p>
+
+      <a href="maximum-likelihood-map-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.6 Maximum Likelihood and MAP Estimation</h3>
+
+          <p>
+            Likelihood, log-likelihood, Gaussian observation models, maximum likelihood,
+            maximum a posteriori estimation, priors, posteriors, negative log-likelihood,
+            Fisher information, parameter estimation, and the statistical interpretation
+            of weighted least squares.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Maximum Likelihood and MAP Estimation &rarr;
+          </p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+
+</body>
+</html>
