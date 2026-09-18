@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.3.2 Linear and Weighted Least Squares | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      margin: 1rem 0 1.4rem;
+    }
+
+    .table-wrap table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table-wrap th,
+    .table-wrap td {
+      border: 1px solid #d8dee6;
+      padding: 0.75rem 0.85rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .table-wrap th {
+      font-weight: 700;
+      background: #f7f9fb;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="notes-hero">
+    <h1>Linear and Weighted Least Squares</h1>
+
+    <p class="notes-tagline">
+      Linear estimation from noisy observations using residual minimization, design matrices,
+      ordinary and weighted least squares, measurement covariance, prior information,
+      estimate covariance, geometric interpretation, rank and conditioning analysis,
+      robust numerical solution, and connections to dynamic and recursive estimation.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.3.2 Linear and Weighted Least Squares</h2>
+      <p>Once an estimation problem has been formulated, the next question is how to determine the unknown state or parameters from the available observations.</p>
+      <p>The simplest important case is the <strong>linear estimation problem</strong>:</p>
+      <p>
+        \[
+        \boxed{ \mathbf z=\mathbf H\mathbf x+\mathbf v }
+        \]
+      </p>
+      <p>where</p>
+      <ul>
+        <li><code>\mathbf z</code> is the measurement or observation vector,</li>
+        <li><code>\mathbf x</code> is the vector of unknown states or parameters,</li>
+        <li><code>\mathbf H</code> is the design, observation, or sensitivity matrix,</li>
+        <li><code>\mathbf v</code> is the measurement error.</li>
+      </ul>
+      <p>If the measurements were perfect and the equations exactly determined, the problem could sometimes be solved directly. Real estimation problems, however, usually contain <strong>more measurements than unknowns</strong>, and those measurements contain noise.</p>
+      <p>Therefore, in general,</p>
+      <p>
+        \[
+        \boxed{ \mathbf z \neq \mathbf H\mathbf x }
+        \]
+      </p>
+      <p>for every individual observation simultaneously.</p>
+      <p>Instead of searching for a state that satisfies every noisy equation exactly, least squares searches for the state that makes the overall disagreement between the observations and model predictions as small as possible.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Measurements} + \text{Measurement Model} \rightarrow \text{Residuals} \rightarrow \text{Residual Minimization} \rightarrow \text{Best-Fit Estimate} }
+        \]
+      </p>
+      <p>Linear least squares is therefore one of the fundamental mathematical foundations of state estimation, parameter estimation, sensor calibration, trajectory reconstruction, orbit determination, and many other estimation problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.1 From the Estimation Problem to Least Squares</h3>
+      <p>From Section 4.3.1, the general nonlinear observation model was</p>
+      <p>
+        \[
+        \mathbf z=h(\mathbf x,\boldsymbol{\theta})+\mathbf v.
+        \]
+      </p>
+      <p>For the present section, consider the linear case:</p>
+      <p>
+        \[
+        \boxed{ \mathbf z=\mathbf H\mathbf x+\mathbf v }
+        \]
+      </p>
+      <p>Suppose there are <code>m</code> measurements and <code>n</code> unknown quantities:</p>
+      <p>
+        \[
+        \mathbf z\in\mathbb R^m, \qquad \mathbf x\in\mathbb R^n, \qquad \mathbf H\in\mathbb R^{m\times n}.
+        \]
+      </p>
+      <p>In many practical estimation problems,</p>
+      <p>
+        \[
+        m>n.
+        \]
+      </p>
+      <p>The system is then <strong>overdetermined</strong>.</p>
+      <p>Because the measurements contain noise, a value of <code>\mathbf x</code> that satisfies every equation exactly generally does not exist.</p>
+      <p>Therefore, the problem changes from</p>
+      <p>
+        \[
+        \text{Solve exactly}
+        \]
+      </p>
+      <p>to</p>
+      <p>
+        \[
+        \boxed{ \text{Find the state that best fits all observations simultaneously.} }
+        \]
+      </p>
+      <p>This is the central idea of least-squares estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.2 Linear Observation Model</h3>
+      <p>Consider the observation equations</p>
+      <p>
+        \[
+        \begin{aligned} z_1 &= H_{11}x_1+H_{12}x_2+\cdots+H_{1n}x_n+v_1,\\ z_2 &= H_{21}x_1+H_{22}x_2+\cdots+H_{2n}x_n+v_2,\\ &\vdots\\ z_m &= H_{m1}x_1+H_{m2}x_2+\cdots+H_{mn}x_n+v_m. \end{aligned}
+        \]
+      </p>
+      <p>These equations can be collected into matrix form:</p>
+      <p>
+        \[
+        \boxed{ \mathbf z=\mathbf H\mathbf x+\mathbf v. }
+        \]
+      </p>
+      <p>The matrix</p>
+      <p>
+        \[
+        \mathbf H= \begin{bmatrix} H_{11}&H_{12}&\cdots&H_{1n}\\ H_{21}&H_{22}&\cdots&H_{2n}\\ \vdots&\vdots&\ddots&\vdots\\ H_{m1}&H_{m2}&\cdots&H_{mn} \end{bmatrix}
+        \]
+      </p>
+      <p>contains the relationship between the unknown quantities and observations.</p>
+      <p>Each <strong>row</strong> corresponds to an observation equation.</p>
+      <p>Each <strong>column</strong> describes how the complete observation set responds to one unknown quantity.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Rows of }\mathbf H \rightarrow \text{Measurements} }
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boxed{ \text{Columns of }\mathbf H \rightarrow \text{Unknown State or Parameter Components}. }
+        \]
+      </p>
+      <p>This interpretation becomes extremely important when studying rank, geometry, conditioning, observability, and parameter correlation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.3 Predicted Measurements and Residuals</h3>
+      <p>Given a candidate state estimate <code>\hat{\mathbf x}</code>, the corresponding predicted observations are</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}=\mathbf H\hat{\mathbf x}. }
+        \]
+      </p>
+      <p>The residual vector is</p>
+      <p>
+        \[
+        \boxed{ \mathbf r = \mathbf z-\hat{\mathbf z} = \mathbf z-\mathbf H\hat{\mathbf x}. }
+        \]
+      </p>
+      <p>Component-wise,</p>
+      <p>
+        \[
+        r_i=z_i-\hat z_i.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Residual} = \text{Observed Measurement} - \text{Predicted Measurement}. }
+        \]
+      </p>
+      <p>If the candidate state changes, the predicted observations change, and therefore the residuals also change.</p>
+      <p>Least squares chooses the candidate state for which the overall residual magnitude is minimized.</p>
+      <p>Remember that the residual is a <strong>measurement-space quantity</strong>. It should not be confused with the state-estimation error.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.4 Why an Exact Solution Usually Does Not Exist</h3>
+      <p>Suppose three measurements are used to estimate one unknown quantity:</p>
+      <p>
+        \[
+        \begin{aligned} z_1 &= x+v_1,\\ z_2 &= x+v_2,\\ z_3 &= x+v_3. \end{aligned}
+        \]
+      </p>
+      <p>Suppose the measured values are</p>
+      <p>
+        \[
+        z_1=10.1,\qquad z_2=9.9,\qquad z_3=10.2.
+        \]
+      </p>
+      <p>There is no single value of <code>x</code> that satisfies</p>
+      <p>
+        \[
+        x=10.1,\qquad x=9.9,\qquad x=10.2
+        \]
+      </p>
+      <p>simultaneously.</p>
+      <p>The inconsistency is not necessarily a problem with the model. It is the natural consequence of measurement uncertainty.</p>
+      <p>Instead, we seek the value of <code>x</code> that gives the smallest overall disagreement.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Noisy Overdetermined System} \rightarrow \text{Best-Fit Solution Rather Than Exact Solution}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.5 Ordinary Least-Squares Cost Function</h3>
+      <p>For the linear model,</p>
+      <p>
+        \[
+        \mathbf r=\mathbf z-\mathbf H\mathbf x.
+        \]
+      </p>
+      <p>Ordinary least squares defines the cost function</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x)=\mathbf r^T\mathbf r. }
+        \]
+      </p>
+      <p>Substituting the residual,</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = (\mathbf z-\mathbf H\mathbf x)^T (\mathbf z-\mathbf H\mathbf x). }
+        \]
+      </p>
+      <p>Since</p>
+      <p>
+        \[
+        \mathbf r^T\mathbf r = \sum_{i=1}^{m}r_i^2,
+        \]
+      </p>
+      <p>we may also write</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = \sum_{i=1}^{m} (z_i-\hat z_i)^2. }
+        \]
+      </p>
+      <p>The least-squares estimate is</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{LS} = \arg\min_{\mathbf x} J(\mathbf x). }
+        \]
+      </p>
+      <p>This is why the method is called <strong>least squares</strong>: it minimizes the sum of the squared measurement residuals.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.6 Why Square the Residuals?</h3>
+      <p>Suppose the residuals are</p>
+      <p>
+        \[
+        r_1=+2, \qquad r_2=-2.
+        \]
+      </p>
+      <p>If they were simply added,</p>
+      <p>
+        \[
+        r_1+r_2=0,
+        \]
+      </p>
+      <p>which could misleadingly suggest perfect agreement.</p>
+      <p>Squaring gives</p>
+      <p>
+        \[
+        r_1^2+r_2^2=4+4=8.
+        \]
+      </p>
+      <p>Therefore positive and negative errors cannot cancel.</p>
+      <p>Squaring also produces a smooth differentiable objective function:</p>
+      <p>
+        \[
+        J(\mathbf x)=\mathbf r^T\mathbf r\ge0.
+        \]
+      </p>
+      <p>This allows the minimum to be found analytically for the linear case.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Residual Squaring} \rightarrow \text{No Sign Cancellation} + \text{Nonnegative Cost} + \text{Convenient Optimization}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.7 Derivation of the Ordinary Least-Squares Solution</h3>
+      <p>Start with</p>
+      <p>
+        \[
+        J(\mathbf x) = (\mathbf z-\mathbf H\mathbf x)^T (\mathbf z-\mathbf H\mathbf x).
+        \]
+      </p>
+      <p>Expand:</p>
+      <p>
+        \[
+        J = \mathbf z^T\mathbf z - 2\mathbf x^T\mathbf H^T\mathbf z + \mathbf x^T\mathbf H^T\mathbf H\mathbf x.
+        \]
+      </p>
+      <p>At the minimum,</p>
+      <p>
+        \[
+        \frac{\partial J}{\partial\mathbf x}=0.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        -2\mathbf H^T\mathbf z + 2\mathbf H^T\mathbf H\mathbf x = 0.
+        \]
+      </p>
+      <p>Hence,</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\mathbf H\hat{\mathbf x} = \mathbf H^T\mathbf z. }
+        \]
+      </p>
+      <p>These are the <strong>normal equations</strong>.</p>
+      <p>If <code>\mathbf H^T\mathbf H</code> is nonsingular,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{LS} = (\mathbf H^T\mathbf H)^{-1} \mathbf H^T\mathbf z. }
+        \]
+      </p>
+      <p>This is the classical ordinary least-squares solution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.8 Meaning of the Normal Equations</h3>
+      <p>The normal equations are</p>
+      <p>
+        \[
+        \mathbf H^T (\mathbf z-\mathbf H\hat{\mathbf x}) = 0.
+        \]
+      </p>
+      <p>Since</p>
+      <p>
+        \[
+        \hat{\mathbf r} = \mathbf z-\mathbf H\hat{\mathbf x},
+        \]
+      </p>
+      <p>we obtain</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\hat{\mathbf r}=0. }
+        \]
+      </p>
+      <p>This has an important geometric interpretation.</p>
+      <p>The residual vector at the least-squares solution is orthogonal to every column of <code>\mathbf H</code>.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r} \perp \operatorname{Col}(\mathbf H). }
+        \]
+      </p>
+      <p>Least squares therefore does more than simply produce a formula. It finds the point in the measurement-model subspace that is closest to the actual observation vector.</p>
+      <p><strong>Engineering interpretation:</strong> The orthogonality condition means there is no remaining component of the residual that can be reduced by moving the estimate within the column space of the design matrix. The remaining residual lies outside the set of measurements that the assumed linear model can reproduce.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.9 Geometric Interpretation of Least Squares</h3>
+      <p>The model</p>
+      <p>
+        \[
+        \mathbf H\mathbf x
+        \]
+      </p>
+      <p>can produce only vectors lying in the column space of <code>\mathbf H</code>:</p>
+      <p>
+        \[
+        \operatorname{Col}(\mathbf H).
+        \]
+      </p>
+      <p>The measured vector <code>\mathbf z</code>, because of noise, may not lie exactly in that space.</p>
+      <p>Least squares projects <code>\mathbf z</code> onto the column space:</p>
+      <p>
+        \[
+        \boxed{ \mathbf z \rightarrow \hat{\mathbf z} = \mathbf H\hat{\mathbf x}. }
+        \]
+      </p>
+      <p>The residual is</p>
+      <p>
+        \[
+        \hat{\mathbf r} = \mathbf z-\hat{\mathbf z}.
+        \]
+      </p>
+      <p>At the optimum,</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\hat{\mathbf r}=0. }
+        \]
+      </p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Observation Vector} = \text{Best Model-Compatible Component} + \text{Orthogonal Residual}. }
+        \]
+      </p>
+      <p>This geometric viewpoint is especially useful for understanding rank deficiency and poorly observable directions.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.10 Projection Matrix</h3>
+      <p>For full-column-rank <code>\mathbf H</code>,</p>
+      <p>
+        \[
+        \hat{\mathbf z} = \mathbf H (\mathbf H^T\mathbf H)^{-1} \mathbf H^T\mathbf z.
+        \]
+      </p>
+      <p>Define</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_H = \mathbf H (\mathbf H^T\mathbf H)^{-1} \mathbf H^T. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z} = \mathbf P_H\mathbf z. }
+        \]
+      </p>
+      <p>The residual becomes</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r} = (\mathbf I-\mathbf P_H)\mathbf z. }
+        \]
+      </p>
+      <p>Thus <code>\mathbf P_H</code> projects the measurement vector onto the column space of <code>\mathbf H</code>.</p>
+      <p>This gives a direct mathematical representation of the geometric interpretation of least squares.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.11 Simple Scalar Least-Squares Example</h3>
+      <p>Consider again</p>
+      <p>
+        \[
+        z_i=x+v_i
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        z_1=10.1,\qquad z_2=9.9,\qquad z_3=10.2.
+        \]
+      </p>
+      <p>The cost function is</p>
+      <p>
+        \[
+        J(x) = (10.1-x)^2 + (9.9-x)^2 + (10.2-x)^2.
+        \]
+      </p>
+      <p>Differentiate:</p>
+      <p>
+        \[
+        \frac{dJ}{dx} = -2(10.1-x) -2(9.9-x) -2(10.2-x).
+        \]
+      </p>
+      <p>Setting this equal to zero gives</p>
+      <p>
+        \[
+        3x=30.2.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \hat x=10.0667. }
+        \]
+      </p>
+      <p>For equally accurate independent measurements,</p>
+      <p>
+        \[
+        \boxed{ \hat x = \frac{1}{m} \sum_{i=1}^{m}z_i. }
+        \]
+      </p>
+      <p>The arithmetic mean is therefore a special case of least-squares estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.12 Why Ordinary Least Squares Is Not Always Appropriate</h3>
+      <p>Ordinary least squares treats every residual equally:</p>
+      <p>
+        \[
+        J=\sum_i r_i^2.
+        \]
+      </p>
+      <p>But suppose two sensors measure the same quantity and have standard deviations</p>
+      <p>
+        \[
+        \sigma_1=0.1
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \sigma_2=10.
+        \]
+      </p>
+      <p>The first measurement is much more precise.</p>
+      <p>Treating both measurements equally ignores known information about their quality.</p>
+      <p>This motivates <strong>weighted least squares</strong>.</p>
+      <p>The principle is</p>
+      <p>
+        \[
+        \boxed{ \text{Measurements Should Influence the Estimate According to Their Uncertainty}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.13 Measurement Covariance</h3>
+      <p>Let</p>
+      <p>
+        \[
+        \mathbf v
+        \]
+      </p>
+      <p>represent measurement error.</p>
+      <p>Its covariance is</p>
+      <p>
+        \[
+        \boxed{ \mathbf R = E[ \mathbf v\mathbf v^T ]. }
+        \]
+      </p>
+      <p>If the measurement errors are independent,</p>
+      <p>
+        \[
+        \mathbf R = \begin{bmatrix} \sigma_1^2&0&\cdots&0\\ 0&\sigma_2^2&\cdots&0\\ \vdots&\vdots&\ddots&\vdots\\ 0&0&\cdots&\sigma_m^2 \end{bmatrix}.
+        \]
+      </p>
+      <p>Smaller variance means greater measurement precision.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \sigma_i^2\downarrow \Rightarrow \text{Measurement Confidence}\uparrow. }
+        \]
+      </p>
+      <p>The covariance matrix allows this information to be incorporated mathematically into the estimator.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.14 Weight Matrix</h3>
+      <p>The conventional statistical weighting matrix is</p>
+      <p>
+        \[
+        \boxed{ \mathbf W=\mathbf R^{-1}. }
+        \]
+      </p>
+      <p>For independent measurements,</p>
+      <p>
+        \[
+        \mathbf W = \begin{bmatrix} 1/\sigma_1^2&0&\cdots\\ 0&1/\sigma_2^2&\cdots\\ \vdots&\vdots&\ddots \end{bmatrix}.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ w_i=\frac{1}{\sigma_i^2}. }
+        \]
+      </p>
+      <p>A measurement with smaller uncertainty receives greater weight.</p>
+      <p>A measurement with larger uncertainty receives less weight.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Accuracy} \rightarrow \text{Statistical Weight} \rightarrow \text{Influence on Estimate}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.15 Weighted Least-Squares Cost Function</h3>
+      <p>Weighted least squares defines</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = \mathbf r^T\mathbf W\mathbf r. }
+        \]
+      </p>
+      <p>Using</p>
+      <p>
+        \[
+        \mathbf W=\mathbf R^{-1},
+        \]
+      </p>
+      <p>we obtain</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = (\mathbf z-\mathbf H\mathbf x)^T \mathbf R^{-1} (\mathbf z-\mathbf H\mathbf x). }
+        \]
+      </p>
+      <p>For independent measurements,</p>
+      <p>
+        \[
+        \boxed{ J = \sum_{i=1}^{m} \frac{r_i^2}{\sigma_i^2}. }
+        \]
+      </p>
+      <p>Each residual is therefore evaluated relative to the expected uncertainty of its measurement.</p>
+      <p>This is more meaningful than comparing raw residual magnitudes when the measurements have different accuracy or units.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.16 Normalized Residual Interpretation</h3>
+      <p>For an independent scalar measurement,</p>
+      <p>
+        \[
+        \frac{r_i}{\sigma_i}
+        \]
+      </p>
+      <p>represents the residual relative to its standard deviation.</p>
+      <p>The weighted cost becomes</p>
+      <p>
+        \[
+        J = \sum_i \left( \frac{r_i}{\sigma_i} \right)^2.
+        \]
+      </p>
+      <p>Therefore weighted least squares effectively asks:</p>
+      <blockquote>
+        <p>How large is each measurement mismatch relative to the uncertainty expected for that measurement?</p>
+      </blockquote>
+      <p>A residual of <code>1</code> m may be extremely significant for a millimetre-accuracy sensor but almost insignificant for a measurement with tens of metres of uncertainty.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Residual Magnitude Alone Does Not Determine Its Statistical Importance}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.17 Derivation of Weighted Least Squares</h3>
+      <p>Start from</p>
+      <p>
+        \[
+        J(\mathbf x) = (\mathbf z-\mathbf H\mathbf x)^T \mathbf W (\mathbf z-\mathbf H\mathbf x).
+        \]
+      </p>
+      <p>Assuming <code>\mathbf W</code> is symmetric,</p>
+      <p>
+        \[
+        \frac{\partial J}{\partial\mathbf x} = -2\mathbf H^T\mathbf W (\mathbf z-\mathbf H\mathbf x).
+        \]
+      </p>
+      <p>At the minimum,</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf W (\mathbf z-\mathbf H\hat{\mathbf x}) = 0.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\mathbf W\mathbf H \hat{\mathbf x} = \mathbf H^T\mathbf W\mathbf z. }
+        \]
+      </p>
+      <p>These are the <strong>weighted normal equations</strong>.</p>
+      <p>If the matrix is nonsingular,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{WLS} = (\mathbf H^T\mathbf W\mathbf H)^{-1} \mathbf H^T\mathbf W\mathbf z. }
+        \]
+      </p>
+      <p>Using</p>
+      <p>
+        \[
+        \mathbf W=\mathbf R^{-1},
+        \]
+      </p>
+      <p>the solution becomes</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{WLS} = (\mathbf H^T\mathbf R^{-1}\mathbf H)^{-1} \mathbf H^T\mathbf R^{-1}\mathbf z. }
+        \]
+      </p>
+      <p>This is one of the most important equations in estimation theory.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.18 Information Matrix</h3>
+      <p>The matrix</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \mathbf H^T\mathbf R^{-1}\mathbf H }
+        \]
+      </p>
+      <p>is often interpreted as an <strong>information matrix</strong>.</p>
+      <p>It describes how much measurement information is available about the unknown state.</p>
+      <p>The contribution of measurement <code>i</code> can be understood through its sensitivity and uncertainty.</p>
+      <p>A measurement provides more useful information when it has</p>
+      <ul>
+        <li>strong sensitivity to the unknown quantity,</li>
+        <li>low measurement uncertainty,</li>
+        <li>useful geometry,</li>
+        <li>independent information relative to other observations.</li>
+      </ul>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Information} \sim \frac{\text{Sensitivity}^2} {\text{Measurement Uncertainty}}. }
+        \]
+      </p>
+      <p>This relationship helps connect least squares with covariance, observability, experiment design, and recursive estimation.</p>
+      <p><strong>Engineering interpretation:</strong> The information matrix is also useful for diagnosis. Its eigenvectors identify combinations of states that are strongly or weakly constrained, while small eigenvalues indicate weak-information directions that typically correspond to large uncertainty after inversion.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.19 Covariance of the Least-Squares Estimate</h3>
+      <p>Suppose</p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\mathbf x+\mathbf v
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        E[\mathbf v]=0
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        E[\mathbf v\mathbf v^T]=\mathbf R.
+        \]
+      </p>
+      <p>The weighted least-squares estimate is</p>
+      <p>
+        \[
+        \hat{\mathbf x} = (\mathbf H^T\mathbf R^{-1}\mathbf H)^{-1} \mathbf H^T\mathbf R^{-1}\mathbf z.
+        \]
+      </p>
+      <p>Under the standard linear model assumptions, the covariance of the estimation error is</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_{\hat x} = (\mathbf H^T\mathbf R^{-1}\mathbf H)^{-1}. }
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Information Matrix} = \mathbf P_{\hat x}^{-1}. }
+        \]
+      </p>
+      <p>or</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_{\hat x}^{-1} = \mathbf H^T\mathbf R^{-1}\mathbf H. }
+        \]
+      </p>
+      <p>This is a powerful interpretation:</p>
+      <p>
+        \[
+        \boxed{ \text{More Independent Measurement Information} \rightarrow \text{Smaller Estimate Uncertainty}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.20 Meaning of Estimate Covariance</h3>
+      <p>Suppose</p>
+      <p>
+        \[
+        \mathbf P_{\hat x} = \begin{bmatrix} \sigma_{x_1}^2 & P_{12}\\ P_{21} & \sigma_{x_2}^2 \end{bmatrix}.
+        \]
+      </p>
+      <p>The diagonal terms represent estimated variances:</p>
+      <p>
+        \[
+        P_{ii}=\sigma_{x_i}^2.
+        \]
+      </p>
+      <p>The off-diagonal terms describe covariance between estimation errors.</p>
+      <p>The correlation coefficient is</p>
+      <p>
+        \[
+        \boxed{ \rho_{ij} = \frac{P_{ij}} {\sqrt{P_{ii}P_{jj}}}. }
+        \]
+      </p>
+      <p>If</p>
+      <p>
+        \[
+        |\rho_{ij}|\approx1,
+        \]
+      </p>
+      <p>the estimated quantities are strongly correlated.</p>
+      <p>This may indicate that the observations have difficulty distinguishing their individual effects.</p>
+      <p>Therefore covariance provides information not only about <strong>how uncertain</strong> the solution is, but also about <strong>which unknowns are coupled</strong>.</p>
+      <p><strong>Engineering interpretation:</strong> For multidimensional states, covariance also has a geometric interpretation. A position covariance defines an uncertainty ellipsoid whose principal axes follow the covariance eigenvectors, so a small scalar residual can coexist with a large uncertainty direction.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.21 Unbiasedness of Linear Least Squares</h3>
+      <p>For</p>
+      <p>
+        \[
+        \mathbf z=\mathbf H\mathbf x+\mathbf v,
+        \]
+      </p>
+      <p>suppose</p>
+      <p>
+        \[
+        E[\mathbf v]=0.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        E[\hat{\mathbf x}] = \mathbf x
+        \]
+      </p>
+      <p>for the standard full-rank least-squares estimator.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ E[\hat{\mathbf x}-\mathbf x]=0. }
+        \]
+      </p>
+      <p>The estimator is unbiased under the assumed model.</p>
+      <p>However, this conclusion depends on the model assumptions.</p>
+      <p>If the measurement contains an unmodelled bias,</p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\mathbf x+\mathbf b+\boldsymbol{\eta},
+        \]
+      </p>
+      <p>then the estimated state can also become biased.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Unbiased Noise Assumption} \neq \text{Guarantee of an Unbiased Real System}. }
+        \]
+      </p>
+      <p>Model errors and systematic sensor errors still matter.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.22 Gauss-Markov Interpretation</h3>
+      <p>Under the classical assumptions that</p>
+      <ul>
+        <li>the model is linear,</li>
+        <li>the observation errors have zero mean,</li>
+        <li>the covariance is correctly represented,</li>
+        <li>the design matrix has sufficient rank,</li>
+      </ul>
+      <p>weighted least squares has an important optimality property.</p>
+      <p>Among linear unbiased estimators, it provides a minimum-variance solution under the corresponding covariance model.</p>
+      <p>This is closely related to the <strong>Gauss-Markov theorem</strong>.</p>
+      <p>Thus least squares is not simply a convenient curve-fitting technique. Under appropriate assumptions, it has a rigorous statistical interpretation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.23 Weighted Least Squares and Gaussian Maximum Likelihood</h3>
+      <p>Suppose</p>
+      <p>
+        \[
+        \mathbf v \sim \mathcal N(\mathbf0,\mathbf R).
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        p(\mathbf z|\mathbf x) \propto \exp \left[ -\frac12 (\mathbf z-\mathbf H\mathbf x)^T \mathbf R^{-1} (\mathbf z-\mathbf H\mathbf x) \right].
+        \]
+      </p>
+      <p>Maximizing the likelihood is equivalent to minimizing</p>
+      <p>
+        \[
+        (\mathbf z-\mathbf H\mathbf x)^T \mathbf R^{-1} (\mathbf z-\mathbf H\mathbf x).
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Weighted Least Squares} \Longleftrightarrow \text{Maximum Likelihood} }
+        \]
+      </p>
+      <p>for linear measurements with Gaussian errors.</p>
+      <p>This important relationship will be developed more generally in <strong>4.3.6 Maximum Likelihood and MAP Estimation</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.24 Correlated Measurement Errors</h3>
+      <p>The measurement covariance need not be diagonal.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \mathbf R= \begin{bmatrix} \sigma_1^2 & R_{12}\\ R_{21} & \sigma_2^2 \end{bmatrix}.
+        \]
+      </p>
+      <p>If</p>
+      <p>
+        \[
+        R_{12}\neq0,
+        \]
+      </p>
+      <p>the measurement errors are correlated.</p>
+      <p>The WLS objective remains</p>
+      <p>
+        \[
+        \boxed{ J = \mathbf r^T\mathbf R^{-1}\mathbf r. }
+        \]
+      </p>
+      <p>The complete covariance must be used.</p>
+      <p>Ignoring the off-diagonal terms effectively treats correlated observations as if they contained more independent information than they actually do.</p>
+      <p><strong>Engineering interpretation:</strong> collecting more measurements does not automatically provide proportionally more information if their errors are strongly correlated.</p>
+      <p><strong>Engineering interpretation:</strong> Correlation can arise when measurements share a clock, calibration process, atmospheric correction, image-processing chain, or other common error source. Off-diagonal covariance terms therefore represent real shared uncertainty and should not be discarded merely to simplify the algebra.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.25 Whitening the Measurements</h3>
+      <p>Weighted least squares can also be converted into an ordinary least-squares problem.</p>
+      <p>Suppose a matrix <code>\mathbf L</code> satisfies</p>
+      <p>
+        \[
+        \mathbf R=\mathbf L\mathbf L^T.
+        \]
+      </p>
+      <p>For example, <code>\mathbf L</code> may be obtained from a Cholesky factorization.</p>
+      <p>Define whitened quantities:</p>
+      <p>
+        \[
+        \boxed{ \tilde{\mathbf z} = \mathbf L^{-1}\mathbf z }
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boxed{ \tilde{\mathbf H} = \mathbf L^{-1}\mathbf H. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \tilde{\mathbf z} = \tilde{\mathbf H}\mathbf x + \tilde{\mathbf v},
+        \]
+      </p>
+      <p>where the transformed measurement noise has identity covariance:</p>
+      <p>
+        \[
+        E[ \tilde{\mathbf v}\tilde{\mathbf v}^T ] = \mathbf I.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Weighted Least Squares} \rightarrow \text{Ordinary Least Squares in Whitened Coordinates}. }
+        \]
+      </p>
+      <p>This is both mathematically useful and numerically important.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.26 Measurements with Different Units</h3>
+      <p>Suppose the measurement vector contains</p>
+      <p>
+        \[
+        \mathbf z= \begin{bmatrix} \rho\\ \dot\rho\\ \alpha \end{bmatrix},
+        \]
+      </p>
+      <p>where</p>
+      <ul>
+        <li><code>\rho</code> is range in metres,</li>
+        <li><code>\dot\rho</code> is range rate in metres per second,</li>
+        <li><code>\alpha</code> is an angle in radians.</li>
+      </ul>
+      <p>Directly minimizing</p>
+      <p>
+        \[
+        r_\rho^2+r_{\dot\rho}^2+r_\alpha^2
+        \]
+      </p>
+      <p>can be physically misleading because the residuals have different units and scales.</p>
+      <p>Weighting by covariance gives</p>
+      <p>
+        \[
+        J = \frac{r_\rho^2}{\sigma_\rho^2} + \frac{r_{\dot\rho}^2}{\sigma_{\dot\rho}^2} + \frac{r_\alpha^2}{\sigma_\alpha^2}
+        \]
+      </p>
+      <p>when the measurements are independent.</p>
+      <p>Each residual is then measured relative to its expected uncertainty.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Covariance Weighting Makes Heterogeneous Measurements Statistically Comparable}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.27 A Priori Information</h3>
+      <p>Suppose an approximate state is already available:</p>
+      <p>
+        \[
+        \bar{\mathbf x}_0
+        \]
+      </p>
+      <p>with covariance</p>
+      <p>
+        \[
+        \mathbf P_0.
+        \]
+      </p>
+      <p>The measurement cost is</p>
+      <p>
+        \[
+        J_m = (\mathbf z-\mathbf H\mathbf x)^T \mathbf R^{-1} (\mathbf z-\mathbf H\mathbf x).
+        \]
+      </p>
+      <p>The prior cost is</p>
+      <p>
+        \[
+        J_p = (\mathbf x-\bar{\mathbf x}_0)^T \mathbf P_0^{-1} (\mathbf x-\bar{\mathbf x}_0).
+        \]
+      </p>
+      <p>The combined objective becomes</p>
+      <p>
+        \[
+        \boxed{ \begin{aligned} J(\mathbf x) ={}& (\mathbf z-\mathbf H\mathbf x)^T \mathbf R^{-1} (\mathbf z-\mathbf H\mathbf x) \\ &+ (\mathbf x-\bar{\mathbf x}_0)^T \mathbf P_0^{-1} (\mathbf x-\bar{\mathbf x}_0). \end{aligned} }
+        \]
+      </p>
+      <p>This combines information from the prior estimate and new observations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.28 Least Squares with A Priori Constraint</h3>
+      <p>Differentiating the combined cost gives</p>
+      <p>
+        \[
+        \left( \mathbf H^T\mathbf R^{-1}\mathbf H + \mathbf P_0^{-1} \right) \hat{\mathbf x} = \mathbf H^T\mathbf R^{-1}\mathbf z + \mathbf P_0^{-1}\bar{\mathbf x}_0.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \left( \mathbf H^T\mathbf R^{-1}\mathbf H + \mathbf P_0^{-1} \right)^{-1} \left( \mathbf H^T\mathbf R^{-1}\mathbf z + \mathbf P_0^{-1}\bar{\mathbf x}_0 \right). }
+        \]
+      </p>
+      <p>The posterior covariance is</p>
+      <p>
+        \[
+        \boxed{ \mathbf P = \left( \mathbf P_0^{-1} + \mathbf H^T\mathbf R^{-1}\mathbf H \right)^{-1}. }
+        \]
+      </p>
+      <p>This equation gives a particularly important information interpretation:</p>
+      <p>
+        \[
+        \boxed{ \text{Posterior Information} = \text{Prior Information} + \text{Measurement Information}. }
+        \]
+      </p>
+      <p>That is,</p>
+      <p>
+        \[
+        \boxed{ \mathbf P^{-1} = \mathbf P_0^{-1} + \mathbf H^T\mathbf R^{-1}\mathbf H. }
+        \]
+      </p>
+      <p>This relationship becomes central when connecting batch estimation to Bayesian and recursive estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.29 Strength of the Prior</h3>
+      <p>If</p>
+      <p>
+        \[
+        \mathbf P_0
+        \]
+      </p>
+      <p>is small, the prior is precise.</p>
+      <p>Then</p>
+      <p>
+        \[
+        \mathbf P_0^{-1}
+        \]
+      </p>
+      <p>is large, giving the prior strong influence.</p>
+      <p>Conversely,</p>
+      <p>
+        \[
+        \mathbf P_0
+        \]
+      </p>
+      <p>large implies weak prior information.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_0\downarrow \Rightarrow \text{Prior Weight}\uparrow. }
+        \]
+      </p>
+      <p>But a prior should not be made artificially precise simply to stabilize an otherwise weak estimation problem.</p>
+      <p>An incorrect overconfident prior can dominate valid measurement information and bias the solution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.30 A Priori Information as Additional Observations</h3>
+      <p>Prior information can also be interpreted as another observation equation:</p>
+      <p>
+        \[
+        \bar{\mathbf x}_0 = \mathbf I\mathbf x+\mathbf e_0,
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        E[\mathbf e_0\mathbf e_0^T] = \mathbf P_0.
+        \]
+      </p>
+      <p>The complete estimation problem can therefore be written as</p>
+      <p>
+        \[
+        \begin{bmatrix} \mathbf z\\ \bar{\mathbf x}_0 \end{bmatrix} = \begin{bmatrix} \mathbf H\\ \mathbf I \end{bmatrix} \mathbf x + \begin{bmatrix} \mathbf v\\ \mathbf e_0 \end{bmatrix}.
+        \]
+      </p>
+      <p>This demonstrates that prior information and measurements can be treated within the same mathematical framework.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.31 Rank Requirement</h3>
+      <p>For a unique unconstrained least-squares solution,</p>
+      <p>
+        \[
+        \mathbf H
+        \]
+      </p>
+      <p>must have sufficient independent columns.</p>
+      <p>For <code>n</code> unknowns,</p>
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathbf H)=n. }
+        \]
+      </p>
+      <p>If</p>
+      <p>
+        \[
+        \operatorname{rank}(\mathbf H)<n,
+        \]
+      </p>
+      <p>then some combination of unknown quantities cannot be uniquely determined from the observations.</p>
+      <p>Consequently,</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf H
+        \]
+      </p>
+      <p>is singular in ordinary least squares.</p>
+      <p>Similarly,</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf R^{-1}\mathbf H
+        \]
+      </p>
+      <p>will be singular when the weighted problem lacks sufficient independent information.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Full Measurement Count} \neq \text{Full Information Rank}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.32 Rank Deficiency Example</h3>
+      <p>Consider</p>
+      <p>
+        \[
+        \mathbf H= \begin{bmatrix} 1&1\\ 2&2\\ 3&3 \end{bmatrix}.
+        \]
+      </p>
+      <p>The second column is exactly equal to the first.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \operatorname{rank}(\mathbf H)=1
+        \]
+      </p>
+      <p>even though there are two unknowns.</p>
+      <p>If</p>
+      <p>
+        \[
+        \mathbf x= \begin{bmatrix} x_1\\ x_2 \end{bmatrix},
+        \]
+      </p>
+      <p>the measurements depend only on</p>
+      <p>
+        \[
+        x_1+x_2.
+        \]
+      </p>
+      <p>The estimator may determine that combination but cannot distinguish <code>x_1</code> and <code>x_2</code> individually.</p>
+      <p>This is the linear algebra version of the identifiability problem discussed in Section 4.3.1.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.33 More Measurements Do Not Guarantee Better Geometry</h3>
+      <p>Suppose one observation row is</p>
+      <p>
+        \[
+        \mathbf h^T.
+        \]
+      </p>
+      <p>Repeating exactly the same observation many times gives</p>
+      <p>
+        \[
+        \mathbf H= \begin{bmatrix} \mathbf h^T\\ \mathbf h^T\\ \mathbf h^T\\ \vdots \end{bmatrix}.
+        \]
+      </p>
+      <p>The number of measurements increases, but the measurement geometry does not fundamentally change.</p>
+      <p>If some state direction was unobservable from <code>\mathbf h</code>, repeating the same geometry does not create sensitivity to that direction.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{More Measurements} \neq \text{More Independent Measurement Directions}. }
+        \]
+      </p>
+      <p>Diverse measurement geometry is often more valuable than simply increasing measurement count.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.34 Conditioning</h3>
+      <p>A matrix may have full rank and still be difficult to solve numerically.</p>
+      <p>Suppose two columns of <code>\mathbf H</code> are nearly linearly dependent.</p>
+      <p>Then</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf H
+        \]
+      </p>
+      <p>may be nearly singular.</p>
+      <p>The problem is then <strong>ill-conditioned</strong>.</p>
+      <p>A common measure is the condition number:</p>
+      <p>
+        \[
+        \boxed{ \kappa(\mathbf H) = \frac{\sigma_{\max}} {\sigma_{\min}}, }
+        \]
+      </p>
+      <p>where <code>\sigma_{\max}</code> and <code>\sigma_{\min}</code> are the largest and smallest singular values.</p>
+      <p>If</p>
+      <p>
+        \[
+        \kappa(\mathbf H)\gg1,
+        \]
+      </p>
+      <p>small changes in the observations can produce large changes in the estimated state.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Full Rank} \not\Rightarrow \text{Well-Conditioned Estimation}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> Rank asks whether a unique solution exists in principle; conditioning asks how sensitive that solution is to small perturbations. A full-rank matrix can therefore still produce a fragile estimate when its smallest singular value is very small.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.35 Why Forming the Normal Equations Can Be Numerically Risky</h3>
+      <p>The analytical expression</p>
+      <p>
+        \[
+        \hat{\mathbf x} = (\mathbf H^T\mathbf H)^{-1} \mathbf H^T\mathbf z
+        \]
+      </p>
+      <p>is useful for understanding least squares.</p>
+      <p>However, explicitly forming and inverting</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf H
+        \]
+      </p>
+      <p>is not always the best numerical implementation.</p>
+      <p>Approximately,</p>
+      <p>
+        \[
+        \boxed{ \kappa(\mathbf H^T\mathbf H) \approx \kappa(\mathbf H)^2. }
+        \]
+      </p>
+      <p>Therefore, forming the normal equations can worsen conditioning.</p>
+      <p>A problem that is moderately ill-conditioned in <code>\mathbf H</code> can become substantially more difficult when expressed through <code>\mathbf H^T\mathbf H</code>.</p>
+      <p><strong>Engineering interpretation:</strong> the closed-form inverse is an important theoretical equation, but production estimation software should not automatically implement the equation literally using an explicit matrix inverse.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.36 Never Invert a Matrix Just Because the Equation Contains an Inverse</h3>
+      <p>Mathematical derivations often write</p>
+      <p>
+        \[
+        \mathbf A^{-1}\mathbf b.
+        \]
+      </p>
+      <p>Numerically, it is generally preferable to solve</p>
+      <p>
+        \[
+        \boxed{ \mathbf A\mathbf x=\mathbf b }
+        \]
+      </p>
+      <p>directly rather than explicitly computing</p>
+      <p>
+        \[
+        \mathbf A^{-1}.
+        \]
+      </p>
+      <p>Thus the normal equations should generally be treated as</p>
+      <p>
+        \[
+        \boxed{ (\mathbf H^T\mathbf W\mathbf H)\hat{\mathbf x} = \mathbf H^T\mathbf W\mathbf z }
+        \]
+      </p>
+      <p>and solved using an appropriate linear-system method.</p>
+      <p>This distinction between <strong>mathematical notation</strong> and <strong>numerical implementation</strong> is important throughout estimation theory.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.37 QR Factorization</h3>
+      <p>A more numerically robust solution can be obtained using QR factorization.</p>
+      <p>Suppose</p>
+      <p>
+        \[
+        \boxed{ \mathbf H=\mathbf Q\mathbf R_H, }
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \mathbf Q^T\mathbf Q=\mathbf I
+        \]
+      </p>
+      <p>and <code>\mathbf R_H</code> is upper triangular.</p>
+      <p>Then</p>
+      <p>
+        \[
+        \|\mathbf z-\mathbf H\mathbf x\|^2 = \|\mathbf Q^T\mathbf z-\mathbf R_H\mathbf x\|^2.
+        \]
+      </p>
+      <p>For a full-column-rank problem, the least-squares solution can be obtained from the triangular system</p>
+      <p>
+        \[
+        \boxed{ \mathbf R_H\hat{\mathbf x} = \mathbf Q^T\mathbf z. }
+        \]
+      </p>
+      <p>QR avoids explicitly forming <code>\mathbf H^T\mathbf H</code> and is generally more numerically stable than solving the normal equations directly.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.38 Cholesky Factorization</h3>
+      <p>If the weighted information matrix</p>
+      <p>
+        \[
+        \mathbf A = \mathbf H^T\mathbf R^{-1}\mathbf H
+        \]
+      </p>
+      <p>is symmetric positive definite, it can be factored as</p>
+      <p>
+        \[
+        \boxed{ \mathbf A=\mathbf L\mathbf L^T. }
+        \]
+      </p>
+      <p>The normal equations</p>
+      <p>
+        \[
+        \mathbf A\hat{\mathbf x}=\mathbf b
+        \]
+      </p>
+      <p>can then be solved using two triangular systems:</p>
+      <p>
+        \[
+        \mathbf L\mathbf y=\mathbf b
+        \]
+      </p>
+      <p>followed by</p>
+      <p>
+        \[
+        \mathbf L^T\hat{\mathbf x}=\mathbf y.
+        \]
+      </p>
+      <p>Cholesky factorization is computationally efficient when its assumptions are satisfied.</p>
+      <p>However, if the problem is nearly rank deficient, QR or SVD may provide better numerical diagnostics.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.39 Singular Value Decomposition</h3>
+      <p>The Singular Value Decomposition writes</p>
+      <p>
+        \[
+        \boxed{ \mathbf H = \mathbf U\boldsymbol{\Sigma}\mathbf V^T. }
+        \]
+      </p>
+      <p>The diagonal matrix <code>\boldsymbol{\Sigma}</code> contains singular values</p>
+      <p>
+        \[
+        \sigma_1\ge\sigma_2\ge\cdots\ge\sigma_n\ge0.
+        \]
+      </p>
+      <p>Very small singular values indicate weakly determined directions.</p>
+      <p>If a singular value is zero, the corresponding direction is unobservable in the linear estimation problem.</p>
+      <p>Using the pseudoinverse,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \mathbf H^{+}\mathbf z. }
+        \]
+      </p>
+      <p>SVD is particularly valuable for</p>
+      <ul>
+        <li>detecting rank deficiency,</li>
+        <li>examining weak estimation directions,</li>
+        <li>computing minimum-norm solutions,</li>
+        <li>diagnosing parameter correlation,</li>
+        <li>understanding numerical conditioning.</li>
+      </ul>
+      <p>Thus SVD is not only a solver; it is also a powerful estimation-analysis tool.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.40 Pseudoinverse and Minimum-Norm Solution</h3>
+      <p>When <code>\mathbf H</code> is not square or lacks full rank, the Moore-Penrose pseudoinverse may be used:</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^+ = \mathbf V\boldsymbol{\Sigma}^+\mathbf U^T. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \mathbf H^+\mathbf z. }
+        \]
+      </p>
+      <p>For an underdetermined system, multiple states may produce the same minimum residual.</p>
+      <p>The pseudoinverse selects the minimum-Euclidean-norm solution under the standard formulation.</p>
+      <p>However,</p>
+      <p>
+        \[
+        \boxed{ \text{A Pseudoinverse Producing a Number} \neq \text{Physical Identifiability}. }
+        \]
+      </p>
+      <p>If the data do not independently determine a parameter, numerical machinery cannot create that missing physical information.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.41 Scaling of the Estimation Problem</h3>
+      <p>Suppose the state contains quantities with very different magnitudes:</p>
+      <p>
+        \[
+        \mathbf x= \begin{bmatrix} r\\ v\\ b \end{bmatrix}
+        \]
+      </p>
+      <p>where position may be of order <code>10^6</code>, velocity <code>10^3</code>, and a sensor bias <code>10^{-5}</code>.</p>
+      <p>Poor scaling can make numerical conditioning worse.</p>
+      <p>Introduce scaled variables:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x=\mathbf S_x\tilde{\mathbf x}. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\mathbf S_x\tilde{\mathbf x} + \mathbf v.
+        \]
+      </p>
+      <p>Define</p>
+      <p>
+        \[
+        \tilde{\mathbf H} = \mathbf H\mathbf S_x.
+        \]
+      </p>
+      <p>The scaled estimation problem may have much better numerical behaviour.</p>
+      <p>Scaling does not create new information, but it can prevent numerical representation from unnecessarily degrading an otherwise valid problem.</p>
+      <p><strong>Engineering interpretation:</strong> Scaling is especially important when one solve contains heterogeneous quantities such as position, velocity, angles, sensor biases, and dimensionless coefficients. Representative scaling can make design-matrix columns comparable in magnitude and improve numerical behaviour without changing the underlying physics.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.42 Regularization</h3>
+      <p>If an estimation problem is poorly conditioned, additional information or constraints may sometimes be introduced through regularization.</p>
+      <p>A common form is</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = \|\mathbf z-\mathbf H\mathbf x\|^2 + \lambda\|\mathbf L\mathbf x\|^2. }
+        \]
+      </p>
+      <p>Here,</p>
+      <ul>
+        <li><code>\lambda</code> controls regularization strength,</li>
+        <li><code>\mathbf L</code> determines which combinations of states are penalized.</li>
+      </ul>
+      <p>The solution satisfies</p>
+      <p>
+        \[
+        \boxed{ ( \mathbf H^T\mathbf H + \lambda\mathbf L^T\mathbf L ) \hat{\mathbf x} = \mathbf H^T\mathbf z. }
+        \]
+      </p>
+      <p>For</p>
+      <p>
+        \[
+        \mathbf L=\mathbf I,
+        \]
+      </p>
+      <p>this becomes a common Tikhonov or ridge-type regularization.</p>
+      <p>Regularization can stabilize weak problems, but it introduces additional assumptions.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Regularization Stabilizes a Problem by Adding Information or Preference}; \quad \text{It Does Not Create Measurement Information}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.43 Hard Constraints versus Soft Constraints</h3>
+      <p>Suppose a quantity must satisfy</p>
+      <p>
+        \[
+        \mathbf C\mathbf x=\mathbf d.
+        \]
+      </p>
+      <p>This is a <strong>hard equality constraint</strong>.</p>
+      <p>It can be enforced directly using constrained optimization methods.</p>
+      <p>Alternatively, suppose the constraint is approximate:</p>
+      <p>
+        \[
+        \mathbf C\mathbf x \approx \mathbf d.
+        \]
+      </p>
+      <p>Then it may be included as a weighted residual:</p>
+      <p>
+        \[
+        \boxed{ J_c = (\mathbf C\mathbf x-\mathbf d)^T \mathbf R_c^{-1} (\mathbf C\mathbf x-\mathbf d). }
+        \]
+      </p>
+      <p>This behaves like a <strong>soft constraint</strong>.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Hard Constraint} \rightarrow \text{Must Be Satisfied} }
+        \]
+      </p>
+      <p>whereas</p>
+      <p>
+        \[
+        \boxed{ \text{Soft Constraint} \rightarrow \text{Penalizes Departure According to Uncertainty}. }
+        \]
+      </p>
+      <p>The distinction is important because uncertain engineering knowledge should not automatically be treated as exact truth.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.44 Combining Multiple Sensor Types</h3>
+      <p>Suppose one sensor produces</p>
+      <p>
+        \[
+        \mathbf z_A = \mathbf H_A\mathbf x+\mathbf v_A
+        \]
+      </p>
+      <p>and another produces</p>
+      <p>
+        \[
+        \mathbf z_B = \mathbf H_B\mathbf x+\mathbf v_B.
+        \]
+      </p>
+      <p>The observations can be stacked:</p>
+      <p>
+        \[
+        \boxed{ \mathbf z= \begin{bmatrix} \mathbf z_A\\ \mathbf z_B \end{bmatrix}, \qquad \mathbf H= \begin{bmatrix} \mathbf H_A\\ \mathbf H_B \end{bmatrix}. }
+        \]
+      </p>
+      <p>If the sensor errors are independent,</p>
+      <p>
+        \[
+        \mathbf R= \begin{bmatrix} \mathbf R_A&0\\ 0&\mathbf R_B \end{bmatrix}.
+        \]
+      </p>
+      <p>Then the same WLS equation estimates the common state:</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = (\mathbf H^T\mathbf R^{-1}\mathbf H)^{-1} \mathbf H^T\mathbf R^{-1}\mathbf z. }
+        \]
+      </p>
+      <p>This shows that multisensor estimation is mathematically not simply “averaging sensors.” Each sensor contributes information according to its <strong>measurement model, sensitivity, geometry, and uncertainty</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.45 Information Contribution from Multiple Independent Sensors</h3>
+      <p>For independent sensor groups,</p>
+      <p>
+        \[
+        \mathbf H= \begin{bmatrix} \mathbf H_A\\ \mathbf H_B \end{bmatrix}
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \mathbf R= \begin{bmatrix} \mathbf R_A&0\\ 0&\mathbf R_B \end{bmatrix}.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \mathbf H^T\mathbf R^{-1}\mathbf H = \mathbf H_A^T\mathbf R_A^{-1}\mathbf H_A + \mathbf H_B^T\mathbf R_B^{-1}\mathbf H_B.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \boldsymbol{\Lambda}_A + \boldsymbol{\Lambda}_B. }
+        \]
+      </p>
+      <p>This gives an elegant interpretation:</p>
+      <p>
+        \[
+        \boxed{ \text{Independent Sensor Information Adds}. }
+        \]
+      </p>
+      <p>A sensor can be valuable even when it is individually less precise if it provides information in a state direction that other sensors constrain poorly.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.46 General Relative-Navigation Example</h3>
+      <p>Consider a general relative-navigation problem with translational state</p>
+      <p>
+        \[
+        \mathbf x_{\mathrm{rel}} = \begin{bmatrix} x\\y\\z \end{bmatrix}.
+        \]
+      </p>
+      <p>Suppose several linearized measurements around a nominal relative state satisfy</p>
+      <p>
+        \[
+        \delta\mathbf z = \mathbf H \delta\mathbf x_{\mathrm{rel}} + \mathbf v.
+        \]
+      </p>
+      <p>Different observations may provide different directional sensitivities.</p>
+      <p>For example, one measurement may constrain primarily the line-of-sight direction while another contributes information about range or another independent geometric direction.</p>
+      <p>The weighted correction is</p>
+      <p>
+        \[
+        \boxed{ \delta\hat{\mathbf x}_{\mathrm{rel}} = ( \mathbf H^T\mathbf R^{-1}\mathbf H )^{-1} \mathbf H^T\mathbf R^{-1} \delta\mathbf z. }
+        \]
+      </p>
+      <p>The updated relative-state estimate is</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{\mathrm{rel}}^{+} = \hat{\mathbf x}_{\mathrm{rel}}^{-} + \delta\hat{\mathbf x}_{\mathrm{rel}}. }
+        \]
+      </p>
+      <p>The important principle is general:</p>
+      <p>
+        \[
+        \boxed{ \text{Complementary Measurement Geometry} \rightarrow \text{Improved Relative-State Estimation}. }
+        \]
+      </p>
+      <p>This is not tied to any particular rendezvous or proximity-operations implementation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.47 Parameter-Estimation Example</h3>
+      <p>Least squares can estimate parameters as well as states.</p>
+      <p>Suppose a measured quantity satisfies</p>
+      <p>
+        \[
+        z_i = a_i\theta+v_i,
+        \]
+      </p>
+      <p>where <code>\theta</code> is an unknown model parameter.</p>
+      <p>Stacking the observations gives</p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\theta+\mathbf v,
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        \mathbf H= \begin{bmatrix} a_1\\ a_2\\ \vdots\\ a_m \end{bmatrix}.
+        \]
+      </p>
+      <p>The WLS estimate is</p>
+      <p>
+        \[
+        \boxed{ \hat\theta = \frac{ \mathbf H^T\mathbf R^{-1}\mathbf z }{ \mathbf H^T\mathbf R^{-1}\mathbf H }. }
+        \]
+      </p>
+      <p>The parameter is estimable only if the observations are sufficiently sensitive to it.</p>
+      <p>If all</p>
+      <p>
+        \[
+        a_i\approx0,
+        \]
+      </p>
+      <p>then the parameter has little influence on the measurements and its uncertainty will remain large.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.48 Estimating Multiple Parameters</h3>
+      <p>Suppose</p>
+      <p>
+        \[
+        \boldsymbol{\theta} = \begin{bmatrix} \theta_1\\ \theta_2 \end{bmatrix}
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \mathbf z = \mathbf H_\theta\boldsymbol{\theta} + \mathbf v.
+        \]
+      </p>
+      <p>If the two columns of <code>\mathbf H_\theta</code> are almost parallel,</p>
+      <p>
+        \[
+        \mathbf h_{\theta_1} \approx c\mathbf h_{\theta_2},
+        \]
+      </p>
+      <p>the two parameters produce nearly indistinguishable effects on the observations.</p>
+      <p>The information matrix</p>
+      <p>
+        \[
+        \mathbf H_\theta^T \mathbf R^{-1} \mathbf H_\theta
+        \]
+      </p>
+      <p>then becomes poorly conditioned.</p>
+      <p>The resulting parameter covariance may contain large variances and strong correlations.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Good Residual Fit} \neq \text{Well-Identified Individual Parameters}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.49 Residual Analysis After Estimation</h3>
+      <p>After solving for</p>
+      <p>
+        \[
+        \hat{\mathbf x},
+        \]
+      </p>
+      <p>the post-fit residual is</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf r} = \mathbf z-\mathbf H\hat{\mathbf x}. }
+        \]
+      </p>
+      <p>Residual analysis can reveal useful information.</p>
+      <p>Questions include:</p>
+      <ul>
+        <li>Are residuals centred approximately around zero?</li>
+        <li>Are there persistent biases?</li>
+        <li>Are some sensors producing systematically larger residuals?</li>
+        <li>Are residual magnitudes consistent with the assumed measurement uncertainty?</li>
+        <li>Do residuals show time dependence?</li>
+        <li>Are there outliers?</li>
+        <li>Do residuals correlate with geometry, temperature, operating mode, or another variable?</li>
+        <li>Does a particular measurement type dominate the cost?</li>
+      </ul>
+      <p>A small total least-squares cost does not by itself prove that the physical model is correct.</p>
+      <p>Residual structure should therefore be examined, not only the final scalar cost.</p>
+      <p><strong>Engineering interpretation:</strong> Residual analysis should be performed by measurement type as well as globally. A single total cost can hide systematic behaviour in one sensor class, whereas grouped residual statistics can reveal a biased sensor, an incorrect covariance model, geometry-dependent mismatch, or an unmodelled effect.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.50 Pre-Fit and Post-Fit Residuals</h3>
+      <p>If an initial estimate</p>
+      <p>
+        \[
+        \mathbf x_0
+        \]
+      </p>
+      <p>is available, the <strong>pre-fit residual</strong> is</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{\text{pre}} = \mathbf z-\mathbf H\mathbf x_0. }
+        \]
+      </p>
+      <p>After estimating a correction</p>
+      <p>
+        \[
+        \Delta\hat{\mathbf x},
+        \]
+      </p>
+      <p>the updated state is</p>
+      <p>
+        \[
+        \hat{\mathbf x} = \mathbf x_0+\Delta\hat{\mathbf x}.
+        \]
+      </p>
+      <p>The <strong>post-fit residual</strong> is</p>
+      <p>
+        \[
+        \boxed{ \mathbf r_{\text{post}} = \mathbf z-\mathbf H\hat{\mathbf x}. }
+        \]
+      </p>
+      <p>Comparing pre-fit and post-fit residuals shows how much of the observation mismatch the estimated state correction explains.</p>
+      <p>However, forcing residuals to become extremely small can also indicate overfitting if too many parameters are estimated.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.51 Outliers and the Limitation of Squared Residuals</h3>
+      <p>Ordinary and weighted least squares square the residuals.</p>
+      <p>Therefore, a very large residual receives a disproportionately large penalty.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        r=10
+        \]
+      </p>
+      <p>contributes</p>
+      <p>
+        \[
+        r^2=100.
+        \]
+      </p>
+      <p>This means least squares can be sensitive to outliers.</p>
+      <p>Outliers may arise from</p>
+      <ul>
+        <li>corrupted measurements,</li>
+        <li>tracking loss,</li>
+        <li>false feature association,</li>
+        <li>multipath,</li>
+        <li>sensor saturation,</li>
+        <li>timing errors,</li>
+        <li>data-processing faults.</li>
+      </ul>
+      <p>Classical least squares assumes the adopted residual model is appropriate.</p>
+      <p>When outliers are significant, robust estimation methods may be required.</p>
+      <p>Examples include robust loss functions, data screening, gating, or iterative reweighting.</p>
+      <p>These methods should not be confused with ordinary statistical weighting by measurement covariance.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.52 Weighted Least Squares Is Not Arbitrary Weight Tuning</h3>
+      <p>A common misunderstanding is to treat WLS weights as tuning gains.</p>
+      <p>In statistically formulated WLS,</p>
+      <p>
+        \[
+        \boxed{ \mathbf W=\mathbf R^{-1}. }
+        \]
+      </p>
+      <p>Therefore, the weights should represent the measurement uncertainty model.</p>
+      <p>Artificially increasing a sensor's weight means mathematically claiming that its measurements are more precise.</p>
+      <p>Artificially reducing its weight means claiming greater uncertainty.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Weight Selection} \leftrightarrow \text{Measurement-Uncertainty Assumption}. }
+        \]
+      </p>
+      <p>If weights are adjusted empirically, that choice should be documented and validated rather than presented as a physical covariance without justification.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.53 Measurement Quantity versus Measurement Information</h3>
+      <p>Two measurements with similar numerical accuracy may provide very different state information.</p>
+      <p>Suppose measurement A has very small noise but weak sensitivity to <code>x_2</code>.</p>
+      <p>Measurement B has somewhat larger noise but strong sensitivity to <code>x_2</code>.</p>
+      <p>Measurement B may contribute more information about <code>x_2</code>.</p>
+      <p>The information matrix captures both effects:</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \mathbf H^T\mathbf R^{-1}\mathbf H. }
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Useful Estimation Information} = \text{Measurement Precision} + \text{State Sensitivity} + \text{Independent Geometry}. }
+        \]
+      </p>
+      <p>Sensor accuracy alone does not determine estimator performance.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.54 Adding a Measurement</h3>
+      <p>Suppose the current information matrix is</p>
+      <p>
+        \[
+        \boldsymbol{\Lambda}_{old}.
+        \]
+      </p>
+      <p>A new independent scalar measurement has sensitivity row</p>
+      <p>
+        \[
+        \mathbf h^T
+        \]
+      </p>
+      <p>and variance</p>
+      <p>
+        \[
+        \sigma^2.
+        \]
+      </p>
+      <p>Its information contribution is</p>
+      <p>
+        \[
+        \boxed{ \Delta\boldsymbol{\Lambda} = \frac{1}{\sigma^2} \mathbf h\mathbf h^T. }
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}_{new} = \boldsymbol{\Lambda}_{old} + \frac{1}{\sigma^2} \mathbf h\mathbf h^T. }
+        \]
+      </p>
+      <p>This equation clearly shows why a new measurement is useful only in the state directions to which it is sensitive.</p>
+      <p>It also begins to reveal the connection between batch least squares and recursive estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.55 Connection to Recursive Estimation</h3>
+      <p>Suppose measurements arrive one at a time.</p>
+      <p>Instead of rebuilding the entire batch problem from the beginning, the estimator can update the accumulated information.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Old Information} + \text{New Measurement Information} \rightarrow \text{New Estimate}. }
+        \]
+      </p>
+      <p>This is one of the mathematical foundations of recursive least squares and Gaussian recursive estimation.</p>
+      <p>The detailed connection will be developed in <strong>4.3.4 Recursive Estimation from Least-Squares and Bayesian Viewpoints</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.56 Static Least Squares versus Dynamic Estimation</h3>
+      <p>The least-squares formulation developed so far assumes a common unknown vector <code>\mathbf x</code> appearing directly in the observation equations:</p>
+      <p>
+        \[
+        \mathbf z=\mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>But spacecraft observations are frequently collected at different times:</p>
+      <p>
+        \[
+        t_1,t_2,\ldots,t_N.
+        \]
+      </p>
+      <p>The state at each measurement epoch is related to an earlier state through the dynamics.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \delta\mathbf x(t_k) = \boldsymbol{\Phi}(t_k,t_0) \delta\mathbf x(t_0).
+        \]
+      </p>
+      <p>Then the measurement sensitivity to the initial state becomes</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial h_k} {\partial\mathbf x_0} = \frac{\partial h_k} {\partial\mathbf x_k} \boldsymbol{\Phi}(t_k,t_0). }
+        \]
+      </p>
+      <p>This converts measurements distributed along a trajectory into information about a common initial state.</p>
+      <p>That is the subject of <strong>4.3.3 Batch Dynamic State Estimation</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.57 Static versus Dynamic Design Matrix</h3>
+      <p>For static estimation,</p>
+      <p>
+        \[
+        \mathbf H = \frac{\partial h} {\partial\mathbf x}.
+        \]
+      </p>
+      <p>For a dynamic batch problem, the effective design matrix contains sensitivities propagated through time:</p>
+      <p>
+        \[
+        \boxed{ \mathbf H_k^{(0)} = \mathbf H_k \boldsymbol{\Phi}(t_k,t_0). }
+        \]
+      </p>
+      <p>Measurements can then be stacked:</p>
+      <p>
+        \[
+        \begin{bmatrix} \delta\mathbf z_1\\ \delta\mathbf z_2\\ \vdots\\ \delta\mathbf z_N \end{bmatrix} = \begin{bmatrix} \mathbf H_1\boldsymbol{\Phi}_{1,0}\\ \mathbf H_2\boldsymbol{\Phi}_{2,0}\\ \vdots\\ \mathbf H_N\boldsymbol{\Phi}_{N,0} \end{bmatrix} \delta\mathbf x_0 + \mathbf v.
+        \]
+      </p>
+      <p>This has exactly the same algebraic structure as linear least squares.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Dynamic Batch Estimation} = \text{Least Squares} + \text{Dynamic Sensitivity Propagation}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.58 Linear Least Squares versus Nonlinear Least Squares</h3>
+      <p>Linear least squares assumes</p>
+      <p>
+        \[
+        \mathbf z=\mathbf H\mathbf x+\mathbf v
+        \]
+      </p>
+      <p>with a fixed <code>\mathbf H</code>.</p>
+      <p>For a nonlinear model,</p>
+      <p>
+        \[
+        \mathbf z=h(\mathbf x)+\mathbf v,
+        \]
+      </p>
+      <p>the measurement equation can be linearized around the current estimate:</p>
+      <p>
+        \[
+        h(\mathbf x+\delta\mathbf x) \approx h(\mathbf x) + \mathbf H\delta\mathbf x.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf z \approx \mathbf H\delta\mathbf x+\mathbf v. }
+        \]
+      </p>
+      <p>A linear least-squares problem is solved for the correction <code>\delta\mathbf x</code>, the nominal state is updated, and the process is repeated.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Estimation} \rightarrow \text{Linearize} \rightarrow \text{Solve LS Correction} \rightarrow \text{Update} \rightarrow \text{Relinearize}. }
+        \]
+      </p>
+      <p>This becomes the foundation of <strong>4.3.5 Nonlinear Least Squares and Differential Corrections</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.59 When Linear Least Squares Is Appropriate</h3>
+      <p>Linear least squares is appropriate when</p>
+      <ul>
+        <li>the observation equations are genuinely linear in the unknowns,</li>
+        <li>or a local linear model is sufficiently accurate,</li>
+        <li>the measurement uncertainty model is reasonably characterized,</li>
+        <li>the unknowns are sufficiently constrained by the observations,</li>
+        <li>numerical conditioning is acceptable.</li>
+      </ul>
+      <p>Typical applications include</p>
+      <ul>
+        <li>static calibration,</li>
+        <li>linear parameter estimation,</li>
+        <li>bias estimation,</li>
+        <li>fitting linearized measurement corrections,</li>
+        <li>local state corrections,</li>
+        <li>components of orbit-determination algorithms,</li>
+        <li>components of navigation and sensor-calibration algorithms.</li>
+      </ul>
+      <p>The mathematics is simple, but the assumptions must still be checked.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.60 When Least Squares Can Give a Misleading Solution</h3>
+      <p>A numerical least-squares solution does not automatically mean the estimation problem is physically valid.</p>
+      <p>Potential problems include</p>
+      <ul>
+        <li>incorrect measurement models,</li>
+        <li>incorrect covariance assumptions,</li>
+        <li>measurement bias,</li>
+        <li>outliers,</li>
+        <li>poor geometry,</li>
+        <li>rank deficiency,</li>
+        <li>nearly dependent parameters,</li>
+        <li>incorrect reference frames,</li>
+        <li>inconsistent units,</li>
+        <li>weak sensitivities,</li>
+        <li>model mismatch,</li>
+        <li>nonlinear effects outside the linearization region,</li>
+        <li>overconfident priors,</li>
+        <li>numerical ill-conditioning.</li>
+      </ul>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Successful Matrix Solution} \neq \text{Successful Estimation Problem}. }
+        \]
+      </p>
+      <p>The physical meaning of the solution must always be assessed.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.61 Practical Linear/WLS Estimation Workflow</h3>
+      <p>A disciplined workflow is:</p>
+      <ol>
+        <li>Define the unknown state or parameter vector <code>\mathbf x</code>.</li>
+        <li>Assemble the measurement vector <code>\mathbf z</code>.</li>
+        <li>Define the observation equations.</li>
+        <li>Construct the design matrix <code>\mathbf H</code>.</li>
+        <li>Verify units, reference frames, epochs, and sign conventions.</li>
+        <li>Define measurement covariance <code>\mathbf R</code>.</li>
+        <li>Include measurement correlations where required.</li>
+        <li>Determine whether prior information <code>(\bar{\mathbf x}_0,\mathbf P_0)</code> exists.</li>
+        <li>Examine dimensions and rank.</li>
+        <li>Examine column scaling.</li>
+        <li>Examine singular values and condition number when necessary.</li>
+        <li>Form residuals.</li>
+        <li>Whiten the problem if useful.</li>
+        <li>Select an appropriate numerical solver.</li>
+        <li>Solve for <code>\hat{\mathbf x}</code> without unnecessary explicit matrix inversion.</li>
+        <li>Compute or assess solution covariance.</li>
+        <li>Calculate post-fit residuals.</li>
+        <li>Examine parameter correlations.</li>
+        <li>Check physical plausibility.</li>
+        <li>Investigate outliers and residual structure.</li>
+        <li>Verify that the solution is supported by actual measurement information.</li>
+      </ol>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Define Unknowns}\\ \downarrow\\ \text{Assemble Observations}\\ \downarrow\\ \text{Construct }\mathbf H\\ \downarrow\\ \text{Define }\mathbf R\text{ and Prior Information}\\ \downarrow\\ \text{Check Rank / Geometry / Conditioning}\\ \downarrow\\ \text{Form Weighted LS Problem}\\ \downarrow\\ \text{Solve Numerically}\\ \downarrow\\ \text{Compute Covariance}\\ \downarrow\\ \text{Analyse Residuals and Correlations}\\ \downarrow\\ \text{Validate Physical Meaning} \end{array} }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The workflow is iterative in practice. If residuals, covariance, singular values, or physical checks reveal a weakness, return to the measurement model, state definition, covariance model, or data selection rather than only changing the numerical solver.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.62 Complete Linear Least-Squares Architecture</h3>
+      <p>The complete structure can be summarized as</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Unknown State / Parameters }\mathbf x\\ \downarrow\\ \text{Linear Observation Model}\\ \mathbf z=\mathbf H\mathbf x+\mathbf v\\ \downarrow\\ \text{Predicted Observation}\\ \hat{\mathbf z}=\mathbf H\hat{\mathbf x}\\ \downarrow\\ \text{Residual}\\ \mathbf r=\mathbf z-\hat{\mathbf z}\\ \downarrow\\ \text{Measurement Covariance }\mathbf R\\ \downarrow\\ \text{Weighted Cost}\\ J=\mathbf r^T\mathbf R^{-1}\mathbf r\\ \downarrow\\ \text{Information Matrix}\\ \boldsymbol{\Lambda} = \mathbf H^T\mathbf R^{-1}\mathbf H\\ \downarrow\\ \text{Solve}\\ \hat{\mathbf x} = \boldsymbol{\Lambda}^{-1} \mathbf H^T\mathbf R^{-1}\mathbf z\\ \downarrow\\ \text{Estimate Covariance}\\ \mathbf P_{\hat x} = \boldsymbol{\Lambda}^{-1}\\ \downarrow\\ \text{Residual / Correlation / Conditioning Assessment} \end{array} }
+        \]
+      </p>
+      <p>The inverse notation above expresses the analytical result. In numerical software, direct factorization and linear solves are generally preferable to explicitly computing matrix inverses.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.63 Ordinary LS versus Weighted LS versus Prior-Constrained LS</h3>
+      <p>The three major forms can be summarized as follows.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Form</th>
+            <th>Cost function</th>
+            <th>Main assumption</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>Ordinary LS</td>
+              <td>\(J=\mathbf r^T\mathbf r\)</td>
+              <td>Measurements treated equally</td>
+            </tr>
+            <tr>
+              <td>Weighted LS</td>
+              <td>\(J=\mathbf r^T\mathbf R^{-1}\mathbf r\)</td>
+              <td>Measurement uncertainty is represented</td>
+            </tr>
+            <tr>
+              <td>WLS with prior</td>
+              <td>\(J=\mathbf r^T\mathbf R^{-1}\mathbf r+(\mathbf x-\bar{\mathbf x}_0)^T\mathbf P_0^{-1}(\mathbf x-\bar{\mathbf x}_0)\)</td>
+              <td>Measurements and prior information are combined</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Their conceptual progression is</p>
+      <p>
+        \[
+        \boxed{ \text{Residual Fit} \rightarrow \text{Uncertainty-Weighted Residual Fit} \rightarrow \text{Measurement + Prior Information}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.64 Key Equations</h3>
+      <h4>Linear measurement model</h4>
+      <p>
+        \[
+        \boxed{ \mathbf z=\mathbf H\mathbf x+\mathbf v }
+        \]
+      </p>
+      <h4>Predicted observation</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf z}=\mathbf H\hat{\mathbf x} }
+        \]
+      </p>
+      <h4>Residual</h4>
+      <p>
+        \[
+        \boxed{ \mathbf r=\mathbf z-\mathbf H\mathbf x }
+        \]
+      </p>
+      <h4>Ordinary least-squares cost</h4>
+      <p>
+        \[
+        \boxed{ J=\mathbf r^T\mathbf r }
+        \]
+      </p>
+      <h4>Ordinary normal equations</h4>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\mathbf H\hat{\mathbf x} = \mathbf H^T\mathbf z }
+        \]
+      </p>
+      <h4>Ordinary least-squares solution</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{LS} = (\mathbf H^T\mathbf H)^{-1} \mathbf H^T\mathbf z }
+        \]
+      </p>
+      <h4>Measurement covariance</h4>
+      <p>
+        \[
+        \boxed{ \mathbf R = E[\mathbf v\mathbf v^T] }
+        \]
+      </p>
+      <h4>Weight matrix</h4>
+      <p>
+        \[
+        \boxed{ \mathbf W=\mathbf R^{-1} }
+        \]
+      </p>
+      <h4>Weighted least-squares cost</h4>
+      <p>
+        \[
+        \boxed{ J = \mathbf r^T\mathbf R^{-1}\mathbf r }
+        \]
+      </p>
+      <h4>Weighted normal equations</h4>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\mathbf R^{-1}\mathbf H \hat{\mathbf x} = \mathbf H^T\mathbf R^{-1}\mathbf z }
+        \]
+      </p>
+      <h4>Weighted least-squares solution</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{WLS} = (\mathbf H^T\mathbf R^{-1}\mathbf H)^{-1} \mathbf H^T\mathbf R^{-1}\mathbf z }
+        \]
+      </p>
+      <h4>Information matrix</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \mathbf H^T\mathbf R^{-1}\mathbf H }
+        \]
+      </p>
+      <h4>Estimate covariance</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P_{\hat x} = (\mathbf H^T\mathbf R^{-1}\mathbf H)^{-1} }
+        \]
+      </p>
+      <h4>Prior-constrained information matrix</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P^{-1} = \mathbf P_0^{-1} + \mathbf H^T\mathbf R^{-1}\mathbf H }
+        \]
+      </p>
+      <h4>Prior-constrained estimate</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \mathbf P \left( \mathbf P_0^{-1}\bar{\mathbf x}_0 + \mathbf H^T\mathbf R^{-1}\mathbf z \right) }
+        \]
+      </p>
+      <h4>Rank requirement</h4>
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathbf H)=n }
+        \]
+      </p>
+      <p>for a unique unconstrained estimate of <code>n</code> unknown quantities.</p>
+      <h4>SVD</h4>
+      <p>
+        \[
+        \boxed{ \mathbf H = \mathbf U\boldsymbol{\Sigma}\mathbf V^T }
+        \]
+      </p>
+      <h4>Pseudoinverse solution</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \mathbf H^+\mathbf z }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.65 Key Takeaways</h3>
+      <p>Linear least squares begins with</p>
+      <p>
+        \[
+        \boxed{ \mathbf z=\mathbf H\mathbf x+\mathbf v. }
+        \]
+      </p>
+      <p>When noisy measurements make the system inconsistent, the goal is not to satisfy every observation exactly.</p>
+      <p>Instead,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = \arg\min_{\mathbf x} \|\mathbf z-\mathbf H\mathbf x\|^2. }
+        \]
+      </p>
+      <p>Ordinary least squares treats all residuals equally.</p>
+      <p>Weighted least squares incorporates measurement uncertainty:</p>
+      <p>
+        \[
+        \boxed{ J = \mathbf r^T\mathbf R^{-1}\mathbf r. }
+        \]
+      </p>
+      <p>Its solution is</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = ( \mathbf H^T\mathbf R^{-1}\mathbf H )^{-1} \mathbf H^T\mathbf R^{-1}\mathbf z. }
+        \]
+      </p>
+      <p>The matrix</p>
+      <p>
+        \[
+        \boxed{ \mathbf H^T\mathbf R^{-1}\mathbf H }
+        \]
+      </p>
+      <p>represents measurement information about the unknown state, while</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_{\hat x} = ( \mathbf H^T\mathbf R^{-1}\mathbf H )^{-1} }
+        \]
+      </p>
+      <p>represents the corresponding estimate uncertainty under the assumed linear statistical model.</p>
+      <p>Prior information adds naturally:</p>
+      <p>
+        \[
+        \boxed{ \text{Posterior Information} = \text{Prior Information} + \text{Measurement Information}. }
+        \]
+      </p>
+      <p>A large number of observations does not guarantee a good solution.</p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Count} \neq \text{Independent Information}. }
+        \]
+      </p>
+      <p>The design matrix must contain sufficient independent sensitivity:</p>
+      <p>
+        \[
+        \boxed{ \operatorname{rank}(\mathbf H)=n. }
+        \]
+      </p>
+      <p>Even full-rank problems may be poorly conditioned.</p>
+      <p>Therefore rank, singular values, geometry, scaling, parameter correlation, and numerical conditioning must also be examined.</p>
+      <p>The analytical inverse formulas are useful for understanding the mathematics, but numerical implementations should generally use stable matrix factorizations or linear solves such as <strong>QR, Cholesky, or SVD</strong>, rather than blindly forming explicit inverses.</p>
+      <p>The central engineering principle is</p>
+      <p>
+        \[
+        \boxed{ \text{Least Squares Finds the Best Fit Allowed by the Model and Data;} \quad \text{It Does Not Guarantee That the Model or Data Are Correct}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.2.66 What Comes Next</h3>
+      <p>The formulation developed in this section assumed that all measurements could be related directly to a common unknown vector through</p>
+      <p>
+        \[
+        \mathbf z=\mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>Spacecraft estimation problems are often more complicated because observations occur at different epochs while the spacecraft state evolves continuously.</p>
+      <p>A measurement at time <code>t_k</code> depends on</p>
+      <p>
+        \[
+        \mathbf x(t_k),
+        \]
+      </p>
+      <p>but the quantity being estimated may be the state at an earlier reference epoch:</p>
+      <p>
+        \[
+        \mathbf x(t_0).
+        \]
+      </p>
+      <p>The dynamics provide the connection:</p>
+      <p>
+        \[
+        \boxed{ \delta\mathbf x(t_k) = \boldsymbol{\Phi}(t_k,t_0) \delta\mathbf x(t_0). }
+        \]
+      </p>
+      <p>Consequently,</p>
+      <p>
+        \[
+        \boxed{ \frac{\partial h_k}{\partial\mathbf x_0} = \frac{\partial h_k}{\partial\mathbf x_k} \boldsymbol{\Phi}(t_k,t_0). }
+        \]
+      </p>
+      <p>Measurements distributed over an observation arc can therefore all contribute information about the same initial state.</p>
+      <p>This leads directly to:</p>
+      <p>
+        \[
+        \boxed{ \textbf{4.3.3 Batch Dynamic State Estimation} }
+        \]
+      </p>
+      <p>where least squares is extended from a static linear problem to a <strong>dynamic trajectory-estimation problem involving multiple measurement epochs, trajectory propagation, initial-state estimation, state-transition matrices, dynamic sensitivities, and batch correction</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.3.3 Batch Dynamic State Estimation</h2>
+
+      <p>
+        Linear and weighted least squares provide the static mathematical foundation for
+        estimating unknown quantities from noisy observations. Spacecraft estimation problems,
+        however, commonly involve measurements acquired at different times while the state
+        evolves according to the equations of motion.
+      </p>
+
+      <p>
+        The next section extends least squares to a dynamic observation arc. It develops
+        trajectory propagation, reference-epoch state estimation, measurement stacking,
+        State Transition Matrix propagation, dynamic design matrices, sensitivity propagation,
+        batch normal equations, iterative correction, convergence, and post-fit assessment.
+      </p>
+
+      <a href="batch-dynamic-state-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.3 Batch Dynamic State Estimation</h3>
+
+          <p>
+            Measurements over multiple epochs, trajectory propagation, reference-epoch and
+            initial-state estimation, State Transition Matrices, dynamic sensitivities,
+            observation stacking, weighted batch correction, convergence, covariance,
+            and post-fit residual analysis.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Batch Dynamic State Estimation &rarr;
+          </p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+
+</body>
+</html>
