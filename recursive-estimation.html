@@ -1,0 +1,3125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.3.4 Recursive Estimation from Least-Squares and Bayesian Viewpoints | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="notes-hero">
+    <h1>Recursive Estimation from Least-Squares and Bayesian Viewpoints</h1>
+
+    <p class="notes-tagline">
+      Sequential information accumulation through recursive least squares,
+      Bayesian prior-to-posterior updating, information and covariance forms,
+      innovations, recursive gains, dynamic prediction, process and measurement
+      uncertainty, multisensor estimation, observability, consistency, and the
+      mathematical bridge to Kalman filtering.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+      <h2>4.3.4 Recursive Estimation from Least-Squares and Bayesian Viewpoints</h2>
+      <p>Batch estimation processes a collection of observations together. In many spacecraft applications, however, measurements arrive continuously or asynchronously, and the navigation system must update its estimate without repeatedly solving the complete historical data set from the beginning.</p>
+      <p>This motivates <strong>recursive estimation</strong>.</p>
+      <p>The central idea is</p>
+      <p>
+        \[
+        \boxed{ \text{Previous Estimate} + \text{New Measurement Information} \rightarrow \text{Updated Estimate} }
+        \]
+      </p>
+      <p>Rather than storing and reprocessing every previous observation, the information accumulated from past measurements is summarized by quantities such as</p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k-1}, \qquad \mathbf P_{k-1},
+        \]
+      </p>
+      <p>or, equivalently, by an information matrix and information vector.</p>
+      <p>When a new measurement arrives, the previous estimate becomes the <strong>prior</strong>, the measurement provides new information, and the estimator produces a <strong>posterior</strong> estimate.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Prior} + \text{Likelihood} \rightarrow \text{Posterior} }
+        \]
+      </p>
+      <p>This is the Bayesian interpretation of recursive estimation.</p>
+      <p>From a least-squares viewpoint,</p>
+      <p>
+        \[
+        \boxed{ \text{Previously Accumulated Normal Equations} + \text{New Measurement Contribution} \rightarrow \text{Updated Normal Equations} }
+        \]
+      </p>
+      <p>The two viewpoints are closely related.</p>
+      <p>For linear systems with Gaussian uncertainty,</p>
+      <p>
+        \[
+        \boxed{ \text{Recursive Weighted Least Squares} \Longleftrightarrow \text{Bayesian Gaussian Updating} \Longleftrightarrow \text{Kalman Measurement Update} }
+        \]
+      </p>
+      <p>under the corresponding assumptions.</p>
+      <p>This section develops that connection without repeating the detailed Kalman-filter implementation already covered in Section 4.2.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.1 Why Recursive Estimation Is Needed</h3>
+      <p>Suppose measurements arrive sequentially:</p>
+      <p>
+        \[
+        \mathbf z_1, \mathbf z_2, \mathbf z_3, \ldots
+        \]
+      </p>
+      <p>A batch estimator could, in principle, solve</p>
+      <p>
+        \[
+        \{\mathbf z_1,\ldots,\mathbf z_k\}
+        \]
+      </p>
+      <p>every time a new measurement arrives.</p>
+      <p>However, this would repeatedly reprocess old information.</p>
+      <p>For a real-time spacecraft system, this can be inefficient because</p>
+      <ul>
+        <li>measurements may arrive continuously,</li>
+        <li>onboard memory may be limited,</li>
+        <li>computation must often be completed before the next measurement,</li>
+        <li>navigation outputs may be required immediately,</li>
+        <li>the complete measurement history may become very large.</li>
+      </ul>
+      <p>Recursive estimation instead carries forward a compact representation of previously accumulated information.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Historical Measurements} \rightarrow \text{Compressed Into Current Estimate and Uncertainty}. }
+        \]
+      </p>
+      <p>When the next observation arrives, only the new information needs to be incorporated.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.2 Batch versus Recursive Processing</h3>
+      <p>Consider a static linear model:</p>
+      <p>
+        \[
+        \mathbf z_i = \mathbf H_i\mathbf x+\mathbf v_i.
+        \]
+      </p>
+      <p>In batch estimation, all measurements are stacked:</p>
+      <p>
+        \[
+        \mathbf z = \begin{bmatrix} \mathbf z_1\\ \mathbf z_2\\ \vdots\\ \mathbf z_N \end{bmatrix}
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        \mathbf H = \begin{bmatrix} \mathbf H_1\\ \mathbf H_2\\ \vdots\\ \mathbf H_N \end{bmatrix}.
+        \]
+      </p>
+      <p>The complete solution is found in one operation.</p>
+      <p>Recursive estimation instead proceeds as</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_1 \rightarrow \hat{\mathbf x}_1 \rightarrow \mathbf z_2 \rightarrow \hat{\mathbf x}_2 \rightarrow \cdots \rightarrow \hat{\mathbf x}_N. }
+        \]
+      </p>
+      <p>The final estimate can contain the same information as the batch solution under appropriate assumptions.</p>
+      <p>The difference is how that information is accumulated and represented.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.3 The Fundamental Recursive Question</h3>
+      <p>At measurement step <code>k-1</code>, suppose we have already processed all observations up to that point.</p>
+      <p>The available information is summarized by</p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k-1}
+        \]
+      </p>
+      <p>and uncertainty</p>
+      <p>
+        \[
+        \mathbf P_{k-1}.
+        \]
+      </p>
+      <p>A new measurement arrives:</p>
+      <p>
+        \[
+        \mathbf z_k.
+        \]
+      </p>
+      <p>The recursive-estimation problem is</p>
+      <p>
+        \[
+        \boxed{ ( \hat{\mathbf x}_{k-1}, \mathbf P_{k-1} ) + \mathbf z_k \rightarrow ( \hat{\mathbf x}_{k}, \mathbf P_{k} ). }
+        \]
+      </p>
+      <p>The estimator must determine</p>
+      <ol>
+        <li>how strongly the previous estimate should be trusted,</li>
+        <li>how strongly the new measurement should be trusted,</li>
+        <li>how the new measurement changes the state estimate,</li>
+        <li>how the state uncertainty changes.</li>
+      </ol>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.4 Prior and Posterior Terminology</h3>
+      <p>Recursive estimation commonly distinguishes between a <strong>prior</strong> and a <strong>posterior</strong>.</p>
+      <p>Before processing measurement \(k\),</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{-} }
+        \]
+      </p>
+      <p>denotes the prior estimate.</p>
+      <p>After processing measurement \(k\),</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{+} }
+        \]
+      </p>
+      <p>denotes the posterior estimate.</p>
+      <p>Similarly,</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{-} }
+        \]
+      </p>
+      <p>is prior covariance and</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{+} }
+        \]
+      </p>
+      <p>is posterior covariance.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Prior} \xrightarrow{\text{Measurement Update}} \text{Posterior}. }
+        \]
+      </p>
+      <p>For a dynamic estimator, the posterior from one epoch later becomes the basis for the next prediction.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.5 Measurement Model</h3>
+      <p>Consider a linear measurement model:</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = \mathbf H_k\mathbf x + \mathbf v_k. }
+        \]
+      </p>
+      <p>Assume</p>
+      <p>
+        \[
+        E[\mathbf v_k]=\mathbf0
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boxed{ E[ \mathbf v_k \mathbf v_k^T ] = \mathbf R_k. }
+        \]
+      </p>
+      <p>The matrix</p>
+      <p>
+        \[
+        \mathbf H_k
+        \]
+      </p>
+      <p>describes measurement sensitivity, while</p>
+      <p>
+        \[
+        \mathbf R_k
+        \]
+      </p>
+      <p>describes measurement uncertainty.</p>
+      <p>A new measurement therefore contributes information through both</p>
+      <p>
+        \[
+        \boxed{ \mathbf H_k }
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boxed{ \mathbf R_k. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.6 Prior Information as a Least-Squares Term</h3>
+      <p>Suppose the previous estimate is</p>
+      <p>
+        \[
+        \hat{\mathbf x}^{-}
+        \]
+      </p>
+      <p>with covariance</p>
+      <p>
+        \[
+        \mathbf P^{-}.
+        \]
+      </p>
+      <p>This prior can be included in a least-squares objective:</p>
+      <p>
+        \[
+        \boxed{ J(\mathbf x) = (\mathbf x-\hat{\mathbf x}^{-})^T (\mathbf P^{-})^{-1} (\mathbf x-\hat{\mathbf x}^{-}) + (\mathbf z-\mathbf H\mathbf x)^T \mathbf R^{-1} (\mathbf z-\mathbf H\mathbf x). }
+        \]
+      </p>
+      <p>The first term represents prior information.</p>
+      <p>The second term represents the new measurement.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Recursive Update} = \text{Prior-Constrained Weighted Least Squares}. }
+        \]
+      </p>
+      <p>This provides the first major connection between least squares and recursive estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.7 Information Matrix</h3>
+      <p>Define the prior information matrix</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}^{-} = (\mathbf P^{-})^{-1}. }
+        \]
+      </p>
+      <p>The measurement contributes information</p>
+      <p>
+        \[
+        \boxed{ \Delta\boldsymbol{\Lambda} = \mathbf H^T \mathbf R^{-1} \mathbf H. }
+        \]
+      </p>
+      <p>The posterior information matrix is therefore</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}^{+} = \boldsymbol{\Lambda}^{-} + \mathbf H^T \mathbf R^{-1} \mathbf H. }
+        \]
+      </p>
+      <p>This is one of the most important equations in recursive estimation.</p>
+      <p>It shows that, for independent Gaussian information,</p>
+      <p>
+        \[
+        \boxed{ \text{Posterior Information} = \text{Prior Information} + \text{New Measurement Information}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The information matrix is more than an algebraic convenience. Its eigenvectors identify combinations of states that are strongly or weakly constrained, while its eigenvalues indicate the strength of those constraints. A small eigenvalue corresponds to a weak-information direction.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.8 Information Vector</h3>
+      <p>The information matrix alone is not enough to recover the state estimate.</p>
+      <p>Define the information vector</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\eta} = \boldsymbol{\Lambda}\hat{\mathbf x}. }
+        \]
+      </p>
+      <p>For the prior,</p>
+      <p>
+        \[
+        \boldsymbol{\eta}^{-} = \boldsymbol{\Lambda}^{-} \hat{\mathbf x}^{-}.
+        \]
+      </p>
+      <p>The new measurement contributes</p>
+      <p>
+        \[
+        \boxed{ \Delta\boldsymbol{\eta} = \mathbf H^T \mathbf R^{-1} \mathbf z. }
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\eta}^{+} = \boldsymbol{\eta}^{-} + \mathbf H^T \mathbf R^{-1} \mathbf z. }
+        \]
+      </p>
+      <p>The posterior estimate is then</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+} = (\boldsymbol{\Lambda}^{+})^{-1} \boldsymbol{\eta}^{+}. }
+        \]
+      </p>
+      <p>This is the information-form recursive update.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.9 Recursive Least Squares from Information Accumulation</h3>
+      <p>Suppose independent measurements</p>
+      <p>
+        \[
+        \mathbf z_1,\ldots,\mathbf z_k
+        \]
+      </p>
+      <p>have been processed.</p>
+      <p>The information matrix is</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}_k = \boldsymbol{\Lambda}_0 + \sum_{i=1}^{k} \mathbf H_i^T \mathbf R_i^{-1} \mathbf H_i. }
+        \]
+      </p>
+      <p>The information vector is</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\eta}_k = \boldsymbol{\eta}_0 + \sum_{i=1}^{k} \mathbf H_i^T \mathbf R_i^{-1} \mathbf z_i. }
+        \]
+      </p>
+      <p>Hence,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k = \boldsymbol{\Lambda}_k^{-1} \boldsymbol{\eta}_k. }
+        \]
+      </p>
+      <p>Each new measurement simply adds another information contribution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.10 Batch and Recursive Least Squares Are Closely Related</h3>
+      <p>For batch WLS,</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x} = ( \mathbf H^T \mathbf R^{-1} \mathbf H )^{-1} \mathbf H^T \mathbf R^{-1} \mathbf z. }
+        \]
+      </p>
+      <p>If the measurements are independent and stacked, then</p>
+      <p>
+        \[
+        \mathbf H^T \mathbf R^{-1} \mathbf H = \sum_i \mathbf H_i^T \mathbf R_i^{-1} \mathbf H_i.
+        \]
+      </p>
+      <p>Similarly,</p>
+      <p>
+        \[
+        \mathbf H^T \mathbf R^{-1} \mathbf z = \sum_i \mathbf H_i^T \mathbf R_i^{-1} \mathbf z_i.
+        \]
+      </p>
+      <p>Thus recursive estimation is not introducing different information.</p>
+      <p>It is accumulating the same least-squares information progressively.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Batch Solution} \leftrightarrow \text{Sequential Accumulation of the Same Information}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> This equivalence depends on using the same models, covariance assumptions, and independent measurement information. If data are rejected, reweighted, correlated, or relinearized differently, the recursive and batch results can diverge.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.11 Measurement Order in the Static Linear Case</h3>
+      <p>If</p>
+      <ul>
+        <li>the model is linear,</li>
+        <li>measurement errors are independent,</li>
+        <li>the same covariance assumptions are used,</li>
+        <li>no forgetting or data rejection is applied,</li>
+      </ul>
+      <p>then the final information matrix is</p>
+      <p>
+        \[
+        \boldsymbol{\Lambda}_N = \boldsymbol{\Lambda}_0 + \sum_{k=1}^{N} \Delta\boldsymbol{\Lambda}_k.
+        \]
+      </p>
+      <p>Because matrix addition is commutative,</p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Ordering Does Not Change the Final Static Linear WLS Information}. }
+        \]
+      </p>
+      <p>This is an important theoretical result.</p>
+      <p>However, measurement ordering can matter in nonlinear estimation because the system may be repeatedly linearized around changing state estimates.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.12 Scalar Recursive Example</h3>
+      <p>Suppose the unknown quantity is a scalar \(x\).</p>
+      <p>The prior estimate is</p>
+      <p>
+        \[
+        \hat x^{-}
+        \]
+      </p>
+      <p>with variance</p>
+      <p>
+        \[
+        P^{-}.
+        \]
+      </p>
+      <p>A new scalar measurement is</p>
+      <p>
+        \[
+        z=x+v
+        \]
+      </p>
+      <p>with variance</p>
+      <p>
+        \[
+        R.
+        \]
+      </p>
+      <p>The prior information is</p>
+      <p>
+        \[
+        \frac{1}{P^{-}}.
+        \]
+      </p>
+      <p>The measurement information is</p>
+      <p>
+        \[
+        \frac{1}{R}.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \frac{1}{P^{+}} = \frac{1}{P^{-}} + \frac{1}{R}. }
+        \]
+      </p>
+      <p>The posterior estimate is</p>
+      <p>
+        \[
+        \boxed{ \hat x^{+} = P^{+} \left( \frac{\hat x^{-}}{P^{-}} + \frac{z}{R} \right). }
+        \]
+      </p>
+      <p>Thus the posterior is a statistically weighted combination of the prior and measurement.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.13 Interpretation of the Scalar Update</h3>
+      <p>If</p>
+      <p>
+        \[
+        R\ll P^{-},
+        \]
+      </p>
+      <p>the measurement is much more precise than the prior.</p>
+      <p>Then the posterior estimate moves strongly toward the measurement.</p>
+      <p>If</p>
+      <p>
+        \[
+        P^{-}\ll R,
+        \]
+      </p>
+      <p>the prior is much more precise.</p>
+      <p>Then the new measurement has relatively little effect.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Relative Uncertainty Determines Relative Influence}. }
+        \]
+      </p>
+      <p>This is the same principle encountered in weighted least squares.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.14 From Information Form to Correction Form</h3>
+      <p>Recursive estimation is often written not in information form but in a correction form.</p>
+      <p>Define the measurement residual or innovation</p>
+      <p>
+        \[
+        \boxed{ \mathbf y = \mathbf z-\mathbf H\hat{\mathbf x}^{-}. }
+        \]
+      </p>
+      <p>The posterior estimate can be written as</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + \mathbf K\mathbf y }
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \mathbf K
+        \]
+      </p>
+      <p>determines how strongly the residual corrects the prior estimate.</p>
+      <p>This matrix is the familiar gain appearing in Kalman-style estimators.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.15 Innovation</h3>
+      <p>The innovation is</p>
+      <p>
+        \[
+        \boxed{ \mathbf y_k = \mathbf z_k - \mathbf H_k \hat{\mathbf x}_k^{-}. }
+        \]
+      </p>
+      <p>It represents the new information that was not predicted by the prior estimate.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Measurement} - \text{Prior Prediction} = \text{Innovation}. }
+        \]
+      </p>
+      <p>If the measurement is exactly predicted,</p>
+      <p>
+        \[
+        \mathbf y_k=\mathbf0.
+        \]
+      </p>
+      <p>Then there is no measurement-driven state correction.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.16 Innovation Covariance</h3>
+      <p>The innovation itself has uncertainty.</p>
+      <p>For a linear measurement,</p>
+      <p>
+        \[
+        \boxed{ \mathbf S = \mathbf H \mathbf P^{-} \mathbf H^T + \mathbf R. }
+        \]
+      </p>
+      <p>The first term represents uncertainty in the predicted measurement caused by prior state uncertainty.</p>
+      <p>The second term represents sensor measurement uncertainty.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Innovation Uncertainty} = \text{Predicted-State Contribution} + \text{Measurement-Noise Contribution}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The innovation covariance provides the statistically correct scale for judging an innovation. It combines uncertainty in the predicted state with uncertainty in the measurement, which is why normalized innovation tests use \(\mathbf S^{-1}\) rather than raw residual magnitude alone.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.17 Recursive Gain</h3>
+      <p>The correction gain is</p>
+      <p>
+        \[
+        \boxed{ \mathbf K = \mathbf P^{-} \mathbf H^T \mathbf S^{-1}. }
+        \]
+      </p>
+      <p>Substituting</p>
+      <p>
+        \[
+        \mathbf S = \mathbf H\mathbf P^{-}\mathbf H^T+\mathbf R,
+        \]
+      </p>
+      <p>gives</p>
+      <p>
+        \[
+        \boxed{ \mathbf K = \mathbf P^{-} \mathbf H^T ( \mathbf H\mathbf P^{-}\mathbf H^T + \mathbf R )^{-1}. }
+        \]
+      </p>
+      <p>The state update becomes</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + \mathbf K ( \mathbf z-\mathbf H\hat{\mathbf x}^{-} ). }
+        \]
+      </p>
+      <p>This is the covariance-form equivalent of the recursive least-squares update.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.18 Physical Interpretation of the Gain</h3>
+      <p>The gain balances prior uncertainty against measurement uncertainty.</p>
+      <p>If the prior covariance is large,</p>
+      <p>
+        \[
+        \mathbf P^{-}\uparrow,
+        \]
+      </p>
+      <p>the estimator is less confident in its prior prediction.</p>
+      <p>The measurement tends to influence the posterior more strongly.</p>
+      <p>If measurement covariance is large,</p>
+      <p>
+        \[
+        \mathbf R\uparrow,
+        \]
+      </p>
+      <p>the new measurement is considered less reliable.</p>
+      <p>The gain generally decreases in the measurement-sensitive directions.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \mathbf K \rightarrow \text{How Measurement Innovation Is Mapped Into State Correction}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.19 Posterior Covariance</h3>
+      <p>A common covariance update is</p>
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^{-}. }
+        \]
+      </p>
+      <p>The measurement normally reduces uncertainty in the state directions to which it is informative.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Useful Measurement} \rightarrow \text{Additional Information} \rightarrow \text{Reduced Posterior Uncertainty}. }
+        \]
+      </p>
+      <p>However, uncertainty may remain largely unchanged in state directions that the measurement does not constrain.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.20 Joseph Covariance Form</h3>
+      <p>For numerical robustness, the posterior covariance can also be written as</p>
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^{-} ( \mathbf I-\mathbf K\mathbf H )^T + \mathbf K\mathbf R\mathbf K^T. }
+        \]
+      </p>
+      <p>This is commonly called the <strong>Joseph form</strong>.</p>
+      <p>It is algebraically equivalent under exact arithmetic but often provides better numerical preservation of symmetry and positive semidefiniteness.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Equivalent Mathematics} \neq \text{Equivalent Numerical Robustness}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The Joseph form is especially useful in long-running onboard estimators because repeated finite-precision arithmetic can otherwise slowly destroy covariance symmetry or positive semidefiniteness.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.21 Recursive Least Squares for Static Parameters</h3>
+      <p>Suppose a constant parameter vector</p>
+      <p>
+        \[
+        \boldsymbol{\theta}
+        \]
+      </p>
+      <p>is observed through</p>
+      <p>
+        \[
+        \mathbf z_k = \mathbf H_k\boldsymbol{\theta} + \mathbf v_k.
+        \]
+      </p>
+      <p>A recursive least-squares estimator can update</p>
+      <p>
+        \[
+        \hat{\boldsymbol{\theta}}_k
+        \]
+      </p>
+      <p>as new observations arrive.</p>
+      <p>The update has the same form:</p>
+      <p>
+        \[
+        \boxed{ \hat{\boldsymbol{\theta}}_k = \hat{\boldsymbol{\theta}}_{k-1} + \mathbf K_k [ \mathbf z_k - \mathbf H_k \hat{\boldsymbol{\theta}}_{k-1} ]. }
+        \]
+      </p>
+      <p>This is particularly useful for online calibration and slowly varying parameter estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.22 Recursive Least-Squares Covariance Update</h3>
+      <p>For static RLS,</p>
+      <p>
+        \[
+        \boxed{ \mathbf K_k = \mathbf P_{k-1} \mathbf H_k^T ( \mathbf H_k \mathbf P_{k-1} \mathbf H_k^T + \mathbf R_k )^{-1}. }
+        \]
+      </p>
+      <p>The covariance becomes</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_k = ( \mathbf I-\mathbf K_k\mathbf H_k ) \mathbf P_{k-1}. }
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \hat{\boldsymbol{\theta}}_k
+        \]
+      </p>
+      <p>contains the information from all previously processed measurements.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.23 Forgetting Factor</h3>
+      <p>A conventional static RLS estimator assumes the unknown parameter remains constant.</p>
+      <p>If the parameter changes slowly, old measurements may become less relevant.</p>
+      <p>A forgetting factor</p>
+      <p>
+        \[
+        \lambda
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        0<\lambda\le1
+        \]
+      </p>
+      <p>can reduce the influence of older data.</p>
+      <p>A common information interpretation is</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}_{k}^{-} = \lambda \boldsymbol{\Lambda}_{k-1}^{+}. }
+        \]
+      </p>
+      <p>For</p>
+      <p>
+        \[
+        \lambda=1,
+        \]
+      </p>
+      <p>no information is intentionally forgotten.</p>
+      <p>For</p>
+      <p>
+        \[
+        \lambda<1,
+        \]
+      </p>
+      <p>older information gradually loses influence.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.24 Meaning of the Forgetting Factor</h3>
+      <p>A forgetting factor can allow an estimator to track slowly changing parameters.</p>
+      <p>However,</p>
+      <p>
+        \[
+        \boxed{ \text{Forgetting} \neq \text{Free Information}. }
+        \]
+      </p>
+      <p>Reducing old information increases estimator responsiveness but generally increases estimate variance.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \lambda\downarrow \rightarrow \text{Faster Adaptation} + \text{Less Memory} + \text{Greater Uncertainty}. }
+        \]
+      </p>
+      <p>The forgetting factor should therefore have a physical or statistical justification.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.25 Bayesian Estimation Viewpoint</h3>
+      <p>The same recursive process can be expressed using probability.</p>
+      <p>Let</p>
+      <p>
+        \[
+        Z_{k-1} = \{ \mathbf z_1, \ldots, \mathbf z_{k-1} \}
+        \]
+      </p>
+      <p>represent all observations available before measurement \(k\).</p>
+      <p>The prior distribution is</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|Z_{k-1}). }
+        \]
+      </p>
+      <p>When measurement</p>
+      <p>
+        \[
+        \mathbf z_k
+        \]
+      </p>
+      <p>arrives, Bayes' theorem gives</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|Z_k) = \frac{ p(\mathbf z_k|\mathbf x_k) p(\mathbf x_k|Z_{k-1}) }{ p(\mathbf z_k|Z_{k-1}) }. }
+        \]
+      </p>
+      <p>This equation is the conceptual foundation of Bayesian recursive estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.26 Prior, Likelihood, and Posterior</h3>
+      <p>The three central Bayesian quantities are:</p>
+      <h4>Prior</h4>
+      <p>
+        \[
+        \boxed{ p(\mathbf x|\text{previous information}) }
+        \]
+      </p>
+      <p>which describes what is believed before processing the new measurement.</p>
+      <h4>Likelihood</h4>
+      <p>
+        \[
+        \boxed{ p(\mathbf z|\mathbf x) }
+        \]
+      </p>
+      <p>which describes how compatible a candidate state is with the new measurement.</p>
+      <h4>Posterior</h4>
+      <p>
+        \[
+        \boxed{ p(\mathbf x|\mathbf z) }
+        \]
+      </p>
+      <p>which describes the updated state uncertainty after combining prior and measurement information.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Posterior} \propto \text{Likelihood} \times \text{Prior}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.27 Evidence or Normalizing Constant</h3>
+      <p>The denominator in Bayes' theorem is</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf z) = \int p(\mathbf z|\mathbf x) p(\mathbf x) \,d\mathbf x. }
+        \]
+      </p>
+      <p>This ensures that the posterior distribution integrates to one.</p>
+      <p>For state estimation, it is often sufficient to write</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf x|\mathbf z) \propto p(\mathbf z|\mathbf x) p(\mathbf x) }
+        \]
+      </p>
+      <p>when only the shape or maximizer of the posterior is required.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.28 Gaussian Prior</h3>
+      <p>Suppose the prior is Gaussian:</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf x) = \mathcal N ( \hat{\mathbf x}^{-}, \mathbf P^{-} ). }
+        \]
+      </p>
+      <p>Its negative log-probability, ignoring constants, is proportional to</p>
+      <p>
+        \[
+        \boxed{ ( \mathbf x-\hat{\mathbf x}^{-} )^T ( \mathbf P^{-} )^{-1} ( \mathbf x-\hat{\mathbf x}^{-} ). }
+        \]
+      </p>
+      <p>This is exactly the prior least-squares term introduced earlier.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.29 Gaussian Likelihood</h3>
+      <p>Suppose</p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\mathbf x+\mathbf v
+        \]
+      </p>
+      <p>with</p>
+      <p>
+        \[
+        \mathbf v \sim \mathcal N(\mathbf0,\mathbf R).
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf z|\mathbf x) \propto \exp \left[ -\frac12 ( \mathbf z-\mathbf H\mathbf x )^T \mathbf R^{-1} ( \mathbf z-\mathbf H\mathbf x ) \right]. }
+        \]
+      </p>
+      <p>The negative log-likelihood is therefore the weighted residual cost.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.30 Gaussian Posterior</h3>
+      <p>Multiplying Gaussian prior and Gaussian likelihood produces another Gaussian distribution.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf x|\mathbf z) = \mathcal N ( \hat{\mathbf x}^{+}, \mathbf P^{+} ). }
+        \]
+      </p>
+      <p>The posterior information matrix is</p>
+      <p>
+        \[
+        \boxed{ (\mathbf P^{+})^{-1} = (\mathbf P^{-})^{-1} + \mathbf H^T \mathbf R^{-1} \mathbf H. }
+        \]
+      </p>
+      <p>The posterior information vector is</p>
+      <p>
+        \[
+        \boxed{ (\mathbf P^{+})^{-1} \hat{\mathbf x}^{+} = (\mathbf P^{-})^{-1} \hat{\mathbf x}^{-} + \mathbf H^T \mathbf R^{-1} \mathbf z. }
+        \]
+      </p>
+      <p>These are exactly the recursive information equations derived from least squares.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.31 Least-Squares and Bayesian Equivalence</h3>
+      <p>We have now arrived at the same posterior from two viewpoints.</p>
+      <h4>Least-squares viewpoint</h4>
+      <p>Minimize</p>
+      <p>
+        \[
+        J = \text{prior penalty} + \text{measurement residual penalty}.
+        \]
+      </p>
+      <h4>Bayesian viewpoint</h4>
+      <p>Compute</p>
+      <p>
+        \[
+        p(\mathbf x|\mathbf z) \propto p(\mathbf z|\mathbf x) p(\mathbf x).
+        \]
+      </p>
+      <p>With Gaussian distributions,</p>
+      <p>
+        \[
+        \boxed{ \text{Prior-Constrained WLS} \Longleftrightarrow \text{Gaussian MAP Estimation}. }
+        \]
+      </p>
+      <p>Because Gaussian mean and MAP coincide,</p>
+      <p>
+        \[
+        \boxed{ \text{Gaussian Recursive WLS} \Longleftrightarrow \text{Gaussian Bayesian Update}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The equivalence is exact for the stated Gaussian-linear assumptions. Outside that setting, least-squares, MAP, and posterior-mean estimates need not coincide.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.32 Maximum A Posteriori Interpretation</h3>
+      <p>The posterior estimate may be written as</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{MAP} = \arg\max_{\mathbf x} p(\mathbf x|\mathbf z). }
+        \]
+      </p>
+      <p>Equivalently,</p>
+      <p>
+        \[
+        \hat{\mathbf x}_{MAP} = \arg\min_{\mathbf x} \left[ -\ln p(\mathbf x|\mathbf z) \right].
+        \]
+      </p>
+      <p>Under Gaussian assumptions this gives</p>
+      <p>
+        \[
+        \boxed{ J = ( \mathbf x-\hat{\mathbf x}^{-} )^T (\mathbf P^{-})^{-1} ( \mathbf x-\hat{\mathbf x}^{-} ) + ( \mathbf z-\mathbf H\mathbf x )^T \mathbf R^{-1} ( \mathbf z-\mathbf H\mathbf x ). }
+        \]
+      </p>
+      <p>This is the same objective used for recursive WLS.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.33 Dynamic Recursive Estimation</h3>
+      <p>So far, the unknown state has effectively been treated as static during the measurement update.</p>
+      <p>A spacecraft state evolves with time:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_k = f_{k-1} ( \mathbf x_{k-1}, \mathbf u_{k-1} ) + \mathbf w_{k-1}. }
+        \]
+      </p>
+      <p>Recursive dynamic estimation therefore requires two stages:</p>
+      <p>
+        \[
+        \boxed{ \text{Prediction} \rightarrow \text{Measurement Update}. }
+        \]
+      </p>
+      <p>The prediction uses the dynamic model.</p>
+      <p>The measurement update uses the new observation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.34 Prediction Step</h3>
+      <p>Given the previous posterior estimate</p>
+      <p>
+        \[
+        \hat{\mathbf x}_{k-1}^{+},
+        \]
+      </p>
+      <p>the dynamic model produces the prior for the next epoch:</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{-} = f_{k-1} ( \hat{\mathbf x}_{k-1}^{+}, \mathbf u_{k-1} ). }
+        \]
+      </p>
+      <p>The covariance is also propagated.</p>
+      <p>For a linear system</p>
+      <p>
+        \[
+        \mathbf x_k = \mathbf F_{k-1}\mathbf x_{k-1} + \mathbf w_{k-1},
+        \]
+      </p>
+      <p>the covariance prediction is</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{-} = \mathbf F_{k-1} \mathbf P_{k-1}^{+} \mathbf F_{k-1}^T + \mathbf Q_{k-1}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.35 Why Process Noise Appears in Prediction</h3>
+      <p>The matrix</p>
+      <p>
+        \[
+        \mathbf Q_{k-1}
+        \]
+      </p>
+      <p>represents uncertainty introduced by imperfect dynamics.</p>
+      <p>Possible sources include</p>
+      <ul>
+        <li>environmental-force uncertainty,</li>
+        <li>imperfect actuator knowledge,</li>
+        <li>unresolved disturbance accelerations,</li>
+        <li>simplified dynamics,</li>
+        <li>parameter variation.</li>
+      </ul>
+      <p>Without process noise,</p>
+      <p>
+        \[
+        \mathbf P_k^{-} = \mathbf F \mathbf P_{k-1}^{+} \mathbf F^T.
+        \]
+      </p>
+      <p>With process uncertainty,</p>
+      <p>
+        \[
+        \boxed{ \text{Prediction Uncertainty} = \text{Propagated Previous Uncertainty} + \text{New Dynamic Uncertainty}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.36 Measurement Update after Prediction</h3>
+      <p>When measurement \(\mathbf z_k\) arrives,</p>
+      <p>
+        \[
+        \mathbf y_k = \mathbf z_k - \mathbf H_k \hat{\mathbf x}_k^{-}.
+        \]
+      </p>
+      <p>Then</p>
+      <p>
+        \[
+        \mathbf S_k = \mathbf H_k \mathbf P_k^{-} \mathbf H_k^T + \mathbf R_k.
+        \]
+      </p>
+      <p>The gain is</p>
+      <p>
+        \[
+        \boxed{ \mathbf K_k = \mathbf P_k^{-} \mathbf H_k^T \mathbf S_k^{-1}. }
+        \]
+      </p>
+      <p>The posterior estimate becomes</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{+} = \hat{\mathbf x}_k^{-} + \mathbf K_k\mathbf y_k. }
+        \]
+      </p>
+      <p>This is the standard linear Gaussian recursive update.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.37 Relationship to the Kalman Filter</h3>
+      <p>The equations just obtained are mathematically the core of the linear Kalman filter.</p>
+      <p>However, there are two useful ways to interpret them.</p>
+      <h4>Control/navigation interpretation</h4>
+      <p>The Kalman filter is a recursive state estimator.</p>
+      <h4>Estimation-theory interpretation</h4>
+      <p>The Kalman filter is a sequential Gaussian Bayesian estimator and recursive least-squares solution for a dynamic linear system.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Kalman Filter} = \text{Dynamic Model} + \text{Recursive Bayesian Update} + \text{Gaussian Linear Estimation}. }
+        \]
+      </p>
+      <p>Section 4.2 develops the Kalman filter as a sensor-fusion architecture.</p>
+      <p>Here, the emphasis is on <strong>why those equations arise mathematically</strong>.</p>
+      <p><strong>Engineering interpretation:</strong> This viewpoint is useful because it shows that the Kalman filter is not an isolated algorithm: it is the recursive realization of a broader information-estimation framework.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.38 Why This Section Does Not Repeat Section 4.2</h3>
+      <p>Section 4.2 addresses questions such as</p>
+      <ul>
+        <li>how multiple spacecraft sensors are fused,</li>
+        <li>prediction and measurement-update implementation,</li>
+        <li>KF/EKF/ESKF/MEKF/UKF architectures,</li>
+        <li>tuning,</li>
+        <li>gating,</li>
+        <li>asynchronous sensors,</li>
+        <li>software implementation.</li>
+      </ul>
+      <p>Section 4.3.4 instead asks:</p>
+      <p>
+        \[
+        \boxed{ \text{How does recursive filtering arise from least-squares information accumulation and Bayesian inference?} }
+        \]
+      </p>
+      <p>Therefore the focus here is mathematical connection rather than repeating individual filter architectures.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.39 Recursive Information Form</h3>
+      <p>Instead of propagating covariance,</p>
+      <p>
+        \[
+        \mathbf P,
+        \]
+      </p>
+      <p>an estimator may work with information</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \mathbf P^{-1}. }
+        \]
+      </p>
+      <p>The measurement update is particularly simple:</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}^{+} = \boldsymbol{\Lambda}^{-} + \mathbf H^T\mathbf R^{-1}\mathbf H. }
+        \]
+      </p>
+      <p>Similarly,</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\eta}^{+} = \boldsymbol{\eta}^{-} + \mathbf H^T\mathbf R^{-1}\mathbf z. }
+        \]
+      </p>
+      <p>This makes independent information accumulation explicit.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.40 Covariance Form versus Information Form</h3>
+      <p>The covariance form naturally represents uncertainty:</p>
+      <p>
+        \[
+        \mathbf P.
+        \]
+      </p>
+      <p>The information form naturally represents certainty:</p>
+      <p>
+        \[
+        \boldsymbol{\Lambda} = \mathbf P^{-1}.
+        \]
+      </p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \mathbf P\uparrow \Rightarrow \text{Uncertainty}\uparrow }
+        \]
+      </p>
+      <p>while</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}\uparrow \Rightarrow \text{Information}\uparrow. }
+        \]
+      </p>
+      <p>The two contain equivalent information when the matrices are nonsingular.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.41 Why Measurement Updates Are Simple in Information Form</h3>
+      <p>Independent measurement information adds:</p>
+      <p>
+        \[
+        \boldsymbol{\Lambda}^{+} = \boldsymbol{\Lambda}^{-} + \Delta\boldsymbol{\Lambda}.
+        \]
+      </p>
+      <p>For multiple independent sensors,</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}^{+} = \boldsymbol{\Lambda}^{-} + \sum_j \mathbf H_j^T \mathbf R_j^{-1} \mathbf H_j. }
+        \]
+      </p>
+      <p>This makes information form especially attractive conceptually for distributed sensing and multisensor estimation.</p>
+      <p>Each sensor contributes its own information block.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.42 Prediction Is Less Simple in Information Form</h3>
+      <p>Although the measurement update becomes simple in information form, dynamic prediction is generally less convenient.</p>
+      <p>For covariance form,</p>
+      <p>
+        \[
+        \mathbf P_k^{-} = \mathbf F \mathbf P_{k-1}^{+} \mathbf F^T + \mathbf Q.
+        \]
+      </p>
+      <p>The corresponding information prediction involves inversion of this expression.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Information Form Simplifies Measurement Fusion but Can Complicate Dynamic Prediction}. }
+        \]
+      </p>
+      <p>The preferred form depends on the estimation architecture and computational structure.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.43 Independent Sensor Information</h3>
+      <p>Suppose sensors \(A\) and \(B\) provide independent measurements.</p>
+      <p>Then</p>
+      <p>
+        \[
+        \Delta\boldsymbol{\Lambda}_A = \mathbf H_A^T \mathbf R_A^{-1} \mathbf H_A
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \Delta\boldsymbol{\Lambda}_B = \mathbf H_B^T \mathbf R_B^{-1} \mathbf H_B.
+        \]
+      </p>
+      <p>The combined information is</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}^{+} = \boldsymbol{\Lambda}^{-} + \Delta\boldsymbol{\Lambda}_A + \Delta\boldsymbol{\Lambda}_B. }
+        \]
+      </p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Independent Sensor Information Adds}. }
+        \]
+      </p>
+      <p>This is the recursive equivalent of stacking independent measurements in batch WLS.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.44 Correlated Measurements</h3>
+      <p>The simple additive form assumes that measurement errors are appropriately represented and independent of previously incorporated measurement errors.</p>
+      <p>If observations are correlated, treating them as independent can cause information to be counted more than once.</p>
+      <p>For jointly correlated measurements,</p>
+      <p>
+        \[
+        \mathbf R = \begin{bmatrix} \mathbf R_A & \mathbf R_{AB}\\ \mathbf R_{BA} & \mathbf R_B \end{bmatrix}.
+        \]
+      </p>
+      <p>The complete covariance structure should be used.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Correlated Measurements} \neq \text{Independent Information Contributions}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.45 Double Counting Information</h3>
+      <p>Recursive systems must be especially careful about <strong>information reuse</strong>.</p>
+      <p>Suppose measurement \(B\) has already been computed using information from measurement \(A\).</p>
+      <p>If both are later treated as independent raw measurements, the estimator may count some information twice.</p>
+      <p>This problem can occur in distributed navigation systems where multiple subsystems exchange already-fused estimates.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Fusing Estimates Without Tracking Cross-Correlation Can Produce Overconfidence}. }
+        \]
+      </p>
+      <p>This is one motivation for conservative fusion methods and federated architectures.</p>
+      <p><strong>Engineering interpretation:</strong> Double counting is particularly dangerous because the estimator may appear numerically stable while its covariance becomes too small. The state estimate can then be overconfident even when the mean appears reasonable.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.46 Asynchronous Measurements</h3>
+      <p>Recursive estimation naturally supports sensors operating at different rates.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \text{IMU}: \text{high rate},
+        \]
+      </p>
+      <p>
+        \[
+        \text{GNSS}: \text{lower rate},
+        \]
+      </p>
+      <p>
+        \[
+        \text{camera}: \text{event dependent}.
+        \]
+      </p>
+      <p>The state can propagate continuously or at a fixed estimator rate, while measurement updates occur whenever measurements become available.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Prediction at System Rate} + \text{Updates at Measurement Times}. }
+        \]
+      </p>
+      <p>This is one of the major practical advantages of recursive estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.47 Missing Measurements</h3>
+      <p>If no measurement is available at epoch \(k\), the estimator can simply perform prediction:</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{+} = \hat{\mathbf x}_k^{-} }
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{+} = \mathbf P_k^{-} }
+        \]
+      </p>
+      <p>if no update occurs.</p>
+      <p>The dynamic model continues to propagate the state.</p>
+      <p>As measurement gaps increase, uncertainty may grow.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{No Measurement} \rightarrow \text{Prediction Continues but Measurement Information Does Not Increase}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.48 Delayed or Out-of-Sequence Measurements</h3>
+      <p>A measurement may arrive after the estimator has already advanced beyond its measurement epoch.</p>
+      <p>Such observations are called delayed or out-of-sequence measurements.</p>
+      <p>Naively applying them at the current time can be incorrect because</p>
+      <p>
+        \[
+        \mathbf z_k
+        \]
+      </p>
+      <p>corresponds to an earlier state.</p>
+      <p>Possible strategies include</p>
+      <ul>
+        <li>state-history buffering,</li>
+        <li>repropagation,</li>
+        <li>fixed-lag smoothing,</li>
+        <li>specialized out-of-sequence update methods.</li>
+      </ul>
+      <p>The timestamp therefore belongs to the measurement information itself.</p>
+      <p><strong>Engineering interpretation:</strong> Correct handling requires preserving the measurement timestamp and the estimator's historical state relationship. An out-of-sequence observation should not simply be treated as though it were measured at the current epoch.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.49 Initialization</h3>
+      <p>A recursive estimator requires an initial estimate:</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_0^{+} }
+        \]
+      </p>
+      <p>and initial covariance</p>
+      <p>
+        \[
+        \boxed{ \mathbf P_0^{+}. }
+        \]
+      </p>
+      <p>The covariance should describe how uncertain the initialization actually is.</p>
+      <p>If</p>
+      <p>
+        \[
+        \mathbf P_0
+        \]
+      </p>
+      <p>is unrealistically small, the estimator may resist valid measurements.</p>
+      <p>If it is extremely large, measurements may produce very aggressive corrections.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Initial Covariance} \rightarrow \text{Initial Trust in the State Estimate}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.50 Noninformative or Weak Prior</h3>
+      <p>When little is known about the initial state, a weak prior may be represented by relatively large covariance.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \mathbf P_0\rightarrow\text{large}
+        \]
+      </p>
+      <p>means</p>
+      <p>
+        \[
+        \boldsymbol{\Lambda}_0 = \mathbf P_0^{-1} \rightarrow \text{small}.
+        \]
+      </p>
+      <p>Thus early measurements dominate the estimate.</p>
+      <p>A completely uninformative prior is mathematically delicate because a singular information matrix may result before sufficient measurements have been accumulated.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.51 Strong Prior</h3>
+      <p>If the initial state is well known,</p>
+      <p>
+        \[
+        \mathbf P_0
+        \]
+      </p>
+      <p>may be small.</p>
+      <p>Then the estimator initially places substantial confidence in the prior.</p>
+      <p>A new measurement must contain sufficiently strong information to move the estimate significantly.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Strong Prior} \rightarrow \text{Smaller Initial Measurement-Driven Corrections}. }
+        \]
+      </p>
+      <p>An incorrect but overconfident prior can therefore delay recovery.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.52 Recursive Parameter Estimation</h3>
+      <p>Unknown physical parameters can also be estimated recursively.</p>
+      <p>Define</p>
+      <p>
+        \[
+        \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol{\theta} \end{bmatrix}.
+        \]
+      </p>
+      <p>The estimator can update both state and parameter estimates as new measurements arrive.</p>
+      <p>Examples include</p>
+      <ul>
+        <li>sensor bias,</li>
+        <li>scale factor,</li>
+        <li>clock terms,</li>
+        <li>drag coefficient,</li>
+        <li>ballistic coefficient,</li>
+        <li>empirical acceleration,</li>
+        <li>actuator calibration.</li>
+      </ul>
+      <p>However, each parameter must have sufficient measurement sensitivity.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.53 Constant Parameter Model</h3>
+      <p>A constant parameter may be modeled as</p>
+      <p>
+        \[
+        \boxed{ \theta_{k+1}=\theta_k. }
+        \]
+      </p>
+      <p>Its process-noise variance may be set very small or zero if the parameter is truly constant.</p>
+      <p>Then information about \(\theta\) accumulates over time.</p>
+      <p>The corresponding uncertainty generally decreases as more informative measurements are processed.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.54 Slowly Varying Parameter Model</h3>
+      <p>If a parameter changes slowly,</p>
+      <p>
+        \[
+        \boxed{ \theta_{k+1} = \theta_k+w_{\theta,k}. }
+        \]
+      </p>
+      <p>The parameter process noise</p>
+      <p>
+        \[
+        Q_\theta
+        \]
+      </p>
+      <p>prevents the estimator from becoming permanently overconfident.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Parameter Process Noise} \rightarrow \text{Allows Controlled Parameter Adaptation}. }
+        \]
+      </p>
+      <p>Too little process noise may prevent tracking real parameter changes.</p>
+      <p>Too much can make the estimate noisy.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.55 Recursive Estimation and Identifiability</h3>
+      <p>A recursive estimator cannot estimate a parameter merely because it has been added to the state vector.</p>
+      <p>If</p>
+      <p>
+        \[
+        \frac{\partial h}{\partial\theta} \approx0,
+        \]
+      </p>
+      <p>then measurements contain little information about \(\theta\).</p>
+      <p>If two parameters produce almost identical signatures,</p>
+      <p>
+        \[
+        \frac{\partial h}{\partial\theta_1} \approx c \frac{\partial h}{\partial\theta_2},
+        \]
+      </p>
+      <p>their estimates may remain strongly correlated.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{State Augmentation} \neq \text{Parameter Identifiability}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> Adding a parameter state without sensitivity can increase state dimension and correlation without adding information. Identifiability should therefore be assessed before or alongside augmentation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.56 Persistent Excitation</h3>
+      <p>For online parameter estimation, measurements must contain sufficient independent variation over time.</p>
+      <p>This is often described through <strong>persistent excitation</strong>.</p>
+      <p>If the system remains in a condition where a parameter has almost no observable effect, repeated measurements may add little useful information.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Repeated Measurements} + \text{No Parameter Excitation} \rightarrow \text{Little Parameter Information}. }
+        \]
+      </p>
+      <p>System motion and changing geometry can therefore be essential for recursive parameter estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.57 General Relative-Navigation Example</h3>
+      <p>Consider a general rendezvous or proximity-navigation problem with relative state</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_{\text{rel}} = \begin{bmatrix} \mathbf r_{\text{rel}}\\ \mathbf v_{\text{rel}} \end{bmatrix}. }
+        \]
+      </p>
+      <p>The previous navigation solution provides</p>
+      <p>
+        \[
+        \hat{\mathbf x}_{\text{rel},k}^{-}
+        \]
+      </p>
+      <p>with covariance</p>
+      <p>
+        \[
+        \mathbf P_k^{-}.
+        \]
+      </p>
+      <p>Suppose a ranging sensor provides</p>
+      <p>
+        \[
+        z_{\rho,k}.
+        \]
+      </p>
+      <p>The predicted range is</p>
+      <p>
+        \[
+        \hat\rho_k = \| \hat{\mathbf r}_{\text{rel},k}^{-} \|.
+        \]
+      </p>
+      <p>The innovation is</p>
+      <p>
+        \[
+        \boxed{ y_{\rho,k} = z_{\rho,k}-\hat\rho_k. }
+        \]
+      </p>
+      <p>The estimator uses this innovation, measurement sensitivity, and uncertainty to update the relative state.</p>
+      <p>Later, an optical observation may provide line-of-sight information and contribute a different sensitivity direction.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Sequential Range Information} + \text{Sequential Angular Information} + \text{Relative Dynamics} \rightarrow \text{Continuously Updated Relative Navigation State}. }
+        \]
+      </p>
+      <p>This is a general RPO estimation concept rather than a particular mission architecture.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.58 Why Different Measurements Correct Different State Directions</h3>
+      <p>Suppose a range measurement is primarily sensitive to one combination of relative-position components.</p>
+      <p>Its measurement Jacobian may constrain that direction strongly.</p>
+      <p>A bearing measurement may constrain another combination.</p>
+      <p>The gain</p>
+      <p>
+        \[
+        \mathbf K_k = \mathbf P_k^{-} \mathbf H_k^T \mathbf S_k^{-1}
+        \]
+      </p>
+      <p>maps each measurement innovation into the state directions correlated with that observation.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Sensor Geometry} + \text{Prior State Correlation} \rightarrow \text{Direction of Recursive Correction}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.59 Measurement Rejection and Gating</h3>
+      <p>Not every measurement should necessarily be incorporated.</p>
+      <p>A large innovation may indicate</p>
+      <ul>
+        <li>outlier,</li>
+        <li>false association,</li>
+        <li>sensor fault,</li>
+        <li>timing error,</li>
+        <li>model mismatch.</li>
+      </ul>
+      <p>A normalized innovation statistic is often based on</p>
+      <p>
+        \[
+        \boxed{ d^2 = \mathbf y^T \mathbf S^{-1} \mathbf y. }
+        \]
+      </p>
+      <p>This measures innovation magnitude relative to expected uncertainty.</p>
+      <p>Measurements with unusually large normalized innovations may be investigated or rejected according to defined validation logic.</p>
+      <p><strong>Engineering interpretation:</strong> A gating threshold should be selected from the assumed statistical model and the measurement dimension, then validated in simulation. A large innovation is evidence of inconsistency, not proof of a particular failure cause.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.60 Why Raw Residual Magnitude Is Not Enough</h3>
+      <p>Suppose one sensor has</p>
+      <p>
+        \[
+        \sigma=0.01
+        \]
+      </p>
+      <p>while another has</p>
+      <p>
+        \[
+        \sigma=10.
+        \]
+      </p>
+      <p>A residual of magnitude <code>1</code> means very different things for these two sensors.</p>
+      <p>Therefore measurement consistency should be judged relative to</p>
+      <p>
+        \[
+        \mathbf S
+        \]
+      </p>
+      <p>rather than only raw residual magnitude.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Innovation Significance} \neq \text{Innovation Magnitude Alone}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.61 Innovation Consistency</h3>
+      <p>For a properly modeled linear-Gaussian estimator, innovations should be broadly consistent with the predicted innovation covariance.</p>
+      <p>Persistent behaviour such as</p>
+      <ul>
+        <li>nonzero mean,</li>
+        <li>unexpectedly large magnitude,</li>
+        <li>temporal correlation,</li>
+        <li>periodic structure</li>
+      </ul>
+      <p>may indicate</p>
+      <ul>
+        <li>incorrect <code>R</code>,</li>
+        <li>incorrect <code>Q</code>,</li>
+        <li>model bias,</li>
+        <li>missing state,</li>
+        <li>timing error,</li>
+        <li>sensor bias.</li>
+      </ul>
+      <p>Therefore innovations are valuable diagnostic signals.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.62 Innovation Should Be Unpredictable</h3>
+      <p>A well-modeled innovation sequence should not contain strong predictable structure.</p>
+      <p>If future innovations can be predicted from past innovations, some systematic information may not have been captured by the estimator model.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Structured Innovation} \rightarrow \text{Possible Model Deficiency}. }
+        \]
+      </p>
+      <p>This is related to innovation whiteness testing used in filter verification.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.63 Covariance Consistency</h3>
+      <p>An estimator can produce small errors while reporting unrealistic uncertainty, or large errors while appearing overly confident.</p>
+      <p>Therefore state accuracy and covariance consistency are different questions.</p>
+      <p>A consistent estimator should have actual errors broadly compatible with its predicted covariance.</p>
+      <p>This can be evaluated in simulation using truth information and metrics such as normalized estimation error.</p>
+      <p>The detailed Monte Carlo consistency framework belongs to Section 4.2 verification topics.</p>
+      <p><strong>Engineering interpretation:</strong> In simulation, covariance consistency can be assessed against known truth; in flight, direct truth is unavailable, so innovation statistics, cross-comparisons, and external references become especially important.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.64 Process Noise and Responsiveness</h3>
+      <p>Process noise controls how rapidly prior certainty is lost during prediction.</p>
+      <p>Larger</p>
+      <p>
+        \[
+        \mathbf Q
+        \]
+      </p>
+      <p>generally produces larger</p>
+      <p>
+        \[
+        \mathbf P^{-},
+        \]
+      </p>
+      <p>which often increases measurement influence.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \mathbf Q\uparrow \rightarrow \text{Less Confidence in Dynamics} \rightarrow \text{Greater Measurement Responsiveness}. }
+        \]
+      </p>
+      <p>But excessive process noise can create unnecessarily noisy estimates.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.65 Measurement Noise and Responsiveness</h3>
+      <p>Increasing</p>
+      <p>
+        \[
+        \mathbf R
+        \]
+      </p>
+      <p>indicates lower trust in the measurement.</p>
+      <p>The gain tends to decrease.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \mathbf R\uparrow \rightarrow \text{Lower Measurement Influence}. }
+        \]
+      </p>
+      <p>Reducing \(R\) does the opposite.</p>
+      <p>However, \(Q\) and \(R\) should represent actual uncertainty rather than being treated only as arbitrary response-tuning parameters.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.66 Recursive Estimation Is Not Simple Averaging</h3>
+      <p>The update</p>
+      <p>
+        \[
+        \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + \mathbf K\mathbf y
+        \]
+      </p>
+      <p>may look similar to weighted averaging.</p>
+      <p>However, in a multidimensional system,</p>
+      <ul>
+        <li>state variables are coupled through covariance,</li>
+        <li>sensors observe combinations of states,</li>
+        <li>geometry changes,</li>
+        <li>measurement uncertainties may be correlated,</li>
+        <li>dynamics propagate information.</li>
+      </ul>
+      <p>Therefore recursive estimation is much richer than simply averaging sensor outputs.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.67 Dynamic Coupling Transfers Measurement Information</h3>
+      <p>Suppose a measurement directly observes position but not velocity.</p>
+      <p>If position and velocity are dynamically coupled, a position measurement can still reduce velocity uncertainty.</p>
+      <p>This occurs because covariance contains cross-correlation terms:</p>
+      <p>
+        \[
+        \mathbf P = \begin{bmatrix} \mathbf P_{rr} & \mathbf P_{rv} \\ \mathbf P_{vr} & \mathbf P_{vv} \end{bmatrix}.
+        \]
+      </p>
+      <p>The gain can therefore map a position innovation into both position and velocity corrections.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{A Measurement Can Improve an Unmeasured State Through Dynamic Correlation}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.68 Covariance Carries More Than Variances</h3>
+      <p>The covariance matrix contains both</p>
+      <ul>
+        <li>state variances,</li>
+        <li>cross-correlations.</li>
+      </ul>
+      <p>These cross-correlations are essential.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        P_{rv}\neq0
+        \]
+      </p>
+      <p>indicates that position and velocity errors are statistically coupled.</p>
+      <p>Ignoring off-diagonal covariance can prevent correct information transfer between state components.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Covariance Structure} \rightarrow \text{How Information Propagates Between States}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.69 Sequential Processing of Multiple Measurements at One Epoch</h3>
+      <p>Suppose two independent measurements are available at the same epoch.</p>
+      <p>They may be processed together:</p>
+      <p>
+        \[
+        \mathbf z = \begin{bmatrix} \mathbf z_A\\ \mathbf z_B \end{bmatrix},
+        \]
+      </p>
+      <p>or sequentially:</p>
+      <p>
+        \[
+        \mathbf z_A \rightarrow \text{update} \rightarrow \mathbf z_B \rightarrow \text{update}.
+        \]
+      </p>
+      <p>For linear independent Gaussian measurements, these approaches are mathematically equivalent under exact arithmetic.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Joint Update} \Longleftrightarrow \text{Sequential Independent Updates} }
+        \]
+      </p>
+      <p>under the appropriate assumptions.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.70 Why Sequential Scalar Updates Can Be Useful</h3>
+      <p>Processing scalar or small measurement blocks sequentially can reduce the size of matrix inversions.</p>
+      <p>Instead of inverting a large innovation covariance, the estimator may perform several small updates.</p>
+      <p>This may be computationally attractive for onboard applications.</p>
+      <p>However, correlations between measurements must still be handled correctly.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.71 Numerical Stability</h3>
+      <p>Recursive covariance updates occur repeatedly, sometimes for millions of cycles.</p>
+      <p>Numerical roundoff can gradually produce</p>
+      <ul>
+        <li>loss of symmetry,</li>
+        <li>negative covariance eigenvalues,</li>
+        <li>poor conditioning.</li>
+      </ul>
+      <p>Therefore implementation details matter.</p>
+      <p>Useful strategies include</p>
+      <ul>
+        <li>Joseph covariance update,</li>
+        <li>square-root filtering,</li>
+        <li>symmetry enforcement where justified,</li>
+        <li>robust matrix factorizations,</li>
+        <li>avoiding explicit inversion.</li>
+      </ul>
+      <p><strong>Engineering interpretation:</strong> Numerical stability is an estimator-design requirement, not merely a software detail. A mathematically correct recursion can still fail over long operation if finite-precision effects are ignored.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.72 Square-Root Recursive Estimation</h3>
+      <p>Instead of propagating</p>
+      <p>
+        \[
+        \mathbf P
+        \]
+      </p>
+      <p>directly, square-root methods propagate a factor such as</p>
+      <p>
+        \[
+        \boxed{ \mathbf P = \mathbf S\mathbf S^T. }
+        \]
+      </p>
+      <p>This can improve numerical stability and preserve positive semidefiniteness more reliably.</p>
+      <p>Square-root forms are especially valuable when</p>
+      <ul>
+        <li>precision requirements are high,</li>
+        <li>covariance spans many orders of magnitude,</li>
+        <li>the system operates for long durations.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.73 Information Square-Root Form</h3>
+      <p>Similarly, the information matrix may be factored:</p>
+      <p>
+        \[
+        \boldsymbol{\Lambda} = \mathbf R_I^T \mathbf R_I.
+        \]
+      </p>
+      <p>Measurements can then update the square-root information representation.</p>
+      <p>This avoids explicitly forming some poorly conditioned matrices and provides numerically stable information accumulation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.74 Computational Complexity</h3>
+      <p>For a state dimension \(n\), covariance propagation and matrix operations can become expensive as \(n\) grows.</p>
+      <p>Recursive estimation avoids continuously increasing the number of historical measurements in the active optimization problem.</p>
+      <p>The size of the core estimator therefore remains primarily tied to the state dimension rather than the entire observation history.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Recursive Estimation} \rightarrow \text{Bounded Online State Representation}. }
+        \]
+      </p>
+      <p>This makes it attractive for onboard use.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.75 Memory Advantage</h3>
+      <p>A full batch estimator may need access to</p>
+      <p>
+        \[
+        \mathbf z_1,\ldots,\mathbf z_N.
+        \]
+      </p>
+      <p>A recursive estimator generally needs only</p>
+      <ul>
+        <li>current state estimate,</li>
+        <li>uncertainty representation,</li>
+        <li>current model information,</li>
+        <li>incoming measurement.</li>
+      </ul>
+      <p>Therefore memory requirements can be substantially lower.</p>
+      <p>This is particularly relevant for long-duration autonomous operation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.76 Recursive Estimation Loses Easy Reprocessing</h3>
+      <p>The computational efficiency of recursive estimation has a tradeoff.</p>
+      <p>Once information is compressed into</p>
+      <p>
+        \[
+        \hat{\mathbf x}_k, \mathbf P_k,
+        \]
+      </p>
+      <p>individual historical measurements are no longer explicitly represented in the current estimator state.</p>
+      <p>If an old calibration error is later discovered, reprocessing may require access to stored raw data.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Recursive Efficiency} \leftrightarrow \text{Less Direct Access to Historical Measurement Contributions}. }
+        \]
+      </p>
+      <p>Batch reprocessing is often easier for offline analysis.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.77 Recursive Estimation and Smoothing</h3>
+      <p>Filtering estimates the state using measurements available up to the current epoch:</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k|k}. }
+        \]
+      </p>
+      <p>Smoothing additionally uses future measurements:</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_{k|N}, \qquad N>k. }
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Filter} = \text{Past + Present Information} }
+        \]
+      </p>
+      <p>while</p>
+      <p>
+        \[
+        \boxed{ \text{Smoother} = \text{Past + Present + Future Information}. }
+        \]
+      </p>
+      <p>Smoothing is developed in Section 4.3.7.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.78 Recursive Estimation and Nonlinear Systems</h3>
+      <p>Most spacecraft dynamics and measurements are nonlinear:</p>
+      <p>
+        \[
+        \mathbf x_{k+1} = f(\mathbf x_k) + \mathbf w_k,
+        \]
+      </p>
+      <p>
+        \[
+        \mathbf z_k = h(\mathbf x_k) + \mathbf v_k.
+        \]
+      </p>
+      <p>The linear recursive equations cannot simply be applied globally.</p>
+      <p>Possible approaches include</p>
+      <ul>
+        <li>local linearization,</li>
+        <li>sigma-point propagation,</li>
+        <li>sampling-based methods.</li>
+      </ul>
+      <p>These lead to estimator families such as EKF, UKF, and particle filters, already treated in Section 4.2 from the sensor-fusion perspective.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.79 Local Linearization in Recursive Estimation</h3>
+      <p>For a nonlinear measurement model,</p>
+      <p>
+        \[
+        \mathbf z_k = h(\mathbf x_k) + \mathbf v_k,
+        \]
+      </p>
+      <p>linearize around the prior estimate:</p>
+      <p>
+        \[
+        \boxed{ h(\mathbf x_k) \approx h(\hat{\mathbf x}_k^{-}) + \mathbf H_k ( \mathbf x_k-\hat{\mathbf x}_k^{-} ). }
+        \]
+      </p>
+      <p>where</p>
+      <p>
+        \[
+        \boxed{ \mathbf H_k = \left. \frac{\partial h} {\partial\mathbf x} \right|_{\hat{\mathbf x}_k^{-}}. }
+        \]
+      </p>
+      <p>The recursive correction is then based on this local approximation.</p>
+      <p>This connects recursive estimation to nonlinear least-squares linearization.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.80 Recursive versus Iterative Measurement Update</h3>
+      <p>A conventional recursive update processes the measurement once.</p>
+      <p>For a strongly nonlinear measurement model, one may instead relinearize around an updated state and process the same measurement iteratively.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Predict} \rightarrow \text{Linearize} \rightarrow \text{Update} \rightarrow \text{Relinearize} \rightarrow \text{Repeat}. }
+        \]
+      </p>
+      <p>This creates a closer connection between nonlinear recursive estimation and Gauss-Newton-style differential correction.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.81 Constraints in Recursive Estimation</h3>
+      <p>Physical constraints may exist, such as</p>
+      <p>
+        \[
+        \|\mathbf q\|=1
+        \]
+      </p>
+      <p>or bounds on parameters.</p>
+      <p>Possible approaches include</p>
+      <ul>
+        <li>state normalization,</li>
+        <li>constrained update methods,</li>
+        <li>transformed variables,</li>
+        <li>pseudo-measurements,</li>
+        <li>projection onto the feasible set.</li>
+      </ul>
+      <p>Constraints should represent genuine physical information.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.82 Pseudo-Measurements</h3>
+      <p>A known relationship may sometimes be represented as an artificial observation.</p>
+      <p>Suppose approximately</p>
+      <p>
+        \[
+        \mathbf C\mathbf x = \mathbf d.
+        \]
+      </p>
+      <p>Then define</p>
+      <p>
+        \[
+        \boxed{ \mathbf z_c = \mathbf d, \qquad \mathbf H_c=\mathbf C }
+        \]
+      </p>
+      <p>with covariance</p>
+      <p>
+        \[
+        \mathbf R_c.
+        \]
+      </p>
+      <p>This allows the constraint to be incorporated through the same recursive measurement-update machinery.</p>
+      <p>A very small covariance makes the constraint strong.</p>
+      <p>A larger covariance makes it soft.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.83 Sensor Bias in Recursive Estimation</h3>
+      <p>Suppose</p>
+      <p>
+        \[
+        \mathbf z_k = h(\mathbf x_k) + \mathbf b_k + \boldsymbol{\eta}_k.
+        \]
+      </p>
+      <p>If bias is ignored, the state may absorb it.</p>
+      <p>Instead, augment the state:</p>
+      <p>
+        \[
+        \boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \mathbf b \end{bmatrix}. }
+        \]
+      </p>
+      <p>A bias model may be</p>
+      <p>
+        \[
+        \mathbf b_{k+1} = \mathbf b_k+\mathbf w_b.
+        \]
+      </p>
+      <p>This allows the estimator to separate, where observable, physical state changes from sensor-bias evolution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.84 State-Parameter Correlation</h3>
+      <p>When a bias or parameter is added to the state, it may become strongly correlated with physical states.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \mathbf P = \begin{bmatrix} \mathbf P_{xx} & \mathbf P_{x\theta}\\ \mathbf P_{\theta x} & \mathbf P_{\theta\theta} \end{bmatrix}.
+        \]
+      </p>
+      <p>Large</p>
+      <p>
+        \[
+        \mathbf P_{x\theta}
+        \]
+      </p>
+      <p>indicates that uncertainty in the state and parameter is coupled.</p>
+      <p>This can be physically meaningful, but strong correlation may also signal weak distinguishability.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.85 Recursive Information Growth</h3>
+      <p>For a truly static parameter with repeated independent informative measurements,</p>
+      <p>
+        \[
+        \boldsymbol{\Lambda}_k = \boldsymbol{\Lambda}_{k-1} + \Delta\boldsymbol{\Lambda}_k.
+        \]
+      </p>
+      <p>Therefore information tends to increase monotonically.</p>
+      <p>Correspondingly, uncertainty tends to decrease.</p>
+      <p>However, in a dynamic estimator, process noise can reduce confidence between measurements.</p>
+      <p>Therefore dynamic estimation contains competing effects:</p>
+      <p>
+        \[
+        \boxed{ \text{Measurement Update Adds Information} }
+        \]
+      </p>
+      <p>while</p>
+      <p>
+        \[
+        \boxed{ \text{Process Uncertainty Reduces Predictive Confidence}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.86 Steady-State Behaviour</h3>
+      <p>For some time-invariant linear systems, the covariance and gain may converge toward approximately constant values.</p>
+      <p>Then</p>
+      <p>
+        \[
+        \mathbf K_k \rightarrow \mathbf K_\infty.
+        \]
+      </p>
+      <p>This is called steady-state filtering behaviour.</p>
+      <p>It can reduce onboard computation in some applications because a nearly constant gain may eventually be used.</p>
+      <p>However, this is only appropriate when the assumptions leading to steady state are valid.</p>
+      <p><strong>Engineering interpretation:</strong> Steady-state gain is most meaningful when system dynamics, measurement geometry, sampling, and noise statistics remain approximately stationary. Changing geometry or sensor availability can invalidate a fixed-gain assumption.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.87 Covariance Collapse</h3>
+      <p>If an estimator repeatedly processes measurements while assuming too little process noise or too-small measurement uncertainty, the covariance may become unrealistically small.</p>
+      <p>Then</p>
+      <p>
+        \[
+        \mathbf P\rightarrow\text{very small}
+        \]
+      </p>
+      <p>and subsequent valid measurements may have insufficient influence.</p>
+      <p>This is sometimes called overconfidence or covariance collapse.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Small Covariance} \neq \text{Automatically Accurate Estimate}. }
+        \]
+      </p>
+      <p>Covariance must remain statistically credible.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.88 Divergence</h3>
+      <p>An estimator is said to diverge when the estimate moves increasingly away from the actual state or loses statistical consistency.</p>
+      <p>Possible causes include</p>
+      <ul>
+        <li>incorrect dynamics,</li>
+        <li>incorrect measurement model,</li>
+        <li>underestimated <code>Q</code>,</li>
+        <li>underestimated <code>R</code>,</li>
+        <li>poor initialization,</li>
+        <li>numerical instability,</li>
+        <li>nonlinear linearization error,</li>
+        <li>unmodeled bias,</li>
+        <li>bad measurement association.</li>
+      </ul>
+      <p>Divergence is therefore often a symptom of a model or consistency problem rather than simply an equation failure.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.89 Overweighting Measurements</h3>
+      <p>If</p>
+      <p>
+        \[
+        \mathbf R
+        \]
+      </p>
+      <p>is made unrealistically small, measurements are treated as more accurate than they really are.</p>
+      <p>This produces large gain and potentially aggressive corrections.</p>
+      <p>Noise can then be injected into the state estimate.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Underestimated Measurement Noise} \rightarrow \text{Overconfident Measurement Updates}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.90 Underweighting Measurements</h3>
+      <p>If</p>
+      <p>
+        \[
+        \mathbf R
+        \]
+      </p>
+      <p>is too large, useful measurements are treated as uninformative.</p>
+      <p>The estimator may depend excessively on the model.</p>
+      <p>This can allow model errors to accumulate.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Overestimated Measurement Noise} \rightarrow \text{Weak Measurement Correction}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.91 Underestimated Process Noise</h3>
+      <p>If</p>
+      <p>
+        \[
+        \mathbf Q
+        \]
+      </p>
+      <p>is too small, the estimator assumes the dynamics are more accurate than they actually are.</p>
+      <p>The covariance can become too small during prediction.</p>
+      <p>Then the estimator may reject or underweight valid measurement corrections.</p>
+      <p>This is a common source of inconsistent estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.92 Overestimated Process Noise</h3>
+      <p>If</p>
+      <p>
+        \[
+        \mathbf Q
+        \]
+      </p>
+      <p>is too large, predicted covariance grows excessively.</p>
+      <p>Measurements then dominate updates.</p>
+      <p>The state estimate may become unnecessarily noisy and sensitive to individual observations.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ Q \text{ and } R \text{ should represent uncertainty, not arbitrary gains}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.93 Model Error versus Process Noise</h3>
+      <p>Process noise can represent uncertainty not explicitly modeled in the dynamics.</p>
+      <p>However, increasing \(Q\) is not a substitute for correcting known modelling errors.</p>
+      <p>If a deterministic bias or missing force is known to exist, explicitly modeling it is generally more meaningful than indefinitely inflating process noise.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Known Physics} \rightarrow \text{Model It}; \qquad \text{Residual Uncertainty} \rightarrow \text{Represent Statistically}. }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> Process noise is best interpreted as a model for unresolved uncertainty. When a repeatable deterministic effect is known, explicitly representing that physics or estimating the associated parameter usually gives a more interpretable solution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.94 Relationship to Moving-Window Estimation</h3>
+      <p>Recursive estimation uses a compact summary of all past information.</p>
+      <p>A moving-window estimator instead keeps only a finite recent measurement history.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \{\mathbf z_{k-L+1},\ldots,\mathbf z_k\} }
+        \]
+      </p>
+      <p>is processed repeatedly.</p>
+      <p>This can provide a compromise between</p>
+      <ul>
+        <li>full batch estimation,</li>
+        <li>purely recursive filtering.</li>
+      </ul>
+      <p>It is useful when old information should not dominate or when recent states and parameters require re-estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.95 Recursive Estimation and Real-Time Navigation</h3>
+      <p>Recursive estimation is naturally suited to onboard navigation because the cycle is</p>
+      <p>
+        \[
+        \boxed{ \text{Propagate} \rightarrow \text{Receive Measurement} \rightarrow \text{Validate} \rightarrow \text{Update} \rightarrow \text{Output Navigation State}. }
+        \]
+      </p>
+      <p>This can be repeated whenever new sensor data arrive.</p>
+      <p>The estimator therefore maintains a continuously updated navigation solution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.96 Real-Time Timing Requirement</h3>
+      <p>A recursive algorithm must usually complete its update before the next required processing deadline.</p>
+      <p>Thus computation time must satisfy approximately</p>
+      <p>
+        \[
+        \boxed{ t_{\text{compute}} < t_{\text{available}}. }
+        \]
+      </p>
+      <p>If the estimator cannot meet this requirement,</p>
+      <ul>
+        <li>measurements may backlog,</li>
+        <li>latency may increase,</li>
+        <li>the state used by guidance/control may become stale.</li>
+      </ul>
+      <p>Computational architecture is therefore part of recursive-estimator design.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.97 Estimation Latency</h3>
+      <p>A mathematically accurate estimate can still be operationally poor if it is delivered too late.</p>
+      <p>If a state estimate corresponds to</p>
+      <p>
+        \[
+        t_k
+        \]
+      </p>
+      <p>but becomes available at</p>
+      <p>
+        \[
+        t_k+\Delta t,
+        \]
+      </p>
+      <p>guidance and control are acting on delayed information.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Navigation Performance} = \text{Accuracy} + \text{Uncertainty Quality} + \text{Timeliness}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.98 Sequential Sensor Scheduling</h3>
+      <p>If several measurements are available but computational resources are limited, the estimator may need to decide which observations to process first or whether all are necessary.</p>
+      <p>Useful considerations include</p>
+      <ul>
+        <li>measurement uncertainty,</li>
+        <li>expected information contribution,</li>
+        <li>geometry,</li>
+        <li>computational cost,</li>
+        <li>measurement age.</li>
+      </ul>
+      <p>This connects recursive estimation to sensor-management and information-based scheduling problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.99 Information Contribution of One Measurement</h3>
+      <p>For measurement \(k\),</p>
+      <p>
+        \[
+        \boxed{ \Delta\boldsymbol{\Lambda}_k = \mathbf H_k^T \mathbf R_k^{-1} \mathbf H_k. }
+        \]
+      </p>
+      <p>This allows the contribution of a measurement to be interpreted before or after processing.</p>
+      <p>A measurement with</p>
+      <ul>
+        <li>low uncertainty,</li>
+        <li>strong sensitivity,</li>
+        <li>useful independent geometry</li>
+      </ul>
+      <p>can provide significant information.</p>
+      <p>A highly precise measurement may still contribute little to a particular state direction if its sensitivity to that direction is weak.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.100 Recursive Observability Development</h3>
+      <p>Observability can develop over time.</p>
+      <p>At one instant,</p>
+      <p>
+        \[
+        \mathbf H_k
+        \]
+      </p>
+      <p>may not constrain every state component.</p>
+      <p>But dynamics change the state and measurement geometry.</p>
+      <p>Across multiple recursive updates, previously weak state directions may become informative.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Instantaneous Weak Observability} \not\Rightarrow \text{Long-Term Unobservability}. }
+        \]
+      </p>
+      <p>Dynamic evolution must be considered.</p>
+      <p><strong>Engineering interpretation:</strong> This is why recursive observability should be assessed over time rather than from one measurement Jacobian alone. Dynamic coupling and changing sensor geometry can gradually reveal states that are weakly constrained instantaneously.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.101 Covariance as an Observability Indicator</h3>
+      <p>Persistent large covariance in one state direction may indicate weak available information.</p>
+      <p>Similarly, strong state correlations may reveal that certain state combinations are difficult to separate.</p>
+      <p>However, covariance depends on the assumed model and noise statistics.</p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Large Covariance} \rightarrow \text{Possible Weak Estimation Direction}, }
+        \]
+      </p>
+      <p>but formal observability analysis may still be required.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.102 Recursive Estimation with Maneuvers</h3>
+      <p>If a maneuver is known and commanded, its effect can be included in state propagation:</p>
+      <p>
+        \[
+        \mathbf x_{k+1} = f( \mathbf x_k, \mathbf u_k ).
+        \]
+      </p>
+      <p>If maneuver magnitude is uncertain, its uncertainty should influence prediction covariance.</p>
+      <p>An unknown maneuver can also be treated as</p>
+      <ul>
+        <li>an augmented parameter,</li>
+        <li>a process disturbance,</li>
+        <li>a detected event followed by estimator reset or augmentation.</li>
+      </ul>
+      <p>The appropriate treatment depends on what information is known about the maneuver.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.103 Maneuver Detection from Innovations</h3>
+      <p>An unexpected maneuver may cause innovation sequences to depart strongly from predicted behaviour.</p>
+      <p>For example,</p>
+      <p>
+        \[
+        \mathbf y_k
+        \]
+      </p>
+      <p>may suddenly become large and remain structured.</p>
+      <p>This can indicate</p>
+      <ul>
+        <li>actual maneuver,</li>
+        <li>sensor fault,</li>
+        <li>model change.</li>
+      </ul>
+      <p>Innovation monitoring can therefore help identify dynamic events, but the cause should not be inferred from residual magnitude alone.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.104 Recursive Multi-Sensor Architecture</h3>
+      <p>A general multisensor recursive architecture can be written as</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Previous Posterior State}\\ \downarrow\\ \text{Dynamic Prediction}\\ \downarrow\\ \text{Prior State and Covariance}\\ \downarrow\\ \text{Sensor A Update}\\ \downarrow\\ \text{Sensor B Update}\\ \downarrow\\ \cdots\\ \downarrow\\ \text{Current Posterior Navigation State} \end{array} }
+        \]
+      </p>
+      <p>Sensors may update at different times and observe different combinations of states.</p>
+      <p>The common state and covariance carry information between these updates.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.105 Centralized versus Distributed Recursive Estimation</h3>
+      <p>In a centralized estimator, raw or minimally processed measurements are combined in one state estimator.</p>
+      <p>In a distributed architecture, local estimators may generate partial estimates that are later fused.</p>
+      <p>Centralized fusion simplifies correlation accounting when all information is available.</p>
+      <p>Distributed fusion can improve modularity and fault containment but requires care with cross-correlation.</p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Estimator Architecture} \rightarrow \text{How Information and Correlation Are Managed}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.106 Recursive Estimation and Sensor Failure</h3>
+      <p>If a sensor becomes unavailable, recursive estimation can continue using</p>
+      <ul>
+        <li>dynamics,</li>
+        <li>remaining sensors.</li>
+      </ul>
+      <p>However, uncertainty may grow in directions that depended strongly on the failed sensor.</p>
+      <p>This may be visible as increasing covariance.</p>
+      <p>Thus covariance can support navigation-health monitoring and sensor-failure assessment.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.107 Why Covariance Should Grow During Information Loss</h3>
+      <p>Suppose no measurements constrain a particular state for some interval.</p>
+      <p>Process noise and propagation uncertainty continue to act.</p>
+      <p>Therefore uncertainty should usually increase.</p>
+      <p>If the estimator covariance remains unrealistically small despite long measurement outages, the uncertainty model may be inconsistent.</p>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \text{Information Loss} + \text{Dynamic Uncertainty} \rightarrow \text{Covariance Growth}. }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.108 Measurement Update as Error Correction</h3>
+      <p>The recursive state equation</p>
+      <p>
+        \[
+        \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + \mathbf K\mathbf y
+        \]
+      </p>
+      <p>can be interpreted as</p>
+      <p>
+        \[
+        \boxed{ \text{Posterior} = \text{Prediction} + \text{Estimated Prediction Error}. }
+        \]
+      </p>
+      <p>The term</p>
+      <p>
+        \[
+        \mathbf K\mathbf y
+        \]
+      </p>
+      <p>is the estimated state correction inferred from the measurement innovation.</p>
+      <p>This gives a useful physical interpretation of recursive estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.109 Bayesian Prediction Step</h3>
+      <p>The dynamic prediction also has a Bayesian interpretation.</p>
+      <p>The prior distribution at time \(k\) is</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|Z_{k-1}) = \int p(\mathbf x_k|\mathbf x_{k-1}) p(\mathbf x_{k-1}|Z_{k-1}) \,d\mathbf x_{k-1}. }
+        \]
+      </p>
+      <p>This is the Chapman-Kolmogorov prediction equation.</p>
+      <p>It propagates the entire state probability distribution through the transition model.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.110 Bayesian Measurement Update</h3>
+      <p>Once measurement \(\mathbf z_k\) arrives,</p>
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|Z_k) \propto p(\mathbf z_k|\mathbf x_k) p(\mathbf x_k|Z_{k-1}). }
+        \]
+      </p>
+      <p>Thus the complete Bayesian recursion consists of</p>
+      <p>
+        \[
+        \boxed{ \text{Prediction Integral} \rightarrow \text{Bayesian Measurement Update}. }
+        \]
+      </p>
+      <p>For linear Gaussian systems, these probability-distribution equations reduce to the familiar mean and covariance recursions.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.111 Why Gaussian Estimation Is Special</h3>
+      <p>The Gaussian distribution is completely characterized by</p>
+      <p>
+        \[
+        \boxed{ \text{Mean} + \text{Covariance}. }
+        \]
+      </p>
+      <p>For linear dynamics and linear measurements with Gaussian uncertainties, Gaussian distributions remain Gaussian under both prediction and update.</p>
+      <p>Therefore the estimator only needs to propagate</p>
+      <p>
+        \[
+        \hat{\mathbf x}
+        \]
+      </p>
+      <p>and</p>
+      <p>
+        \[
+        \mathbf P.
+        \]
+      </p>
+      <p>This is why the linear Kalman filter has such a compact recursive form.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.112 Non-Gaussian Recursive Estimation</h3>
+      <p>If the posterior distribution is strongly non-Gaussian, mean and covariance may no longer describe all relevant information.</p>
+      <p>The state distribution may be</p>
+      <ul>
+        <li>skewed,</li>
+        <li>heavy-tailed,</li>
+        <li>multimodal.</li>
+      </ul>
+      <p>Then more general methods may be required.</p>
+      <p>Examples include</p>
+      <ul>
+        <li>particle filters,</li>
+        <li>Gaussian-mixture methods,</li>
+        <li>nonlinear sampling-based estimation.</li>
+      </ul>
+      <p>These methods are covered conceptually elsewhere in the sensor-fusion section.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.113 Batch versus Recursive Information Storage</h3>
+      <p>Batch estimation retains explicit measurement equations:</p>
+      <p>
+        \[
+        \mathbf z, \mathbf H, \mathbf R.
+        \]
+      </p>
+      <p>Recursive estimation compresses previously processed observations into quantities such as</p>
+      <p>
+        \[
+        \hat{\mathbf x}, \mathbf P
+        \]
+      </p>
+      <p>or</p>
+      <p>
+        \[
+        \boldsymbol{\eta}, \boldsymbol{\Lambda}.
+        \]
+      </p>
+      <p>Therefore,</p>
+      <p>
+        \[
+        \boxed{ \text{Recursive Estimation} = \text{Information Compression Through Sufficient Statistics} }
+        \]
+      </p>
+      <p>for cases where those statistics completely describe the relevant posterior information.</p>
+      <p>For Gaussian estimation, mean and covariance serve this role.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.114 Advantages of Recursive Estimation</h3>
+      <p>Important advantages include</p>
+      <ul>
+        <li>real-time operation,</li>
+        <li>fixed-size state representation,</li>
+        <li>lower memory requirement,</li>
+        <li>natural asynchronous sensor handling,</li>
+        <li>continuous navigation output,</li>
+        <li>efficient information accumulation,</li>
+        <li>suitability for onboard implementation,</li>
+        <li>straightforward prediction between measurements.</li>
+      </ul>
+      <p>These features explain why recursive estimation is central to spacecraft navigation systems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.115 Limitations of Recursive Estimation</h3>
+      <p>Important limitations include</p>
+      <ul>
+        <li>sensitivity to incorrect noise assumptions,</li>
+        <li>possible inconsistency or divergence,</li>
+        <li>difficulty reprocessing old information,</li>
+        <li>possible loss of information about individual historical measurements,</li>
+        <li>nonlinear linearization issues,</li>
+        <li>sensitivity to initialization,</li>
+        <li>potential cross-correlation problems in distributed fusion,</li>
+        <li>numerical covariance degradation.</li>
+      </ul>
+      <p>Therefore recursive implementation efficiency does not eliminate the need for estimation-system verification.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.116 Common Failure Modes</h3>
+      <p>Common recursive-estimation failures include</p>
+      <ul>
+        <li>incorrect initialization,</li>
+        <li>underestimated initial covariance,</li>
+        <li>incorrect <code>Q</code>,</li>
+        <li>incorrect <code>R</code>,</li>
+        <li>unmodeled bias,</li>
+        <li>measurement double counting,</li>
+        <li>ignored correlations,</li>
+        <li>nonlinear divergence,</li>
+        <li>bad measurement association,</li>
+        <li>incorrect timestamps,</li>
+        <li>frame errors,</li>
+        <li>numerical instability,</li>
+        <li>weak observability,</li>
+        <li>over-augmented state vector.</li>
+      </ul>
+      <p>These should be diagnosed systematically.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.117 Recursive Estimation Development Workflow</h3>
+      <p>A disciplined workflow is:</p>
+      <ol>
+        <li>Define the state vector.</li>
+        <li>Define any estimated parameters.</li>
+        <li>Define the dynamic model.</li>
+        <li>Define process-noise assumptions.</li>
+        <li>Define all measurement models.</li>
+        <li>Define measurement covariance.</li>
+        <li>Define initial state.</li>
+        <li>Define initial covariance.</li>
+        <li>Establish prediction timing.</li>
+        <li>Associate measurements with correct epochs.</li>
+        <li>Predict the state.</li>
+        <li>Predict covariance.</li>
+        <li>Predict measurement.</li>
+        <li>Compute innovation.</li>
+        <li>Compute innovation covariance.</li>
+        <li>Perform measurement validation.</li>
+        <li>Compute recursive gain.</li>
+        <li>Update state.</li>
+        <li>Update covariance.</li>
+        <li>Preserve covariance symmetry and numerical stability.</li>
+        <li>Process additional measurements.</li>
+        <li>Monitor innovation statistics.</li>
+        <li>Monitor covariance growth or collapse.</li>
+        <li>Check observability and parameter correlations.</li>
+        <li>Validate against batch solutions where possible.</li>
+        <li>Perform Monte Carlo consistency analysis.</li>
+        <li>Test measurement outages.</li>
+        <li>Test sensor biases.</li>
+        <li>Test model mismatch.</li>
+        <li>Test delayed and asynchronous measurements.</li>
+        <li>Verify computational timing.</li>
+        <li>Verify physical plausibility.</li>
+      </ol>
+      <p>Conceptually,</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Initialize}\\ \downarrow\\ \text{Predict State}\\ \downarrow\\ \text{Predict Uncertainty}\\ \downarrow\\ \text{Receive Measurement}\\ \downarrow\\ \text{Compute Innovation}\\ \downarrow\\ \text{Evaluate Measurement Information}\\ \downarrow\\ \text{Update State}\\ \downarrow\\ \text{Update Uncertainty}\\ \downarrow\\ \text{Validate}\\ \downarrow\\ \text{Repeat} \end{array} }
+        \]
+      </p>
+      <p><strong>Engineering interpretation:</strong> The workflow should be treated as an engineering loop rather than a one-time implementation checklist. Innovation statistics, covariance behaviour, observability, timing, and failure tests should feed back into model and covariance refinement.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.118 Complete Recursive Estimation Architecture</h3>
+      <p>The complete dynamic recursive-estimation architecture may be summarized as</p>
+      <p>
+        \[
+        \boxed{ \begin{array}{c} \text{Previous Posterior}\\ \hat{\mathbf x}_{k-1}^{+}, \mathbf P_{k-1}^{+} \\ \downarrow\\ \text{Dynamic Prediction}\\ \hat{\mathbf x}_{k}^{-} = f( \hat{\mathbf x}_{k-1}^{+} ) \\ \downarrow\\ \text{Covariance Prediction}\\ \mathbf P_k^{-} \\ \downarrow\\ \text{Measurement Prediction}\\ \hat{\mathbf z}_k = h( \hat{\mathbf x}_k^{-} ) \\ \downarrow\\ \text{Innovation}\\ \mathbf y_k = \mathbf z_k-\hat{\mathbf z}_k \\ \downarrow\\ \text{Innovation Covariance}\\ \mathbf S_k \\ \downarrow\\ \text{Information / Gain Calculation}\\ \mathbf K_k \\ \downarrow\\ \text{State Update}\\ \hat{\mathbf x}_k^{+} = \hat{\mathbf x}_k^{-} + \mathbf K_k\mathbf y_k \\ \downarrow\\ \text{Covariance Update}\\ \mathbf P_k^{+} \\ \downarrow\\ \text{Posterior Becomes Basis for Next Prediction} \end{array} }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.119 Key Equations</h3>
+      <h4>Linear measurement model</h4>
+      <p>
+        \[
+        \boxed{ \mathbf z_k = \mathbf H_k\mathbf x_k + \mathbf v_k }
+        \]
+      </p>
+      <h4>Measurement covariance</h4>
+      <p>
+        \[
+        \boxed{ E[ \mathbf v_k\mathbf v_k^T ] = \mathbf R_k }
+        \]
+      </p>
+      <h4>Prior-constrained least-squares cost</h4>
+      <p>
+        \[
+        \boxed{ \begin{aligned} J(\mathbf x) ={}& ( \mathbf x-\hat{\mathbf x}^{-} )^T ( \mathbf P^{-} )^{-1} ( \mathbf x-\hat{\mathbf x}^{-} ) \\ &+ ( \mathbf z-\mathbf H\mathbf x )^T \mathbf R^{-1} ( \mathbf z-\mathbf H\mathbf x ) \end{aligned} }
+        \]
+      </p>
+      <h4>Information matrix</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda} = \mathbf P^{-1} }
+        \]
+      </p>
+      <h4>Information vector</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\eta} = \boldsymbol{\Lambda} \hat{\mathbf x} }
+        \]
+      </p>
+      <h4>Information update</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}^{+} = \boldsymbol{\Lambda}^{-} + \mathbf H^T \mathbf R^{-1} \mathbf H }
+        \]
+      </p>
+      <h4>Information-vector update</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\eta}^{+} = \boldsymbol{\eta}^{-} + \mathbf H^T \mathbf R^{-1} \mathbf z }
+        \]
+      </p>
+      <h4>Innovation</h4>
+      <p>
+        \[
+        \boxed{ \mathbf y = \mathbf z-\mathbf H\hat{\mathbf x}^{-} }
+        \]
+      </p>
+      <h4>Innovation covariance</h4>
+      <p>
+        \[
+        \boxed{ \mathbf S = \mathbf H \mathbf P^{-} \mathbf H^T + \mathbf R }
+        \]
+      </p>
+      <h4>Recursive gain</h4>
+      <p>
+        \[
+        \boxed{ \mathbf K = \mathbf P^{-} \mathbf H^T \mathbf S^{-1} }
+        \]
+      </p>
+      <h4>State update</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + \mathbf K\mathbf y }
+        \]
+      </p>
+      <h4>Covariance update</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^{-} }
+        \]
+      </p>
+      <h4>Joseph covariance form</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P^{+} = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^{-} ( \mathbf I-\mathbf K\mathbf H )^T + \mathbf K\mathbf R\mathbf K^T }
+        \]
+      </p>
+      <h4>Dynamic prediction</h4>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}_k^{-} = f_{k-1} ( \hat{\mathbf x}_{k-1}^{+} ) }
+        \]
+      </p>
+      <h4>Linear covariance prediction</h4>
+      <p>
+        \[
+        \boxed{ \mathbf P_k^{-} = \mathbf F_{k-1} \mathbf P_{k-1}^{+} \mathbf F_{k-1}^T + \mathbf Q_{k-1} }
+        \]
+      </p>
+      <h4>Bayesian prediction</h4>
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|Z_{k-1}) = \int p(\mathbf x_k|\mathbf x_{k-1}) p(\mathbf x_{k-1}|Z_{k-1}) \,d\mathbf x_{k-1} }
+        \]
+      </p>
+      <h4>Bayesian measurement update</h4>
+      <p>
+        \[
+        \boxed{ p(\mathbf x_k|Z_k) \propto p(\mathbf z_k|\mathbf x_k) p(\mathbf x_k|Z_{k-1}) }
+        \]
+      </p>
+      <h4>Measurement information increment</h4>
+      <p>
+        \[
+        \boxed{ \Delta\boldsymbol{\Lambda}_k = \mathbf H_k^T \mathbf R_k^{-1} \mathbf H_k }
+        \]
+      </p>
+      <h4>Accumulated information</h4>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}_k = \boldsymbol{\Lambda}_0 + \sum_{i=1}^{k} \mathbf H_i^T \mathbf R_i^{-1} \mathbf H_i }
+        \]
+      </p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.120 Key Takeaways</h3>
+      <p>Recursive estimation processes information <strong>incrementally</strong> rather than repeatedly solving the complete measurement history.</p>
+      <p>The basic concept is</p>
+      <p>
+        \[
+        \boxed{ \text{Previous Estimate} + \text{New Measurement} \rightarrow \text{Updated Estimate}. }
+        \]
+      </p>
+      <p>From the least-squares viewpoint, recursive estimation accumulates information:</p>
+      <p>
+        \[
+        \boxed{ \boldsymbol{\Lambda}^{+} = \boldsymbol{\Lambda}^{-} + \mathbf H^T \mathbf R^{-1} \mathbf H. }
+        \]
+      </p>
+      <p>Thus,</p>
+      <p>
+        \[
+        \boxed{ \text{Posterior Information} = \text{Prior Information} + \text{Measurement Information}. }
+        \]
+      </p>
+      <p>From the Bayesian viewpoint,</p>
+      <p>
+        \[
+        \boxed{ \text{Posterior} \propto \text{Likelihood} \times \text{Prior}. }
+        \]
+      </p>
+      <p>For Gaussian linear estimation, these two viewpoints are mathematically equivalent.</p>
+      <p>The measurement innovation is</p>
+      <p>
+        \[
+        \boxed{ \mathbf y = \mathbf z-\mathbf H\hat{\mathbf x}^{-}, }
+        \]
+      </p>
+      <p>and the state update is</p>
+      <p>
+        \[
+        \boxed{ \hat{\mathbf x}^{+} = \hat{\mathbf x}^{-} + \mathbf K\mathbf y. }
+        \]
+      </p>
+      <p>The gain determines how measurement-space disagreement becomes a state correction.</p>
+      <p>The estimator must balance</p>
+      <p>
+        \[
+        \boxed{ \text{Dynamic Confidence} \leftrightarrow \text{Measurement Confidence}. }
+        \]
+      </p>
+      <p>Process covariance</p>
+      <p>
+        \[
+        \mathbf Q
+        \]
+      </p>
+      <p>represents uncertainty introduced during state propagation, while measurement covariance</p>
+      <p>
+        \[
+        \mathbf R
+        \]
+      </p>
+      <p>represents observation uncertainty.</p>
+      <p>Neither should be treated merely as an arbitrary tuning gain.</p>
+      <p>Recursive estimation is especially suitable for real-time spacecraft navigation because it maintains a fixed-size representation of previously accumulated information and naturally handles measurements as they arrive.</p>
+      <p>However,</p>
+      <p>
+        \[
+        \boxed{ \text{Recursive Processing} \neq \text{Automatic Consistency}. }
+        \]
+      </p>
+      <p>The estimator can still fail because of</p>
+      <ul>
+        <li>poor initialization,</li>
+        <li>incorrect models,</li>
+        <li>wrong covariance assumptions,</li>
+        <li>weak observability,</li>
+        <li>parameter correlation,</li>
+        <li>measurement double counting,</li>
+        <li>nonlinear effects,</li>
+        <li>numerical instability.</li>
+      </ul>
+      <p>A central engineering principle is</p>
+      <p>
+        \[
+        \boxed{ \text{Recursive Estimation Does Not Generate New Information; It Efficiently Carries Forward and Updates the Information Already Available From Dynamics, Measurements, and Prior Knowledge}. }
+        \]
+      </p>
+      <p>Finally,</p>
+      <p>
+        \[
+        \boxed{ \text{Batch Least Squares} \leftrightarrow \text{Recursive Least Squares} \leftrightarrow \text{Bayesian Gaussian Estimation} }
+        \]
+      </p>
+      <p>are not isolated subjects. They are different mathematical views of how information about an unknown state is accumulated.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.4.121 What Comes Next</h3>
+      <p>The recursive relationships developed in this section are especially elegant when the system is linear:</p>
+      <p>
+        \[
+        \mathbf z = \mathbf H\mathbf x+\mathbf v.
+        \]
+      </p>
+      <p>Real spacecraft-estimation problems are rarely perfectly linear.</p>
+      <p>Instead,</p>
+      <p>
+        \[
+        \boxed{ \mathbf z = h(\mathbf x) + \mathbf v }
+        \]
+      </p>
+      <p>and the trajectory may also evolve through nonlinear dynamics:</p>
+      <p>
+        \[
+        \boxed{ \dot{\mathbf x} = f(\mathbf x,t). }
+        \]
+      </p>
+      <p>The estimator must therefore solve a more difficult problem:</p>
+      <p>
+        \[
+        \boxed{ \text{How do we estimate unknown quantities when the residuals depend nonlinearly on the state?} }
+        \]
+      </p>
+      <p>A common approach is to linearize the nonlinear model around the current estimate and repeatedly solve for a correction.</p>
+      <p>This produces methods such as</p>
+      <ul>
+        <li>nonlinear least squares,</li>
+        <li>Gauss–Newton iteration,</li>
+        <li>differential correction,</li>
+        <li>damped least squares,</li>
+        <li>Levenberg–Marquardt,</li>
+        <li>trust-region approaches,</li>
+        <li>convergence analysis.</li>
+      </ul>
+      <p>That leads directly to</p>
+      <p>
+        \[
+        \boxed{ \textbf{4.3.5 Nonlinear Least Squares and Differential Corrections} }
+        \]
+      </p>
+      <p>where the next section should develop how</p>
+      <p>
+        \[
+        \boxed{ \text{Nonlinear Residual} \rightarrow \text{Jacobian} \rightarrow \text{Linearized Correction} \rightarrow \text{State Update} \rightarrow \text{Relinearization} }
+        \]
+      </p>
+      <p>turns a nonlinear spacecraft estimation problem into a sequence of locally linear estimation problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.3.5 Nonlinear Least Squares and Differential Corrections</h2>
+
+      <p>
+        Recursive estimation provides a compact sequential framework for carrying forward
+        prior information and incorporating new measurements. The linear-Gaussian case leads
+        naturally to information-form, covariance-form, and Kalman-style updates.
+      </p>
+
+      <p>
+        Real spacecraft estimation problems are frequently nonlinear. The next section therefore
+        develops nonlinear residuals, Jacobians, local linearization, Gauss–Newton iteration,
+        differential corrections, convergence behaviour, damping, Levenberg–Marquardt,
+        trust-region ideas, initial-guess sensitivity, and practical diagnostics for nonlinear
+        estimation problems.
+      </p>
+
+      <a href="nonlinear-least-squares.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.5 Nonlinear Least Squares and Differential Corrections</h3>
+
+          <p>
+            Nonlinear residuals, Jacobians, Gauss–Newton iteration, differential correction,
+            weighted nonlinear least squares, convergence criteria, damping,
+            Levenberg–Marquardt, trust-region interpretation, initial-guess sensitivity,
+            covariance approximation, and practical nonlinear-estimation diagnostics.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Nonlinear Least Squares and Differential Corrections &rarr;
+          </p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+
+</body>
+</html>
