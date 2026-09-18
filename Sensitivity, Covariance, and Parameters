@@ -1,0 +1,3816 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>4.3.8 State Transition and Sensitivity Matrices | Interactive GNC &amp; Space Mechanics</title>
+
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      }
+    };
+  </script>
+  <script id="MathJax-script"
+          async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+
+  <style>
+    .sensor-link-card {
+      display: block;
+      margin-top: 1.25rem;
+      text-decoration: none;
+    }
+
+    .sensor-link-arrow {
+      font-weight: 700;
+      margin-bottom: 0;
+    }
+
+    .equation-box {
+      margin: 1rem 0 1.35rem;
+      padding: 0.8rem 1rem;
+      border: 1px solid #d9e0e8;
+      border-radius: 12px;
+      background: #fbfcfd;
+      overflow-x: auto;
+    }
+
+    blockquote {
+      margin: 1rem 0 1.4rem;
+      padding: 0.9rem 1.1rem;
+      border-left: 4px solid #9bb8d3;
+      background: #f7f9fb;
+      font-style: italic;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      margin: 1rem 0 1.4rem;
+    }
+
+    .table-wrap table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table-wrap th,
+    .table-wrap td {
+      border: 1px solid #d8dee6;
+      padding: 0.75rem 0.85rem;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .table-wrap th {
+      font-weight: 700;
+      background: #f7f9fb;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.95em;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header class="notes-hero">
+    <h1>State Transition and Sensitivity Matrices</h1>
+
+    <p class="notes-tagline">
+      State perturbations, variational equations, STM propagation, covariance mapping,
+      parameter and control sensitivities, measurement sensitivities, observability,
+      maneuver targeting, numerical differentiation, verification, conditioning,
+      coordinate transformations, and general spacecraft GNC applications.
+    </p>
+
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+
+    <section class="notes-section-card">
+      <h2>4.3.8 State Transition and Sensitivity Matrices</h2>
+      <p>The previous section showed that filtering, smoothing, batch estimation, and trajectory reconstruction all depend on relationships between spacecraft states at different times. For example, the RTS smoother uses a transition matrix to transfer future-state information backward, while dynamic estimation requires the sensitivity of later measurements to an earlier reference state.</p>
+      <p>This leads to one of the most important mathematical tools in spacecraft dynamics and estimation:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{State Transition Matrix} \quad\text{and}\quad \text{Sensitivity Matrices} }
+        \]
+      </div>
+      <p>These matrices answer questions such as:</p>
+      <blockquote>
+        <p>If I slightly perturb the spacecraft state now, how will that perturbation evolve later?</p>
+      </blockquote>
+      <blockquote>
+        <p>If I change an uncertain physical parameter, how does the trajectory change?</p>
+      </blockquote>
+      <blockquote>
+        <p>If a maneuver magnitude changes slightly, how does the final state change?</p>
+      </blockquote>
+      <blockquote>
+        <p>How sensitive is a future sensor measurement to the initial position, velocity, attitude, bias, or model parameter?</p>
+      </blockquote>
+      <p>The central idea is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Small Input Perturbation} \rightarrow \text{Dynamic Propagation} \rightarrow \text{Future State Perturbation} }
+        \]
+      </div>
+      <p>and, more generally,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensitivity} = \frac{\partial(\text{output})} {\partial(\text{input})}. }
+        \]
+      </div>
+      <p>The <strong>State Transition Matrix</strong>, or STM,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t_0) = \frac{ \partial\mathbf x(t) }{ \partial\mathbf x(t_0) } }
+        \]
+      </div>
+      <p>describes the first-order sensitivity of the state at time <code>t</code> to the state at an earlier reference time <code>t_0</code>.</p>
+      <p>For a small perturbation,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x(t) \approx \boldsymbol{\Phi}(t,t_0) \delta\mathbf x(t_0). }
+        \]
+      </div>
+      <p>That single relationship appears throughout:</p>
+      <ul>
+        <li>orbit determination,</li>
+        <li>batch least squares,</li>
+        <li>Kalman filtering,</li>
+        <li>covariance propagation,</li>
+        <li>smoothing,</li>
+        <li>trajectory optimization,</li>
+        <li>maneuver analysis,</li>
+        <li>guidance,</li>
+        <li>targeting,</li>
+        <li>parameter estimation,</li>
+        <li>navigation observability,</li>
+        <li>general rendezvous and proximity operations.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.1 Why State Transition Matrices Are Needed</h3>
+      <p>Consider a spacecraft state</p>
+      <div class="equation-box">
+        \[
+        \mathbf x(t).
+        \]
+      </div>
+      <p>Suppose the state at reference epoch <code>t_0</code> is slightly wrong:</p>
+      <div class="equation-box">
+        \[
+        \mathbf x(t_0) = \bar{\mathbf x}(t_0) + \delta\mathbf x_0.
+        \]
+      </div>
+      <p>After propagation, that small initial error produces a later error</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x(t).
+        \]
+      </div>
+      <p>The fundamental question is:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{How does } \delta\mathbf x_0 \text{ propagate to } \delta\mathbf x(t)? }
+        \]
+      </div>
+      <p>For sufficiently small perturbations,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x(t) = \boldsymbol{\Phi}(t,t_0) \delta\mathbf x_0. }
+        \]
+      </div>
+      <p>Thus the STM is the linear map between state perturbations at two times.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.2 Nonlinear Dynamic System</h3>
+      <p>Consider continuous nonlinear spacecraft dynamics</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\mathbf x} = \mathbf f( \mathbf x, \mathbf u, \boldsymbol{\theta}, t ) }
+        \]
+      </div>
+      <p>where</p>
+      <ul>
+        <li><code>\mathbf x</code> is the state,</li>
+        <li><code>\mathbf u</code> is a known or commanded input,</li>
+        <li><code>\boldsymbol{\theta}</code> contains physical or model parameters,</li>
+        <li><code>t</code> is time.</li>
+      </ul>
+      <p>The nominal trajectory satisfies</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\bar{\mathbf x}} = \mathbf f( \bar{\mathbf x}, \bar{\mathbf u}, \bar{\boldsymbol{\theta}}, t ). }
+        \]
+      </div>
+      <p>The purpose of sensitivity analysis is to determine how small changes around this nominal solution evolve.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.3 Nominal State and Perturbed State</h3>
+      <p>Write the actual state as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x = \bar{\mathbf x} + \delta\mathbf x. }
+        \]
+      </div>
+      <p>Similarly,</p>
+      <div class="equation-box">
+        \[
+        \mathbf u = \bar{\mathbf u} + \delta\mathbf u,
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\theta} = \bar{\boldsymbol{\theta}} + \delta\boldsymbol{\theta}.
+        \]
+      </div>
+      <p>Then</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf x} = \mathbf f( \bar{\mathbf x} + \delta\mathbf x, \bar{\mathbf u} + \delta\mathbf u, \bar{\boldsymbol{\theta}} + \delta\boldsymbol{\theta}, t ).
+        \]
+      </div>
+      <p>The goal is to derive an approximate equation for the perturbation</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x.
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.4 First-Order Linearization of the Dynamics</h3>
+      <p>Expand the nonlinear dynamics around the nominal trajectory.</p>
+      <p>Using a first-order Taylor expansion,</p>
+      <div class="equation-box">
+        \[
+        \begin{aligned} \mathbf f( \bar{\mathbf x}+\delta\mathbf x, \bar{\mathbf u}+\delta\mathbf u, \bar{\boldsymbol{\theta}}+\delta\boldsymbol{\theta} ) \approx{}& \mathbf f( \bar{\mathbf x}, \bar{\mathbf u}, \bar{\boldsymbol{\theta}} ) \\ &+ \frac{\partial\mathbf f}{\partial\mathbf x} \delta\mathbf x + \frac{\partial\mathbf f}{\partial\mathbf u} \delta\mathbf u + \frac{\partial\mathbf f}{\partial\boldsymbol{\theta}} \delta\boldsymbol{\theta}. \end{aligned}
+        \]
+      </div>
+      <p>Subtracting the nominal dynamics gives</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf A(t)\delta\mathbf x + \mathbf B(t)\delta\mathbf u + \mathbf E(t)\delta\boldsymbol{\theta}. }
+        \]
+      </div>
+      <p>where</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A(t) = \left. \frac{\partial\mathbf f} {\partial\mathbf x} \right|_{\bar{\mathbf x}} }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf B(t) = \left. \frac{\partial\mathbf f} {\partial\mathbf u} \right|_{\bar{\mathbf x}} }
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf E(t) = \left. \frac{\partial\mathbf f} {\partial\boldsymbol{\theta}} \right|_{\bar{\mathbf x}}. }
+        \]
+      </div>
+      <p><strong>Engineering interpretation:</strong> The linearization is local: the matrices \(\mathbf A\), \(\mathbf B\), and \(\mathbf E\) are evaluated about the nominal trajectory and therefore generally vary with time in a nonlinear spacecraft model.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.5 The Dynamics Jacobian</h3>
+      <p>The matrix</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A(t) = \frac{\partial\mathbf f}{\partial\mathbf x} }
+        \]
+      </div>
+      <p>is the local state Jacobian of the dynamics.</p>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \mathbf x\in\mathbb R^n,
+        \]
+      </div>
+      <p>then</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A\in\mathbb R^{n\times n}. }
+        \]
+      </div>
+      <p>Each element</p>
+      <div class="equation-box">
+        \[
+        A_{ij} = \frac{\partial f_i}{\partial x_j}
+        \]
+      </div>
+      <p>describes how the derivative of state component <code>i</code> responds locally to a perturbation in state component <code>j</code>.</p>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A = \text{Local Dynamic Coupling Matrix}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.6 Variational Equations</h3>
+      <p>Ignoring input and parameter perturbations temporarily,</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf u=\mathbf0, \qquad \delta\boldsymbol{\theta}=\mathbf0,
+        \]
+      </div>
+      <p>the perturbation dynamics become</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf A(t)\delta\mathbf x. }
+        \]
+      </div>
+      <p>This system is called the <strong>variational equation</strong>.</p>
+      <p>It describes how infinitesimal perturbations evolve along the nominal nonlinear trajectory.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.7 Definition of the State Transition Matrix</h3>
+      <p>The STM is formally defined as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t_0) = \frac{ \partial\mathbf x(t) }{ \partial\mathbf x(t_0) }. }
+        \]
+      </div>
+      <p>Its element</p>
+      <div class="equation-box">
+        \[
+        \Phi_{ij} = \frac{ \partial x_i(t) }{ \partial x_j(t_0) }
+        \]
+      </div>
+      <p>answers:</p>
+      <blockquote>
+        <p>How much does state component <code>i</code> at time <code>t</code> change due to a small change in state component <code>j</code> at the reference epoch?</p>
+      </blockquote>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.8 Perturbation Propagation</h3>
+      <p>The STM maps an initial perturbation to a later perturbation:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x(t) = \boldsymbol{\Phi}(t,t_0) \delta\mathbf x(t_0). }
+        \]
+      </div>
+      <p>For example,</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x_0 = \begin{bmatrix} \delta\mathbf r_0\\ \delta\mathbf v_0 \end{bmatrix}
+        \]
+      </div>
+      <p>may create</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x(t) = \begin{bmatrix} \delta\mathbf r(t)\\ \delta\mathbf v(t) \end{bmatrix}.
+        \]
+      </div>
+      <p>The STM tells us exactly how these first-order errors are coupled.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.9 Initial Condition of the STM</h3>
+      <p>At the same epoch,</p>
+      <div class="equation-box">
+        \[
+        t=t_0.
+        \]
+      </div>
+      <p>A perturbation maps to itself:</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x(t_0) = \delta\mathbf x(t_0).
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_0,t_0) = \mathbf I. }
+        \]
+      </div>
+      <p>This is the fundamental initial condition for STM integration.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.10 Differential Equation for the STM</h3>
+      <p>Starting from</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x(t) = \boldsymbol{\Phi}(t,t_0) \delta\mathbf x_0,
+        \]
+      </div>
+      <p>differentiate with respect to time:</p>
+      <div class="equation-box">
+        \[
+        \delta\dot{\mathbf x} = \dot{\boldsymbol{\Phi}} \delta\mathbf x_0.
+        \]
+      </div>
+      <p>But the variational equation gives</p>
+      <div class="equation-box">
+        \[
+        \delta\dot{\mathbf x} = \mathbf A(t) \delta\mathbf x = \mathbf A(t) \boldsymbol{\Phi} \delta\mathbf x_0.
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\boldsymbol{\Phi}}(t,t_0) = \mathbf A(t) \boldsymbol{\Phi}(t,t_0). }
+        \]
+      </div>
+      <p>with</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_0,t_0) = \mathbf I. }
+        \]
+      </div>
+      <p>This is the most important differential equation for computing the STM.</p>
+      <p><strong>Engineering interpretation:</strong> This differential equation is what turns the STM from a definition into a computable object. Integrating it alongside the nominal dynamics gives the exact first-order sensitivity associated with the chosen model and reference trajectory.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.11 Coupled State and STM Integration</h3>
+      <p>For a nonlinear spacecraft model, the nominal state and STM are usually propagated together.</p>
+      <p>The augmented differential system is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \begin{aligned} \dot{\mathbf x} &= \mathbf f(\mathbf x,t), \\ \dot{\boldsymbol{\Phi}} &= \mathbf A(\mathbf x,t) \boldsymbol{\Phi}. \end{aligned} }
+        \]
+      </div>
+      <p>The Jacobian must be evaluated along the evolving nominal trajectory.</p>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A(t) = \mathbf A[ \mathbf x(t),t ]. }
+        \]
+      </div>
+      <p>The STM is trajectory dependent.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.12 STM for a Linear Time-Invariant System</h3>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf x} = \mathbf A\mathbf x
+        \]
+      </div>
+      <p>with constant <code>\mathbf A</code>, then</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t_0) = e^{\mathbf A(t-t_0)}. }
+        \]
+      </div>
+      <p>The matrix exponential is</p>
+      <div class="equation-box">
+        \[
+        e^{\mathbf A\Delta t} = \mathbf I + \mathbf A\Delta t + \frac{\mathbf A^2\Delta t^2}{2!} + \cdots.
+        \]
+      </div>
+      <p>Thus the familiar linear-system solution is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x(t) = \boldsymbol{\Phi}(t,t_0) \mathbf x(t_0). }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.13 STM for a Time-Varying System</h3>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \mathbf A=\mathbf A(t),
+        \]
+      </div>
+      <p>then, in general,</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}(t,t_0) \neq e^{\int_{t_0}^{t}\mathbf A(\tau)d\tau}
+        \]
+      </div>
+      <p>unless the matrices commute appropriately over time.</p>
+      <p>The STM is therefore normally obtained by directly integrating</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\boldsymbol{\Phi}} = \mathbf A(t)\boldsymbol{\Phi}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.14 STM Composition Property</h3>
+      <p>Suppose</p>
+      <div class="equation-box">
+        \[
+        t_0<t_1<t_2.
+        \]
+      </div>
+      <p>Then</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x(t_1) = \boldsymbol{\Phi}(t_1,t_0) \delta\mathbf x(t_0)
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x(t_2) = \boldsymbol{\Phi}(t_2,t_1) \delta\mathbf x(t_1).
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_2,t_0) = \boldsymbol{\Phi}(t_2,t_1) \boldsymbol{\Phi}(t_1,t_0). }
+        \]
+      </div>
+      <p>This is the <strong>semigroup or composition property</strong>.</p>
+      <p>It is essential for multi-stage propagation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.15 STM Inverse Property</h3>
+      <p>Provided the flow is locally invertible,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_0,t) = \boldsymbol{\Phi}(t,t_0)^{-1}. }
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t_0) \boldsymbol{\Phi}(t_0,t) = \mathbf I. }
+        \]
+      </div>
+      <p>This property is useful for verification and backward sensitivity mapping.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.16 Identity Property</h3>
+      <p>Another basic property is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t) = \mathbf I. }
+        \]
+      </div>
+      <p>Together, the major STM properties are</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \begin{aligned} \boldsymbol{\Phi}(t,t)&=\mathbf I, \\ \boldsymbol{\Phi}(t_2,t_0) &= \boldsymbol{\Phi}(t_2,t_1) \boldsymbol{\Phi}(t_1,t_0), \\ \boldsymbol{\Phi}(t_0,t) &= \boldsymbol{\Phi}(t,t_0)^{-1}. \end{aligned} }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.17 Block Structure for Position and Velocity</h3>
+      <p>For a translational state</p>
+      <div class="equation-box">
+        \[
+        \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix},
+        \]
+      </div>
+      <p>the STM can be partitioned as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi} = \begin{bmatrix} \boldsymbol{\Phi}_{rr} & \boldsymbol{\Phi}_{rv} \\ \boldsymbol{\Phi}_{vr} & \boldsymbol{\Phi}_{vv} \end{bmatrix}. }
+        \]
+      </div>
+      <p>These blocks have direct interpretations.</p>
+      <p><strong>Engineering interpretation:</strong> The four translational STM blocks reveal different physical pathways for uncertainty growth. In particular, \(\boldsymbol{\Phi}_{rv}\) explains why even a small velocity error can become a substantial future position error.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.18 Position-to-Position Sensitivity</h3>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{rr} = \frac{ \partial\mathbf r(t) }{ \partial\mathbf r_0 }. }
+        \]
+      </div>
+      <p>It describes how initial-position perturbations influence later position.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.19 Velocity-to-Position Sensitivity</h3>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{rv} = \frac{ \partial\mathbf r(t) }{ \partial\mathbf v_0 }. }
+        \]
+      </div>
+      <p>This block is especially important in trajectory targeting because small velocity changes can accumulate into large position changes later.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.20 Position-to-Velocity Sensitivity</h3>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{vr} = \frac{ \partial\mathbf v(t) }{ \partial\mathbf r_0 }. }
+        \]
+      </div>
+      <p>This describes how initial-position errors change later velocity.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.21 Velocity-to-Velocity Sensitivity</h3>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{vv} = \frac{ \partial\mathbf v(t) }{ \partial\mathbf v_0 }. }
+        \]
+      </div>
+      <p>It describes how an initial velocity perturbation influences later velocity.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.22 Simple Constant-Velocity Example</h3>
+      <p>Consider</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf r} = \mathbf v, \qquad \dot{\mathbf v} = \mathbf0.
+        \]
+      </div>
+      <p>Then</p>
+      <div class="equation-box">
+        \[
+        \mathbf r(t) = \mathbf r_0 + \mathbf v_0\Delta t,
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \mathbf v(t) = \mathbf v_0.
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi} = \begin{bmatrix} \mathbf I & \Delta t\,\mathbf I \\ \mathbf0 & \mathbf I \end{bmatrix}. }
+        \]
+      </div>
+      <p>This clearly shows how velocity uncertainty grows into position uncertainty.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.23 STM for Two-Body Orbital Dynamics</h3>
+      <p>For a simplified point-mass gravitational model,</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf r} = \mathbf v,
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf v} = -\mu \frac{\mathbf r}{r^3}.
+        \]
+      </div>
+      <p>The state Jacobian is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A = \begin{bmatrix} \mathbf0 & \mathbf I\\ \mathbf G & \mathbf0 \end{bmatrix} }
+        \]
+      </div>
+      <p>where</p>
+      <div class="equation-box">
+        \[
+        \mathbf G = \frac{\partial\mathbf a_g}{\partial\mathbf r}.
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.24 Gravity Gradient Matrix</h3>
+      <p>For</p>
+      <div class="equation-box">
+        \[
+        \mathbf a_g = -\mu \frac{\mathbf r}{r^3},
+        \]
+      </div>
+      <p>the position derivative is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf G = \mu \left( \frac{ 3\mathbf r\mathbf r^T }{ r^5 } - \frac{\mathbf I}{r^3} \right). }
+        \]
+      </div>
+      <p>This is the familiar gravity-gradient structure.</p>
+      <p>Therefore</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A = \begin{bmatrix} \mathbf0 & \mathbf I\\ \mu \left( \frac{3\mathbf r\mathbf r^T}{r^5} - \frac{\mathbf I}{r^3} \right) & \mathbf0 \end{bmatrix}. }
+        \]
+      </div>
+      <p><strong>Engineering interpretation:</strong> The gravity-gradient matrix is the local curvature of the gravitational acceleration field. It is the term that couples position perturbations into acceleration perturbations in two-body variational dynamics.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.25 STM for Relative Motion</h3>
+      <p>For linearized relative orbital motion,</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf x}_{rel} = \mathbf A_{rel} \mathbf x_{rel},
+        \]
+      </div>
+      <p>the STM is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{rel} = e^{\mathbf A_{rel}\Delta t}. }
+        \]
+      </div>
+      <p>For models such as Hill–Clohessy–Wiltshire dynamics, closed-form STMs can be derived.</p>
+      <p>These matrices are useful for general proximity-motion analysis, targeting, guidance, and uncertainty propagation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.26 General RPO Interpretation</h3>
+      <p>Consider a relative state</p>
+      <div class="equation-box">
+        \[
+        \mathbf x_{rel} = \begin{bmatrix} \mathbf r_{rel}\\ \mathbf v_{rel} \end{bmatrix}.
+        \]
+      </div>
+      <p>A small error at reference epoch,</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x_{rel,0},
+        \]
+      </div>
+      <p>propagates as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x_{rel}(t) = \boldsymbol{\Phi}_{rel}(t,t_0) \delta\mathbf x_{rel,0}. }
+        \]
+      </div>
+      <p>This can answer general questions such as:</p>
+      <ul>
+        <li>how initial relative-position error affects later separation,</li>
+        <li>how initial relative-velocity error affects approach geometry,</li>
+        <li>which initial state directions have the greatest influence near a future waypoint,</li>
+        <li>how navigation covariance evolves during a proximity-operation phase.</li>
+      </ul>
+      <p>This is a general RPO concept and is not tied to any particular mission.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.27 Discrete-Time State Transition Matrix</h3>
+      <p>For a discrete system</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x_{k+1} = \mathbf f_k( \mathbf x_k ) }
+        \]
+      </div>
+      <p>the local perturbation model is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x_{k+1} = \mathbf F_k \delta\mathbf x_k }
+        \]
+      </div>
+      <p>where</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf F_k = \left. \frac{\partial\mathbf f_k} {\partial\mathbf x_k} \right|_{\bar{\mathbf x}_k}. }
+        \]
+      </div>
+      <p>Thus <code>\mathbf F_k</code> is the discrete-time STM over one propagation step.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.28 Multi-Step Discrete STM</h3>
+      <p>Over several discrete steps,</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x_N = \mathbf F_{N-1} \cdots \mathbf F_1 \mathbf F_0 \delta\mathbf x_0.
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{N,0} = \mathbf F_{N-1} \mathbf F_{N-2} \cdots \mathbf F_0. }
+        \]
+      </div>
+      <p>Matrix multiplication order matters.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.29 Continuous-Discrete Relationship</h3>
+      <p>For continuous dynamics over a sampling interval,</p>
+      <div class="equation-box">
+        \[
+        t_k \rightarrow t_{k+1},
+        \]
+      </div>
+      <p>the discrete transition matrix is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf F_k = \boldsymbol{\Phi}(t_{k+1},t_k). }
+        \]
+      </div>
+      <p>Thus continuous STM theory and discrete filtering equations are directly connected.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.30 Covariance Propagation</h3>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x(t) = \boldsymbol{\Phi}(t,t_0) \delta\mathbf x_0,
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \mathbf P_0 = E[ \delta\mathbf x_0 \delta\mathbf x_0^T ],
+        \]
+      </div>
+      <p>then</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P(t) = \boldsymbol{\Phi}(t,t_0) \mathbf P_0 \boldsymbol{\Phi}(t,t_0)^T. }
+        \]
+      </div>
+      <p>This is deterministic covariance propagation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.31 Why Covariance Uses Two STMs</h3>
+      <p>Covariance is quadratic in the state error.</p>
+      <p>Since</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x = \boldsymbol{\Phi}\delta\mathbf x_0,
+        \]
+      </div>
+      <p>then</p>
+      <div class="equation-box">
+        \[
+        \begin{aligned} \mathbf P &= E[ \delta\mathbf x \delta\mathbf x^T ] \\ &= E[ \boldsymbol{\Phi} \delta\mathbf x_0 \delta\mathbf x_0^T \boldsymbol{\Phi}^T ] \\ &= \boldsymbol{\Phi} \mathbf P_0 \boldsymbol{\Phi}^T. \end{aligned}
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{State Perturbation} \rightarrow \boldsymbol{\Phi} }
+        \]
+      </div>
+      <p>but</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Covariance} \rightarrow \boldsymbol{\Phi} \mathbf P \boldsymbol{\Phi}^T. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.32 Covariance Propagation with Process Noise</h3>
+      <p>If dynamic uncertainty is present,</p>
+      <div class="equation-box">
+        \[
+        \delta\dot{\mathbf x} = \mathbf A\delta\mathbf x + \mathbf G\mathbf w,
+        \]
+      </div>
+      <p>then covariance propagation must include process noise.</p>
+      <p>In discrete form,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P_{k+1}^{-} = \mathbf F_k \mathbf P_k^{+} \mathbf F_k^T + \mathbf Q_k. }
+        \]
+      </div>
+      <p>In continuous time,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\mathbf P} = \mathbf A\mathbf P + \mathbf P\mathbf A^T + \mathbf G \mathbf Q_c \mathbf G^T. }
+        \]
+      </div>
+      <p>This is the continuous covariance differential equation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.33 STM and Kalman Filtering</h3>
+      <p>The prediction step of a linear or extended Kalman filter uses</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P_k^{-} = \mathbf F_{k-1} \mathbf P_{k-1}^{+} \mathbf F_{k-1}^T + \mathbf Q_{k-1}. }
+        \]
+      </div>
+      <p>Here,</p>
+      <div class="equation-box">
+        \[
+        \mathbf F_{k-1}
+        \]
+      </div>
+      <p>is precisely the local state-transition map from one filter epoch to the next.</p>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{STM} \rightarrow \text{Filter State and Covariance Prediction}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.34 STM and Smoothing</h3>
+      <p>The RTS smoother gain is</p>
+      <div class="equation-box">
+        \[
+        \mathbf G_k = \mathbf P_{k|k} \mathbf F_k^T \mathbf P_{k+1|k}^{-1}.
+        \]
+      </div>
+      <p>Therefore the STM controls how future information is mapped backward.</p>
+      <p>Conceptually,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Dynamic State Coupling} \rightarrow \mathbf F_k \rightarrow \text{Backward Smoothing Correction}. }
+        \]
+      </div>
+      <p>This directly connects this section to smoothing and retrodiction.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.35 Measurement Sensitivity to Current State</h3>
+      <p>For</p>
+      <div class="equation-box">
+        \[
+        \mathbf z_k = h_k( \mathbf x_k ) + \mathbf v_k,
+        \]
+      </div>
+      <p>the measurement Jacobian is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf H_k = \left. \frac{\partial h_k} {\partial\mathbf x_k} \right|. }
+        \]
+      </div>
+      <p>It gives measurement sensitivity to the state <strong>at the measurement epoch</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.36 Measurement Sensitivity to Reference State</h3>
+      <p>In batch estimation, the unknown may instead be a reference state</p>
+      <div class="equation-box">
+        \[
+        \mathbf x_0.
+        \]
+      </div>
+      <p>Using the chain rule,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial h_k} {\partial\mathbf x_0} = \frac{\partial h_k} {\partial\mathbf x_k} \frac{\partial\mathbf x_k} {\partial\mathbf x_0}. }
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf G_k = \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </div>
+      <p>This is the <strong>dynamic measurement sensitivity matrix</strong>.</p>
+      <p><strong>Engineering interpretation:</strong> This chain-rule expression is fundamental in orbit determination: the sensor is sensitive to the state at measurement time, while the STM maps that local sensitivity back to the solve-for state at the reference epoch.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.37 Importance in Batch Estimation</h3>
+      <p>Each measurement at time <code>t_k</code> contributes sensitivity</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf G_k = \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </div>
+      <p>Stacking them gives</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf G = \begin{bmatrix} \mathbf H_1\boldsymbol{\Phi}_{1,0}\\ \mathbf H_2\boldsymbol{\Phi}_{2,0}\\ \vdots\\ \mathbf H_N\boldsymbol{\Phi}_{N,0} \end{bmatrix}. }
+        \]
+      </div>
+      <p>The normal matrix then becomes</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf N = \mathbf G^T \mathbf R^{-1} \mathbf G. }
+        \]
+      </div>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{STM} \rightarrow \text{Dynamic Design Matrix} \rightarrow \text{Batch State Correction}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.38 Why the STM Matters in Orbit Determination</h3>
+      <p>Suppose an observation is taken long after the reference epoch.</p>
+      <p>The measurement is sensitive directly to</p>
+      <div class="equation-box">
+        \[
+        \mathbf x(t_k).
+        \]
+      </div>
+      <p>But the estimator may solve for</p>
+      <div class="equation-box">
+        \[
+        \mathbf x(t_0).
+        \]
+      </div>
+      <p>The STM supplies the connection:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x(t_0) \rightarrow \mathbf x(t_k) \rightarrow \mathbf z_k. }
+        \]
+      </div>
+      <p>Without this sensitivity mapping, the estimator would not know how to correct the reference state from later observations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.39 Parameter Sensitivity Matrix</h3>
+      <p>Suppose the dynamics depend on parameter vector</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\theta}.
+        \]
+      </div>
+      <p>Define the parameter sensitivity matrix</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta(t) = \frac{ \partial\mathbf x(t) }{ \partial\boldsymbol{\theta} }. }
+        \]
+      </div>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \mathbf x\in\mathbb R^n
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\theta}\in\mathbb R^p,
+        \]
+      </div>
+      <p>then</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta \in \mathbb R^{n\times p}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.40 Meaning of Parameter Sensitivity</h3>
+      <p>An element</p>
+      <div class="equation-box">
+        \[
+        \left[ \mathbf S_\theta \right]_{ij} = \frac{ \partial x_i(t) }{ \partial\theta_j }
+        \]
+      </div>
+      <p>answers:</p>
+      <blockquote>
+        <p>If parameter <code>\theta_j</code> changes slightly, how does state component <code>x_i</code> at time <code>t</code> change?</p>
+      </blockquote>
+      <p>This is fundamental for estimating parameters such as:</p>
+      <ul>
+        <li>drag coefficient,</li>
+        <li>ballistic coefficient,</li>
+        <li>gravity coefficients,</li>
+        <li>thrust scale factor,</li>
+        <li>sensor bias,</li>
+        <li>actuator calibration,</li>
+        <li>environmental parameters.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.41 Differential Equation for Parameter Sensitivity</h3>
+      <p>Starting from</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf x} = \mathbf f( \mathbf x, \boldsymbol{\theta}, t ),
+        \]
+      </div>
+      <p>differentiate with respect to <code>\boldsymbol{\theta}</code>:</p>
+      <div class="equation-box">
+        \[
+        \frac{d}{dt} \left( \frac{\partial\mathbf x} {\partial\boldsymbol{\theta}} \right) = \frac{\partial\mathbf f}{\partial\mathbf x} \frac{\partial\mathbf x}{\partial\boldsymbol{\theta}} + \frac{\partial\mathbf f}{\partial\boldsymbol{\theta}}.
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta + \mathbf E. }
+        \]
+      </div>
+      <p>where</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf E = \frac{\partial\mathbf f} {\partial\boldsymbol{\theta}}. }
+        \]
+      </div>
+      <p><strong>Engineering interpretation:</strong> Parameter sensitivities are forced variational equations. Unlike the STM, which evolves from an identity initial condition, parameter sensitivity also contains the direct forcing term \(\mathbf E=\partial\mathbf f/\partial\boldsymbol{\theta}\).</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.42 Initial Condition for Parameter Sensitivity</h3>
+      <p>If the initial state does not depend on the parameter,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta(t_0) = \mathbf0. }
+        \]
+      </div>
+      <p>But if</p>
+      <div class="equation-box">
+        \[
+        \mathbf x_0 = \mathbf x_0( \boldsymbol{\theta} ),
+        \]
+      </div>
+      <p>then</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta(t_0) = \frac{\partial\mathbf x_0} {\partial\boldsymbol{\theta}}. }
+        \]
+      </div>
+      <p>This distinction matters in augmented estimation problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.43 Integral Form of Parameter Sensitivity</h3>
+      <p>The solution of</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta + \mathbf E
+        \]
+      </div>
+      <p>can be written as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta(t) = \boldsymbol{\Phi}(t,t_0) \mathbf S_\theta(t_0) + \int_{t_0}^{t} \boldsymbol{\Phi}(t,\tau) \mathbf E(\tau) \,d\tau. }
+        \]
+      </div>
+      <p>This equation shows that parameter sensitivity is accumulated continuously along the trajectory.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.44 Measurement Sensitivity to Parameters</h3>
+      <p>A measurement can depend on a parameter directly or indirectly through the trajectory.</p>
+      <p>Using the chain rule,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial h} {\partial\boldsymbol{\theta}} = \frac{\partial h} {\partial\mathbf x} \frac{\partial\mathbf x} {\partial\boldsymbol{\theta}} + \left. \frac{\partial h} {\partial\boldsymbol{\theta}} \right|_{\text{direct}}. }
+        \]
+      </div>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf H_{\theta,k} = \mathbf H_{x,k} \mathbf S_{\theta,k} + \mathbf H_{\theta,k}^{direct}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.45 Direct versus Indirect Parameter Sensitivity</h3>
+      <p>A parameter may affect a measurement in two ways.</p>
+      <h4>Indirect effect</h4>
+      <div class="equation-box">
+        \[
+        \theta \rightarrow \text{trajectory} \rightarrow \text{measurement}.
+        \]
+      </div>
+      <h4>Direct effect</h4>
+      <div class="equation-box">
+        \[
+        \theta \rightarrow \text{measurement model directly}.
+        \]
+      </div>
+      <p>Both terms must be included.</p>
+      <p>Ignoring one can lead to incorrect parameter estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.46 Augmented State Approach</h3>
+      <p>Instead of maintaining a separate parameter sensitivity matrix, parameters can be included in an augmented state:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol{\theta} \end{bmatrix}. }
+        \]
+      </div>
+      <p>For constant parameters,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\boldsymbol{\theta}} = \mathbf0. }
+        \]
+      </div>
+      <p>Then an augmented STM can propagate state and parameter sensitivity together.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.47 Augmented Dynamics Jacobian</h3>
+      <p>For</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf x} = \mathbf f( \mathbf x,\boldsymbol{\theta} ),
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \dot{\boldsymbol{\theta}} = \mathbf0,
+        \]
+      </div>
+      <p>the augmented Jacobian is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A_a = \begin{bmatrix} \mathbf A & \mathbf E \\ \mathbf0 & \mathbf0 \end{bmatrix}. }
+        \]
+      </div>
+      <p>The resulting augmented STM contains both ordinary state-transition and parameter-sensitivity blocks.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.48 Augmented STM Structure</h3>
+      <p>The augmented STM may be written as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_a = \begin{bmatrix} \boldsymbol{\Phi}_{xx} & \boldsymbol{\Phi}_{x\theta} \\ \boldsymbol{\Phi}_{\theta x} & \boldsymbol{\Phi}_{\theta\theta} \end{bmatrix}. }
+        \]
+      </div>
+      <p>For constant independent parameters,</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}_{\theta x} = \mathbf0,
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}_{\theta\theta} = \mathbf I.
+        \]
+      </div>
+      <p>The block</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{x\theta} }
+        \]
+      </div>
+      <p>contains trajectory sensitivity to the parameters.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.49 Control-Input Sensitivity</h3>
+      <p>Now consider a control input</p>
+      <div class="equation-box">
+        \[
+        \mathbf u.
+        \]
+      </div>
+      <p>Define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_u(t) = \frac{ \partial\mathbf x(t) }{ \partial\mathbf u }. }
+        \]
+      </div>
+      <p>For continuous distributed input perturbations,</p>
+      <div class="equation-box">
+        \[
+        \delta\dot{\mathbf x} = \mathbf A\delta\mathbf x + \mathbf B\delta\mathbf u.
+        \]
+      </div>
+      <p>The corresponding response is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x(t) = \boldsymbol{\Phi}(t,t_0) \delta\mathbf x_0 + \int_{t_0}^{t} \boldsymbol{\Phi}(t,\tau) \mathbf B(\tau) \delta\mathbf u(\tau) \,d\tau. }
+        \]
+      </div>
+      <p><strong>Engineering interpretation:</strong> Control sensitivity and parameter sensitivity have the same mathematical structure: both describe how an external quantity changes the propagated trajectory. The difference is in physical interpretation and how that quantity enters the dynamics.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.50 Physical Meaning of Control Sensitivity</h3>
+      <p>The control-sensitivity relationship answers:</p>
+      <blockquote>
+        <p>If the commanded acceleration, thrust, torque, burn duration, or other control changes slightly, how will the later state change?</p>
+      </blockquote>
+      <p>This is important in</p>
+      <ul>
+        <li>guidance,</li>
+        <li>targeting,</li>
+        <li>maneuver optimization,</li>
+        <li>control allocation analysis,</li>
+        <li>robustness studies.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.51 Maneuver Sensitivity</h3>
+      <p>Suppose an impulsive velocity maneuver is applied at <code>t_m</code>:</p>
+      <div class="equation-box">
+        \[
+        \mathbf v(t_m^+) = \mathbf v(t_m^-) + \Delta\mathbf v.
+        \]
+      </div>
+      <p>Then, for <code>t&gt;t_m</code>,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{ \partial\mathbf x(t) }{ \partial\Delta\mathbf v } = \boldsymbol{\Phi}(t,t_m) \mathbf B_{\Delta v}. }
+        \]
+      </div>
+      <p>For a translational state,</p>
+      <div class="equation-box">
+        \[
+        \mathbf B_{\Delta v} = \begin{bmatrix} \mathbf0\\ \mathbf I \end{bmatrix}.
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.52 Maneuver Targeting</h3>
+      <p>Suppose a desired terminal position is</p>
+      <div class="equation-box">
+        \[
+        \mathbf r_f^\star.
+        \]
+      </div>
+      <p>Current prediction gives</p>
+      <div class="equation-box">
+        \[
+        \mathbf r_f.
+        \]
+      </div>
+      <p>The terminal error is</p>
+      <div class="equation-box">
+        \[
+        \Delta\mathbf r_f = \mathbf r_f^\star-\mathbf r_f.
+        \]
+      </div>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \mathbf S_{\Delta v} = \frac{ \partial\mathbf r_f }{ \partial\Delta\mathbf v },
+        \]
+      </div>
+      <p>then a first-order maneuver correction may satisfy</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_{\Delta v} \delta(\Delta\mathbf v) \approx \Delta\mathbf r_f. }
+        \]
+      </div>
+      <p>This is a basic targeting principle.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.53 Targeting Matrix</h3>
+      <p>More generally, define a terminal constraint</p>
+      <div class="equation-box">
+        \[
+        \mathbf c( \mathbf x_f )=\mathbf0.
+        \]
+      </div>
+      <p>Its sensitivity to maneuver variables <code>\mathbf u</code> is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf T = \frac{ \partial\mathbf c }{ \partial\mathbf u } = \frac{ \partial\mathbf c }{ \partial\mathbf x_f } \frac{ \partial\mathbf x_f }{ \partial\mathbf u }. }
+        \]
+      </div>
+      <p>This matrix may be called a targeting or sensitivity matrix.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.54 Sensitivity to Burn Time</h3>
+      <p>A maneuver outcome may depend not only on impulse magnitude but also on burn timing.</p>
+      <p>Define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_t = \frac{ \partial\mathbf x_f }{ \partial t_m }. }
+        \]
+      </div>
+      <p>A small timing error produces</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x_f \approx \mathbf S_t \delta t_m. }
+        \]
+      </div>
+      <p>This is important when maneuver timing uncertainty affects terminal conditions.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.55 Sensitivity to Burn Duration</h3>
+      <p>For finite burns, the final state may depend on burn duration</p>
+      <div class="equation-box">
+        \[
+        T_b.
+        \]
+      </div>
+      <p>Define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_T = \frac{ \partial\mathbf x_f }{ \partial T_b }. }
+        \]
+      </div>
+      <p>This can be used to assess timing-error effects or refine finite-burn targeting.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.56 Sensitivity to Thrust Magnitude</h3>
+      <p>Let</p>
+      <div class="equation-box">
+        \[
+        T
+        \]
+      </div>
+      <p>be thrust magnitude.</p>
+      <p>Then</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_T = \frac{ \partial\mathbf x_f }{ \partial T }. }
+        \]
+      </div>
+      <p>This is useful for:</p>
+      <ul>
+        <li>propulsion uncertainty,</li>
+        <li>thrust calibration,</li>
+        <li>Monte Carlo analysis,</li>
+        <li>terminal-state robustness.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.57 Sensitivity to Thrust Direction</h3>
+      <p>If the thrust direction is parameterized by angle vector</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\alpha},
+        \]
+      </div>
+      <p>define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\alpha = \frac{ \partial\mathbf x_f }{ \partial\boldsymbol{\alpha} }. }
+        \]
+      </div>
+      <p>Misalignment uncertainty can then be approximated by</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x_f \approx \mathbf S_\alpha \delta\boldsymbol{\alpha}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.58 Sensitivity to Sensor Bias</h3>
+      <p>Suppose measurement bias is</p>
+      <div class="equation-box">
+        \[
+        \mathbf b.
+        \]
+      </div>
+      <p>For</p>
+      <div class="equation-box">
+        \[
+        \mathbf z = h(\mathbf x) + \mathbf b + \mathbf v,
+        \]
+      </div>
+      <p>the direct bias sensitivity is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\mathbf z}{\partial\mathbf b} = \mathbf I. }
+        \]
+      </div>
+      <p>When bias is estimated jointly with the state, its indirect dynamic correlations may also affect the complete design matrix.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.59 Trajectory Sensitivity</h3>
+      <p>A general trajectory sensitivity is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{ \partial\mathbf x(t) }{ \partial\boldsymbol{\eta} } }
+        \]
+      </div>
+      <p>where <code>\boldsymbol{\eta}</code> may represent:</p>
+      <ul>
+        <li>initial conditions,</li>
+        <li>dynamic parameters,</li>
+        <li>control variables,</li>
+        <li>maneuver parameters,</li>
+        <li>calibration variables.</li>
+      </ul>
+      <p>Thus the STM is one member of a broader family of trajectory sensitivity matrices.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.60 Sensitivity Matrix as a General Jacobian</h3>
+      <p>Conceptually,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S = \frac{ \partial(\text{trajectory quantity}) }{ \partial(\text{uncertain or controllable quantity}) }. }
+        \]
+      </div>
+      <p>The STM is specifically</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi} = \frac{ \partial\mathbf x(t) }{ \partial\mathbf x_0 }. }
+        \]
+      </div>
+      <p>Parameter sensitivity is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta = \frac{ \partial\mathbf x(t) }{ \partial\boldsymbol{\theta} }. }
+        \]
+      </div>
+      <p>Control sensitivity is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_u = \frac{ \partial\mathbf x(t) }{ \partial\mathbf u }. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.61 Local Nature of Sensitivity</h3>
+      <p>Sensitivity matrices are generally first-order quantities.</p>
+      <p>For</p>
+      <div class="equation-box">
+        \[
+        \mathbf x(\boldsymbol{\eta}+\delta\boldsymbol{\eta}),
+        \]
+      </div>
+      <p>the approximation is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x( \boldsymbol{\eta}+\delta\boldsymbol{\eta} ) \approx \mathbf x(\boldsymbol{\eta}) + \mathbf S \delta\boldsymbol{\eta}. }
+        \]
+      </div>
+      <p>This is accurate only when the perturbation is sufficiently small and the system is locally smooth.</p>
+      <p><strong>Engineering interpretation:</strong> A sensitivity derivative is trustworthy only within the neighbourhood in which the first-order approximation is valid. Validation over the actual uncertainty or control range is therefore essential before using it for requirements or targeting.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.62 Higher-Order Effects</h3>
+      <p>If perturbations are large,</p>
+      <div class="equation-box">
+        \[
+        \mathbf S \delta\boldsymbol{\eta}
+        \]
+      </div>
+      <p>may not accurately predict trajectory changes.</p>
+      <p>Higher-order terms become important:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x \approx \mathbf S \delta\boldsymbol{\eta} + \frac12 \mathcal H[ \delta\boldsymbol{\eta}, \delta\boldsymbol{\eta} ] + \cdots. }
+        \]
+      </div>
+      <p>Here <code>\mathcal H</code> represents second-order sensitivity information.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.63 When First-Order STM Propagation Can Fail</h3>
+      <p>First-order propagation may become inaccurate when:</p>
+      <ul>
+        <li>perturbations are large,</li>
+        <li>propagation intervals are long,</li>
+        <li>dynamics are strongly nonlinear,</li>
+        <li>trajectory passes near sensitive regions,</li>
+        <li>attitude representation has nonlinear constraints,</li>
+        <li>discontinuities occur.</li>
+      </ul>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{STM Accuracy} \text{ must be checked over the actual uncertainty range}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.64 Numerical Computation of the STM</h3>
+      <p>The STM can be computed in several ways:</p>
+      <ul>
+        <li>integrate the variational equations,</li>
+        <li>finite-difference propagation,</li>
+        <li>automatic differentiation,</li>
+        <li>closed-form analytical solution,</li>
+        <li>matrix exponential for LTI systems.</li>
+      </ul>
+      <p>Each approach has advantages and limitations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.65 Variational-Equation Method</h3>
+      <p>The standard high-quality method is to integrate</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\boldsymbol{\Phi}} = \mathbf A(t) \boldsymbol{\Phi} }
+        \]
+      </div>
+      <p>alongside</p>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf x} = \mathbf f(\mathbf x,t).
+        \]
+      </div>
+      <p>Advantages include:</p>
+      <ul>
+        <li>high efficiency for many perturbation directions,</li>
+        <li>accurate local derivatives,</li>
+        <li>consistency with dynamic propagation.</li>
+      </ul>
+      <p>The main requirement is an accurate dynamic Jacobian.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.66 Finite-Difference STM</h3>
+      <p>The STM may also be approximated column by column.</p>
+      <p>For state component <code>j</code>,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{:,j} \approx \frac{ \mathbf x( t; \mathbf x_0+\Delta x_j\mathbf e_j ) - \mathbf x( t; \mathbf x_0-\Delta x_j\mathbf e_j ) }{ 2\Delta x_j }. }
+        \]
+      </div>
+      <p>This is a central-difference approximation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.67 Interpretation of Finite-Difference STM</h3>
+      <p>Each column is obtained by:</p>
+      <ol>
+        <li>perturbing one initial-state component,</li>
+        <li>propagating forward,</li>
+        <li>comparing the final state.</li>
+      </ol>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{One Initial-State Perturbation} \rightarrow \text{One STM Column}. }
+        \]
+      </div>
+      <p>For an <code>n</code>-state system, central differences require approximately <code>2n</code> additional trajectory propagations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.68 Finite-Difference Step Size</h3>
+      <p>The perturbation</p>
+      <div class="equation-box">
+        \[
+        \Delta x_j
+        \]
+      </div>
+      <p>must be chosen carefully.</p>
+      <p>Too large:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Nonlinear truncation error dominates}. }
+        \]
+      </div>
+      <p>Too small:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Floating-point and integration noise dominate}. }
+        \]
+      </div>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Good FD Step} = \text{Balance Between Linearization and Numerical Precision}. }
+        \]
+      </div>
+      <p><strong>Engineering interpretation:</strong> Finite-difference step-size studies are an important verification tool: a useful derivative should remain approximately stable over a reasonable range of perturbation sizes before roundoff or nonlinearity begins to dominate.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.69 Forward Difference</h3>
+      <p>A simpler approximation is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{ \partial\mathbf x(t) }{ \partial x_{0,j} } \approx \frac{ \mathbf x(t;\mathbf x_0+\Delta x_j\mathbf e_j) - \mathbf x(t;\mathbf x_0) }{ \Delta x_j }. }
+        \]
+      </div>
+      <p>It requires fewer propagations but is generally less accurate than central differences.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.70 Complex-Step Differentiation</h3>
+      <p>For compatible smooth numerical code, derivatives may be approximated using complex-step differentiation.</p>
+      <p>For scalar dependence,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial f}{\partial x} \approx \frac{ \operatorname{Im} f(x+i\epsilon) }{ \epsilon }. }
+        \]
+      </div>
+      <p>This can provide very high derivative accuracy without subtractive cancellation.</p>
+      <p>However, all model functions must properly support complex arithmetic.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.71 Automatic Differentiation</h3>
+      <p>Automatic differentiation can generate derivatives of</p>
+      <div class="equation-box">
+        \[
+        \mathbf f
+        \]
+      </div>
+      <p>and sometimes the complete numerical propagation.</p>
+      <p>Advantages include:</p>
+      <ul>
+        <li>machine-precision derivative consistency,</li>
+        <li>less manual derivative algebra,</li>
+        <li>fewer finite-difference tuning issues.</li>
+      </ul>
+      <p>It can be especially useful for large nonlinear dynamics.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.72 Analytical Jacobians</h3>
+      <p>An analytical dynamics Jacobian provides explicit expressions for</p>
+      <div class="equation-box">
+        \[
+        \mathbf A = \frac{\partial\mathbf f}{\partial\mathbf x}.
+        \]
+      </div>
+      <p>Advantages include:</p>
+      <ul>
+        <li>high computational efficiency,</li>
+        <li>physical transparency,</li>
+        <li>accurate sensitivity propagation.</li>
+      </ul>
+      <p>But analytical derivatives must be carefully verified.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.73 Jacobian Verification</h3>
+      <p>A recommended procedure is:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A_{\text{analytic}} \quad\text{versus}\quad \mathbf A_{\text{finite difference}}. }
+        \]
+      </div>
+      <p>Similarly compare</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{\text{variational}} \quad\text{versus}\quad \boldsymbol{\Phi}_{\text{finite difference}}. }
+        \]
+      </div>
+      <p>Agreement should be checked over representative trajectories.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.74 STM Verification with Perturbation Propagation</h3>
+      <p>Choose a small test perturbation</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x_0.
+        \]
+      </div>
+      <p>The linear prediction is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x_{\Phi}(t) = \boldsymbol{\Phi}(t,t_0) \delta\mathbf x_0. }
+        \]
+      </div>
+      <p>The nonlinear truth perturbation is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x_{NL}(t) = \mathbf x( t;\mathbf x_0+\delta\mathbf x_0 ) - \mathbf x( t;\mathbf x_0 ). }
+        \]
+      </div>
+      <p>Compare them.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.75 STM Verification Error</h3>
+      <p>Define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf e_\Phi = \delta\mathbf x_{NL} - \delta\mathbf x_\Phi. }
+        \]
+      </div>
+      <p>A normalized metric might be</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \epsilon_\Phi = \frac{ \| \mathbf e_\Phi \| }{ \| \delta\mathbf x_{NL} \| }. }
+        \]
+      </div>
+      <p>For sufficiently small perturbations, the error should decrease approximately with perturbation magnitude according to the neglected higher-order terms.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.76 Composition Verification</h3>
+      <p>Choose three times</p>
+      <div class="equation-box">
+        \[
+        t_0<t_1<t_2.
+        \]
+      </div>
+      <p>Verify</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_2,t_0) \approx \boldsymbol{\Phi}(t_2,t_1) \boldsymbol{\Phi}(t_1,t_0). }
+        \]
+      </div>
+      <p>This is a useful implementation check.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.77 Inverse Verification</h3>
+      <p>Check</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t_0) \boldsymbol{\Phi}(t_0,t) \approx \mathbf I. }
+        \]
+      </div>
+      <p>Large deviations may indicate:</p>
+      <ul>
+        <li>integration error,</li>
+        <li>incorrect Jacobian,</li>
+        <li>inconsistent reference trajectory,</li>
+        <li>severe conditioning issues.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.78 Initial-Condition Verification</h3>
+      <p>At</p>
+      <div class="equation-box">
+        \[
+        t=t_0,
+        \]
+      </div>
+      <p>verify</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_0,t_0) = \mathbf I. }
+        \]
+      </div>
+      <p>This seems simple, but incorrect initialization is a common implementation mistake.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.79 Numerical Integration Tolerance</h3>
+      <p>Because the STM can contain rapidly growing or shrinking elements, its integration may be more sensitive than state integration.</p>
+      <p>A practical test is to tighten the integrator tolerance and confirm that:</p>
+      <ul>
+        <li>state solution,</li>
+        <li>STM,</li>
+        <li>propagated covariance,</li>
+        <li>estimated corrections</li>
+      </ul>
+      <p>change negligibly.</p>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Converged State Integration} \not\Rightarrow \text{Automatically Converged Sensitivity Integration}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.80 Conditioning of the STM</h3>
+      <p>The STM itself may become poorly conditioned.</p>
+      <p>Define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \kappa(\boldsymbol{\Phi}) = \| \boldsymbol{\Phi} \| \| \boldsymbol{\Phi}^{-1} \|. }
+        \]
+      </div>
+      <p>A large condition number means some perturbation directions grow or shrink much more strongly than others.</p>
+      <p>This can affect:</p>
+      <ul>
+        <li>covariance propagation,</li>
+        <li>targeting,</li>
+        <li>estimation,</li>
+        <li>backward propagation.</li>
+      </ul>
+      <p><strong>Engineering interpretation:</strong> Poor conditioning does not necessarily mean the dynamics are numerically wrong. It can indicate that the chosen coordinates contain directions with very different amplification, which is why scaling and singular-value analysis are important.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.81 Singular Values of the STM</h3>
+      <p>Use SVD:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi} = \mathbf U \boldsymbol{\Sigma} \mathbf V^T. }
+        \]
+      </div>
+      <p>The largest singular value identifies the perturbation direction with greatest first-order amplification.</p>
+      <p>The smallest identifies a strongly contracted direction.</p>
+      <p>Thus singular values reveal dynamic sensitivity directions.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.82 Perturbation Amplification</h3>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \sigma_{\max}( \boldsymbol{\Phi} ) \gg1,
+        \]
+      </div>
+      <p>some initial-state errors can grow strongly.</p>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \sigma_{\min} \ll1,
+        \]
+      </div>
+      <p>some perturbations contract strongly.</p>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{STM Singular Values} \rightarrow \text{Local Error Growth and Contraction}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.83 Local Stability Interpretation</h3>
+      <p>The STM contains local information about trajectory stability.</p>
+      <p>If small perturbations grow rapidly, the nominal trajectory is locally sensitive.</p>
+      <p>However, finite-time STM behaviour should not automatically be interpreted as asymptotic stability.</p>
+      <p>That requires additional dynamical-systems analysis.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.84 STM Determinant</h3>
+      <p>The determinant</p>
+      <div class="equation-box">
+        \[
+        \det\boldsymbol{\Phi}
+        \]
+      </div>
+      <p>measures local volume expansion or contraction of perturbation space.</p>
+      <p>For certain Hamiltonian orbital dynamics, special structure may exist.</p>
+      <p>But interpretation depends strongly on the underlying coordinate system and model.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.85 State Scaling and STM Scaling</h3>
+      <p>Suppose position is measured in kilometres while velocity is measured in kilometres per second, and other states have very different magnitudes.</p>
+      <p>Then raw STM elements may have very different numerical scales.</p>
+      <p>Introduce</p>
+      <div class="equation-box">
+        \[
+        \mathbf x = \mathbf S_x \tilde{\mathbf x}.
+        \]
+      </div>
+      <p>The scaled STM becomes</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \tilde{\boldsymbol{\Phi}} = \mathbf S_x^{-1} \boldsymbol{\Phi} \mathbf S_x. }
+        \]
+      </div>
+      <p>Scaling can improve numerical conditioning and interpretation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.86 Units of STM Elements</h3>
+      <p>STM elements are not always dimensionless.</p>
+      <p>For example,</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}_{rv} = \frac{ \partial\mathbf r }{ \partial\mathbf v_0 }
+        \]
+      </div>
+      <p>has units of time.</p>
+      <p>Therefore comparing raw STM elements without considering units can be misleading.</p>
+      <p>Scaled or nondimensional sensitivity measures may be more meaningful.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.87 Dimensionless Sensitivities</h3>
+      <p>A normalized sensitivity can be defined as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ S_{ij}^{rel} = \frac{x_j} {y_i} \frac{ \partial y_i }{ \partial x_j }. }
+        \]
+      </div>
+      <p>This measures fractional output change per fractional input change.</p>
+      <p>It can help compare sensitivity between variables with different physical units.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.88 Sensitivity and Observability</h3>
+      <p>Measurement observability depends on both:</p>
+      <ul>
+        <li>sensor sensitivity,</li>
+        <li>dynamic sensitivity.</li>
+      </ul>
+      <p>For measurement <code>k</code>,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf G_k = \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </div>
+      <p>Thus a state that is not directly measured may become observable because dynamics transfer its influence into measured quantities.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.89 Dynamic Observability Matrix</h3>
+      <p>For a discrete linear system,</p>
+      <div class="equation-box">
+        \[
+        \mathbf x_{k+1} = \mathbf F\mathbf x_k,
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \mathbf z_k = \mathbf H\mathbf x_k,
+        \]
+      </div>
+      <p>the observability matrix is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathcal O = \begin{bmatrix} \mathbf H\\ \mathbf H\mathbf F\\ \mathbf H\mathbf F^2\\ \vdots\\ \mathbf H\mathbf F^{n-1} \end{bmatrix}. }
+        \]
+      </div>
+      <p>Each row block is essentially a measurement sensitivity propagated to the reference state.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.90 Connection to the Information Matrix</h3>
+      <p>The information matrix in batch estimation is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf N = \sum_k \mathbf G_k^T \mathbf R_k^{-1} \mathbf G_k. }
+        \]
+      </div>
+      <p>Since</p>
+      <div class="equation-box">
+        \[
+        \mathbf G_k = \mathbf H_k \boldsymbol{\Phi}_{k,0},
+        \]
+      </div>
+      <p>we obtain</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf N = \sum_k \boldsymbol{\Phi}_{k,0}^T \mathbf H_k^T \mathbf R_k^{-1} \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </div>
+      <p>This equation explicitly shows how dynamics, measurement geometry, and sensor uncertainty combine to determine estimation information.</p>
+      <p><strong>Engineering interpretation:</strong> This equation unifies dynamics and sensing. A measurement can be accurate yet provide little information about a state direction if \(\mathbf H_k\boldsymbol{\Phi}_{k,0}\) is weak in that direction.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.91 Sensitivity and Identifiability</h3>
+      <p>For parameter <code>\theta</code>, if</p>
+      <div class="equation-box">
+        \[
+        \frac{\partial h} {\partial\theta} \approx0,
+        \]
+      </div>
+      <p>the measurements contain little information about it.</p>
+      <p>If two parameter-sensitivity columns are nearly dependent,</p>
+      <div class="equation-box">
+        \[
+        \mathbf g_{\theta_1} \approx c \mathbf g_{\theta_2},
+        \]
+      </div>
+      <p>then the parameters may be difficult to distinguish.</p>
+      <p>Thus sensitivity matrices provide direct insight into identifiability.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.92 Parameter Correlation</h3>
+      <p>Suppose two parameters create similar trajectory perturbations:</p>
+      <div class="equation-box">
+        \[
+        \mathbf S_{\theta_1} \approx c \mathbf S_{\theta_2}.
+        \]
+      </div>
+      <p>Then their measurement signatures will also be similar.</p>
+      <p>This can produce:</p>
+      <ul>
+        <li>ill-conditioned information matrix,</li>
+        <li>large covariance,</li>
+        <li>strong parameter correlation.</li>
+      </ul>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Similar Sensitivity Signatures} \rightarrow \text{Weak Parameter Separation}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.93 Sensitivity and Experiment Design</h3>
+      <p>Sensitivity analysis can help decide:</p>
+      <ul>
+        <li>when to take measurements,</li>
+        <li>which sensor geometry is valuable,</li>
+        <li>which maneuver excites an uncertain parameter,</li>
+        <li>which observation arc is informative.</li>
+      </ul>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensitivity Analysis} \rightarrow \text{Measurement and Maneuver Design}. }
+        \]
+      </div>
+      <p>This turns estimation theory into mission-design information.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.94 Sensitivity and Sensor Selection</h3>
+      <p>Suppose several sensors measure different functions.</p>
+      <p>Their Jacobians are</p>
+      <div class="equation-box">
+        \[
+        \mathbf H_1, \mathbf H_2, \ldots
+        \]
+      </div>
+      <p>and dynamic sensitivities are</p>
+      <div class="equation-box">
+        \[
+        \mathbf H_i\boldsymbol{\Phi}.
+        \]
+      </div>
+      <p>The sensor providing the smallest raw noise is not necessarily the most informative for every state direction.</p>
+      <p>Information depends on both sensitivity and covariance.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.95 Sensitivity and Guidance</h3>
+      <p>Guidance requires understanding how control changes future conditions.</p>
+      <p>For terminal quantity</p>
+      <div class="equation-box">
+        \[
+        \mathbf y_f = g( \mathbf x_f ),
+        \]
+      </div>
+      <p>control sensitivity is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{ \partial\mathbf y_f }{ \partial\mathbf u } = \frac{ \partial g }{ \partial\mathbf x_f } \frac{ \partial\mathbf x_f }{ \partial\mathbf u }. }
+        \]
+      </div>
+      <p>This matrix can be used in iterative guidance or targeting.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.96 Sensitivity and Trajectory Optimization</h3>
+      <p>Trajectory optimization frequently requires gradients such as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial J}{\partial\mathbf u}, \qquad \frac{\partial\mathbf c}{\partial\mathbf u}. }
+        \]
+      </div>
+      <p>These can be built from state and control sensitivities.</p>
+      <p>Thus sensitivity propagation is fundamental not only to estimation but also to optimization.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.97 Forward Sensitivity Method</h3>
+      <p>The direct variational approach propagates one sensitivity column for every parameter.</p>
+      <p>For <code>p</code> parameters,</p>
+      <div class="equation-box">
+        \[
+        \mathbf S_\theta \in \mathbb R^{n\times p}.
+        \]
+      </div>
+      <p>This is efficient when <code>p</code> is relatively small.</p>
+      <p>It is known as <strong>forward sensitivity propagation</strong>.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.98 Adjoint Sensitivity Concept</h3>
+      <p>If there are many parameters but only a few scalar outputs or cost functions, an adjoint method can be more efficient.</p>
+      <p>Instead of propagating sensitivity with respect to every parameter individually, an adjoint variable is integrated and used to construct gradients.</p>
+      <p>Conceptually,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Forward Sensitivity} \rightarrow \text{Cost Scales with Number of Parameters} }
+        \]
+      </div>
+      <p>whereas</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Adjoint Sensitivity} \rightarrow \text{Often Efficient for Few Outputs and Many Parameters}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.99 Why Adjoint Methods Matter</h3>
+      <p>Suppose an optimizer has hundreds of control parameters but only one cost</p>
+      <div class="equation-box">
+        \[
+        J.
+        \]
+      </div>
+      <p>Forward sensitivity may require hundreds of derivative propagations.</p>
+      <p>Adjoint methods can often obtain</p>
+      <div class="equation-box">
+        \[
+        \frac{\partial J}{\partial\boldsymbol{\theta}}
+        \]
+      </div>
+      <p>with much less dependence on parameter dimension.</p>
+      <p>This becomes important in large trajectory-optimization problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.100 Discontinuities and the STM</h3>
+      <p>If the trajectory contains a discontinuity, the STM cannot simply be propagated through it as though dynamics were smooth.</p>
+      <p>Examples include:</p>
+      <ul>
+        <li>impulsive maneuvers,</li>
+        <li>stage separation,</li>
+        <li>contact events,</li>
+        <li>reset maps.</li>
+      </ul>
+      <p>A jump relation must be applied.</p>
+      <p><strong>Engineering interpretation:</strong> For hybrid systems, sensitivity propagation must respect event boundaries. Treating a discontinuity as a smooth segment can corrupt both the STM and any covariance or targeting result derived from it.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.101 Jump Matrix</h3>
+      <p>Suppose</p>
+      <div class="equation-box">
+        \[
+        \mathbf x^{+} = \mathbf g( \mathbf x^{-} ).
+        \]
+      </div>
+      <p>Then the perturbation satisfies</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x^{+} = \mathbf J_g \delta\mathbf x^{-} }
+        \]
+      </div>
+      <p>where</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf J_g = \frac{\partial\mathbf g} {\partial\mathbf x^{-}}. }
+        \]
+      </div>
+      <p>Thus the STM across the event becomes</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}^{+} = \mathbf J_g \boldsymbol{\Phi}^{-}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.102 Impulsive Maneuver Jump Matrix</h3>
+      <p>For a simple known velocity impulse,</p>
+      <div class="equation-box">
+        \[
+        \mathbf r^{+} = \mathbf r^{-},
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \mathbf v^{+} = \mathbf v^{-} + \Delta\mathbf v.
+        \]
+      </div>
+      <p>If <code>\Delta\mathbf v</code> is known and independent of state, the state jump Jacobian is simply</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf J_g = \mathbf I. }
+        \]
+      </div>
+      <p>But if the maneuver depends on the state or attitude, additional derivatives appear.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.103 Sensitivity to Event Time</h3>
+      <p>When an event time changes, the system follows one dynamics model for a slightly different duration.</p>
+      <p>Event-time sensitivity therefore requires special treatment.</p>
+      <p>A small timing perturbation can affect the state both through:</p>
+      <ul>
+        <li>pre-event propagation,</li>
+        <li>post-event propagation.</li>
+      </ul>
+      <p>This is especially important in burn timing and mode-switch problems.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.104 Hybrid Systems</h3>
+      <p>A spacecraft may alternate among dynamic modes:</p>
+      <div class="equation-box">
+        \[
+        f^{(1)}, \quad f^{(2)}, \quad \ldots
+        \]
+      </div>
+      <p>The complete sensitivity propagation becomes</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi} = \boldsymbol{\Phi}_m \mathbf J_{m-1} \boldsymbol{\Phi}_{m-1} \cdots \mathbf J_1 \boldsymbol{\Phi}_1. }
+        \]
+      </div>
+      <p>This combines continuous evolution with discrete jump mappings.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.105 Attitude-State Sensitivity</h3>
+      <p>For attitude dynamics, the state may contain</p>
+      <div class="equation-box">
+        \[
+        \mathbf q, \qquad \boldsymbol{\omega}.
+        \]
+      </div>
+      <p>Because quaternion attitude lies on a constrained manifold,</p>
+      <div class="equation-box">
+        \[
+        \|\mathbf q\|=1,
+        \]
+      </div>
+      <p>a naive Euclidean STM in four quaternion components may be undesirable.</p>
+      <p>A local attitude-error representation is often preferable.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.106 Multiplicative Attitude Error</h3>
+      <p>Represent attitude error through a small rotation vector</p>
+      <div class="equation-box">
+        \[
+        \delta\boldsymbol{\theta}.
+        \]
+      </div>
+      <p>Then the error state may be</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x = \begin{bmatrix} \delta\boldsymbol{\theta}\\ \delta\boldsymbol{\omega}\\ \cdots \end{bmatrix}. }
+        \]
+      </div>
+      <p>The STM then maps physically meaningful local attitude errors.</p>
+      <p>This is consistent with error-state and multiplicative filtering approaches.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.107 Coupled Translational and Attitude Sensitivity</h3>
+      <p>For a fully coupled spacecraft,</p>
+      <div class="equation-box">
+        \[
+        \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\ \boldsymbol{\omega}\\ \cdots \end{bmatrix}.
+        \]
+      </div>
+      <p>Then</p>
+      <div class="equation-box">
+        \[
+        \mathbf A
+        \]
+      </div>
+      <p>may contain off-diagonal terms coupling translation and attitude.</p>
+      <p>Examples include:</p>
+      <ul>
+        <li>thrust-direction dependence on attitude,</li>
+        <li>drag depending on projected area,</li>
+        <li>gravity-gradient torque effects,</li>
+        <li>sensor-frame measurement geometry.</li>
+      </ul>
+      <p>Thus full 6-DOF sensitivity may require a coupled STM.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.108 Sensor-to-State Sensitivity</h3>
+      <p>A sensor may produce</p>
+      <div class="equation-box">
+        \[
+        \mathbf z = h( \mathbf x ).
+        \]
+      </div>
+      <p>The measurement Jacobian</p>
+      <div class="equation-box">
+        \[
+        \mathbf H = \frac{\partial h}{\partial\mathbf x}
+        \]
+      </div>
+      <p>converts state perturbation to measurement perturbation:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf z = \mathbf H \delta\mathbf x. }
+        \]
+      </div>
+      <p>With an STM,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf z_k = \mathbf H_k \boldsymbol{\Phi}_{k,0} \delta\mathbf x_0. }
+        \]
+      </div>
+      <p>This is the complete state-to-measurement sensitivity chain.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.109 General Range Sensitivity</h3>
+      <p>For range</p>
+      <div class="equation-box">
+        \[
+        \rho = \|\mathbf r\|,
+        \]
+      </div>
+      <p>the measurement Jacobian is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\rho}{\partial\mathbf r} = \frac{\mathbf r^T}{\|\mathbf r\|}. }
+        \]
+      </div>
+      <p>Sensitivity to the reference state becomes</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\rho_k} {\partial\mathbf x_0} = \mathbf H_{\rho,k} \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.110 General Range-Rate Sensitivity</h3>
+      <p>Range rate is</p>
+      <div class="equation-box">
+        \[
+        \dot\rho = \frac{ \mathbf r^T\mathbf v }{ \rho }.
+        \]
+      </div>
+      <p>Its Jacobian contains both position and velocity terms.</p>
+      <p>Therefore range-rate measurements often provide complementary information to range measurements.</p>
+      <p>When propagated through the STM, this can improve reference-state observability.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.111 Line-of-Sight Sensitivity</h3>
+      <p>For</p>
+      <div class="equation-box">
+        \[
+        \mathbf u = \frac{\mathbf r}{r},
+        \]
+      </div>
+      <p>the derivative with respect to <code>\mathbf r</code> is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\mathbf u} {\partial\mathbf r} = \frac{1}{r} \left( \mathbf I - \mathbf u\mathbf u^T \right). }
+        \]
+      </div>
+      <p>This matrix projects perturbations into directions perpendicular to the line of sight.</p>
+      <p>Thus an angular measurement is locally insensitive to motion directly along the line of sight.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.112 Why Changing Geometry Helps</h3>
+      <p>At one instant, LOS measurements may poorly constrain range.</p>
+      <p>But as geometry evolves,</p>
+      <div class="equation-box">
+        \[
+        \mathbf H_k
+        \]
+      </div>
+      <p>changes.</p>
+      <p>Combined with</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}_{k,0},
+        \]
+      </div>
+      <p>the stacked design matrix can become full rank.</p>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Changing Geometry} + \text{Dynamics} \rightarrow \text{Improved Observability}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.113 Sensitivity to Bias and Calibration States</h3>
+      <p>If a measurement contains calibration parameters,</p>
+      <div class="equation-box">
+        \[
+        \mathbf z = h( \mathbf x, \mathbf b, \mathbf s, \boldsymbol{\alpha} ),
+        \]
+      </div>
+      <p>the complete Jacobian may include</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf H = \begin{bmatrix} \frac{\partial h}{\partial\mathbf x} & \frac{\partial h}{\partial\mathbf b} & \frac{\partial h}{\partial\mathbf s} & \frac{\partial h}{\partial\boldsymbol{\alpha}} \end{bmatrix}. }
+        \]
+      </div>
+      <p>This is essential for joint state and calibration estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.114 Sensitivity and Monte Carlo Analysis</h3>
+      <p>Sensitivity analysis provides a first-order alternative to brute-force Monte Carlo.</p>
+      <p>If uncertain parameters have covariance</p>
+      <div class="equation-box">
+        \[
+        \mathbf P_\eta,
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf y = \mathbf S_\eta \delta\boldsymbol{\eta},
+        \]
+      </div>
+      <p>then approximately</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P_y = \mathbf S_\eta \mathbf P_\eta \mathbf S_\eta^T. }
+        \]
+      </div>
+      <p>This predicts uncertainty propagation efficiently.</p>
+      <p><strong>Engineering interpretation:</strong> This first-order covariance mapping is one of the fastest ways to estimate uncertainty contributions, but Monte Carlo remains important for checking whether the local linear approximation remains valid over the actual uncertainty distribution.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.115 First-Order Covariance versus Monte Carlo</h3>
+      <p>First-order covariance propagation is fast but local.</p>
+      <p>Monte Carlo captures more nonlinear effects.</p>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensitivity/Covariance} \rightarrow \text{Fast Local Approximation} }
+        \]
+      </div>
+      <p>while</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Monte Carlo} \rightarrow \text{More General Nonlinear Statistical Validation}. }
+        \]
+      </div>
+      <p>They complement rather than replace one another.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.116 Sensitivity Ranking</h3>
+      <p>One may rank parameters by how strongly they affect a chosen output.</p>
+      <p>For scalar output <code>y</code>,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ S_j = \left| \frac{\partial y} {\partial\theta_j} \right|. }
+        \]
+      </div>
+      <p>However, raw derivatives may be misleading when parameters have different units or uncertainty ranges.</p>
+      <p>Normalized or uncertainty-weighted sensitivities are often preferable.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.117 Uncertainty-Weighted Sensitivity</h3>
+      <p>If parameter <code>\theta_j</code> has standard deviation <code>\sigma_{\theta_j}</code>, define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ S_j^{unc} = \left| \frac{\partial y} {\partial\theta_j} \right| \sigma_{\theta_j}. }
+        \]
+      </div>
+      <p>This estimates the typical output uncertainty contributed by that parameter.</p>
+      <p>It is often more useful than the derivative alone.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.118 Sensitivity Does Not Equal Importance Automatically</h3>
+      <p>A parameter can have:</p>
+      <ul>
+        <li>large derivative but tiny uncertainty,</li>
+        <li>small derivative but huge uncertainty.</li>
+      </ul>
+      <p>Therefore physical importance depends on both sensitivity and expected parameter variation.</p>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Impact} \approx \text{Sensitivity} \times \text{Uncertainty Scale}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.119 Time History of Sensitivity</h3>
+      <p>Sensitivity should often be examined as a function of time:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S(t). }
+        \]
+      </div>
+      <p>A parameter may have little influence early in the trajectory but strong influence later.</p>
+      <p>This is useful for:</p>
+      <ul>
+        <li>selecting measurement epochs,</li>
+        <li>designing maneuvers,</li>
+        <li>choosing estimation arcs.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.120 Sensitivity Peaks</h3>
+      <p>If</p>
+      <div class="equation-box">
+        \[
+        \left\| \frac{\partial\mathbf y(t)} {\partial\theta} \right\|
+        \]
+      </div>
+      <p>has a strong peak at certain times, measurements near those epochs may be especially informative about <code>\theta</code>.</p>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensitivity-Time History} \rightarrow \text{Potential Measurement Scheduling Information}. }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.121 Sensitivity Heat Maps</h3>
+      <p>For many outputs and parameters, construct</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_{ij} = \frac{ \partial y_i }{ \partial\theta_j }. }
+        \]
+      </div>
+      <p>A heat map can reveal:</p>
+      <ul>
+        <li>weak parameters,</li>
+        <li>dominant parameters,</li>
+        <li>coupled outputs,</li>
+        <li>redundant sensitivity patterns.</li>
+      </ul>
+      <p>This is especially useful before a large estimation study.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.122 Sensitivity and Requirement Allocation</h3>
+      <p>Suppose final-position uncertainty must satisfy</p>
+      <div class="equation-box">
+        \[
+        \sigma_{r_f} < \sigma_{req}.
+        \]
+      </div>
+      <p>Sensitivity can identify how much each uncertainty source contributes.</p>
+      <p>For parameter covariance <code>\mathbf P_\theta</code>,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P_{r_f,\theta} = \mathbf S_{\theta} \mathbf P_\theta \mathbf S_{\theta}^T. }
+        \]
+      </div>
+      <p>This can support allocation of sensor, actuator, or model requirements.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.123 Sensitivity and Navigation Requirement Design</h3>
+      <p>Suppose initial navigation error is</p>
+      <div class="equation-box">
+        \[
+        \mathbf P_0.
+        \]
+      </div>
+      <p>Terminal covariance is approximately</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P_f = \boldsymbol{\Phi}_{f,0} \mathbf P_0 \boldsymbol{\Phi}_{f,0}^T. }
+        \]
+      </div>
+      <p>If a terminal accuracy requirement is imposed, one can work backward conceptually to determine acceptable initial-state uncertainty.</p>
+      <p>This connects dynamics directly to navigation requirements.</p>
+      <p><strong>Engineering interpretation:</strong> Requirement design can therefore be performed in both directions: propagate an assumed navigation covariance forward to check a terminal requirement, or use terminal sensitivity to identify which initial uncertainty components require tighter allocation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.124 Backward Requirement Mapping</h3>
+      <p>Given a terminal sensitivity direction <code>\mathbf c</code>, terminal variance is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \sigma_c^2 = \mathbf c^T \mathbf P_f \mathbf c. }
+        \]
+      </div>
+      <p>Using</p>
+      <div class="equation-box">
+        \[
+        \mathbf P_f = \boldsymbol{\Phi} \mathbf P_0 \boldsymbol{\Phi}^T,
+        \]
+      </div>
+      <p>we obtain</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \sigma_c^2 = ( \boldsymbol{\Phi}^T\mathbf c )^T \mathbf P_0 ( \boldsymbol{\Phi}^T\mathbf c ). }
+        \]
+      </div>
+      <p>This shows which initial-state directions drive the terminal requirement.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.125 Sensitivity in General RPO Navigation Requirements</h3>
+      <p>In a general RPO context, suppose final relative position accuracy must satisfy a tolerance.</p>
+      <p>The relative-motion STM can be used to determine how uncertainty in</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf r_0, \qquad \delta\mathbf v_0
+        \]
+      </div>
+      <p>maps into final relative-position uncertainty.</p>
+      <p>This helps identify whether the navigation requirement should focus more strongly on:</p>
+      <ul>
+        <li>initial relative position,</li>
+        <li>initial relative velocity,</li>
+        <li>measurement geometry,</li>
+        <li>process-model accuracy.</li>
+      </ul>
+      <p>Again, this is a general method rather than a mission-specific result.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.126 Sensitivity to Process Parameters</h3>
+      <p>Suppose trajectory acceleration is</p>
+      <div class="equation-box">
+        \[
+        \mathbf a = \mathbf a( \mathbf x, \theta ).
+        \]
+      </div>
+      <p>Then</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\mathbf a} {\partial\theta} }
+        \]
+      </div>
+      <p>drives the parameter-sensitivity equation.</p>
+      <p>If that derivative remains almost zero throughout the trajectory, the parameter is unlikely to be observable from the trajectory.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.127 Example: Drag-Coefficient Sensitivity</h3>
+      <p>For a drag model</p>
+      <div class="equation-box">
+        \[
+        \mathbf a_D = -\frac12 \rho C_D \frac{A}{m} v_{rel}^2 \hat{\mathbf v}_{rel},
+        \]
+      </div>
+      <p>the derivative with respect to <code>C_D</code> is approximately</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\mathbf a_D} {\partial C_D} = \frac{\mathbf a_D}{C_D} }
+        \]
+      </div>
+      <p>when other quantities are held fixed.</p>
+      <p>Thus atmospheric density and velocity determine when <code>C_D</code> becomes dynamically observable.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.128 Example: Ballistic-Coefficient Sensitivity</h3>
+      <p>If drag acceleration is parameterized through ballistic coefficient</p>
+      <div class="equation-box">
+        \[
+        B = \frac{m}{C_DA},
+        \]
+      </div>
+      <p>then</p>
+      <div class="equation-box">
+        \[
+        \mathbf a_D \propto -\frac{1}{B}.
+        \]
+      </div>
+      <p>Therefore</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\mathbf a_D} {\partial B} \propto \frac{1}{B^2}. }
+        \]
+      </div>
+      <p>The trajectory sensitivity to <code>B</code> is obtained by integrating the associated parameter variational equations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.129 Example: Gravity-Parameter Sensitivity</h3>
+      <p>For</p>
+      <div class="equation-box">
+        \[
+        \mathbf a = -\mu \frac{\mathbf r}{r^3},
+        \]
+      </div>
+      <p>the acceleration sensitivity to <code>\mu</code> is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\mathbf a} {\partial\mu} = - \frac{\mathbf r}{r^3}. }
+        \]
+      </div>
+      <p>This drives</p>
+      <div class="equation-box">
+        \[
+        \frac{\partial\mathbf x}{\partial\mu}.
+        \]
+      </div>
+      <p>Thus long orbital arcs can accumulate measurable sensitivity to gravitational parameters.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.130 STM and Multiple Shooting</h3>
+      <p>In trajectory optimization, a trajectory may be divided into segments.</p>
+      <p>Each segment has its own state and STM.</p>
+      <p>Continuity constraints are imposed:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf x_{i+1}^{start} - \phi_i( \mathbf x_i^{start} ) = \mathbf0. }
+        \]
+      </div>
+      <p>The Jacobian of this continuity condition contains the segment STM.</p>
+      <p>Therefore STM propagation is central to multiple-shooting methods.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.131 STM and Differential Correction</h3>
+      <p>In differential correction, the residual correction equation contains the dynamic Jacobian</p>
+      <div class="equation-box">
+        \[
+        \mathbf H_k \boldsymbol{\Phi}_{k,0}.
+        \]
+      </div>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Differential Correction} = \text{Measurement Jacobian} \times \text{Dynamic Sensitivity}. }
+        \]
+      </div>
+      <p>This connects Sections 4.3.3, 4.3.5, and 4.3.8 directly.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.132 STM and Smoother Cross-Covariance</h3>
+      <p>The smoother uses</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P_{k,k+1|k} = \mathbf P_{k|k} \mathbf F_k^T. }
+        \]
+      </div>
+      <p>Since</p>
+      <div class="equation-box">
+        \[
+        \mathbf F_k = \boldsymbol{\Phi}(t_{k+1},t_k),
+        \]
+      </div>
+      <p>the same dynamic sensitivity underlying batch estimation also determines the cross-covariance needed for backward smoothing.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.133 STM and Reachability</h3>
+      <p>Control sensitivity is closely related to controllability or reachability.</p>
+      <p>For</p>
+      <div class="equation-box">
+        \[
+        \delta\dot{\mathbf x} = \mathbf A\delta\mathbf x + \mathbf B\delta\mathbf u,
+        \]
+      </div>
+      <p>the control effect is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x(t) = \int \boldsymbol{\Phi}(t,\tau) \mathbf B(\tau) \delta\mathbf u(\tau) d\tau. }
+        \]
+      </div>
+      <p>This shows how control authority is transported through system dynamics.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.134 Controllability Gramian</h3>
+      <p>For a linear system, a controllability Gramian may be defined as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf W_c = \int_{t_0}^{t_f} \boldsymbol{\Phi}(t_f,\tau) \mathbf B(\tau) \mathbf B(\tau)^T \boldsymbol{\Phi}(t_f,\tau)^T d\tau. }
+        \]
+      </div>
+      <p>It describes how strongly the control can influence different state directions.</p>
+      <p>Thus STM theory connects directly to control-system properties.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.135 Observability Gramian</h3>
+      <p>Similarly, an observability Gramian can be written as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf W_o = \int_{t_0}^{t_f} \boldsymbol{\Phi}(t,t_0)^T \mathbf H(t)^T \mathbf H(t) \boldsymbol{\Phi}(t,t_0) dt. }
+        \]
+      </div>
+      <p>With measurement weighting,</p>
+      <div class="equation-box">
+        \[
+        \mathbf H^T\mathbf R^{-1}\mathbf H
+        \]
+      </div>
+      <p>appears.</p>
+      <p>This closely resembles the estimation information matrix.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.136 Information, Observability, and Sensitivity</h3>
+      <p>The following concepts are therefore deeply connected:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{STM} \rightarrow \text{Dynamic Sensitivity} \rightarrow \text{Measurement Sensitivity} \rightarrow \text{Information} \rightarrow \text{Observability}. }
+        \]
+      </div>
+      <p>They are not separate topics.</p>
+      <p>They are different views of how perturbations propagate and become measurable.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.137 Time-Varying Sensitivity and Mission Phases</h3>
+      <p>A spacecraft trajectory may contain:</p>
+      <ul>
+        <li>coast phases,</li>
+        <li>maneuvers,</li>
+        <li>observation phases,</li>
+        <li>proximity phases.</li>
+      </ul>
+      <p>Sensitivity may change dramatically between these phases.</p>
+      <p>Therefore it can be useful to analyse</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}(t,t_0)
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \mathbf S_\theta(t)
+        \]
+      </div>
+      <p>phase by phase rather than only at final time.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.138 Phase-to-Phase STM</h3>
+      <p>If a trajectory has several phases,</p>
+      <div class="equation-box">
+        \[
+        t_0 \rightarrow t_1 \rightarrow t_2 \rightarrow t_3,
+        \]
+      </div>
+      <p>then</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{3,0} = \boldsymbol{\Phi}_{3,2} \boldsymbol{\Phi}_{2,1} \boldsymbol{\Phi}_{1,0}. }
+        \]
+      </div>
+      <p>This is valuable for tracing where sensitivity grows.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.139 Sensitivity Contribution by Phase</h3>
+      <p>Suppose total terminal sensitivity is large.</p>
+      <p>By examining each phase STM, one may identify whether the amplification originates during:</p>
+      <ul>
+        <li>initial coast,</li>
+        <li>maneuver,</li>
+        <li>long free flight,</li>
+        <li>close approach.</li>
+      </ul>
+      <p>This supports design improvement.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.140 STM Reset at Reference Epoch</h3>
+      <p>When changing the estimation reference epoch to <code>t_r</code>,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_r,t_r)=\mathbf I. }
+        \]
+      </div>
+      <p>Sensitivities must then be redefined relative to the new reference state.</p>
+      <p>Care is required when comparing covariances or normal matrices across reference epochs.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.141 Reference Epoch and Conditioning</h3>
+      <p>Choosing a reference epoch near the middle of an observation arc can sometimes improve numerical conditioning because sensitivities need not grow over the entire interval in only one time direction.</p>
+      <p>However, the optimal choice depends on the estimation formulation.</p>
+      <p>Reference epoch is therefore partly a numerical-design decision.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.142 Forward versus Backward STM Propagation</h3>
+      <p>A forward STM maps</p>
+      <div class="equation-box">
+        \[
+        t_0\rightarrow t.
+        \]
+      </div>
+      <p>A backward STM maps</p>
+      <div class="equation-box">
+        \[
+        t\rightarrow t_0.
+        \]
+      </div>
+      <p>Since</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}(t_0,t) = \boldsymbol{\Phi}(t,t_0)^{-1},
+        \]
+      </div>
+      <p>one may obtain the backward map from the inverse, but direct backward integration may sometimes be preferable numerically.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.143 Numerical Danger of Explicit Inversion</h3>
+      <p>If the STM is ill conditioned,</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}^{-1}
+        \]
+      </div>
+      <p>may be numerically unstable.</p>
+      <p>Therefore one should often solve linear systems instead of explicitly forming the inverse.</p>
+      <p>This is the same numerical principle encountered in least squares and covariance propagation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.144 Sparsity of Large Sensitivity Systems</h3>
+      <p>For large augmented systems, many derivatives may be zero.</p>
+      <p>Examples include parameters affecting only particular forces or sensors.</p>
+      <p>The matrices</p>
+      <div class="equation-box">
+        \[
+        \mathbf A, \quad \mathbf E, \quad \mathbf H
+        \]
+      </div>
+      <p>may therefore be sparse.</p>
+      <p>Exploiting sparsity reduces computational cost.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.145 Memory Requirements</h3>
+      <p>An <code>n\times n</code> STM contains</p>
+      <div class="equation-box">
+        \[
+        n^2
+        \]
+      </div>
+      <p>elements.</p>
+      <p>For a 6-state orbit,</p>
+      <div class="equation-box">
+        \[
+        36
+        \]
+      </div>
+      <p>elements are modest.</p>
+      <p>But a large augmented navigation state can produce a much larger STM.</p>
+      <p>Therefore one may choose between:</p>
+      <ul>
+        <li>full STM propagation,</li>
+        <li>selected sensitivity columns,</li>
+        <li>sparse methods,</li>
+        <li>adjoint methods.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.146 Selected Sensitivity Propagation</h3>
+      <p>If only sensitivity to a few parameters is needed, there is no requirement to propagate a full augmented STM.</p>
+      <p>Instead propagate</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta }
+        \]
+      </div>
+      <p>only for selected parameters.</p>
+      <p>This can reduce computational load significantly.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.147 Coordinate-Frame Dependence</h3>
+      <p>STM values depend on the coordinates used to represent the state.</p>
+      <p>For example, an STM expressed in:</p>
+      <ul>
+        <li>inertial Cartesian coordinates,</li>
+        <li>orbital elements,</li>
+        <li>relative Hill coordinates</li>
+      </ul>
+      <p>will look different.</p>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{STM Is Coordinate-Representation Dependent}. }
+        \]
+      </div>
+      <p>The physical perturbation mapping is equivalent only after consistent coordinate transformations.</p>
+      <p><strong>Engineering interpretation:</strong> Because an STM is a derivative with respect to coordinates, its numerical values change when the coordinates change. Physical conclusions should therefore be based on consistently transformed perturbations, covariances, and sensitivities.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.148 STM Transformation Between Coordinate Systems</h3>
+      <p>Suppose</p>
+      <div class="equation-box">
+        \[
+        \mathbf y = g(\mathbf x).
+        \]
+      </div>
+      <p>Define coordinate Jacobian</p>
+      <div class="equation-box">
+        \[
+        \mathbf T = \frac{\partial\mathbf y}{\partial\mathbf x}.
+        \]
+      </div>
+      <p>Then approximately,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_y(t,t_0) = \mathbf T(t) \boldsymbol{\Phi}_x(t,t_0) \mathbf T(t_0)^{-1}. }
+        \]
+      </div>
+      <p>This allows STM transformation between coordinate representations.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.149 Covariance Transformation and STM</h3>
+      <p>Similarly, coordinate covariance transforms as</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P_y = \mathbf T \mathbf P_x \mathbf T^T. }
+        \]
+      </div>
+      <p>Thus coordinate transformation Jacobians and state transition matrices follow closely related rules.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.150 STM in Orbital Elements</h3>
+      <p>If orbital elements are used,</p>
+      <div class="equation-box">
+        \[
+        \mathbf e = [ a,e,i,\Omega,\omega,\nu ]^T,
+        \]
+      </div>
+      <p>one may define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_e = \frac{ \partial\mathbf e(t) }{ \partial\mathbf e(t_0) }. }
+        \]
+      </div>
+      <p>However, singularities in classical orbital elements can make sensitivity analysis difficult near special orbital configurations.</p>
+      <p>Nonsingular element sets may be preferable.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.151 Coordinate Singularities</h3>
+      <p>Sensitivity matrices can become numerically misleading near coordinate singularities even when physical dynamics remain regular.</p>
+      <p>Examples include classical orbital-element singularities.</p>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Large Sensitivity} \text{ may reflect} \text{coordinate singularity rather than physical instability}. }
+        \]
+      </div>
+      <p>Interpretation should always consider the state representation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.152 Nonlinear Error Geometry</h3>
+      <p>Attitude and some orbital representations live on manifolds rather than unconstrained Euclidean space.</p>
+      <p>In such cases, sensitivity should preferably be defined in local tangent-space coordinates.</p>
+      <p>This avoids interpreting invalid Euclidean perturbations as physical states.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.153 Sensitivity to Time</h3>
+      <p>Time itself may be treated as an uncertain parameter.</p>
+      <p>Define</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_t = \frac{ \partial\mathbf x }{ \partial t }. }
+        \]
+      </div>
+      <p>Since</p>
+      <div class="equation-box">
+        \[
+        \frac{d\mathbf x}{dt} = \mathbf f,
+        \]
+      </div>
+      <p>local time sensitivity is closely related to the state derivative.</p>
+      <p>This becomes important in timestamp-error estimation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.154 Time-Bias Measurement Sensitivity</h3>
+      <p>If a measurement has timing bias</p>
+      <div class="equation-box">
+        \[
+        \Delta t,
+        \]
+      </div>
+      <p>then approximately</p>
+      <div class="equation-box">
+        \[
+        h[ \mathbf x(t+\Delta t) ] \approx h[ \mathbf x(t) ] + \frac{\partial h}{\partial\mathbf x} \dot{\mathbf x} \Delta t.
+        \]
+      </div>
+      <p>Therefore,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial h}{\partial\Delta t} \approx \mathbf H \dot{\mathbf x}. }
+        \]
+      </div>
+      <p>This gives a simple timing-sensitivity relation.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.155 Sensitivity to Frame Misalignment</h3>
+      <p>Suppose a sensor frame is misaligned by small angle</p>
+      <div class="equation-box">
+        \[
+        \delta\boldsymbol{\alpha}.
+        \]
+      </div>
+      <p>A measurement vector transformed by a rotation matrix will have sensitivity</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial\mathbf z} {\partial\boldsymbol{\alpha}}. }
+        \]
+      </div>
+      <p>Such derivatives can be included in the estimation design matrix for alignment calibration.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.156 Sensitivity to Scale Factors</h3>
+      <p>Suppose a sensor reports</p>
+      <div class="equation-box">
+        \[
+        \mathbf z = (\mathbf I+\mathbf S) \mathbf z_{true} + \mathbf b.
+        \]
+      </div>
+      <p>Sensitivity to scale-factor parameter <code>s_i</code> can be obtained analytically.</p>
+      <p>Thus scale-factor calibration can be combined with trajectory sensitivity if sufficient measurement excitation exists.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.157 Local Sensitivity versus Global Sensitivity</h3>
+      <p>STM-based analysis is a <strong>local sensitivity method</strong>.</p>
+      <p>It asks:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{What happens for infinitesimal or small perturbations near this nominal trajectory?} }
+        \]
+      </div>
+      <p>Global sensitivity methods instead explore large parameter ranges and nonlinear interactions.</p>
+      <p>Examples include:</p>
+      <ul>
+        <li>large Monte Carlo campaigns,</li>
+        <li>variance-based sensitivity methods.</li>
+      </ul>
+      <p>Both serve different purposes.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.158 Why Local Sensitivity Is Still Extremely Valuable</h3>
+      <p>Even though local, STM methods are:</p>
+      <ul>
+        <li>computationally efficient,</li>
+        <li>mathematically interpretable,</li>
+        <li>directly compatible with covariance,</li>
+        <li>useful for optimization gradients,</li>
+        <li>useful for estimator design.</li>
+      </ul>
+      <p>Therefore they remain foundational in spacecraft dynamics.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.159 Practical STM Development Workflow</h3>
+      <p>A disciplined STM implementation workflow is:</p>
+      <ol>
+        <li>Define the state vector.</li>
+        <li>Define the nonlinear dynamics.</li>
+        <li>Define coordinate frames and units.</li>
+        <li>Derive</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \mathbf A = \frac{\partial\mathbf f}{\partial\mathbf x}.
+        \]
+      </div>
+      <ol>
+        <li>Check dimensions.</li>
+        <li>Initialize</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}_0=\mathbf I.
+        \]
+      </div>
+      <ol>
+        <li>Integrate state and STM together.</li>
+        <li>Check</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\Phi}(t_0,t_0)=\mathbf I.
+        \]
+      </div>
+      <ol>
+        <li>Compare selected STM columns with finite differences.</li>
+        <li>Test several perturbation magnitudes.</li>
+        <li>Check composition property.</li>
+        <li>Check inverse property when appropriate.</li>
+        <li>Tighten integrator tolerance.</li>
+        <li>Check sensitivity convergence.</li>
+        <li>Examine STM singular values.</li>
+        <li>Examine condition number.</li>
+        <li>Apply state scaling if required.</li>
+        <li>Propagate covariance.</li>
+        <li>Compare covariance with Monte Carlo.</li>
+        <li>Validate over representative trajectory regimes.</li>
+      </ol>
+      <p><strong>Engineering interpretation:</strong> The verification steps are not optional bookkeeping. An STM can look smooth and numerically well behaved while still containing a sign, ordering, unit, or frame error that later corrupts estimation and covariance results.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.160 Practical Parameter-Sensitivity Workflow</h3>
+      <p>For parameter vector</p>
+      <div class="equation-box">
+        \[
+        \boldsymbol{\theta},
+        \]
+      </div>
+      <p>use:</p>
+      <ol>
+        <li>Define the parameters.</li>
+        <li>Derive</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \mathbf E = \frac{\partial\mathbf f} {\partial\boldsymbol{\theta}}.
+        \]
+      </div>
+      <ol>
+        <li>Initialize</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \mathbf S_\theta(t_0).
+        \]
+      </div>
+      <ol>
+        <li>Integrate</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta + \mathbf E.
+        \]
+      </div>
+      <ol>
+        <li>Compare with finite-difference parameter perturbations.</li>
+        <li>Compute measurement sensitivity.</li>
+        <li>Examine rank.</li>
+        <li>Examine parameter correlations.</li>
+        <li>Examine sensitivity versus time.</li>
+        <li>Determine whether the measurement arc can identify the parameter.</li>
+        <li>Compare predicted uncertainty with Monte Carlo.</li>
+        <li>Check physical plausibility.</li>
+      </ol>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.161 Practical Measurement-Sensitivity Workflow</h3>
+      <p>For each observation epoch <code>k</code>:</p>
+      <ol>
+        <li>Propagate the state.</li>
+        <li>Propagate the STM.</li>
+        <li>Compute predicted measurement.</li>
+        <li>Compute</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \mathbf H_k = \frac{\partial h_k}{\partial\mathbf x_k}.
+        \]
+      </div>
+      <ol>
+        <li>Form</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf G_k = \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </div>
+      <ol>
+        <li>Add direct parameter terms.</li>
+        <li>Stack the design matrix.</li>
+        <li>Weight using</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \mathbf R_k^{-1}.
+        \]
+      </div>
+      <ol>
+        <li>Examine rank.</li>
+        <li>Examine singular values.</li>
+        <li>Examine information contributions.</li>
+        <li>Use the result in estimation or observability analysis.</li>
+      </ol>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.162 Complete Sensitivity Architecture</h3>
+      <div class="equation-box">
+        \[
+        \boxed{ \begin{array}{c} \text{Nominal State and Parameters} \\ \downarrow\\ \dot{\mathbf x} = \mathbf f( \mathbf x,\boldsymbol{\theta},\mathbf u,t ) \\ \downarrow\\ \text{Dynamics Jacobians} \\ \mathbf A = \frac{\partial\mathbf f}{\partial\mathbf x}, \qquad \mathbf B = \frac{\partial\mathbf f}{\partial\mathbf u}, \qquad \mathbf E = \frac{\partial\mathbf f}{\partial\boldsymbol{\theta}} \\ \downarrow\\ \text{Variational Equations} \\ \dot{\boldsymbol{\Phi}} = \mathbf A\boldsymbol{\Phi} \\ \dot{\mathbf S}_\theta = \mathbf A\mathbf S_\theta+\mathbf E \\ \downarrow\\ \text{Trajectory Sensitivity} \\ \downarrow\\ \text{Measurement Jacobian} \\ \mathbf H = \frac{\partial h}{\partial\mathbf x} \\ \downarrow\\ \text{Dynamic Measurement Sensitivity} \\ \mathbf G = \mathbf H\boldsymbol{\Phi} \\ \downarrow\\ \text{Estimation / Covariance / Guidance / Targeting / Observability} \end{array} }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.163 Common Implementation Errors</h3>
+      <p>Common problems include:</p>
+      <ul>
+        <li>incorrect Jacobian signs,</li>
+        <li>missing state coupling,</li>
+        <li>incorrect STM initialization,</li>
+        <li>transposed sensitivity matrices,</li>
+        <li>inconsistent state ordering,</li>
+        <li>inconsistent coordinate frames,</li>
+        <li>unit mismatch,</li>
+        <li>incorrect parameter derivatives,</li>
+        <li>finite-difference step too large,</li>
+        <li>finite-difference step too small,</li>
+        <li>loose integration tolerances,</li>
+        <li>ignoring discontinuities,</li>
+        <li>using the wrong STM reference epoch,</li>
+        <li>explicit matrix inversion,</li>
+        <li>ignoring poor conditioning.</li>
+      </ul>
+      <p>These errors can produce apparently reasonable trajectories while corrupting covariance and estimation results.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.164 Debugging Checklist</h3>
+      <p>If the STM appears wrong, check:</p>
+      <ol>
+        <li>Is</li>
+      </ol>
+      <div class="equation-box">
+        \[
+        \Phi(t_0,t_0)=I?
+        \]
+      </div>
+      <ol>
+        <li>Is the state ordering identical in <code>\mathbf x</code>, <code>\mathbf A</code>, and <code>\Phi</code>?</li>
+        <li>Are units consistent?</li>
+        <li>Are frames consistent?</li>
+        <li>Does one STM column match a finite-difference perturbation?</li>
+        <li>Does central differencing agree with forward differencing?</li>
+        <li>Does changing perturbation size produce convergence?</li>
+        <li>Does tightening integrator tolerance change the result?</li>
+        <li>Does composition hold?</li>
+        <li>Does the inverse property hold?</li>
+        <li>Are maneuver jumps handled?</li>
+        <li>Are parameter sensitivities initialized correctly?</li>
+        <li>Is the dynamics Jacobian evaluated along the correct nominal trajectory?</li>
+      </ol>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.165 Key Equations</h3>
+      <h4>Nonlinear dynamics</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\mathbf x} = \mathbf f( \mathbf x,\mathbf u,\boldsymbol{\theta},t ) }
+        \]
+      </div>
+      <h4>Perturbation dynamics</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf A\delta\mathbf x + \mathbf B\delta\mathbf u + \mathbf E\delta\boldsymbol{\theta} }
+        \]
+      </div>
+      <h4>Dynamics Jacobian</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A = \frac{\partial\mathbf f}{\partial\mathbf x} }
+        \]
+      </div>
+      <h4>STM definition</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t_0) = \frac{ \partial\mathbf x(t) }{ \partial\mathbf x(t_0) } }
+        \]
+      </div>
+      <h4>Perturbation propagation</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x(t) = \boldsymbol{\Phi}(t,t_0) \delta\mathbf x_0 }
+        \]
+      </div>
+      <h4>STM differential equation</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\boldsymbol{\Phi}} = \mathbf A\boldsymbol{\Phi} }
+        \]
+      </div>
+      <h4>STM initial condition</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_0,t_0) = \mathbf I }
+        \]
+      </div>
+      <h4>Composition property</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_2,t_0) = \boldsymbol{\Phi}(t_2,t_1) \boldsymbol{\Phi}(t_1,t_0) }
+        \]
+      </div>
+      <h4>Inverse property</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_0,t) = \boldsymbol{\Phi}(t,t_0)^{-1} }
+        \]
+      </div>
+      <h4>Deterministic covariance propagation</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P(t) = \boldsymbol{\Phi} \mathbf P_0 \boldsymbol{\Phi}^T }
+        \]
+      </div>
+      <h4>Discrete covariance prediction</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P_{k+1}^{-} = \mathbf F_k \mathbf P_k^{+} \mathbf F_k^T + \mathbf Q_k }
+        \]
+      </div>
+      <h4>Parameter sensitivity</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta = \frac{ \partial\mathbf x }{ \partial\boldsymbol{\theta} } }
+        \]
+      </div>
+      <h4>Parameter-sensitivity differential equation</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta + \mathbf E }
+        \]
+      </div>
+      <h4>Measurement Jacobian</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf H_k = \frac{ \partial h_k }{ \partial\mathbf x_k } }
+        \]
+      </div>
+      <h4>Dynamic measurement sensitivity</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf G_k = \mathbf H_k \boldsymbol{\Phi}_{k,0} }
+        \]
+      </div>
+      <h4>Parameter measurement sensitivity</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \frac{\partial h_k} {\partial\boldsymbol{\theta}} = \mathbf H_k \mathbf S_{\theta,k} + \left. \frac{\partial h_k} {\partial\boldsymbol{\theta}} \right|_{direct} }
+        \]
+      </div>
+      <h4>Control perturbation response</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x(t) = \boldsymbol{\Phi}(t,t_0)\delta\mathbf x_0 + \int_{t_0}^{t} \boldsymbol{\Phi}(t,\tau) \mathbf B(\tau) \delta\mathbf u(\tau) \,d\tau }
+        \]
+      </div>
+      <h4>Finite-difference STM column</h4>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}_{:,j} \approx \frac{ \mathbf x( t;\mathbf x_0+\Delta x_j\mathbf e_j ) - \mathbf x( t;\mathbf x_0-\Delta x_j\mathbf e_j ) }{ 2\Delta x_j } }
+        \]
+      </div>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.166 Key Takeaways</h3>
+      <p>The <strong>State Transition Matrix</strong> is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t_0) = \frac{ \partial\mathbf x(t) }{ \partial\mathbf x(t_0) }. }
+        \]
+      </div>
+      <p>It describes how small perturbations in the reference state propagate through spacecraft dynamics:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\mathbf x(t) = \boldsymbol{\Phi}(t,t_0) \delta\mathbf x_0. }
+        \]
+      </div>
+      <p>For nonlinear dynamics,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\mathbf x} = \mathbf f(\mathbf x,t), }
+        \]
+      </div>
+      <p>the local perturbation system is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \delta\dot{\mathbf x} = \mathbf A(t)\delta\mathbf x, }
+        \]
+      </div>
+      <p>with</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf A = \frac{\partial\mathbf f}{\partial\mathbf x}. }
+        \]
+      </div>
+      <p>The STM therefore satisfies</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\boldsymbol{\Phi}} = \mathbf A \boldsymbol{\Phi}, \qquad \boldsymbol{\Phi}(t_0,t_0)=\mathbf I. }
+        \]
+      </div>
+      <p>Its most important structural properties are</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t,t)=\mathbf I, }
+        \]
+      </div>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_2,t_0) = \boldsymbol{\Phi}(t_2,t_1) \boldsymbol{\Phi}(t_1,t_0), }
+        \]
+      </div>
+      <p>and</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \boldsymbol{\Phi}(t_0,t) = \boldsymbol{\Phi}(t,t_0)^{-1}. }
+        \]
+      </div>
+      <p>The STM is the foundation of covariance propagation:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf P(t) = \boldsymbol{\Phi} \mathbf P_0 \boldsymbol{\Phi}^T. }
+        \]
+      </div>
+      <p>It also connects later measurements to a reference state:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf G_k = \mathbf H_k \boldsymbol{\Phi}_{k,0}. }
+        \]
+      </div>
+      <p>Thus,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Measurement Sensitivity} = \text{Sensor Sensitivity} \times \text{Dynamic Sensitivity}. }
+        \]
+      </div>
+      <p>Parameter sensitivity is</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \mathbf S_\theta = \frac{\partial\mathbf x}{\partial\boldsymbol{\theta}}, }
+        \]
+      </div>
+      <p>and satisfies</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta + \mathbf E. }
+        \]
+      </div>
+      <p>Therefore the same sensitivity framework can describe:</p>
+      <ul>
+        <li>initial-state uncertainty,</li>
+        <li>physical parameters,</li>
+        <li>sensor biases,</li>
+        <li>maneuver magnitude,</li>
+        <li>burn timing,</li>
+        <li>control inputs.</li>
+      </ul>
+      <p>Sensitivity matrices provide the mathematical link among</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Dynamics} \leftrightarrow \text{Estimation} \leftrightarrow \text{Covariance} \leftrightarrow \text{Observability} \leftrightarrow \text{Guidance} \leftrightarrow \text{Trajectory Optimization}. }
+        \]
+      </div>
+      <p>A crucial engineering principle is:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{The STM Is a Local Linear Description of a Nonlinear Trajectory}. }
+        \]
+      </div>
+      <p>It should therefore be verified against nonlinear propagation and finite differences.</p>
+      <p>Another key point is:</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Large Sensitivity Does Not Automatically Mean Large Uncertainty}. }
+        \]
+      </div>
+      <p>Actual uncertainty impact depends on both</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensitivity} \times \text{Magnitude of Input Uncertainty}. }
+        \]
+      </div>
+      <p>Finally,</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \text{Sensitivity Analysis Does Not Create Information}. }
+        \]
+      </div>
+      <p>It tells us how existing uncertainty, measurement information, control authority, and physical parameters propagate through the spacecraft system.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h3>4.3.8.167 What Comes Next</h3>
+      <p>The STM tells us how perturbations propagate:</p>
+      <div class="equation-box">
+        \[
+        \delta\mathbf x(t) = \boldsymbol{\Phi} \delta\mathbf x_0.
+        \]
+      </div>
+      <p>Therefore if the reference state has covariance</p>
+      <div class="equation-box">
+        \[
+        \mathbf P_0,
+        \]
+      </div>
+      <p>the later covariance becomes</p>
+      <div class="equation-box">
+        \[
+        \mathbf P(t) = \boldsymbol{\Phi} \mathbf P_0 \boldsymbol{\Phi}^T.
+        \]
+      </div>
+      <p>But spacecraft estimation requires much more than simply propagating one covariance matrix.</p>
+      <p>We must understand:</p>
+      <ul>
+        <li>how variances and covariances evolve,</li>
+        <li>how uncertainty ellipsoids are interpreted,</li>
+        <li>how cross-correlations arise,</li>
+        <li>how process noise is accumulated,</li>
+        <li>how uncertainty transforms between coordinate frames,</li>
+        <li>how covariance is propagated through nonlinear functions,</li>
+        <li>how covariance consistency is checked,</li>
+        <li>how confidence ellipsoids are formed,</li>
+        <li>how covariance reveals coupling and weak estimation directions.</li>
+      </ul>
+      <p>This leads directly to</p>
+      <div class="equation-box">
+        \[
+        \boxed{ \textbf{4.3.9 Covariance Analysis and Error Propagation} }
+        \]
+      </div>
+      <p>where the next section should develop:</p>
+      <ul>
+        <li>covariance definition,</li>
+        <li>variance and cross-covariance,</li>
+        <li>covariance-matrix properties,</li>
+        <li>covariance propagation with the STM,</li>
+        <li>process-noise contribution,</li>
+        <li>continuous and discrete covariance equations,</li>
+        <li>covariance transformation through nonlinear functions,</li>
+        <li>Jacobian-based error propagation,</li>
+        <li>uncertainty ellipses and ellipsoids,</li>
+        <li>eigenvalues and eigenvectors,</li>
+        <li>principal axes,</li>
+        <li>correlation coefficients,</li>
+        <li>confidence regions,</li>
+        <li>covariance conditioning,</li>
+        <li>covariance consistency,</li>
+        <li>covariance intersection concepts,</li>
+        <li>cross-covariance,</li>
+        <li>relative-state covariance,</li>
+        <li>position and velocity covariance,</li>
+        <li>attitude covariance,</li>
+        <li>Monte Carlo verification,</li>
+        <li>and the role of covariance in navigation, orbit determination, filtering, smoothing, sensor fusion, and general RPO uncertainty analysis.</li>
+      </ul>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Next: 4.3.9 Covariance Analysis and Error Propagation</h2>
+
+      <p>
+        State-transition and sensitivity matrices show how small perturbations propagate through
+        the dynamics. The next step is to understand how entire uncertainty distributions and
+        covariance structures evolve, transform, accumulate process noise, and reveal coupling
+        between state components.
+      </p>
+
+      <p>
+        The next section develops variance and covariance, cross-covariance, covariance-matrix
+        properties, STM-based covariance propagation, continuous and discrete process-noise
+        accumulation, nonlinear Jacobian error propagation, uncertainty ellipses and ellipsoids,
+        principal axes, confidence regions, correlation coefficients, covariance conditioning
+        and consistency, Monte Carlo verification, and general spacecraft navigation applications.
+      </p>
+
+      <a href="covariance-analysis-and-error-propagation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.9 Covariance Analysis and Error Propagation</h3>
+
+          <p>
+            Covariance definition, error propagation, process noise, coordinate transformations,
+            uncertainty ellipsoids, correlation, confidence regions, cross-covariance,
+            numerical conditioning, consistency, Monte Carlo validation, and navigation use.
+          </p>
+
+          <p class="sensor-link-arrow">
+            Continue to Covariance Analysis and Error Propagation &rarr;
+          </p>
+        </div>
+      </a>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      orbit determination, uncertainty analysis, and spacecraft navigation.
+    </p>
+  </footer>
+
+</body>
+</html>
