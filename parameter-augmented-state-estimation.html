@@ -1,0 +1,2331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.3.10 Parameter and Augmented-State Estimation | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .table-wrap { width:100%; overflow-x:auto; margin:1rem 0 1.4rem; }
+    .table-wrap table { width:100%; border-collapse:collapse; }
+    .table-wrap th, .table-wrap td { border:1px solid #d8dee6; padding:0.75rem 0.85rem; text-align:left; vertical-align:top; }
+    .table-wrap th { font-weight:700; background:#f7f9fb; }
+    .engineering-note { margin:1rem 0; padding:0.95rem 1.05rem; background:#f7f9fb; border-left:4px solid #9bb8d3; }
+    .equation-note { margin-top:0.35rem; color:#475569; }
+    .notes-section-card h4 { margin-top:1.25rem; margin-bottom:0.55rem; }
+    .notes-section-card .math.display { display:block; overflow-x:auto; padding:0.15rem 0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Parameter and Augmented-State Estimation</h1>
+    <p class="notes-tagline">
+      Static and slowly varying parameters, augmented states, sensor biases, calibration coefficients,
+      ballistic coefficient, nuisance parameters, parameter observability and identifiability,
+      state–parameter correlation, covariance propagation, and practical spacecraft estimation architecture.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.3.10 Parameter and Augmented-State Estimation</h2>
+<p>State estimation often begins by estimating only the dynamic state of
+a spacecraft, such as position, velocity, attitude, and angular rate. In
+many practical navigation and GNC problems, however, important
+quantities that influence the dynamics or measurements are not known
+exactly.</p>
+<p>These quantities may include:</p>
+<ul>
+<li>static physical parameters,</li>
+<li>slowly varying dynamic parameters,</li>
+<li>sensor biases,</li>
+<li>calibration coefficients,</li>
+<li>ballistic coefficient,</li>
+<li>drag-related parameters,</li>
+<li>scale factors,</li>
+<li>alignment errors,</li>
+<li>timing offsets,</li>
+<li>environmental parameters,</li>
+<li>nuisance parameters.</li>
+</ul>
+<p>Instead of treating these quantities as perfectly known constants,
+they can be incorporated into an <strong>augmented state vector</strong>
+and estimated together with the spacecraft state.</p>
+<p>If the original dynamic state is</p>
+<p><span class="math display">\[
+\mathbf x
+\]</span></p>
+<p>and the uncertain parameter vector is</p>
+<p><span class="math display">\[
+\boldsymbol\theta,
+\]</span></p>
+<p>the augmented state becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol\theta
+\end{bmatrix} }
+\]</span></p>
+<p>The estimator then solves simultaneously for the physical state and
+for the uncertain parameters that influence the dynamics or
+measurements.</p>
+<p>The central concept is therefore</p>
+<p><span class="math display">\[
+\boxed{ \text{Dynamic State} + \text{Unknown Parameters} \rightarrow
+\text{Augmented-State Estimation} }
+\]</span></p>
+<p>This is widely used in spacecraft navigation, orbit determination,
+attitude estimation, sensor calibration, atmospheric-drag estimation,
+autonomous navigation, relative navigation, system identification, and
+post-flight trajectory reconstruction.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.1 Why Estimate Parameters?</h3>
+<p>Suppose the spacecraft dynamics are written as</p>
+<p><span class="math display">\[
+\dot{\mathbf x} = f(\mathbf x,\boldsymbol\theta,t)
+\]</span></p>
+<p>and the measurements are</p>
+<p><span class="math display">\[
+\mathbf z_k = h(\mathbf x_k,\boldsymbol\theta,t_k) + \mathbf v_k.
+\]</span></p>
+<p>If the parameter vector</p>
+<p><span class="math display">\[
+\boldsymbol\theta
+\]</span></p>
+<p>is assumed known but is actually incorrect, the estimator may
+attribute the resulting mismatch to errors in the dynamic state.</p>
+<p>For example, an incorrect drag coefficient may appear as a position
+or velocity error.</p>
+<p>Similarly, a gyro bias may appear as a persistent attitude-rate
+error.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Incorrect Fixed Parameter} \rightarrow \text{Potential
+State-Estimation Bias} }
+\]</span></p>
+<p>Estimating the uncertain parameter can reduce this systematic
+error.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.2 State versus Parameter</h3>
+<p>A <strong>state</strong> is normally a quantity required to describe
+the instantaneous dynamical condition of the system.</p>
+<p>Examples include</p>
+<p><span class="math display">\[
+\mathbf r,\quad \mathbf v,\quad \mathbf q,\quad \boldsymbol\omega.
+\]</span></p>
+<p>A <strong>parameter</strong> is usually a physical or calibration
+quantity that influences the system but may not have fast dynamics of
+its own.</p>
+<p>Examples include</p>
+<p><span class="math display">\[
+C_D,\quad B,\quad b_g,\quad s_a,\quad \Delta t.
+\]</span></p>
+<p>However, in estimation theory the distinction is flexible.</p>
+<p>Once a parameter is included in the estimator, it becomes part of the
+mathematical state vector.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimated Parameter} \rightarrow \text{Augmented State
+Component} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.3 General Augmented State</h3>
+<p>Suppose the navigation state is</p>
+<p><span class="math display">\[
+\mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}
+\]</span></p>
+<p>and the uncertain parameters are</p>
+<p><span class="math display">\[
+\boldsymbol\theta = \begin{bmatrix} \theta_1\\ \theta_2\\ \vdots\\
+\theta_p \end{bmatrix}.
+\]</span></p>
+<p>Then the augmented state is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \theta_1\\
+\theta_2\\ \vdots\\ \theta_p \end{bmatrix} }
+\]</span></p>
+<p>with dimension</p>
+<p><span class="math display">\[
+n_a=n+p.
+\]</span></p>
+<p>The estimator must propagate not only the state but also the
+uncertainty and correlation associated with the parameters.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.4 Static Parameter Model</h3>
+<p>A truly constant parameter can be modeled as</p>
+<p><span class="math display">\[
+\boxed{ \dot{\theta}=0 }
+\]</span></p>
+<p>or in discrete time,</p>
+<p><span class="math display">\[
+\boxed{ \theta_{k+1}=\theta_k. }
+\]</span></p>
+<p>This states that the best dynamic model for the parameter is
+constant.</p>
+<p>Examples may include approximately constant:</p>
+<ul>
+<li>geometric calibration constants,</li>
+<li>fixed scale factors,</li>
+<li>constant alignment angles,</li>
+<li>fixed mass parameters over a short arc,</li>
+<li>constant sensor offsets over a limited interval.</li>
+</ul>
+<p>The parameter can still be estimated because measurements provide
+information about it even though its nominal time derivative is
+zero.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.5 Slowly Varying Parameter Model</h3>
+<p>Many quantities are not perfectly constant.</p>
+<p>A simple slowly varying model is</p>
+<p><span class="math display">\[
+\boxed{ \theta_{k+1} = \theta_k+w_{\theta,k} }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+w_{\theta,k}\sim\mathcal N(0,Q_\theta).
+\]</span></p>
+<p>This is a random-walk model.</p>
+<p>In continuous time,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\theta} = w_\theta(t). }
+\]</span></p>
+<p>The corresponding process noise allows the estimator to adapt
+gradually as the real parameter changes.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.6 Why Process Noise Is Added to Parameters</h3>
+<p>If</p>
+<p><span class="math display">\[
+Q_\theta=0,
+\]</span></p>
+<p>the estimator assumes that the parameter is perfectly constant.</p>
+<p>If the real parameter changes, the estimator may no longer track it
+correctly.</p>
+<p>Adding</p>
+<p><span class="math display">\[
+Q_\theta&gt;0
+\]</span></p>
+<p>allows slow evolution.</p>
+<p>However, too much process noise can make the estimated parameter
+fluctuate excessively.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ Q_\theta \text{ controls how rapidly the estimator allows the
+parameter to change.} }
+\]</span></p>
+<p>This is one of the most important tuning decisions in augmented-state
+estimation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.7 Random-Walk Parameter Model</h3>
+<p>For a scalar parameter,</p>
+<p><span class="math display">\[
+\boxed{ \theta_{k+1} = \theta_k+w_k }
+\]</span></p>
+<p>with</p>
+<p><span class="math display">\[
+w_k\sim\mathcal N(0,q_\theta).
+\]</span></p>
+<p>The variance grows over time when no measurements constrain the
+parameter.</p>
+<p>This model is useful for quantities expected to drift slowly without
+a preferred nominal value.</p>
+<p>Typical examples include:</p>
+<ul>
+<li>slowly drifting sensor bias,</li>
+<li>uncertain drag-related coefficient,</li>
+<li>calibration drift,</li>
+<li>environmental parameters.</li>
+</ul>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.8 First-Order Gauss-Markov Parameter Model</h3>
+<p>A parameter that tends to remain near a nominal value can be
+represented using a first-order Gauss-Markov process:</p>
+<p><span class="math display">\[
+\boxed{ \dot{\theta} = -\frac{1}{\tau} (\theta-\bar{\theta}) + w_\theta.
+}
+\]</span></p>
+<p>Here,</p>
+<p><span class="math display">\[
+\tau
+\]</span></p>
+<p>is the correlation time, and</p>
+<p><span class="math display">\[
+\bar{\theta}
+\]</span></p>
+<p>is the long-term nominal value.</p>
+<p>In discrete form,</p>
+<p><span class="math display">\[
+\boxed{ \theta_{k+1} = \bar{\theta} + e^{-\Delta t/\tau}
+(\theta_k-\bar{\theta}) + w_k. }
+\]</span></p>
+<p>This model is often more physically realistic than a pure random walk
+when the parameter exhibits bounded temporal correlation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.9 Augmented Dynamics</h3>
+<p>For</p>
+<p><span class="math display">\[
+\mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol\theta
+\end{bmatrix},
+\]</span></p>
+<p>the augmented dynamics become</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf x}_a = \begin{bmatrix} f(\mathbf
+x,\boldsymbol\theta,t)\\ g(\boldsymbol\theta,t) \end{bmatrix} }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+g(\boldsymbol\theta,t)
+\]</span></p>
+<p>describes the chosen parameter dynamics.</p>
+<p>For static parameters,</p>
+<p><span class="math display">\[
+g=0.
+\]</span></p>
+<p>For random-walk parameters,</p>
+<p><span class="math display">\[
+g=w_\theta.
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.10 Augmented State Jacobian</h3>
+<p>The linearized augmented system matrix becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf A_a = \frac{\partial f_a}{\partial \mathbf x_a} }
+\]</span></p>
+<p>which often has block structure</p>
+<p><span class="math display">\[
+\boxed{ \mathbf A_a = \begin{bmatrix} \frac{\partial f}{\partial \mathbf
+x} &amp; \frac{\partial f}{\partial\boldsymbol\theta} \\ \mathbf 0 &amp;
+\frac{\partial g}{\partial\boldsymbol\theta} \end{bmatrix}. }
+\]</span></p>
+<p>The block</p>
+<p><span class="math display">\[
+\frac{\partial f}{\partial\boldsymbol\theta}
+\]</span></p>
+<p>is especially important because it describes how parameter errors
+affect state dynamics.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.11 Augmented Measurement Model</h3>
+<p>The measurement model becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h( \mathbf x_k, \boldsymbol\theta_k ) + \mathbf
+v_k. }
+\]</span></p>
+<p>The augmented measurement Jacobian is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H_a = \begin{bmatrix} \frac{\partial h}{\partial\mathbf
+x} &amp; \frac{\partial h}{\partial\boldsymbol\theta} \end{bmatrix}. }
+\]</span></p>
+<p>A parameter can be estimated only if it influences the measurements
+directly or indirectly through the dynamics.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.12 Direct and Indirect Parameter Observability</h3>
+<p>A parameter may enter the measurement model directly:</p>
+<p><span class="math display">\[
+z=h(\mathbf x,\theta).
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\frac{\partial h}{\partial\theta}\neq0.
+\]</span></p>
+<p>This provides <strong>direct measurement sensitivity</strong>.</p>
+<p>Alternatively, a parameter may influence only the dynamics:</p>
+<p><span class="math display">\[
+\dot{\mathbf x}=f(\mathbf x,\theta)
+\]</span></p>
+<p>while</p>
+<p><span class="math display">\[
+h=h(\mathbf x).
+\]</span></p>
+<p>Then the parameter becomes observable only through its effect on the
+propagated state.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Parameter Observability} = \text{Direct Measurement
+Sensitivity} + \text{Dynamic Sensitivity} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.13 Parameter Sensitivity</h3>
+<p>The sensitivity of the state with respect to a parameter is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf S_\theta = \frac{\partial\mathbf x} {\partial\theta}. }
+\]</span></p>
+<p>If this sensitivity is nearly zero, changes in the parameter barely
+affect the state.</p>
+<p>The parameter will then be difficult to estimate.</p>
+<p>If</p>
+<p><span class="math display">\[
+\left\| \frac{\partial\mathbf x} {\partial\theta} \right\|
+\]</span></p>
+<p>is significant, the trajectory carries information about that
+parameter.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.14 Sensitivity Dynamics</h3>
+<p>Starting with</p>
+<p><span class="math display">\[
+\dot{\mathbf x}=f(\mathbf x,\theta,t),
+\]</span></p>
+<p>differentiate with respect to <code>\theta</code>:</p>
+<p><span class="math display">\[
+\frac{d}{dt} \left( \frac{\partial\mathbf x}{\partial\theta} \right) =
+\frac{\partial f}{\partial\mathbf x} \frac{\partial\mathbf
+x}{\partial\theta} + \frac{\partial f}{\partial\theta}.
+\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta + \mathbf
+B_\theta }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\mathbf B_\theta = \frac{\partial f}{\partial\theta}.
+\]</span></p>
+<p>This equation is fundamental to parameter estimation and system
+identification.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.15 Parameter Covariance</h3>
+<p>For the augmented state,</p>
+<p><span class="math display">\[
+\mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol\theta
+\end{bmatrix},
+\]</span></p>
+<p>the covariance becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_a = \begin{bmatrix} \mathbf P_{xx} &amp; \mathbf
+P_{x\theta} \\ \mathbf P_{\theta x} &amp; \mathbf P_{\theta\theta}
+\end{bmatrix}. }
+\]</span></p>
+<p>Here,</p>
+<p><span class="math display">\[
+\mathbf P_{xx}
+\]</span></p>
+<p>represents state uncertainty,</p>
+<p><span class="math display">\[
+\mathbf P_{\theta\theta}
+\]</span></p>
+<p>represents parameter uncertainty, and</p>
+<p><span class="math display">\[
+\mathbf P_{x\theta}
+\]</span></p>
+<p>represents state-parameter correlation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.16 Why State-Parameter Correlation Matters</h3>
+<p>Suppose an error in a parameter produces a trajectory error similar
+to an error in the initial state.</p>
+<p>Then the estimator may be unable to distinguish between them
+immediately.</p>
+<p>The resulting covariance contains strong cross-correlation:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_{x\theta}\neq0. }
+\]</span></p>
+<p>This correlation is physically meaningful.</p>
+<p>It indicates that uncertainty in the state and uncertainty in the
+parameter are not independent.</p>
+<p>Ignoring this correlation can lead to inconsistent uncertainty
+estimates.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.17 Example: Position versus Dynamic Parameter Correlation</h3>
+<p>Suppose an uncertain parameter changes acceleration.</p>
+<p>A small acceleration error accumulated over time produces velocity
+error:</p>
+<p><span class="math display">\[
+\delta v \approx \delta a\,\Delta t
+\]</span></p>
+<p>and then position error:</p>
+<p><span class="math display">\[
+\delta r \approx \frac12\delta a\,\Delta t^2.
+\]</span></p>
+<p>Therefore the parameter becomes correlated with both velocity and
+position.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Parameter Error} \rightarrow \text{Acceleration Error}
+\rightarrow \text{Velocity Error} \rightarrow \text{Position Error} }
+\]</span></p>
+<p>This is why long observation arcs can sometimes improve
+dynamic-parameter estimation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.18 Sensor Bias as an Augmented State</h3>
+<p>A common application is sensor-bias estimation.</p>
+<p>Suppose a gyro measurement is</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\omega_m = \boldsymbol\omega + \mathbf b_g + \mathbf
+n_g. }
+\]</span></p>
+<p>Here,</p>
+<p><span class="math display">\[
+\mathbf b_g
+\]</span></p>
+<p>is gyro bias and</p>
+<p><span class="math display">\[
+\mathbf n_g
+\]</span></p>
+<p>is measurement noise.</p>
+<p>Augment the state:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \mathbf b_g
+\end{bmatrix}. }
+\]</span></p>
+<p>The estimator then attempts to separate true angular rate from sensor
+bias.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.19 Gyro Bias Dynamics</h3>
+<p>A simple model is</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf b}_g = \mathbf w_b. }
+\]</span></p>
+<p>This random-walk model allows the bias to drift.</p>
+<p>Alternatively,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf b}_g = -\frac{1}{\tau_b} \mathbf b_g + \mathbf w_b
+}
+\]</span></p>
+<p>may be used for a Gauss-Markov bias model.</p>
+<p>The correct model depends on the sensor behavior and time scale of
+interest.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.20 Accelerometer Bias Estimation</h3>
+<p>An accelerometer measurement may be written</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_m = \mathbf a + \mathbf b_a + \mathbf n_a. }
+\]</span></p>
+<p>The augmented state may include</p>
+<p><span class="math display">\[
+\mathbf b_a.
+\]</span></p>
+<p>Because accelerometer bias integrates into velocity and position
+error,</p>
+<p><span class="math display">\[
+\boxed{ \text{Accelerometer Bias} \rightarrow \text{Velocity Drift}
+\rightarrow \text{Position Drift} }
+\]</span></p>
+<p>its estimation can be very important in inertial-navigation
+systems.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.21 Sensor Scale Factor</h3>
+<p>A measurement may contain scale-factor error:</p>
+<p><span class="math display">\[
+\boxed{ z_m = (1+s)z_{\rm true} + b + n. }
+\]</span></p>
+<p>Here,</p>
+<p><span class="math display">\[
+s
+\]</span></p>
+<p>is scale-factor error.</p>
+<p>If <code>s</code> is uncertain, it may be added to the augmented
+state.</p>
+<p>However, estimating scale factor requires sufficient excitation in
+the measured quantity.</p>
+<p>If the true signal barely changes, scale factor may be difficult to
+distinguish from bias.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.22 Misalignment Parameters</h3>
+<p>Sensor axes may not be perfectly aligned with the spacecraft body
+frame.</p>
+<p>A small-angle misalignment can be represented as</p>
+<p><span class="math display">\[
+\boldsymbol\epsilon = \begin{bmatrix} \epsilon_x\\ \epsilon_y\\
+\epsilon_z \end{bmatrix}.
+\]</span></p>
+<p>For small angles,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf C_{\text{actual}} \approx (\mathbf
+I-[\boldsymbol\epsilon\times]) \mathbf C_{\text{nominal}}. }
+\]</span></p>
+<p>These alignment parameters may be calibrated on the ground or
+estimated in flight if the available motion and measurements provide
+sufficient information.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.23 Calibration Parameters</h3>
+<p>Calibration parameters may include:</p>
+<ul>
+<li>bias,</li>
+<li>scale factor,</li>
+<li>non-orthogonality,</li>
+<li>alignment,</li>
+<li>timing offset,</li>
+<li>sensor lever arm,</li>
+<li>temperature coefficient,</li>
+<li>range offset,</li>
+<li>camera focal-length correction.</li>
+</ul>
+<p>A general calibrated measurement may be expressed as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_m = h( \mathbf x, \boldsymbol\theta_{\rm cal} ) +
+\mathbf v. }
+\]</span></p>
+<p>The parameter vector</p>
+<p><span class="math display">\[
+\boldsymbol\theta_{\rm cal}
+\]</span></p>
+<p>can be augmented when in-flight calibration is required.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.24 Calibration versus Navigation State</h3>
+<p>Calibration and navigation states can become strongly correlated.</p>
+<p>For example:</p>
+<ul>
+<li>camera alignment error may appear as attitude error,</li>
+<li>range bias may appear as relative-position error,</li>
+<li>clock error may appear as range error,</li>
+<li>accelerometer bias may appear as velocity error.</li>
+</ul>
+<p>Therefore calibration estimation must be designed with observability
+in mind.</p>
+<p><span class="math display">\[
+\boxed{ \text{Successful Calibration} \neq \text{Simply Adding More
+States} }
+\]</span></p>
+<p>The measurements must contain enough independent information to
+separate the calibration parameter from the physical state.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.25 Ballistic Coefficient</h3>
+<p>A common orbit-determination parameter is the ballistic
+coefficient.</p>
+<p>One convention is</p>
+<p><span class="math display">\[
+\boxed{ B = \frac{m}{C_DA} }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>m</code> is spacecraft mass,</li>
+<li><code>C_D</code> is drag coefficient,</li>
+<li><code>A</code> is effective cross-sectional area.</li>
+</ul>
+<p>Another frequently used parameter is its inverse:</p>
+<p><span class="math display">\[
+\boxed{ \beta = \frac{C_DA}{m}. }
+\]</span></p>
+<p>The exact convention must always be stated because both definitions
+occur in the literature.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.26 Drag Acceleration and Ballistic Coefficient</h3>
+<p>A simplified drag acceleration is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_D = -\frac12 \rho \frac{C_DA}{m} v_{\rm rel}^2
+\hat{\mathbf v}_{\rm rel}. }
+\]</span></p>
+<p>Using</p>
+<p><span class="math display">\[
+B=\frac{m}{C_DA},
+\]</span></p>
+<p>this becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_D = -\frac12 \rho \frac{1}{B} v_{\rm rel}^2
+\hat{\mathbf v}_{\rm rel}. }
+\]</span></p>
+<p>Thus uncertainty in ballistic coefficient directly affects predicted
+drag acceleration.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.27 Why Estimate Ballistic Coefficient?</h3>
+<p>The effective ballistic coefficient may be uncertain because of:</p>
+<ul>
+<li>uncertainty in <code>C_D</code>,</li>
+<li>changing projected area,</li>
+<li>attitude changes,</li>
+<li>uncertain atmospheric density,</li>
+<li>imperfect spacecraft geometry,</li>
+<li>accommodation effects,</li>
+<li>mass uncertainty.</li>
+</ul>
+<p>Therefore a fixed nominal ballistic coefficient may not represent the
+actual long-term drag behavior.</p>
+<p>An estimator may augment</p>
+<p><span class="math display">\[
+B
+\]</span></p>
+<p>or</p>
+<p><span class="math display">\[
+C_D
+\]</span></p>
+<p>as a state.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.28 Ballistic Coefficient as a Static State</h3>
+<p>Over a short arc, one may assume</p>
+<p><span class="math display">\[
+\boxed{ \dot B=0. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+B
+\]</span></p>
+<p>is treated as constant but unknown.</p>
+<p>The estimator uses accumulated trajectory information to determine
+which value best explains the observed orbital motion.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.29 Ballistic Coefficient as a Slowly Varying State</h3>
+<p>For longer arcs,</p>
+<p><span class="math display">\[
+\boxed{ B_{k+1} = B_k+w_{B,k} }
+\]</span></p>
+<p>may be more appropriate.</p>
+<p>This allows the effective coefficient to adapt slowly.</p>
+<p>However, increasing</p>
+<p><span class="math display">\[
+Q_B
+\]</span></p>
+<p>too much can cause the filter to use ballistic coefficient as a
+generic correction term for model errors that actually originate
+elsewhere.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.30 Ballistic Coefficient versus Atmospheric Density</h3>
+<p>Drag depends approximately on</p>
+<p><span class="math display">\[
+\rho\frac{C_DA}{m}.
+\]</span></p>
+<p>Therefore errors in atmospheric density and errors in ballistic
+coefficient can produce similar trajectory effects.</p>
+<p>This can create strong correlation:</p>
+<p><span class="math display">\[
+\boxed{ \text{Atmospheric Density Error} \leftrightarrow
+\text{Ballistic-Coefficient Error} }
+\]</span></p>
+<p>Consequently, a fitted ballistic coefficient can sometimes absorb
+deficiencies in the atmospheric model.</p>
+<p>This must be considered when interpreting the physical meaning of the
+estimate.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.31 Effective Parameters</h3>
+<p>Sometimes the estimated parameter should be interpreted as an
+<strong>effective parameter</strong> rather than an exact physical
+constant.</p>
+<p>For example, an estimated drag coefficient may compensate
+simultaneously for:</p>
+<ul>
+<li>atmospheric-model error,</li>
+<li>attitude-dependent projected area,</li>
+<li>true drag-coefficient uncertainty,</li>
+<li>density-model deficiencies.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimated Effective Parameter} \neq \text{Necessarily a
+Pure Physical Constant} }
+\]</span></p>
+<p>This distinction is important in orbit determination and model
+validation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.32 Mass as an Estimated Parameter</h3>
+<p>Spacecraft mass influences dynamics whenever force is converted to
+acceleration:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a = \frac{\mathbf F}{m}. }
+\]</span></p>
+<p>Mass may be uncertain because of:</p>
+<ul>
+<li>propellant consumption,</li>
+<li>deployment events,</li>
+<li>payload changes,</li>
+<li>uncertain initial mass.</li>
+</ul>
+<p>If necessary, mass can be included as a parameter state.</p>
+<p>However, estimating mass requires motion that makes its effect
+distinguishable from force-model uncertainties.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.33 Center-of-Mass Parameters</h3>
+<p>For rotational dynamics,</p>
+<p><span class="math display">\[
+\boldsymbol\tau = \mathbf r\times\mathbf F.
+\]</span></p>
+<p>Uncertainty in center-of-mass position affects the lever arm</p>
+<p><span class="math display">\[
+\mathbf r.
+\]</span></p>
+<p>Therefore uncertain center-of-mass offsets may influence attitude
+dynamics and actuator calibration.</p>
+<p>Under suitable excitation, selected center-of-mass parameters may be
+estimated as augmented states.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.34 Inertia Parameters</h3>
+<p>Rigid-body attitude dynamics depend on</p>
+<p><span class="math display">\[
+\boxed{ \mathbf I\dot{\boldsymbol\omega} + \boldsymbol\omega\times
+(\mathbf I\boldsymbol\omega) = \boldsymbol\tau. }
+\]</span></p>
+<p>If inertia is poorly known, selected inertia coefficients may be
+estimated.</p>
+<p>However, all inertia terms may not be independently observable from
+available maneuvers.</p>
+<p>Parameterization should respect physical constraints such as
+symmetry:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf I=\mathbf I^T. }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.35 Actuator Calibration Parameters</h3>
+<p>Actuator models may contain uncertain parameters such as:</p>
+<ul>
+<li>thrust scale factor,</li>
+<li>torque scale factor,</li>
+<li>misalignment,</li>
+<li>deadband,</li>
+<li>delay,</li>
+<li>minimum impulse,</li>
+<li>wheel torque calibration.</li>
+</ul>
+<p>A commanded actuator input</p>
+<p><span class="math display">\[
+u_c
+\]</span></p>
+<p>may produce actual output</p>
+<p><span class="math display">\[
+\boxed{ u_{\rm actual} = k_u u_c+b_u. }
+\]</span></p>
+<p>The parameters</p>
+<p><span class="math display">\[
+k_u,\quad b_u
+\]</span></p>
+<p>may be estimated if the resulting spacecraft response is sufficiently
+measured.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.36 Timing Offset Estimation</h3>
+<p>A measurement may be associated with an uncertain timestamp</p>
+<p><span class="math display">\[
+t+\Delta t.
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ z_k = h[ \mathbf x(t_k+\Delta t) ] + v_k. }
+\]</span></p>
+<p>A small timing error can produce a significant apparent state error
+for rapidly changing measurements.</p>
+<p>The timing offset</p>
+<p><span class="math display">\[
+\Delta t
+\]</span></p>
+<p>can therefore be treated as an estimated parameter in precision
+navigation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.37 Clock Bias and Clock Drift</h3>
+<p>For ranging or timing-sensitive navigation, clock states may be
+augmented.</p>
+<p>A simple clock model is</p>
+<p><span class="math display">\[
+\boxed{ \begin{aligned} b_{k+1} &amp;= b_k+\dot b_k\Delta t+w_b\\ \dot
+b_{k+1} &amp;= \dot b_k+w_{\dot b}. \end{aligned} }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+b
+\]</span></p>
+<p>is clock bias and</p>
+<p><span class="math display">\[
+\dot b
+\]</span></p>
+<p>is clock drift.</p>
+<p>These states become correlated with position when measurement
+geometry depends on signal time of flight.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.38 Nuisance Parameters</h3>
+<p>A <strong>nuisance parameter</strong> affects the measurements or
+dynamics but is not itself the main quantity of interest.</p>
+<p>Examples include:</p>
+<ul>
+<li>measurement bias,</li>
+<li>scale factor,</li>
+<li>environmental coefficient,</li>
+<li>unknown background offset,</li>
+<li>calibration constant,</li>
+<li>timing delay,</li>
+<li>unknown noise parameter.</li>
+</ul>
+<p>Suppose</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z = h( \mathbf x, \boldsymbol\eta ) + \mathbf v }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\mathbf x
+\]</span></p>
+<p>is the desired state and</p>
+<p><span class="math display">\[
+\boldsymbol\eta
+\]</span></p>
+<p>is a nuisance parameter.</p>
+<p>Ignoring <code>\boldsymbol\eta</code> can bias the desired
+estimate.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.39 Estimating Nuisance Parameters</h3>
+<p>One option is to augment them:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol\eta
+\end{bmatrix}. }
+\]</span></p>
+<p>This allows uncertainty in the nuisance quantity to propagate
+properly into the state estimate.</p>
+<p>However, adding nuisance states increases:</p>
+<ul>
+<li>estimator dimension,</li>
+<li>covariance size,</li>
+<li>computational cost,</li>
+<li>correlation,</li>
+<li>potential observability problems.</li>
+</ul>
+<p>Therefore augmentation should be justified by estimation performance,
+not done automatically.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.40 Profiling Nuisance Parameters</h3>
+<p>In batch maximum-likelihood estimation, nuisance parameters can
+sometimes be handled by profile likelihood:</p>
+<p><span class="math display">\[
+\boxed{ L_p(\mathbf x) = \max_{\boldsymbol\eta} L( \mathbf x,
+\boldsymbol\eta ). }
+\]</span></p>
+<p>For every candidate state, the nuisance parameters are optimized.</p>
+<p>This avoids reporting them as primary outputs while still accounting
+for their effect on the likelihood.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.41 Marginalizing Nuisance Parameters</h3>
+<p>In Bayesian estimation, nuisance parameters can be integrated
+out:</p>
+<p><span class="math display">\[
+\boxed{ p(\mathbf x|\mathbf z) = \int p( \mathbf x, \boldsymbol\eta |
+\mathbf z ) \,d\boldsymbol\eta. }
+\]</span></p>
+<p>This is marginalization.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Augmentation}, \quad \text{Profiling}, \quad
+\text{Marginalization} }
+\]</span></p>
+<p>are different approaches for handling nuisance variables.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.42 Parameter Identifiability</h3>
+<p>Adding a parameter to the estimator does not guarantee that it can be
+estimated.</p>
+<p>A parameter is identifiable only if the observations provide enough
+independent information about it.</p>
+<p>If</p>
+<p><span class="math display">\[
+\theta_1
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\theta_2
+\]</span></p>
+<p>produce nearly identical measurement effects,</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial h}{\partial\theta_1} \approx c \frac{\partial
+h}{\partial\theta_2}, }
+\]</span></p>
+<p>they may be difficult to separate.</p>
+<p>This produces strong parameter correlation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.43 Observability of Augmented States</h3>
+<p>For a linearized augmented system,</p>
+<p><span class="math display">\[
+\delta\mathbf x_{a,k+1} = \mathbf F_{a,k} \delta\mathbf x_{a,k},
+\]</span></p>
+<p><span class="math display">\[
+\delta\mathbf z_k = \mathbf H_{a,k} \delta\mathbf x_{a,k},
+\]</span></p>
+<p>the observability of the augmented system must be considered.</p>
+<p>A parameter state may be theoretically included but practically
+unobservable.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{State Augmentation} \neq \text{Guaranteed Observability} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.44 Excitation and Parameter Estimation</h3>
+<p>Many parameters become observable only when the system is
+sufficiently excited.</p>
+<p>For example:</p>
+<ul>
+<li>scale factor requires variation in the measured signal,</li>
+<li>inertia estimation requires rotational excitation,</li>
+<li>thrust calibration requires controlled actuation,</li>
+<li>sensor misalignment requires changing orientation,</li>
+<li>timing offset requires dynamic variation.</li>
+</ul>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Parameter Estimation Quality} \propto \text{Informative
+System Excitation} }
+\]</span></p>
+<p>in a qualitative sense.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.45 Persistent Excitation</h3>
+<p>A parameter may remain weakly estimated if the spacecraft repeatedly
+experiences nearly identical conditions.</p>
+<p>Rich motion produces greater variation in measurement
+sensitivities.</p>
+<p>This is related to the concept of <strong>persistent
+excitation</strong>.</p>
+<p>A practical parameter-estimation campaign should therefore consider
+not only estimator mathematics but also whether the trajectory or
+maneuver profile generates sufficient information.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.46 Correlated Parameters</h3>
+<p>Suppose two estimated parameters have covariance block</p>
+<p><span class="math display">\[
+\mathbf P_{\theta\theta} = \begin{bmatrix} \sigma_{\theta_1}^2 &amp;
+P_{12}\\ P_{21} &amp; \sigma_{\theta_2}^2 \end{bmatrix}.
+\]</span></p>
+<p>The correlation coefficient is</p>
+<p><span class="math display">\[
+\boxed{ \rho_{12} = \frac{P_{12}} {\sigma_{\theta_1}\sigma_{\theta_2}}.
+}
+\]</span></p>
+<p>If</p>
+<p><span class="math display">\[
+|\rho_{12}|\approx1,
+\]</span></p>
+<p>the parameters are strongly coupled.</p>
+<p>This often indicates weak independent identifiability.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.47 Parameter Correlation versus Parameter Error</h3>
+<p>Strong correlation does not necessarily mean that the estimates are
+incorrect.</p>
+<p>It means the uncertainties are coupled.</p>
+<p>For example, one parameter may increase while another decreases with
+little change in predicted measurements.</p>
+<p>This corresponds geometrically to an elongated uncertainty region in
+parameter space.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.48 Information Matrix for Parameters</h3>
+<p>For Gaussian measurements,</p>
+<p><span class="math display">\[
+\mathbf z=h(\boldsymbol\theta)+\mathbf v,
+\]</span></p>
+<p>with</p>
+<p><span class="math display">\[
+\mathbf v\sim\mathcal N(0,\mathbf R),
+\]</span></p>
+<p>the local parameter information matrix is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf I_\theta = \mathbf H_\theta^T \mathbf R^{-1} \mathbf
+H_\theta }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\mathbf H_\theta = \frac{\partial h}{\partial\boldsymbol\theta}.
+\]</span></p>
+<p>Poorly conditioned</p>
+<p><span class="math display">\[
+\mathbf I_\theta
+\]</span></p>
+<p>indicates weak parameter identifiability.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.49 Parameter Uncertainty from Information</h3>
+<p>Under local Gaussian assumptions,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_\theta \approx \mathbf I_\theta^{-1}. }
+\]</span></p>
+<p>Large eigenvalues of</p>
+<p><span class="math display">\[
+\mathbf P_\theta
+\]</span></p>
+<p>correspond to poorly determined parameter combinations.</p>
+<p>This provides a direct connection between sensitivity, information,
+and parameter covariance.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.50 Prior Information for Parameters</h3>
+<p>Some parameters may already be known approximately from ground
+calibration or previous analysis.</p>
+<p>Represent this by</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\theta \sim \mathcal N( \bar{\boldsymbol\theta},
+\mathbf P_{\theta,0} ). }
+\]</span></p>
+<p>This prior can stabilize estimation of weakly observed
+parameters.</p>
+<p>However,</p>
+<p><span class="math display">\[
+\boxed{ \text{Prior-Constrained Parameter} \neq \text{Strongly
+Observable Parameter} }
+\]</span></p>
+<p>The posterior may be precise primarily because of the prior, not
+because of new measurement information.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.51 Parameter Covariance Initialization</h3>
+<p>The initial covariance</p>
+<p><span class="math display">\[
+\mathbf P_{\theta,0}
+\]</span></p>
+<p>should reflect actual prior knowledge.</p>
+<p>If it is too small, the estimator may effectively freeze the
+parameter.</p>
+<p>If it is too large, the parameter may initially absorb unrelated
+measurement residuals.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_{\theta,0} = \text{Quantitative Statement of Prior
+Parameter Uncertainty} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.52 Process Noise Tuning for Parameter States</h3>
+<p>For a random-walk parameter,</p>
+<p><span class="math display">\[
+\theta_{k+1} = \theta_k+w_k,
+\]</span></p>
+<p>the tuning quantity is</p>
+<p><span class="math display">\[
+Q_\theta.
+\]</span></p>
+<p>Too small:</p>
+<p><span class="math display">\[
+Q_\theta\downarrow \Rightarrow \text{parameter changes too slowly}.
+\]</span></p>
+<p>Too large:</p>
+<p><span class="math display">\[
+Q_\theta\uparrow \Rightarrow \text{parameter becomes noisy and may
+absorb other errors}.
+\]</span></p>
+<p>Therefore process noise should be connected to expected physical
+parameter variability.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.53 Parameter Absorption</h3>
+<p>An augmented parameter can sometimes absorb errors from an unrelated
+model deficiency.</p>
+<p>For example, an estimated coefficient may compensate for:</p>
+<ul>
+<li>wrong environmental model,</li>
+<li>incorrect sensor bias,</li>
+<li>timing error,</li>
+<li>unmodeled acceleration,</li>
+<li>geometry error.</li>
+</ul>
+<p>Then the filter may fit the measurements well while the parameter
+loses direct physical meaning.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Good Residual Fit} \neq \text{Correct Physical Parameter}
+}
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.54 Bias-State Absorption</h3>
+<p>Similarly, bias states can hide model errors.</p>
+<p>Suppose a persistent residual is caused by incorrect sensor
+alignment.</p>
+<p>If the filter contains only a bias state, it may partially absorb
+that residual into the bias estimate.</p>
+<p>The measurement residual can improve even though the true cause has
+not been modeled correctly.</p>
+<p>Therefore estimated biases should be checked for physical
+plausibility.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.55 Parameter Constraints</h3>
+<p>Some parameters must satisfy physical bounds.</p>
+<p>Examples include</p>
+<p><span class="math display">\[
+m&gt;0,
+\]</span></p>
+<p><span class="math display">\[
+C_D&gt;0,
+\]</span></p>
+<p><span class="math display">\[
+B&gt;0.
+\]</span></p>
+<p>A constrained estimator may impose</p>
+<p><span class="math display">\[
+\boxed{ \theta_{\min} \leq \theta \leq \theta_{\max}. }
+\]</span></p>
+<p>Constraints prevent physically impossible solutions.</p>
+<p>However, constraints and prior probabilities are conceptually
+different.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.56 Parameter Transformation</h3>
+<p>Positive parameters may be reparameterized as</p>
+<p><span class="math display">\[
+\boxed{ \gamma = \ln\theta }
+\]</span></p>
+<p>so that</p>
+<p><span class="math display">\[
+\boxed{ \theta=e^\gamma&gt;0. }
+\]</span></p>
+<p>This can make unconstrained numerical optimization easier.</p>
+<p>However, covariance and prior distributions must be transformed
+consistently.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.57 Covariance Transformation for Parameters</h3>
+<p>Suppose</p>
+<p><span class="math display">\[
+\theta=g(\gamma).
+\]</span></p>
+<p>For small uncertainty,</p>
+<p><span class="math display">\[
+\boxed{ P_\theta \approx \left( \frac{\partial g}{\partial\gamma}
+\right)^2 P_\gamma. }
+\]</span></p>
+<p>For a vector transformation,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_\theta \approx \mathbf J \mathbf P_\gamma \mathbf J^T.
+}
+\]</span></p>
+<p>This is particularly important when reporting parameter uncertainty
+in physical units after estimating transformed parameters.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.58 Parameter Scaling</h3>
+<p>Augmented states often contain quantities with very different
+magnitudes.</p>
+<p>For example:</p>
+<p><span class="math display">\[
+r\sim10^6\ \mathrm{m},
+\]</span></p>
+<p><span class="math display">\[
+v\sim10^3\ \mathrm{m/s},
+\]</span></p>
+<p>while a calibration parameter may be</p>
+<p><span class="math display">\[
+10^{-4}.
+\]</span></p>
+<p>Poor scaling can make the estimator numerically ill-conditioned.</p>
+<p>Introduce scaled parameters:</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\theta = \mathbf S_\theta \tilde{\boldsymbol\theta}.
+}
+\]</span></p>
+<p>Scaling improves numerical behavior without changing the underlying
+physical information when handled consistently.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.59 Augmented-State Covariance Propagation</h3>
+<p>The augmented covariance propagates as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_{a,k+1|k} = \mathbf F_{a,k} \mathbf P_{a,k|k} \mathbf
+F_{a,k}^T + \mathbf Q_{a,k}. }
+\]</span></p>
+<p>Here,</p>
+<p><span class="math display">\[
+\mathbf Q_a
+\]</span></p>
+<p>contains process noise for both dynamic states and parameter
+states.</p>
+<p>A typical structure is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf Q_a = \begin{bmatrix} \mathbf Q_x &amp; \mathbf
+Q_{x\theta}\\ \mathbf Q_{\theta x} &amp; \mathbf Q_\theta \end{bmatrix}.
+}
+\]</span></p>
+<p>Often the cross-noise blocks are assumed zero, but this should
+reflect the actual model.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.60 Augmented Measurement Update</h3>
+<p>Using the augmented Jacobian</p>
+<p><span class="math display">\[
+\mathbf H_a,
+\]</span></p>
+<p>the innovation covariance becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf S_k = \mathbf H_{a,k} \mathbf P_{a,k|k-1} \mathbf
+H_{a,k}^T + \mathbf R_k. }
+\]</span></p>
+<p>The Kalman gain is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf K_k = \mathbf P_{a,k|k-1} \mathbf H_{a,k}^T \mathbf
+S_k^{-1}. }
+\]</span></p>
+<p>The update simultaneously corrects:</p>
+<ul>
+<li>physical states,</li>
+<li>parameter states,</li>
+<li>their correlations.</li>
+</ul>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.61 How Measurements Correct Parameters</h3>
+<p>Partition the gain as</p>
+<p><span class="math display">\[
+\mathbf K = \begin{bmatrix} \mathbf K_x\\ \mathbf K_\theta
+\end{bmatrix}.
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\theta}_{k|k} = \hat{\boldsymbol\theta}_{k|k-1}
++ \mathbf K_\theta\mathbf y_k. }
+\]</span></p>
+<p>A nonzero parameter gain exists because the parameter is correlated
+with the measurement residual through direct or dynamic sensitivity.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.62 Batch Parameter Estimation</h3>
+<p>Parameters can also be estimated using measurements across an entire
+observation arc.</p>
+<p>Suppose</p>
+<p><span class="math display">\[
+\mathbf z_k = h_k( \mathbf x_0, \boldsymbol\theta ) + \mathbf v_k.
+\]</span></p>
+<p>The batch objective may be</p>
+<p><span class="math display">\[
+\boxed{ J( \mathbf x_0, \boldsymbol\theta ) = \sum_{k=1}^{N} \mathbf
+r_k^T \mathbf R_k^{-1} \mathbf r_k. }
+\]</span></p>
+<p>Then both reference state and parameters are estimated together.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.63 Batch versus Recursive Parameter Estimation</h3>
+<p><strong>Batch estimation</strong> uses a complete measurement arc at
+once.</p>
+<p><strong>Recursive estimation</strong> updates the parameter as
+measurements arrive.</p>
+<p>Batch methods are useful for:</p>
+<ul>
+<li>post-processing,</li>
+<li>calibration,</li>
+<li>orbit determination,</li>
+<li>system identification.</li>
+</ul>
+<p>Recursive methods are useful for:</p>
+<ul>
+<li>real-time navigation,</li>
+<li>adaptive estimation,</li>
+<li>onboard calibration,</li>
+<li>slowly varying parameters.</li>
+</ul>
+<p>Neither is universally superior; the choice depends on mission
+architecture and computation constraints.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.64 Static Parameter Estimation in a Kalman Filter</h3>
+<p>Even if</p>
+<p><span class="math display">\[
+\theta_{k+1}=\theta_k,
+\]</span></p>
+<p>the parameter estimate can still change after measurements because
+the measurement update modifies it:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\theta}_{k|k} = \hat{\theta}_{k|k-1} + K_\theta y_k. }
+\]</span></p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\theta}=0 }
+\]</span></p>
+<p>does not mean</p>
+<p><span class="math display">\[
+\boxed{ \hat{\theta}\text{ cannot change}. }
+\]</span></p>
+<p>It means only that the dynamic model predicts no physical change
+between measurements.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.65 Augmented-State Estimation in Attitude Navigation</h3>
+<p>A general attitude-estimation state may include</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \delta\boldsymbol\theta\\ \mathbf
+b_g \end{bmatrix}. }
+\]</span></p>
+<p>More elaborate versions may include</p>
+<ul>
+<li>gyro scale factor,</li>
+<li>sensor alignment,</li>
+<li>accelerometer bias,</li>
+<li>torque-model coefficients.</li>
+</ul>
+<p>The objective is to prevent persistent sensor errors from being
+mistaken for true spacecraft rotation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.66 Augmented-State Estimation in Orbit Determination</h3>
+<p>A general orbit-determination state may be written</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf r\\ \mathbf v\\ B\\
+\mathbf b_{\rm meas}\\ \boldsymbol\theta_{\rm dyn} \end{bmatrix}. }
+\]</span></p>
+<p>Possible estimated quantities include:</p>
+<ul>
+<li>drag-related coefficients,</li>
+<li>radiation-pressure coefficient,</li>
+<li>measurement biases,</li>
+<li>timing offsets,</li>
+<li>empirical accelerations,</li>
+<li>maneuver corrections.</li>
+</ul>
+<p>The selection depends on the measurement set and observation arc.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.67 Augmented States in General Relative Navigation</h3>
+<p>A general relative-navigation state may be</p>
+<p><span class="math display">\[
+\mathbf x_{\rm rel} = \begin{bmatrix} \mathbf r_{\rm rel}\\ \mathbf
+v_{\rm rel} \end{bmatrix}.
+\]</span></p>
+<p>Additional uncertain quantities may include</p>
+<ul>
+<li>sensor bias,</li>
+<li>target feature-location error,</li>
+<li>camera alignment,</li>
+<li>range bias,</li>
+<li>clock or timing offset,</li>
+<li>relative sensor calibration.</li>
+</ul>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{a,\rm rel} = \begin{bmatrix} \mathbf r_{\rm rel}\\
+\mathbf v_{\rm rel}\\ \boldsymbol\theta_{\rm cal} \end{bmatrix}. }
+\]</span></p>
+<p>This is a general relative-navigation principle and is not specific
+to any particular RPO mission.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.68 Parameter Correlation in Relative Navigation</h3>
+<p>Suppose line-of-sight measurements are used.</p>
+<p>A camera boresight error may produce an angular measurement effect
+similar to a relative-position error.</p>
+<p>Then the estimator may produce significant correlation between:</p>
+<p><span class="math display">\[
+\boxed{ \text{Relative Position} \leftrightarrow \text{Camera Alignment}
+}
+\]</span></p>
+<p>Similarly,</p>
+<p><span class="math display">\[
+\boxed{ \text{Range Bias} \leftrightarrow \text{Relative Range} }
+\]</span></p>
+<p>may become strongly correlated.</p>
+<p>Independent measurement geometry or maneuver excitation can help
+separate them.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.69 Calibration before Flight versus In-Flight Estimation</h3>
+<p>Some parameters should preferably be determined on the ground.</p>
+<p>Others may require in-flight estimation.</p>
+<p>Ground calibration is attractive because it can provide controlled
+conditions.</p>
+<p>In-flight estimation is useful when the parameter:</p>
+<ul>
+<li>changes after launch,</li>
+<li>depends on the space environment,</li>
+<li>changes with temperature,</li>
+<li>depends on deployment,</li>
+<li>cannot be fully calibrated on the ground.</li>
+</ul>
+<p>A hybrid approach is common:</p>
+<p><span class="math display">\[
+\boxed{ \text{Ground Calibration} \rightarrow \text{Prior} \rightarrow
+\text{In-Flight Refinement} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.70 Parameter Convergence</h3>
+<p>A parameter estimate may converge more slowly than the primary
+state.</p>
+<p>This occurs because the parameter may influence measurements only
+indirectly through accumulated dynamics.</p>
+<p>Therefore the estimator should be evaluated over a sufficiently long
+observation period.</p>
+<p>Convergence should be judged using:</p>
+<ul>
+<li>estimate history,</li>
+<li>covariance history,</li>
+<li>residuals,</li>
+<li>correlation,</li>
+<li>consistency,</li>
+<li>sensitivity to initialization.</li>
+</ul>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.71 False Parameter Convergence</h3>
+<p>A parameter may appear numerically stable even when it is not
+physically well determined.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\hat{\theta}_k
+\]</span></p>
+<p>may stop changing because:</p>
+<ul>
+<li>covariance became artificially small,</li>
+<li>process noise was set too low,</li>
+<li>measurements provide little new information,</li>
+<li>parameter is strongly constrained by prior.</li>
+</ul>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Stable Estimate} \neq \text{Well-Identified Parameter} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.72 Parameter Covariance Collapse</h3>
+<p>If the estimator repeatedly receives apparently informative
+measurements, parameter covariance may become extremely small.</p>
+<p>But if the underlying model neglects systematic errors, the true
+parameter error may remain larger than predicted.</p>
+<p>This produces an overconfident estimator.</p>
+<p>Covariance floors or process noise may help, but the underlying model
+should first be examined.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.73 Parameter Consistency</h3>
+<p>If true parameter values are known in simulation, parameter
+consistency can be checked through</p>
+<p><span class="math display">\[
+\boxed{ \epsilon_\theta = \tilde{\boldsymbol\theta}^T \mathbf
+P_{\theta\theta}^{-1} \tilde{\boldsymbol\theta}. }
+\]</span></p>
+<p>For a consistent Gaussian estimator,</p>
+<p><span class="math display">\[
+\epsilon_\theta
+\]</span></p>
+<p>should follow the appropriate chi-square statistics.</p>
+<p>This is the parameter analogue of NEES.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.74 Innovation Diagnostics</h3>
+<p>Even when true parameters are unknown, innovation behavior can
+indicate parameter-model problems.</p>
+<p>Persistent innovation bias may suggest:</p>
+<ul>
+<li>unmodeled sensor bias,</li>
+<li>wrong dynamic parameter,</li>
+<li>incorrect calibration,</li>
+<li>timing error,</li>
+<li>insufficient process noise.</li>
+</ul>
+<p>Thus residual analysis remains essential in augmented-state
+estimation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.75 Parameter Estimate Validation</h3>
+<p>Estimated parameters should be checked against:</p>
+<ul>
+<li>physical bounds,</li>
+<li>manufacturer specifications,</li>
+<li>independent calibration,</li>
+<li>alternate observation arcs,</li>
+<li>alternate sensors,</li>
+<li>expected temporal behavior.</li>
+</ul>
+<p>A parameter that produces excellent residuals but is physically
+implausible may indicate model compensation rather than true
+identification.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.76 Over-Parameterization</h3>
+<p>Adding too many parameters may make the estimation problem weakly
+determined.</p>
+<p>Possible symptoms include:</p>
+<ul>
+<li>large covariance,</li>
+<li>strong correlations,</li>
+<li>slow convergence,</li>
+<li>numerical instability,</li>
+<li>dependence on priors,</li>
+<li>unrealistic parameter values.</li>
+</ul>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{More Estimated Parameters} \not\Rightarrow \text{Better
+Estimation} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.77 Under-Parameterization</h3>
+<p>The opposite problem is estimating too few parameters.</p>
+<p>If an important bias or physical coefficient is omitted, the
+estimator may force the dynamic state to compensate.</p>
+<p>This may cause:</p>
+<ul>
+<li>biased state estimates,</li>
+<li>structured residuals,</li>
+<li>underestimated covariance,</li>
+<li>poor prediction.</li>
+</ul>
+<p>Thus parameter selection must balance model completeness and
+observability.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.78 Parameter Selection Strategy</h3>
+<p>A useful parameter should satisfy three conditions:</p>
+<ol type="1">
+<li>It has meaningful uncertainty.</li>
+<li>It materially affects dynamics or measurements.</li>
+<li>Available measurements provide enough information to estimate
+it.</li>
+</ol>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimate Parameter} \quad\text{if}\quad \text{Uncertain} +
+\text{Influential} + \text{Observable}. }
+\]</span></p>
+<p>Otherwise it may be better to keep it fixed or represent its effect
+as process noise.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.79 Parameter versus Process Noise</h3>
+<p>Not every unknown effect should become an explicit parameter.</p>
+<p>Sometimes an uncertain disturbance is better represented through</p>
+<p><span class="math display">\[
+\mathbf Q.
+\]</span></p>
+<p>Parameter augmentation is appropriate when the uncertainty has
+persistent structure that can potentially be inferred.</p>
+<p>Process noise is often more appropriate when the disturbance is
+rapidly varying or poorly parameterizable.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Structured Persistent Uncertainty} \rightarrow
+\text{Candidate Parameter State} }
+\]</span></p>
+<p>whereas</p>
+<p><span class="math display">\[
+\boxed{ \text{Unstructured Random Disturbance} \rightarrow
+\text{Candidate Process Noise} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.80 Parameter versus Bias</h3>
+<p>A <strong>bias</strong> is one type of parameter, but not every
+parameter is a bias.</p>
+<p>Bias typically enters additively:</p>
+<p><span class="math display">\[
+z_m=z+b+n.
+\]</span></p>
+<p>Scale factor enters multiplicatively:</p>
+<p><span class="math display">\[
+z_m=(1+s)z+n.
+\]</span></p>
+<p>Other parameters may influence dynamics nonlinearly.</p>
+<p>Correct parameterization matters because different error mechanisms
+produce different sensitivities.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.81 Parameter versus Calibration Constant</h3>
+<p>A calibration constant may be:</p>
+<ul>
+<li>known from ground calibration,</li>
+<li>estimated once,</li>
+<li>estimated continuously,</li>
+<li>slowly varying.</li>
+</ul>
+<p>Whether it should be part of the online state depends on its expected
+stability and mission requirement.</p>
+<p>An estimator should not continuously estimate a perfectly known
+calibration quantity without a reason, because doing so unnecessarily
+increases state dimension and correlation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.82 Numerical Conditioning of Augmented Filters</h3>
+<p>Adding states increases covariance dimension.</p>
+<p>For <code>n</code> original states and <code>p</code> parameters,</p>
+<p><span class="math display">\[
+\mathbf P_a \in \mathbb R^{(n+p)\times(n+p)}.
+\]</span></p>
+<p>This increases computational burden and may worsen conditioning.</p>
+<p>Good practice includes:</p>
+<ul>
+<li>sensible scaling,</li>
+<li>square-root filtering,</li>
+<li>robust matrix factorizations,</li>
+<li>avoiding explicit inverses,</li>
+<li>monitoring covariance eigenvalues,</li>
+<li>checking parameter correlations.</li>
+</ul>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.83 Reduced Parameter Sets</h3>
+<p>Instead of estimating many individual physical quantities, it may be
+preferable to estimate a smaller set of effective parameters.</p>
+<p>For example, rather than separately estimating</p>
+<p><span class="math display">\[
+C_D,\quad A,\quad m,
+\]</span></p>
+<p>one may estimate the combined quantity</p>
+<p><span class="math display">\[
+\boxed{ \frac{C_DA}{m}. }
+\]</span></p>
+<p>This can improve identifiability because the measurements may respond
+only to the combined effect.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.84 Composite Parameters</h3>
+<p>Suppose measurements depend on</p>
+<p><span class="math display">\[
+\gamma=\theta_1\theta_2.
+\]</span></p>
+<p>If the data contain little independent information about
+<code>\theta_1</code> and <code>\theta_2</code>, estimating them
+separately may be ill-conditioned.</p>
+<p>Estimating</p>
+<p><span class="math display">\[
+\boxed{ \gamma }
+\]</span></p>
+<p>directly may be more appropriate.</p>
+<p>This is a general parameterization principle:</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimate What the Measurements Actually Observe} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.85 Parameterization and Identifiability</h3>
+<p>The choice of parameterization can dramatically affect numerical
+conditioning.</p>
+<p>Two mathematically equivalent physical descriptions may not be
+equally easy to estimate.</p>
+<p>A useful parameterization should:</p>
+<ul>
+<li>respect physical constraints,</li>
+<li>avoid unnecessary redundancy,</li>
+<li>improve scaling,</li>
+<li>align with observable combinations,</li>
+<li>minimize excessive correlation.</li>
+</ul>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.86 Static versus Time-Varying Parameter Decision</h3>
+<p>Before choosing a model, ask:</p>
+<blockquote>
+<p>Is the parameter physically constant over the estimation
+interval?</p>
+</blockquote>
+<p>If yes,</p>
+<p><span class="math display">\[
+\dot{\theta}=0.
+\]</span></p>
+<p>If it drifts slowly,</p>
+<p><span class="math display">\[
+\dot{\theta}=w_\theta
+\]</span></p>
+<p>or a Gauss-Markov model may be more appropriate.</p>
+<p>If it changes rapidly and unpredictably, explicit estimation may no
+longer be the best representation.</p>
+<p>The parameter dynamic model should reflect the physical time
+scale.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.87 Parameter Time Scale</h3>
+<p>The estimator must separate three time scales:</p>
+<ul>
+<li>fast spacecraft dynamics,</li>
+<li>measurement update rate,</li>
+<li>slow parameter variation.</li>
+</ul>
+<p>For a slowly varying parameter,</p>
+<p><span class="math display">\[
+T_\theta \gg T_{\rm measurement}
+\]</span></p>
+<p>is usually desirable for clear separation.</p>
+<p>If the parameter varies as rapidly as the state, a simple constant or
+random-walk model may be inadequate.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.88 Correlation Time</h3>
+<p>For a first-order Gauss-Markov process,</p>
+<p><span class="math display">\[
+\dot{\theta} = -\frac{\theta}{\tau}+w,
+\]</span></p>
+<p>the parameter</p>
+<p><span class="math display">\[
+\tau
+\]</span></p>
+<p>defines the approximate memory of the process.</p>
+<p>Large</p>
+<p><span class="math display">\[
+\tau
+\]</span></p>
+<p>means slow variation.</p>
+<p>Small</p>
+<p><span class="math display">\[
+\tau
+\]</span></p>
+<p>means faster decorrelation.</p>
+<p>The choice should be related to the expected physical behavior of the
+parameter.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.89 State-Parameter Tradeoff</h3>
+<p>Augmented-state estimation inevitably introduces tradeoffs.</p>
+<p>A larger parameter set can improve model fidelity but may reduce
+observability.</p>
+<p>A smaller set improves robustness but may leave systematic errors
+unmodeled.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Parameter Estimation Design} = \text{Model Fidelity}
+\leftrightarrow \text{Observability and Robustness} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.90 Parameter Estimation and Prediction</h3>
+<p>A good parameter estimate improves not only current state
+reconstruction but also future prediction.</p>
+<p>For example, an improved dynamic coefficient can reduce propagation
+error after measurements stop.</p>
+<p>Thus parameter estimation can improve:</p>
+<ul>
+<li>trajectory prediction,</li>
+<li>maneuver planning,</li>
+<li>sensor scheduling,</li>
+<li>autonomy,</li>
+<li>future navigation performance.</li>
+</ul>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.91 Parameter Estimation and Smoothing</h3>
+<p>Parameters estimated over a complete arc can benefit strongly from
+smoothing or batch estimation.</p>
+<p>Future measurements can provide information about parameters that
+affected earlier dynamics.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Forward Measurements over an Arc} \rightarrow
+\text{Improved Parameter Reconstruction} }
+\]</span></p>
+<p>This connects augmented-state estimation directly to the smoothing
+methods developed earlier.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.92 Parameter Estimation and STM/Sensitivity Matrices</h3>
+<p>The state transition matrix maps state perturbations:</p>
+<p><span class="math display">\[
+\delta\mathbf x(t) = \boldsymbol\Phi(t,t_0) \delta\mathbf x_0.
+\]</span></p>
+<p>Parameter sensitivity adds</p>
+<p><span class="math display">\[
+\mathbf S_\theta(t) \delta\boldsymbol\theta.
+\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x(t) = \boldsymbol\Phi(t,t_0) \delta\mathbf x_0 +
+\mathbf S_\theta(t) \delta\boldsymbol\theta. }
+\]</span></p>
+<p>This directly links Section 4.3.8 to augmented-state estimation.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.93 Combined State-Parameter Mapping</h3>
+<p>Define</p>
+<p><span class="math display">\[
+\delta\mathbf y = \begin{bmatrix} \delta\mathbf x_0\\
+\delta\boldsymbol\theta \end{bmatrix}.
+\]</span></p>
+<p>Then the propagated perturbation may be expressed as</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x(t) = \begin{bmatrix} \boldsymbol\Phi(t,t_0)
+&amp; \mathbf S_\theta(t) \end{bmatrix} \delta\mathbf y. }
+\]</span></p>
+<p>The same mapping propagates uncertainty from initial-state and
+parameter errors into trajectory uncertainty.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.94 Parameter Contribution to Covariance</h3>
+<p>If initial-state and parameter errors are independent,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_x(t) = \boldsymbol\Phi \mathbf P_{x0}
+\boldsymbol\Phi^T + \mathbf S_\theta \mathbf P_\theta \mathbf
+S_\theta^T. }
+\]</span></p>
+<p>If they are correlated, cross terms must also be included.</p>
+<p>This shows quantitatively how parameter uncertainty contributes to
+trajectory uncertainty.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.95 Parameter Error Budget</h3>
+<p>Suppose output quantity</p>
+<p><span class="math display">\[
+y=g(\mathbf x,\boldsymbol\theta).
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\delta y \approx \mathbf J_x\delta\mathbf x + \mathbf
+J_\theta\delta\boldsymbol\theta.
+\]</span></p>
+<p>The output variance becomes</p>
+<p><span class="math display">\[
+\boxed{ \sigma_y^2 \approx \begin{bmatrix} \mathbf J_x &amp; \mathbf
+J_\theta \end{bmatrix} \mathbf P_a \begin{bmatrix} \mathbf J_x &amp;
+\mathbf J_\theta \end{bmatrix}^T. }
+\]</span></p>
+<p>This provides a direct connection between augmented-state covariance
+and engineering error budgets.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.96 Common Mistakes in Augmented-State Estimation</h3>
+<p>Common errors include:</p>
+<ol type="1">
+<li>Adding parameters without checking observability.</li>
+<li>Estimating too many highly correlated parameters.</li>
+<li>Assuming a parameter is constant when it actually varies.</li>
+<li>Using excessive parameter process noise.</li>
+<li>Using zero process noise for a drifting parameter.</li>
+<li>Ignoring state-parameter cross-covariance.</li>
+<li>Treating fitted effective parameters as exact physical
+constants.</li>
+<li>Using unrealistic prior covariance.</li>
+<li>Allowing parameters to absorb unrelated model errors.</li>
+<li>Ignoring physical parameter bounds.</li>
+<li>Using poorly scaled parameter states.</li>
+<li>Confusing bias, scale factor, and alignment errors.</li>
+<li>Declaring parameter convergence only because the numerical estimate
+stops changing.</li>
+<li>Reporting posterior covariance without checking whether the
+information came primarily from the prior.</li>
+<li>Failing to validate parameter estimates against independent
+data.</li>
+</ol>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.97 Practical Parameter-Estimation Workflow</h3>
+<p>A disciplined workflow is</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Identify Uncertain Physical/Calibration
+Quantity}\\ \downarrow\\ \text{Determine Whether It Influences Dynamics
+or Measurements}\\ \downarrow\\ \text{Choose Parameterization}\\
+\downarrow\\ \text{Select Static / Random-Walk / Gauss-Markov Model}\\
+\downarrow\\ \text{Define Initial Estimate and Covariance}\\
+\downarrow\\ \text{Derive State and Measurement Sensitivities}\\
+\downarrow\\ \text{Check Observability / Identifiability}\\ \downarrow\\
+\text{Augment the State}\\ \downarrow\\ \text{Propagate State and
+Covariance}\\ \downarrow\\ \text{Process Measurements}\\ \downarrow\\
+\text{Estimate State + Parameters}\\ \downarrow\\ \text{Examine
+Correlations}\\ \downarrow\\ \text{Check Residuals and Consistency}\\
+\downarrow\\ \text{Validate Parameter Physical Plausibility}\\
+\downarrow\\ \text{Validate Against Independent Data} \end{array} }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.98 General Augmented-State Architecture</h3>
+<p>The overall architecture can be summarized as</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Physical State}\\ \mathbf x \\[2mm] +
+\\[2mm] \text{Unknown Parameters}\\ \boldsymbol\theta \\ \downarrow\\
+\text{Augmented State}\\ \mathbf x_a= [\mathbf
+x^T\;\boldsymbol\theta^T]^T \\ \downarrow\\ \text{Augmented Dynamics}\\
+\dot{\mathbf x}_a=f_a(\mathbf x_a) \\ \downarrow\\ \text{Measurement
+Model}\\ \mathbf z=h(\mathbf x_a)+\mathbf v \\ \downarrow\\
+\text{Estimator} \\ \downarrow\\ \hat{\mathbf
+x},\hat{\boldsymbol\theta}, \mathbf P_{xx}, \mathbf P_{\theta\theta},
+\mathbf P_{x\theta} \end{array} }
+\]</span></p>
+<p>The result is not only an estimated trajectory but also estimates of
+the uncertain physical and calibration quantities influencing that
+trajectory.</p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.99 Key Equations</h3>
+<h3 id="augmented-state">Augmented state</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol\theta
+\end{bmatrix} }
+\]</span></p>
+<h3 id="static-parameter">Static parameter</h3>
+<p><span class="math display">\[
+\boxed{ \dot{\boldsymbol\theta}=0 }
+\]</span></p>
+<h3 id="random-walk-parameter">Random-walk parameter</h3>
+<p><span class="math display">\[
+\boxed{ \dot{\boldsymbol\theta} = \mathbf w_\theta }
+\]</span></p>
+<h3 id="gauss-markov-parameter">Gauss-Markov parameter</h3>
+<p><span class="math display">\[
+\boxed{ \dot{\boldsymbol\theta} = -\mathbf T^{-1} (
+\boldsymbol\theta-\bar{\boldsymbol\theta} ) + \mathbf w_\theta }
+\]</span></p>
+<h3 id="augmented-dynamics">Augmented dynamics</h3>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf x}_a = f_a(\mathbf x_a,t) }
+\]</span></p>
+<h3 id="augmented-measurement-model">Augmented measurement model</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h( \mathbf x_{a,k} ) + \mathbf v_k }
+\]</span></p>
+<h3 id="augmented-jacobian">Augmented Jacobian</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf A_a = \begin{bmatrix} \frac{\partial f}{\partial\mathbf
+x} &amp; \frac{\partial f}{\partial\boldsymbol\theta}\\ \mathbf0 &amp;
+\frac{\partial g}{\partial\boldsymbol\theta} \end{bmatrix} }
+\]</span></p>
+<h3 id="measurement-jacobian">Measurement Jacobian</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf H_a = \begin{bmatrix} \frac{\partial h}{\partial\mathbf
+x} &amp; \frac{\partial h}{\partial\boldsymbol\theta} \end{bmatrix} }
+\]</span></p>
+<h3 id="augmented-covariance">Augmented covariance</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf P_a = \begin{bmatrix} \mathbf P_{xx} &amp; \mathbf
+P_{x\theta}\\ \mathbf P_{\theta x} &amp; \mathbf P_{\theta\theta}
+\end{bmatrix} }
+\]</span></p>
+<h3 id="parameter-sensitivity">Parameter sensitivity</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf S_\theta = \frac{\partial\mathbf x}
+{\partial\boldsymbol\theta} }
+\]</span></p>
+<h3 id="sensitivity-dynamics">Sensitivity dynamics</h3>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta +
+\frac{\partial f} {\partial\boldsymbol\theta} }
+\]</span></p>
+<h3 id="augmented-covariance-propagation">Augmented covariance
+propagation</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf P_{a,k+1|k} = \mathbf F_{a,k} \mathbf P_{a,k|k} \mathbf
+F_{a,k}^T + \mathbf Q_{a,k} }
+\]</span></p>
+<h3 id="parameter-correction">Parameter correction</h3>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\theta}_{k|k} = \hat{\boldsymbol\theta}_{k|k-1}
++ \mathbf K_\theta \mathbf y_k }
+\]</span></p>
+<h3 id="ballistic-coefficient">Ballistic coefficient</h3>
+<p><span class="math display">\[
+\boxed{ B=\frac{m}{C_DA} }
+\]</span></p>
+<h3 id="relative-parameter-information">Relative parameter
+information</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf I_\theta = \mathbf H_\theta^T \mathbf R^{-1} \mathbf
+H_\theta }
+\]</span></p>
+
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.10.100 Key Takeaways</h3>
+<p>Parameter and augmented-state estimation extend ordinary state
+estimation by recognizing that many quantities influencing spacecraft
+dynamics and measurements are not perfectly known.</p>
+<p>The essential construction is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol\theta
+\end{bmatrix}. }
+\]</span></p>
+<p>Parameters may be modeled as static,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\boldsymbol\theta}=0, }
+\]</span></p>
+<p>slowly varying,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\boldsymbol\theta} = \mathbf w_\theta, }
+\]</span></p>
+<p>or correlated in time through models such as Gauss-Markov
+processes.</p>
+<p>Sensor biases, scale factors, alignment errors, calibration
+coefficients, ballistic coefficient, timing offsets, actuator
+coefficients, and environmental parameters are all possible
+augmented-state candidates.</p>
+<p>However,</p>
+<p><span class="math display">\[
+\boxed{ \text{Adding a Parameter to the State} \neq \text{Making the
+Parameter Observable}. }
+\]</span></p>
+<p>Successful estimation requires sufficient sensitivity and measurement
+information.</p>
+<p>State and parameter uncertainties are generally correlated:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_{x\theta}\neq0. }
+\]</span></p>
+<p>These cross-correlations must be retained because they describe how
+uncertainty in parameters maps into uncertainty in the physical
+state.</p>
+<p>For drag estimation, an important example is</p>
+<p><span class="math display">\[
+\boxed{ B=\frac{m}{C_DA}. }
+\]</span></p>
+<p>Because atmospheric density and ballistic coefficient can produce
+similar trajectory effects, their estimates may become strongly
+correlated.</p>
+<p>Sensor biases and calibration parameters behave similarly: a
+calibration error can often resemble a physical state error unless
+additional measurements or system excitation separate them.</p>
+<p>Nuisance parameters should not simply be ignored. They may be:</p>
+<ul>
+<li>estimated as augmented states,</li>
+<li>profiled in maximum likelihood,</li>
+<li>marginalized in Bayesian estimation.</li>
+</ul>
+<p>The most important engineering principle is therefore</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimate Only Parameters That Are} \quad \text{Uncertain,
+Influential, and Observable}. }
+\]</span></p>
+<p>A well-designed augmented-state estimator can improve state accuracy,
+calibration, dynamic-model fidelity, and future trajectory prediction. A
+poorly designed augmented estimator can instead create strong
+correlations, weak observability, numerical instability, and physically
+misleading parameter estimates.</p>
+
+    </section>
+    <section class="notes-section-card">
+      <h2>Next: 4.3.11 Orbit Determination Fundamentals</h2>
+      <p>
+        Augmented-state estimation provides the machinery for estimating uncertain dynamic and calibration
+        quantities together with the navigation state. The next section applies the broader state-estimation
+        framework to orbit determination, including reference-epoch states, force models, trajectory propagation,
+        observation arcs, measurement prediction, and the overall orbit-determination architecture.
+      </p>
+      <a href="orbit-determination-fundamentals.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.11 Orbit Determination Fundamentals</h3>
+          <p>
+            Reference-epoch states, force models, orbit propagation, observation arcs, measurement prediction,
+            and the general orbit-determination architecture.
+          </p>
+          <p class="sensor-link-arrow">Continue to Orbit Determination Fundamentals &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
