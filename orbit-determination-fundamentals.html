@@ -1,0 +1,1590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.3.11 Orbit Determination Fundamentals | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .table-wrap { width:100%; overflow-x:auto; margin:1rem 0 1.4rem; }
+    .table-wrap table { width:100%; border-collapse:collapse; }
+    .table-wrap th, .table-wrap td { border:1px solid #d8dee6; padding:0.75rem 0.85rem; text-align:left; vertical-align:top; }
+    .table-wrap th { font-weight:700; background:#f7f9fb; }
+    .engineering-note { margin:1rem 0; padding:0.95rem 1.05rem; background:#f7f9fb; border-left:4px solid #9bb8d3; }
+    .equation-note { margin-top:0.35rem; color:#475569; }
+    .notes-section-card h4 { margin-top:1.25rem; margin-bottom:0.55rem; }
+    .notes-section-card .math.display { display:block; overflow-x:auto; padding:0.15rem 0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Orbit Determination Fundamentals</h1>
+    <p class="notes-tagline">
+      Reference-epoch states, force models, numerical orbit propagation, observation arcs, measurement prediction,
+      residuals, covariance, observability, tracking geometry, multi-sensor navigation, validation, and the general
+      orbit-determination architecture.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.3.11 Orbit Determination Fundamentals</h2>
+<p>Orbit determination is the process of estimating the trajectory of a
+spacecraft from imperfect measurements and a mathematical model of its
+motion.</p>
+<p>The unknown quantity is typically the spacecraft state at some chosen
+epoch,</p>
+<p><span class="math display">\[\boxed{ \mathbf x_0 = \begin{bmatrix}
+\mathbf r_0\\ \mathbf v_0 \end{bmatrix} }\]</span></p>
+<p>where</p>
+<p><span class="math display">\[\mathbf r_0\]</span></p>
+<p>is the position vector and</p>
+<p><span class="math display">\[\mathbf v_0\]</span></p>
+<p>is the velocity vector at the reference epoch.</p>
+<p>The estimated state is not obtained from measurement geometry alone.
+It results from combining</p>
+<p><span class="math display">\[\boxed{ \text{Dynamics} +
+\text{Measurements} + \text{Uncertainty Models} \rightarrow \text{Orbit
+Estimate} }\]</span></p>
+<p>Orbit determination therefore sits at the intersection of orbital
+mechanics, numerical propagation, measurement modeling, estimation
+theory, covariance analysis, and sensor tracking.</p>
+<p>It is used in:</p>
+<ul>
+<li>launch and early-orbit operations,</li>
+<li>routine spacecraft navigation,</li>
+<li>precise orbit reconstruction,</li>
+<li>maneuver planning,</li>
+<li>formation flying,</li>
+<li>rendezvous and proximity operations,</li>
+<li>conjunction analysis,</li>
+<li>GNSS-based navigation,</li>
+<li>deep-space navigation,</li>
+<li>autonomous onboard navigation,</li>
+<li>post-flight trajectory reconstruction.</li>
+</ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.1 What Orbit Determination Actually Estimates</h3>
+<p>The most basic orbit-determination problem estimates</p>
+<p><span class="math display">\[\boxed{ \mathbf x = \begin{bmatrix}
+\mathbf r\\ \mathbf v \end{bmatrix} }\]</span></p>
+<p>at a selected epoch.</p>
+<p>But practical orbit determination may estimate more than position and
+velocity.</p>
+<p>An augmented OD state can include</p>
+<p><span class="math display">\[\boxed{ \mathbf x_a = \begin{bmatrix}
+\mathbf r\\ \mathbf v\\ \boldsymbol\theta \end{bmatrix} }\]</span></p>
+<p>where</p>
+<p><span class="math display">\[\boldsymbol\theta\]</span></p>
+<p>may contain parameters such as</p>
+<ul>
+<li>ballistic coefficient,</li>
+<li>drag coefficient,</li>
+<li>solar-radiation-pressure coefficient,</li>
+<li>sensor bias,</li>
+<li>clock bias,</li>
+<li>timing offset,</li>
+<li>maneuver correction,</li>
+<li>empirical acceleration,</li>
+<li>calibration parameters.</li>
+</ul>
+<p>Thus orbit determination is often both a
+<strong>trajectory-estimation problem</strong> and a
+<strong>parameter-estimation problem</strong>.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.2 Reference Epoch</h3>
+<p>An orbit estimate must be associated with a specific time.</p>
+<p>Let</p>
+<p><span class="math display">\[t_0\]</span></p>
+<p>be the reference epoch.</p>
+<p>The state at that epoch is</p>
+<p><span class="math display">\[\boxed{ \mathbf x_0 = \mathbf x(t_0).
+}\]</span></p>
+<p>Measurements may occur before and after <code>t_0</code>, but the
+estimated reference state provides the common state from which the
+trajectory can be propagated.</p>
+<p>The choice of reference epoch matters numerically because covariance
+and correlation can depend strongly on where the state is defined.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.3 Why Use a Reference-Epoch State?</h3>
+<p>Suppose measurements occur at</p>
+<p><span class="math display">\[t_1,t_2,\ldots,t_N.\]</span></p>
+<p>Instead of estimating an independent state at every observation time,
+one can estimate a single state</p>
+<p><span class="math display">\[\mathbf x_0\]</span></p>
+<p>and propagate it to each measurement epoch:</p>
+<p><span class="math display">\[\boxed{ \mathbf x(t_k) = \phi(
+t_k,t_0,\mathbf x_0 ) }\]</span></p>
+<p>where</p>
+<p><span class="math display">\[\phi\]</span></p>
+<p>denotes the nonlinear orbit-propagation mapping.</p>
+<p>This enforces dynamic consistency across the complete observation
+arc.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.4 State at Measurement Epoch</h3>
+<p>If the estimated reference state is</p>
+<p><span class="math display">\[\hat{\mathbf x}_0,\]</span></p>
+<p>then the predicted state at measurement time <code>t_k</code> is</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_k^{-} = \phi(
+t_k,t_0,\hat{\mathbf x}_0 ). }\]</span></p>
+<p>The superscript “<code>-</code>” often indicates a predicted state
+before incorporating the measurement at that epoch.</p>
+<p>This propagated state is then used to predict what the sensor should
+observe.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.5 Orbit Dynamics</h3>
+<p>Spacecraft translational dynamics are fundamentally governed by</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf r} = \mathbf v
+}\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf v} = \mathbf a(
+\mathbf r, \mathbf v, t, \boldsymbol\theta ). }\]</span></p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf x} = f( \mathbf x,
+t, \boldsymbol\theta ) }\]</span></p>
+<p>with</p>
+<p><span class="math display">\[\mathbf x = \begin{bmatrix} \mathbf r\\
+\mathbf v \end{bmatrix}.\]</span></p>
+<p>The quality of orbit determination depends strongly on how accurately
+the acceleration model represents the actual spacecraft environment.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.6 Two-Body Force Model</h3>
+<p>The simplest orbital force model includes only central-body
+gravity:</p>
+<p><span class="math display">\[\boxed{ \ddot{\mathbf r} = -\mu
+\frac{\mathbf r}{r^3} }\]</span></p>
+<p>where</p>
+<p><span class="math display">\[r=\|\mathbf r\|\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\mu\]</span></p>
+<p>is the gravitational parameter.</p>
+<p>This model is useful for fundamental orbital mechanics but is
+generally insufficient for precise long-duration orbit
+determination.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.7 General Force Model</h3>
+<p>A practical force model may be written</p>
+<p><span class="math display">\[\boxed{ \ddot{\mathbf r} = \mathbf
+a_{\rm grav} + \mathbf a_{\rm drag} + \mathbf a_{\rm SRP} + \mathbf
+a_{\rm third-body} + \mathbf a_{\rm thrust} + \mathbf a_{\rm empirical}
++\cdots }\]</span></p>
+<p>The exact set of terms depends on</p>
+<ul>
+<li>orbital regime,</li>
+<li>required accuracy,</li>
+<li>mission duration,</li>
+<li>spacecraft properties,</li>
+<li>available measurements.</li>
+</ul>
+<p>The force model should be accurate enough to support the required
+navigation performance without adding unnecessary complexity.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.8 Non-Spherical Gravity</h3>
+<p>A real planetary gravity field is not perfectly spherical.</p>
+<p>The gravitational potential may include spherical harmonics:</p>
+<p><span class="math display">\[\boxed{ U(r,\phi,\lambda) =
+\frac{\mu}{r} \left[ 1 + \sum_{n=2}^{\infty} \left(\frac{R}{r}\right)^n
+\sum_{m=0}^{n} \bar P_{nm}(\sin\phi) ( \bar C_{nm}\cos m\lambda + \bar
+S_{nm}\sin m\lambda ) \right]. }\]</span></p>
+<p>This captures effects such as</p>
+<ul>
+<li>oblateness,</li>
+<li>tesseral harmonics,</li>
+<li>sectoral harmonics,</li>
+<li>higher-order gravity terms.</li>
+</ul>
+<p>For many Earth-orbit applications, the <code>J_2</code> perturbation
+is especially important.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.9 Atmospheric Drag</h3>
+<p>For low-Earth orbit, drag may significantly affect orbit
+prediction.</p>
+<p>A simplified drag model is</p>
+<p><span class="math display">\[\boxed{ \mathbf a_D = -\frac12 \rho
+\frac{C_DA}{m} v_{\rm rel}^2 \hat{\mathbf v}_{\rm rel}. }\]</span></p>
+<p>Drag depends on</p>
+<ul>
+<li>atmospheric density,</li>
+<li>relative velocity,</li>
+<li>drag coefficient,</li>
+<li>projected area,</li>
+<li>spacecraft mass,</li>
+<li>attitude.</li>
+</ul>
+<p>Uncertainty in any of these quantities can degrade orbit
+propagation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.10 Solar Radiation Pressure</h3>
+<p>Solar radiation pressure can be represented approximately as</p>
+<p><span class="math display">\[\boxed{ \mathbf a_{\rm SRP} = P_\odot
+C_R \frac{A}{m} \hat{\mathbf s} }\]</span></p>
+<p>with additional geometry and shadowing factors as required.</p>
+<p>Here,</p>
+<p><span class="math display">\[C_R\]</span></p>
+<p>is the radiation-pressure coefficient.</p>
+<p>For higher-altitude spacecraft or long prediction arcs, SRP can
+become important.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.11 Third-Body Gravity</h3>
+<p>The gravitational influence of another body can be written in
+differential form as</p>
+<p><span class="math display">\[\boxed{ \mathbf a_3 = \mu_3 \left[
+\frac{\mathbf r_3-\mathbf r} {\|\mathbf r_3-\mathbf r\|^3} -
+\frac{\mathbf r_3} {\|\mathbf r_3\|^3} \right]. }\]</span></p>
+<p>Third-body gravity is important for</p>
+<ul>
+<li>high Earth orbits,</li>
+<li>lunar trajectories,</li>
+<li>cislunar navigation,</li>
+<li>interplanetary missions.</li>
+</ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.12 Maneuver and Thrust Modeling</h3>
+<p>When a spacecraft performs a maneuver, its dynamics change.</p>
+<p>For an impulsive maneuver,</p>
+<p><span class="math display">\[\boxed{ \mathbf v^+ = \mathbf v^- +
+\Delta\mathbf v. }\]</span></p>
+<p>For finite-duration thrust,</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf v} = \mathbf a_{\rm
+natural} + \frac{\mathbf F(t)}{m(t)}. }\]</span></p>
+<p>Orbit determination must model known maneuvers correctly. Otherwise,
+the estimator may interpret maneuver effects as state errors or
+dynamic-model errors.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.13 Maneuver Uncertainty</h3>
+<p>The commanded maneuver is not always equal to the delivered
+maneuver.</p>
+<p>Let</p>
+<p><span class="math display">\[\Delta\mathbf v_{\rm actual} =
+\Delta\mathbf v_{\rm cmd} + \delta\Delta\mathbf v.\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[\delta\Delta\mathbf v\]</span></p>
+<p>introduces additional uncertainty.</p>
+<p>This may be represented using</p>
+<ul>
+<li>maneuver covariance,</li>
+<li>estimated maneuver correction,</li>
+<li>process noise,</li>
+<li>explicit augmented states.</li>
+</ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.14 Empirical Accelerations</h3>
+<p>Sometimes a precise physical force model is unavailable.</p>
+<p>Small empirical accelerations may be introduced:</p>
+<p><span class="math display">\[\boxed{ \mathbf a_{\rm emp} =
+\begin{bmatrix} a_R\\ a_T\\ a_N \end{bmatrix} }\]</span></p>
+<p>in a radial-transverse-normal frame or another convenient basis.</p>
+<p>These terms can absorb unmodeled accelerations.</p>
+<p>However, they should be used carefully because good residual fit does
+not necessarily imply physically correct force modeling.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.15 Numerical Orbit Propagation</h3>
+<p>For realistic force models, the equations of motion generally cannot
+be solved analytically.</p>
+<p>Therefore numerical integration is used:</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf x} = f(\mathbf x,t)
+}\]</span></p>
+<p>with numerical methods such as</p>
+<ul>
+<li>Runge-Kutta methods,</li>
+<li>adaptive integration,</li>
+<li>multistep methods,</li>
+<li>high-order orbit propagators.</li>
+</ul>
+<p>The integration tolerance should be significantly tighter than the
+desired orbit-estimation accuracy.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.16 Propagation Error</h3>
+<p>Numerical propagation introduces its own error.</p>
+<p>Therefore OD accuracy depends on both</p>
+<p><span class="math display">\[\boxed{ \text{Physical Model Accuracy}
+}\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\boxed{ \text{Numerical Integration
+Accuracy}. }\]</span></p>
+<p>Using an excellent force model with a loose integration tolerance can
+still produce poor predictions.</p>
+<p>Similarly, extremely tight integration cannot compensate for an
+incorrect force model.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.17 State Transition Matrix in Orbit Determination</h3>
+<p>For a small perturbation in the reference state,</p>
+<p><span class="math display">\[\delta\mathbf x_0,\]</span></p>
+<p>the perturbation at time <code>t</code> is approximately</p>
+<p><span class="math display">\[\boxed{ \delta\mathbf x(t) =
+\boldsymbol\Phi(t,t_0) \delta\mathbf x_0. }\]</span></p>
+<p>The STM</p>
+<p><span class="math display">\[\boldsymbol\Phi(t,t_0)\]</span></p>
+<p>is essential for</p>
+<ul>
+<li>covariance propagation,</li>
+<li>batch orbit determination,</li>
+<li>measurement sensitivity,</li>
+<li>differential correction.</li>
+</ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.18 Variational Equations</h3>
+<p>The STM satisfies</p>
+<p><span class="math display">\[\boxed{ \dot{\boldsymbol\Phi} = \mathbf
+A(t) \boldsymbol\Phi }\]</span></p>
+<p>where</p>
+<p><span class="math display">\[\boxed{ \mathbf A(t) = \frac{\partial f}
+{\partial\mathbf x} }\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\boldsymbol\Phi(t_0,t_0)=\mathbf
+I.\]</span></p>
+<p>These equations are propagated alongside the spacecraft state.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.19 Parameter Sensitivity in Orbit Determination</h3>
+<p>If a dynamic parameter</p>
+<p><span class="math display">\[\boldsymbol\theta\]</span></p>
+<p>is estimated, define</p>
+<p><span class="math display">\[\boxed{ \mathbf S_\theta(t) =
+\frac{\partial\mathbf x(t)} {\partial\boldsymbol\theta}. }\]</span></p>
+<p>Its dynamics are</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf S}_\theta = \mathbf
+A\mathbf S_\theta + \frac{\partial f} {\partial\boldsymbol\theta}.
+}\]</span></p>
+<p>These sensitivities connect parameter uncertainty to the predicted
+orbit.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.20 Observation Arc</h3>
+<p>An <strong>observation arc</strong> is the time interval over which
+measurements are collected and used for orbit determination.</p>
+<p>Suppose observations exist from</p>
+<p><span class="math display">\[t_{\rm start}\]</span></p>
+<p>to</p>
+<p><span class="math display">\[t_{\rm end}.\]</span></p>
+<p>Then the arc duration is</p>
+<p><span class="math display">\[\boxed{ T_{\rm arc} = t_{\rm end} -
+t_{\rm start}. }\]</span></p>
+<p>The choice of arc length has a major effect on orbit-determination
+performance.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.21 Short Observation Arcs</h3>
+<p>A short observation arc can provide quick updates but may have weak
+observability.</p>
+<p>For example, position may be well constrained while velocity or
+dynamic parameters remain poorly determined.</p>
+<p>Short arcs may also make it difficult to separate</p>
+<ul>
+<li>initial-state error,</li>
+<li>bias,</li>
+<li>dynamic-model error,</li>
+<li>slowly varying parameters.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Short Arc} \rightarrow
+\text{Potentially Weak Dynamic Information} }\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.22 Long Observation Arcs</h3>
+<p>Longer arcs allow dynamic effects to accumulate.</p>
+<p>This can improve estimation of</p>
+<ul>
+<li>velocity,</li>
+<li>drag parameters,</li>
+<li>biases,</li>
+<li>maneuver corrections,</li>
+<li>other slow parameters.</li>
+</ul>
+<p>However, long arcs also expose the estimator to greater model
+mismatch.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Longer Arc} \rightarrow
+\text{More Information} + \text{More Sensitivity to Model Error}
+}\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.23 Arc-Length Tradeoff</h3>
+<p>The choice of observation arc is therefore a balance:</p>
+<p><span class="math display">\[\boxed{ \text{Arc Length} =
+\text{Observability} \leftrightarrow \text{Model Validity}
+}\]</span></p>
+<p>There is no universally optimal arc duration.</p>
+<p>It depends on</p>
+<ul>
+<li>measurement type,</li>
+<li>orbit regime,</li>
+<li>force-model quality,</li>
+<li>parameter set,</li>
+<li>maneuver activity,</li>
+<li>required prediction interval.</li>
+</ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.24 Measurement Times</h3>
+<p>Measurements occur at discrete times</p>
+<p><span class="math display">\[t_k.\]</span></p>
+<p>At each time,</p>
+<p><span class="math display">\[\boxed{ \mathbf z_k = h_k( \mathbf
+x(t_k) ) + \mathbf v_k. }\]</span></p>
+<p>Orbit determination therefore requires accurate time tagging.</p>
+<p>Timing errors can map directly into apparent position or velocity
+errors.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.25 Measurement Prediction</h3>
+<p>Given the propagated state</p>
+<p><span class="math display">\[\hat{\mathbf x}_k^-,\]</span></p>
+<p>the predicted measurement is</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf z}_k = h_k(
+\hat{\mathbf x}_k^- ). }\]</span></p>
+<p>The difference between actual and predicted measurement is the
+residual or innovation:</p>
+<p><span class="math display">\[\boxed{ \mathbf y_k = \mathbf z_k -
+\hat{\mathbf z}_k. }\]</span></p>
+<p>Residuals are central to orbit determination.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.26 What Residuals Mean</h3>
+<p>The residual</p>
+<p><span class="math display">\[\mathbf y_k\]</span></p>
+<p>contains information about disagreement between measurement and
+prediction.</p>
+<p>This disagreement can arise from</p>
+<ul>
+<li>state error,</li>
+<li>measurement noise,</li>
+<li>sensor bias,</li>
+<li>force-model error,</li>
+<li>timing error,</li>
+<li>calibration error,</li>
+<li>maneuver error.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Residual} \neq \text{Pure
+State Error} }\]</span></p>
+<p>Residual interpretation requires understanding the complete
+estimation model.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.27 Measurement Noise</h3>
+<p>Measurements are generally modeled as</p>
+<p><span class="math display">\[\boxed{ \mathbf v_k \sim \mathcal N(
+\mathbf0, \mathbf R_k ). }\]</span></p>
+<p>The matrix</p>
+<p><span class="math display">\[\mathbf R_k\]</span></p>
+<p>describes measurement uncertainty.</p>
+<p>Different measurements may have different noise levels and
+correlations.</p>
+<p>The weighting used in OD should therefore reflect the statistical
+quality of each measurement type.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.28 Measurement Weighting</h3>
+<p>For a scalar measurement with variance</p>
+<p><span class="math display">\[\sigma^2,\]</span></p>
+<p>the weight is commonly proportional to</p>
+<p><span class="math display">\[\boxed{ w = \frac{1}{\sigma^2}.
+}\]</span></p>
+<p>For vector measurements,</p>
+<p><span class="math display">\[\boxed{ \mathbf W = \mathbf R^{-1}.
+}\]</span></p>
+<p>Higher-quality measurements receive greater statistical
+influence.</p>
+<p>However, incorrect weighting can make the solution inconsistent.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.29 Measurement Geometry</h3>
+<p>Orbit determination quality depends strongly on geometry.</p>
+<p>Two very accurate measurements may provide little new information if
+they constrain nearly the same state direction.</p>
+<p>By contrast, measurements from diverse viewing geometries can
+significantly improve observability.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{OD Accuracy} \neq
+\text{Sensor Accuracy Alone} }\]</span></p>
+<p>but rather</p>
+<p><span class="math display">\[\boxed{ \text{OD Accuracy} = f(
+\text{Noise}, \text{Geometry}, \text{Dynamics}, \text{Arc Length} ).
+}\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.30 Measurement Partial Derivatives</h3>
+<p>Linearizing the measurement model gives</p>
+<p><span class="math display">\[\delta\mathbf z_k \approx \mathbf H_k
+\delta\mathbf x_k\]</span></p>
+<p>where</p>
+<p><span class="math display">\[\boxed{ \mathbf H_k = \frac{\partial
+h_k} {\partial\mathbf x_k}. }\]</span></p>
+<p>If the estimated variable is the reference-epoch state,</p>
+<p><span class="math display">\[\delta\mathbf x_k =
+\boldsymbol\Phi(t_k,t_0) \delta\mathbf x_0.\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[\boxed{ \delta\mathbf z_k \approx
+\mathbf H_k \boldsymbol\Phi(t_k,t_0) \delta\mathbf x_0. }\]</span></p>
+<p>This is the basis of the design matrix used in batch orbit
+determination.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.31 Reference-Epoch Measurement Sensitivity</h3>
+<p>Define</p>
+<p><span class="math display">\[\boxed{ \mathbf G_k = \mathbf H_k
+\boldsymbol\Phi(t_k,t_0). }\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[\boxed{ \delta\mathbf z_k \approx
+\mathbf G_k \delta\mathbf x_0. }\]</span></p>
+<p>The matrix</p>
+<p><span class="math display">\[\mathbf G_k\]</span></p>
+<p>describes how a perturbation in the reference-epoch state affects the
+measurement at time <code>t_k</code>.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.32 General Orbit-Determination Architecture</h3>
+<p>The overall architecture can be represented as</p>
+<p><span class="math display">\[\boxed{ \begin{array}{c} \text{Initial /
+Reference State Guess}\\ \hat{\mathbf x}_0 \\ \downarrow\\ \text{Orbit
+Propagation} \\ \hat{\mathbf x}(t_k) \\ \downarrow\\ \text{Measurement
+Prediction} \\ \hat{\mathbf z}_k = h(\hat{\mathbf x}(t_k)) \\
+\downarrow\\ \text{Residual} \\ \mathbf y_k = \mathbf z_k-\hat{\mathbf
+z}_k \\ \downarrow\\ \text{Estimation Algorithm} \\ \downarrow\\
+\text{State / Parameter Correction} \\ \downarrow\\ \text{Updated Orbit
+Estimate} \end{array} }\]</span></p>
+<p>This same basic architecture appears in both batch and sequential
+orbit determination.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.33 Batch Orbit Determination</h3>
+<p>Batch OD processes a set of measurements over an observation arc
+simultaneously.</p>
+<p>The unknown reference state is adjusted to minimize the weighted
+residuals.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \{\mathbf z_1,\ldots,\mathbf
+z_N\} \rightarrow \text{Single Best-Fit Reference State} }\]</span></p>
+<p>Batch OD will be treated in detail in Section 4.3.13.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.34 Sequential Orbit Determination</h3>
+<p>Sequential OD updates the state as measurements arrive.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k-1|k-1}
+\rightarrow \text{Propagation} \rightarrow \hat{\mathbf x}_{k|k-1}
+\rightarrow \text{Measurement Update} \rightarrow \hat{\mathbf x}_{k|k}.
+}\]</span></p>
+<p>This is the foundation of real-time recursive orbit
+determination.</p>
+<p>Sequential OD will be treated in Section 4.3.14.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.35 Batch versus Sequential OD</h3>
+<p>Batch and sequential OD use the same physical ingredients:</p>
+<ul>
+<li>dynamics,</li>
+<li>measurements,</li>
+<li>uncertainty models,</li>
+<li>sensitivities.</li>
+</ul>
+<p>The difference is mainly how measurement information is
+processed.</p>
+<p>Batch OD:</p>
+<ul>
+<li>processes an observation arc together,</li>
+<li>is useful for post-processing,</li>
+<li>supports high-accuracy reconstruction,</li>
+<li>naturally handles smoothing over an arc.</li>
+</ul>
+<p>Sequential OD:</p>
+<ul>
+<li>processes data recursively,</li>
+<li>supports onboard or real-time navigation,</li>
+<li>updates continuously,</li>
+<li>is suitable for autonomous operations.</li>
+</ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.36 Prior Information</h3>
+<p>Orbit determination may begin with an a priori state:</p>
+<p><span class="math display">\[\boxed{ \mathbf x_0 \sim \mathcal N(
+\bar{\mathbf x}_0, \mathbf P_0 ). }\]</span></p>
+<p>This may come from</p>
+<ul>
+<li>previous OD solution,</li>
+<li>GNSS navigation solution,</li>
+<li>launch injection estimate,</li>
+<li>tracking network solution,</li>
+<li>propagated ephemeris.</li>
+</ul>
+<p>The prior provides both an initial state and an uncertainty
+level.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.37 Initial Guess versus Prior</h3>
+<p>An <strong>initial guess</strong> is simply the starting numerical
+value used by the estimator.</p>
+<p>A <strong>prior</strong> additionally includes statistical
+confidence.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Initial Guess} \neq
+\text{Probabilistic Prior} }\]</span></p>
+<p>unless uncertainty is explicitly assigned.</p>
+<p>This distinction matters especially in batch least-squares
+estimation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.38 A Priori Orbit Covariance</h3>
+<p>The covariance</p>
+<p><span class="math display">\[\mathbf P_0\]</span></p>
+<p>describes uncertainty in the initial or reference state.</p>
+<p>A small covariance gives strong prior confidence.</p>
+<p>A large covariance gives measurements greater influence.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[\boxed{ \mathbf P_0 = \text{Quantitative
+Statement of Initial Orbit Knowledge} }\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.39 Orbit Covariance Propagation</h3>
+<p>If the covariance at <code>t_0</code> is</p>
+<p><span class="math display">\[\mathbf P_0,\]</span></p>
+<p>then for deterministic dynamics,</p>
+<p><span class="math display">\[\boxed{ \mathbf P(t) =
+\boldsymbol\Phi(t,t_0) \mathbf P_0 \boldsymbol\Phi^T(t,t_0).
+}\]</span></p>
+<p>With process noise,</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k+1|k} = \mathbf F_k
+\mathbf P_{k|k} \mathbf F_k^T + \mathbf Q_k. }\]</span></p>
+<p>Thus orbit determination estimates both the nominal trajectory and
+its uncertainty.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.40 Process Noise in OD</h3>
+<p>Process noise represents imperfect knowledge of the dynamics.</p>
+<p>Possible sources include</p>
+<ul>
+<li>atmospheric density error,</li>
+<li>solar-radiation-pressure uncertainty,</li>
+<li>maneuver error,</li>
+<li>empirical accelerations,</li>
+<li>unresolved disturbances.</li>
+</ul>
+<p>Too little process noise can make the estimator overconfident.</p>
+<p>Too much can make the orbit estimate unnecessarily noisy.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.41 Deterministic versus Stochastic OD</h3>
+<p>A deterministic OD model assumes all relevant dynamics are explicitly
+modeled.</p>
+<p>A stochastic OD model allows unmodeled behavior through process noise
+or estimated stochastic parameters.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Deterministic Model} +
+\text{Stochastic Correction} }\]</span></p>
+<p>is often a practical representation of real spacecraft dynamics.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.42 Observability in Orbit Determination</h3>
+<p>An orbit can be estimated only if the measurement set provides
+sufficient information about the state.</p>
+<p>For a linearized system, observability depends on</p>
+<p><span class="math display">\[\mathbf H_k\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\boldsymbol\Phi(t_k,t_0).\]</span></p>
+<p>The accumulated information from multiple observations determines
+whether all state components are recoverable.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.43 Weakly Observed Directions</h3>
+<p>Some state combinations may be poorly observed.</p>
+<p>Examples can occur when</p>
+<ul>
+<li>geometry changes very little,</li>
+<li>all measurements are nearly collinear,</li>
+<li>the observation arc is too short,</li>
+<li>only one measurement type is available.</li>
+</ul>
+<p>The corresponding covariance becomes large along weakly observed
+directions.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Weak Geometry} \rightarrow
+\text{Anisotropic Orbit Uncertainty} }\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.44 Position and Velocity Observability</h3>
+<p>A single position-like observation does not necessarily determine
+velocity well.</p>
+<p>Velocity becomes observable through</p>
+<ul>
+<li>repeated measurements,</li>
+<li>dynamic propagation,</li>
+<li>range-rate or Doppler,</li>
+<li>changing measurement geometry.</li>
+</ul>
+<p>Therefore orbital dynamics provide essential coupling between
+position and velocity estimation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.45 Bias versus State Observability</h3>
+<p>Suppose a range measurement contains an unknown bias:</p>
+<p><span class="math display">\[\rho_m = \rho+b_\rho+n.\]</span></p>
+<p>If <code>b_\rho</code> is estimated together with position, the two
+may become correlated.</p>
+<p>Sufficient geometry or independent measurement information is needed
+to separate them.</p>
+<p>This is a general example of augmented-state observability.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.46 Measurement Types in Orbit Determination</h3>
+<p>Common OD measurements include</p>
+<ul>
+<li>range,</li>
+<li>range rate,</li>
+<li>Doppler,</li>
+<li>azimuth,</li>
+<li>elevation,</li>
+<li>right ascension,</li>
+<li>declination,</li>
+<li>line of sight,</li>
+<li>GNSS pseudorange,</li>
+<li>GNSS carrier phase,</li>
+<li>optical angle measurements,</li>
+<li>inter-satellite range,</li>
+<li>inter-satellite range rate.</li>
+</ul>
+<p>Each measurement constrains the orbit differently.</p>
+<p>Their detailed mathematical models are treated in Section 4.3.12.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.47 Range Measurements</h3>
+<p>Range provides geometric distance between observer and
+spacecraft:</p>
+<p><span class="math display">\[\boxed{ \rho = \| \mathbf r_{\rm sc} -
+\mathbf r_{\rm obs} \|. }\]</span></p>
+<p>Range strongly constrains the radial separation along the line of
+sight but may provide weaker information in transverse directions by
+itself.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.48 Range-Rate Measurements</h3>
+<p>Range rate is approximately</p>
+<p><span class="math display">\[\boxed{ \dot{\rho} = \frac{ (\mathbf
+r_{\rm sc}-\mathbf r_{\rm obs})^T (\mathbf v_{\rm sc}-\mathbf v_{\rm
+obs}) }{ \rho }. }\]</span></p>
+<p>It directly constrains relative velocity along the line of sight.</p>
+<p>Range and range rate therefore provide complementary information.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.49 Angular Measurements</h3>
+<p>Angles such as azimuth/elevation or RA/Dec constrain line-of-sight
+direction.</p>
+<p>They can provide excellent angular geometry but may contain little
+direct range information.</p>
+<p>Thus angle-only OD often relies strongly on</p>
+<ul>
+<li>orbital dynamics,</li>
+<li>changing observer geometry,</li>
+<li>sufficiently long observation arcs.</li>
+</ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.50 GNSS Orbit Determination</h3>
+<p>A spacecraft equipped with GNSS can use satellite measurements to
+estimate position and velocity.</p>
+<p>A navigation state may include</p>
+<p><span class="math display">\[\boxed{ \mathbf x = \begin{bmatrix}
+\mathbf r\\ \mathbf v\\ b_c\\ \dot b_c \end{bmatrix} }\]</span></p>
+<p>where</p>
+<p><span class="math display">\[b_c\]</span></p>
+<p>is clock bias.</p>
+<p>GNSS can support both direct navigation solutions and higher-accuracy
+filtered orbit determination.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.51 Optical Orbit Determination</h3>
+<p>Optical observations commonly provide angular measurements.</p>
+<p>The measurement can be represented by a line-of-sight unit
+vector:</p>
+<p><span class="math display">\[\boxed{ \hat{\boldsymbol\rho} = \frac{
+\mathbf r_{\rm target} - \mathbf r_{\rm observer} }{ \| \mathbf r_{\rm
+target} - \mathbf r_{\rm observer} \| }. }\]</span></p>
+<p>Optical OD therefore depends strongly on geometry and dynamic
+propagation.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.52 Relative Orbit Determination</h3>
+<p>In relative navigation, the state may be</p>
+<p><span class="math display">\[\boxed{ \mathbf x_{\rm rel} =
+\begin{bmatrix} \mathbf r_{\rm rel}\\ \mathbf v_{\rm rel} \end{bmatrix}.
+}\]</span></p>
+<p>Measurements may include</p>
+<ul>
+<li>relative range,</li>
+<li>relative range rate,</li>
+<li>line of sight,</li>
+<li>image-based bearings,</li>
+<li>inter-satellite GNSS,</li>
+<li>LiDAR,</li>
+<li>radar.</li>
+</ul>
+<p>The same OD principles apply:</p>
+<p><span class="math display">\[\boxed{ \text{Relative Dynamics} +
+\text{Relative Measurements} \rightarrow \text{Relative Orbit Estimate}.
+}\]</span></p>
+<p>This is a general principle for formation flying and
+rendezvous/proximity operations.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.53 Absolute versus Relative OD</h3>
+<p>Absolute OD estimates motion relative to an inertial or Earth-fixed
+reference frame.</p>
+<p>Relative OD estimates motion of one object with respect to
+another.</p>
+<p>These problems may use different dynamics and measurements, but the
+estimation structure is the same:</p>
+<p><span class="math display">\[\boxed{ \text{State Propagation} +
+\text{Measurement Prediction} + \text{Residual Processing}
+}\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.54 Tracking Stations</h3>
+<p>Ground-based OD may use measurements from multiple tracking
+stations.</p>
+<p>Each station has known or estimated location</p>
+<p><span class="math display">\[\mathbf r_{\rm station}(t).\]</span></p>
+<p>Station geometry changes as Earth rotates.</p>
+<p>Multiple stations improve geometric diversity and can improve orbit
+observability.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.55 Tracking-Station Errors</h3>
+<p>Ground station parameters can also contribute error:</p>
+<ul>
+<li>station-position uncertainty,</li>
+<li>timing bias,</li>
+<li>tropospheric delay,</li>
+<li>ionospheric delay,</li>
+<li>antenna bias,</li>
+<li>measurement calibration.</li>
+</ul>
+<p>High-accuracy OD may need to model or estimate some of these
+effects.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.56 Time Systems</h3>
+<p>Precise orbit determination depends on consistent time handling.</p>
+<p>Relevant time systems may include</p>
+<ul>
+<li>UTC,</li>
+<li>TAI,</li>
+<li>TT,</li>
+<li>GPS time,</li>
+<li>UT1.</li>
+</ul>
+<p>Time-scale conversion errors can produce apparent measurement or
+propagation errors.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[\boxed{ \text{Correct Time Reference}
+\text{ is part of the OD model.} }\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.57 Coordinate Frames</h3>
+<p>Orbit states and measurements may be expressed in different
+frames.</p>
+<p>Common frames include</p>
+<ul>
+<li>inertial frames,</li>
+<li>Earth-fixed frames,</li>
+<li>local orbital frames,</li>
+<li>topocentric frames,</li>
+<li>sensor frames.</li>
+</ul>
+<p>The transformation between them must be handled consistently.</p>
+<p>A frame error can appear as an orbit-estimation error.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.58 Earth Orientation</h3>
+<p>High-precision Earth-orbit OD may require Earth orientation
+information such as</p>
+<ul>
+<li>polar motion,</li>
+<li>UT1,</li>
+<li>precession,</li>
+<li>nutation,</li>
+<li>Earth rotation.</li>
+</ul>
+<p>These quantities are required to transform accurately between
+inertial and Earth-fixed coordinates.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.59 Measurement Light-Time</h3>
+<p>For high-accuracy tracking, electromagnetic signals do not propagate
+instantaneously.</p>
+<p>The measurement may correspond to spacecraft state at transmission or
+reflection time rather than reception time.</p>
+<p>Therefore a light-time equation may need to be solved.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ t_{\rm receive} - t_{\rm
+transmit} = \frac{\rho}{c}. }\]</span></p>
+<p>Ignoring light time can introduce measurement-model error.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.60 Relativistic Corrections</h3>
+<p>In high-precision applications, relativistic effects may need to be
+included in</p>
+<ul>
+<li>signal propagation,</li>
+<li>clock models,</li>
+<li>orbital dynamics.</li>
+</ul>
+<p>These are usually negligible for basic OD but important for precision
+GNSS, deep-space navigation, and high-accuracy tracking.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.61 Measurement Availability</h3>
+<p>Measurements are not always continuous.</p>
+<p>Tracking may contain</p>
+<ul>
+<li>visibility gaps,</li>
+<li>occultations,</li>
+<li>ground-station outages,</li>
+<li>sensor duty cycles,</li>
+<li>communication gaps.</li>
+</ul>
+<p>During these periods, covariance typically grows through
+propagation.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{No Measurement}
+\rightarrow \text{Increasing Dependence on Dynamics}. }\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.62 Measurement Cadence</h3>
+<p>Higher measurement rate does not automatically mean proportionally
+better orbit accuracy.</p>
+<p>Improvement depends on</p>
+<ul>
+<li>measurement independence,</li>
+<li>sensor noise,</li>
+<li>geometry,</li>
+<li>dynamic evolution,</li>
+<li>correlation.</li>
+</ul>
+<p>Repeated nearly identical measurements may add less information than
+fewer measurements with diverse geometry.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.63 Measurement Correlation</h3>
+<p>Measurement errors may be correlated in time or across sensors.</p>
+<p>If correlated measurements are treated as independent, the estimator
+may become overconfident.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Correct Statistical
+Modeling} }\]</span></p>
+<p>is as important as accurate measurement equations.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.64 Measurement Editing</h3>
+<p>Real tracking data may contain outliers or invalid measurements.</p>
+<p>Measurement editing may include</p>
+<ul>
+<li>range checks,</li>
+<li>residual checks,</li>
+<li>innovation gating,</li>
+<li>quality flags,</li>
+<li>sensor-health checks.</li>
+</ul>
+<p>Outlier rejection should be statistically justified so that valid but
+unusual measurements are not removed systematically.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.65 Pre-Fit Residuals</h3>
+<p>Before updating the estimate, define</p>
+<p><span class="math display">\[\boxed{ \mathbf r_k^{\rm pre} = \mathbf
+z_k - h( \hat{\mathbf x}_k^{-} ). }\]</span></p>
+<p>Pre-fit residuals indicate how well the predicted trajectory matches
+the measurements before correction.</p>
+<p>Large structured residuals may indicate model problems.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.66 Post-Fit Residuals</h3>
+<p>After estimation, evaluate</p>
+<p><span class="math display">\[\boxed{ \mathbf r_k^{\rm post} = \mathbf
+z_k - h( \hat{\mathbf x}_k^{+} ). }\]</span></p>
+<p>Post-fit residuals help assess</p>
+<ul>
+<li>estimator quality,</li>
+<li>remaining bias,</li>
+<li>model adequacy,</li>
+<li>measurement consistency.</li>
+</ul>
+<p>Small residuals alone do not guarantee a physically correct
+solution.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.67 Residual Whitening</h3>
+<p>For a well-modeled estimation problem, normalized residuals should be
+approximately</p>
+<ul>
+<li>zero mean,</li>
+<li>statistically consistent with assumed covariance,</li>
+<li>temporally uncorrelated.</li>
+</ul>
+<p>Persistent temporal structure may indicate unmodeled dynamics or
+biased measurements.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.68 Solution Convergence</h3>
+<p>An OD solution is considered converged when further correction
+becomes sufficiently small and residual statistics stabilize.</p>
+<p>Possible criteria include</p>
+<p><span class="math display">\[\boxed{ \|\delta\mathbf x\| &lt;
+\epsilon_x }\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\boxed{ |J_{i+1}-J_i| &lt; \epsilon_J.
+}\]</span></p>
+<p>Convergence criteria should be tied to engineering accuracy rather
+than arbitrary numerical thresholds.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.69 Convergence Does Not Guarantee Correctness</h3>
+<p>An estimator can converge to the wrong solution.</p>
+<p>Possible causes include</p>
+<ul>
+<li>poor initial guess,</li>
+<li>local minimum,</li>
+<li>wrong force model,</li>
+<li>biased measurements,</li>
+<li>poor observability,</li>
+<li>incorrect weighting.</li>
+</ul>
+<p>Therefore,</p>
+<p><span class="math display">\[\boxed{ \text{Numerical Convergence}
+\neq \text{Physical Correctness} }\]</span></p>
+<p>Independent validation is essential.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.70 Orbit Solution Validation</h3>
+<p>An orbit solution should be checked using</p>
+<ul>
+<li>residual statistics,</li>
+<li>covariance consistency,</li>
+<li>independent tracking data,</li>
+<li>withheld measurements,</li>
+<li>prediction performance,</li>
+<li>comparison across arcs,</li>
+<li>physical plausibility.</li>
+</ul>
+<p>A good OD solution should not only fit current measurements but also
+predict future measurements reasonably well.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.71 Overlap Analysis</h3>
+<p>Two OD arcs may overlap in time.</p>
+<p>If both solutions are propagated into the overlap region, their
+difference provides a useful consistency diagnostic.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \Delta\mathbf x_{\rm overlap} =
+\mathbf x_A - \mathbf x_B. }\]</span></p>
+<p>Small overlap differences can support confidence in the OD
+process.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.72 Prediction Error</h3>
+<p>Orbit determination and orbit prediction are related but
+different.</p>
+<p>OD asks:</p>
+<blockquote>
+<p>What trajectory best explains the measurements?</p>
+</blockquote>
+<p>Prediction asks:</p>
+<blockquote>
+<p>Where will the spacecraft be later?</p>
+</blockquote>
+<p>Prediction accuracy depends strongly on force-model and parameter
+accuracy.</p>
+<p>A highly accurate fitted orbit can still diverge during long
+propagation if important dynamic parameters are poorly modeled.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.73 Fit Span versus Prediction Span</h3>
+<p>The <strong>fit span</strong> is the interval containing measurements
+used in OD.</p>
+<p>The <strong>prediction span</strong> is the future interval over
+which the estimated orbit is propagated without new measurements.</p>
+<p>These should not be confused.</p>
+<p>A solution may fit the observation arc very well while having poor
+long-term predictive performance.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.74 Smoothing and Orbit Reconstruction</h3>
+<p>After all measurements over an arc are available, smoothing can
+improve state estimates at earlier times.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \text{Forward Filter} +
+\text{Future Measurements} \rightarrow \text{Smoothed Orbit}.
+}\]</span></p>
+<p>This is valuable for precise post-flight reconstruction and
+scientific analysis.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.75 Sequential Onboard OD</h3>
+<p>For autonomous spacecraft, OD may run onboard.</p>
+<p>An onboard estimator may combine</p>
+<ul>
+<li>GNSS,</li>
+<li>optical measurements,</li>
+<li>inertial sensors,</li>
+<li>inter-satellite ranging,</li>
+<li>propagated dynamics.</li>
+</ul>
+<p>The resulting state can support autonomous guidance and control.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.76 Onboard versus Ground OD</h3>
+<p>Ground OD typically has access to</p>
+<ul>
+<li>greater computational resources,</li>
+<li>larger tracking networks,</li>
+<li>more detailed force models,</li>
+<li>delayed but high-accuracy processing.</li>
+</ul>
+<p>Onboard OD prioritizes</p>
+<ul>
+<li>real-time availability,</li>
+<li>autonomy,</li>
+<li>limited computation,</li>
+<li>robust operation.</li>
+</ul>
+<p>Many missions use both.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.77 Initial Orbit Determination</h3>
+<p>Before a refined estimator can operate, an initial orbit may need to
+be generated from limited observations.</p>
+<p>This is called <strong>initial orbit determination</strong>.</p>
+<p>Its purpose is generally to produce a sufficiently accurate initial
+state for later differential correction or filtering.</p>
+<p>IOD methods depend strongly on the available measurement type.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.78 Initial Orbit versus Precise Orbit</h3>
+<p>Initial orbit determination typically provides a coarse solution.</p>
+<p>Precise OD iteratively or sequentially refines that solution
+using</p>
+<ul>
+<li>higher-fidelity dynamics,</li>
+<li>many measurements,</li>
+<li>calibrated sensor models,</li>
+<li>covariance weighting,</li>
+<li>estimated parameters.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Initial Orbit} \rightarrow
+\text{Refined Orbit Determination} }\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.79 Dynamic Consistency</h3>
+<p>An essential feature of OD is that measurements at different times
+are linked through the equations of motion.</p>
+<p>The estimate should therefore satisfy</p>
+<p><span class="math display">\[\boxed{ \mathbf x(t_2) = \phi(
+t_2,t_1,\mathbf x(t_1) ) }\]</span></p>
+<p>within the modeled uncertainty.</p>
+<p>This is what differentiates orbit determination from simply fitting
+independent positions.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.80 Data Arc Continuity</h3>
+<p>If a long data gap occurs, the orbit must be propagated through that
+gap.</p>
+<p>Uncertainty grows according to dynamics and process noise.</p>
+<p>When tracking resumes, the estimator must reconcile the new
+measurements with the propagated state.</p>
+<p>Large gaps can therefore challenge convergence and data
+association.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.81 Maneuver Handling within an Arc</h3>
+<p>If a maneuver occurs inside an observation arc, the propagator must
+account for it.</p>
+<p>Options include</p>
+<ul>
+<li>known impulsive <code>\Delta v</code>,</li>
+<li>known finite burn,</li>
+<li>estimated maneuver magnitude,</li>
+<li>split arcs,</li>
+<li>process-noise injection.</li>
+</ul>
+<p>Ignoring a maneuver can create large systematic residuals.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.82 Multiple Observation Arcs</h3>
+<p>Sometimes separate arcs are processed independently.</p>
+<p>This can be useful for</p>
+<ul>
+<li>assessing consistency,</li>
+<li>detecting model drift,</li>
+<li>estimating changing parameters,</li>
+<li>validating long-term prediction.</li>
+</ul>
+<p>Differences between arc solutions can reveal unmodeled behavior.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.83 Multi-Sensor Orbit Determination</h3>
+<p>Multiple sensors can be combined:</p>
+<p><span class="math display">\[\boxed{ \text{Range} + \text{Doppler} +
+\text{Angles} + \text{GNSS} +\cdots \rightarrow \text{Improved Orbit
+Knowledge}. }\]</span></p>
+<p>The benefit is strongest when the sensors provide complementary
+information.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.84 Sensor Bias in Multi-Sensor OD</h3>
+<p>Different sensors may contain different biases.</p>
+<p>If these are not modeled, combining sensors can actually degrade the
+solution.</p>
+<p>Possible augmented states include</p>
+<p><span class="math display">\[b_{\rm range}, \quad b_{\rm Doppler},
+\quad b_{\rm clock}, \quad b_{\rm angle}.\]</span></p>
+<p>Calibration and observability should be assessed before adding these
+states.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.85 Orbit Determination Error Budget</h3>
+<p>An OD error budget may include</p>
+<ul>
+<li>initial-state uncertainty,</li>
+<li>measurement noise,</li>
+<li>measurement bias,</li>
+<li>force-model uncertainty,</li>
+<li>station-location error,</li>
+<li>timing error,</li>
+<li>maneuver uncertainty,</li>
+<li>environmental uncertainty.</li>
+</ul>
+<p>The final orbit uncertainty is produced by the propagation and
+interaction of all these sources.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.86 Covariance Is Part of the Orbit Solution</h3>
+<p>An OD result should ideally be reported as</p>
+<p><span class="math display">\[\boxed{ \{ \hat{\mathbf x}, \mathbf P
+\}. }\]</span></p>
+<p>The state estimate tells where the spacecraft is believed to be.</p>
+<p>The covariance describes uncertainty in that belief.</p>
+<p>A state without uncertainty information is an incomplete navigation
+product.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.87 State Accuracy versus State Precision</h3>
+<p><strong>Accuracy</strong> refers to closeness to the true state.</p>
+<p><strong>Precision</strong> refers to dispersion or uncertainty.</p>
+<p>A solution can be</p>
+<ul>
+<li>precise but biased,</li>
+<li>accurate but noisy,</li>
+<li>both accurate and precise,</li>
+<li>neither.</li>
+</ul>
+<p>Therefore covariance alone is not enough to prove accuracy.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.88 Orbit Determination Consistency</h3>
+<p>Estimator consistency asks whether actual errors match predicted
+covariance statistics.</p>
+<p>When truth is available,</p>
+<p><span class="math display">\[\boxed{ \epsilon_x = \tilde{\mathbf x}^T
+\mathbf P^{-1} \tilde{\mathbf x} }\]</span></p>
+<p>can be used.</p>
+<p>When truth is unavailable, innovation statistics provide indirect
+consistency checks.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.89 Common Mistakes in Orbit Determination</h3>
+<p>Common OD errors include:</p>
+<ol type="1">
+<li>Using an inadequate force model.</li>
+<li>Ignoring measurement bias.</li>
+<li>Mixing coordinate frames.</li>
+<li>Using inconsistent time systems.</li>
+<li>Using incorrect station coordinates.</li>
+<li>Ignoring maneuver uncertainty.</li>
+<li>Assuming measurement errors are independent when they are not.</li>
+<li>Using unrealistic measurement weights.</li>
+<li>Choosing an observation arc that is too short for
+observability.</li>
+<li>Choosing an excessively long arc with poor model fidelity.</li>
+<li>Ignoring parameter-state correlations.</li>
+<li>Reporting covariance without validating consistency.</li>
+<li>Assuming small residuals mean the physical model is correct.</li>
+<li>Confusing numerical convergence with physical correctness.</li>
+<li>Using a high-fidelity estimator with a low-fidelity measurement
+model.</li>
+</ol>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.90 Practical Orbit-Determination Workflow</h3>
+<p>A disciplined OD workflow is</p>
+<p><span class="math display">\[\boxed{ \begin{array}{c} \text{Define
+Reference Epoch and State}\\ \downarrow\\ \text{Select Coordinate Frame
+and Time System}\\ \downarrow\\ \text{Define Force Model}\\ \downarrow\\
+\text{Define Measurement Models}\\ \downarrow\\ \text{Define Measurement
+Covariance}\\ \downarrow\\ \text{Define Initial State and Covariance}\\
+\downarrow\\ \text{Propagate Orbit}\\ \downarrow\\ \text{Predict
+Measurements}\\ \downarrow\\ \text{Compute Residuals}\\ \downarrow\\
+\text{Compute Sensitivities}\\ \downarrow\\ \text{Estimate State /
+Parameters}\\ \downarrow\\ \text{Update Covariance}\\ \downarrow\\
+\text{Inspect Residuals}\\ \downarrow\\ \text{Check Convergence and
+Consistency}\\ \downarrow\\ \text{Validate with Independent Data}\\
+\downarrow\\ \text{Assess Prediction Performance} \end{array}
+}\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.91 General OD Information Flow</h3>
+<p>The complete information flow is</p>
+<p><span class="math display">\[\boxed{ \begin{array}{c} \text{Reference
+State}\\ \hat{\mathbf x}_0 \\ + \\ \text{Dynamic Model} \\ \downarrow\\
+\text{Propagated Trajectory} \\ \hat{\mathbf x}(t) \\ + \\ \text{Sensor
+Geometry} \\ \downarrow\\ \text{Predicted Measurements} \\ \hat{\mathbf
+z} \\ \downarrow\\ \text{Residuals} \\ \mathbf z-\hat{\mathbf z} \\
+\downarrow\\ \text{Estimator} \\ \downarrow\\ \text{Updated State +
+Parameters + Covariance} \end{array} }\]</span></p>
+<p>This is the core structure underlying virtually all
+orbit-determination systems.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.92 Orbit Determination as an Inverse Problem</h3>
+<p>Orbit propagation solves the forward problem:</p>
+<p><span class="math display">\[\boxed{ \mathbf x_0 \rightarrow \mathbf
+x(t) \rightarrow \mathbf z(t). }\]</span></p>
+<p>Orbit determination solves the inverse problem:</p>
+<p><span class="math display">\[\boxed{ \mathbf z(t) \rightarrow
+\hat{\mathbf x}_0. }\]</span></p>
+<p>The measurements are known, while the state that generated them must
+be inferred.</p>
+<p>This inverse nature explains why</p>
+<ul>
+<li>observability,</li>
+<li>geometry,</li>
+<li>measurement noise,</li>
+<li>prior knowledge</li>
+</ul>
+<p>are so important.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.93 Deterministic and Statistical Components</h3>
+<p>OD contains both deterministic and statistical elements.</p>
+<p>The deterministic part includes</p>
+<ul>
+<li>dynamics,</li>
+<li>coordinate transformations,</li>
+<li>measurement geometry.</li>
+</ul>
+<p>The statistical part includes</p>
+<ul>
+<li>covariance,</li>
+<li>measurement noise,</li>
+<li>process noise,</li>
+<li>uncertainty propagation.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Orbit Determination} =
+\text{Orbital Mechanics} + \text{Estimation Theory}. }\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.94 Relationship to Covariance Analysis</h3>
+<p>Section 4.3.9 established how uncertainty propagates.</p>
+<p>In OD, that machinery becomes directly operational.</p>
+<p>The STM propagates orbit uncertainty:</p>
+<p><span class="math display">\[\boxed{ \mathbf P(t) = \boldsymbol\Phi
+\mathbf P_0 \boldsymbol\Phi^T. }\]</span></p>
+<p>Measurements then reduce uncertainty according to their geometry and
+noise.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Orbit Determination} =
+\text{Trajectory Estimation} + \text{Uncertainty Estimation}.
+}\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.95 Relationship to Augmented-State Estimation</h3>
+<p>Section 4.3.10 showed how uncertain parameters can be estimated.</p>
+<p>OD frequently uses this concept.</p>
+<p>A typical augmented orbit state may include</p>
+<p><span class="math display">\[\boxed{ \mathbf x_a = \begin{bmatrix}
+\mathbf r\\ \mathbf v\\ B\\ \mathbf b\\ \boldsymbol\theta_{\rm dyn}
+\end{bmatrix}. }\]</span></p>
+<p>Thus, precise orbit determination often means estimating both
+trajectory and model parameters.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.96 Relationship to Measurement Models</h3>
+<p>The estimator cannot use raw tracking data without a measurement
+model.</p>
+<p>The central relationship is</p>
+<p><span class="math display">\[\boxed{ \mathbf z_k = h_k( \mathbf x_k )
++ \mathbf v_k. }\]</span></p>
+<p>Section 4.3.12 develops the specific models for</p>
+<ul>
+<li>range,</li>
+<li>range rate,</li>
+<li>Doppler,</li>
+<li>azimuth/elevation,</li>
+<li>RA/Dec,</li>
+<li>line of sight,</li>
+<li>GNSS,</li>
+<li>optical observations.</li>
+</ul>
+<p>These models form the measurement layer of OD.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.97 Relationship to Batch Orbit Determination</h3>
+<p>In batch OD, all measurements are assembled into one estimation
+problem.</p>
+<p>The reference-state correction is found from the combined measurement
+sensitivities.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \text{Observation Arc} +
+\text{STM} + \text{Measurement Partials} \rightarrow \text{Best-Fit
+Reference State}. }\]</span></p>
+<p>This is developed in Section 4.3.13.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.98 Relationship to Sequential Orbit Determination</h3>
+<p>In sequential OD, measurement information is incorporated
+recursively.</p>
+<p>The state and covariance evolve continuously:</p>
+<p><span class="math display">\[\boxed{ \text{Propagation} \rightarrow
+\text{Measurement Update} \rightarrow \text{Propagation}
+\rightarrow\cdots }\]</span></p>
+<p>This is developed in Section 4.3.14.</p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.99 Key Equations</h3>
+<h3 id="reference-state">Reference state</h3>
+<p><span class="math display">\[\boxed{ \mathbf x_0 = \begin{bmatrix}
+\mathbf r_0\\ \mathbf v_0 \end{bmatrix} }\]</span></p>
+<h3 id="dynamics">Dynamics</h3>
+<p><span class="math display">\[\boxed{ \dot{\mathbf x} = f( \mathbf x,
+t, \boldsymbol\theta ) }\]</span></p>
+<h3 id="orbit-propagation">Orbit propagation</h3>
+<p><span class="math display">\[\boxed{ \mathbf x(t_k) = \phi(
+t_k,t_0,\mathbf x_0 ) }\]</span></p>
+<h3 id="measurement-model">Measurement model</h3>
+<p><span class="math display">\[\boxed{ \mathbf z_k = h_k( \mathbf x_k )
++ \mathbf v_k }\]</span></p>
+<h3 id="measurement-prediction">Measurement prediction</h3>
+<p><span class="math display">\[\boxed{ \hat{\mathbf z}_k = h_k(
+\hat{\mathbf x}_k^- ) }\]</span></p>
+<h3 id="residual">Residual</h3>
+<p><span class="math display">\[\boxed{ \mathbf y_k = \mathbf z_k -
+\hat{\mathbf z}_k }\]</span></p>
+<h3 id="state-transition-mapping">State transition mapping</h3>
+<p><span class="math display">\[\boxed{ \delta\mathbf x_k =
+\boldsymbol\Phi(t_k,t_0) \delta\mathbf x_0 }\]</span></p>
+<h3 id="measurement-sensitivity">Measurement sensitivity</h3>
+<p><span class="math display">\[\boxed{ \mathbf G_k = \mathbf H_k
+\boldsymbol\Phi(t_k,t_0) }\]</span></p>
+<h3 id="covariance-propagation">Covariance propagation</h3>
+<p><span class="math display">\[\boxed{ \mathbf P(t) = \boldsymbol\Phi
+\mathbf P_0 \boldsymbol\Phi^T }\]</span></p>
+<p>or with process noise,</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k+1|k} = \mathbf F_k
+\mathbf P_{k|k} \mathbf F_k^T + \mathbf Q_k. }\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.11.100 Key Takeaways</h3>
+<p>Orbit determination is the process of inferring a spacecraft
+trajectory from observations and a model of spacecraft motion.</p>
+<p>The estimate is usually defined at a reference epoch:</p>
+<p><span class="math display">\[\boxed{ \mathbf x_0 = \begin{bmatrix}
+\mathbf r_0\\ \mathbf v_0 \end{bmatrix}. }\]</span></p>
+<p>That state is propagated to measurement times using the dynamic
+model:</p>
+<p><span class="math display">\[\boxed{ \mathbf x(t_k) = \phi(
+t_k,t_0,\mathbf x_0 ). }\]</span></p>
+<p>The propagated state is converted into a predicted measurement:</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf z}_k = h(
+\hat{\mathbf x}_k ). }\]</span></p>
+<p>The estimator uses the difference</p>
+<p><span class="math display">\[\boxed{ \mathbf y_k = \mathbf
+z_k-\hat{\mathbf z}_k }\]</span></p>
+<p>to improve the orbit estimate.</p>
+<p>The quality of the solution depends jointly on</p>
+<p><span class="math display">\[\boxed{ \text{Force Models} +
+\text{Measurement Models} + \text{Tracking Geometry} + \text{Observation
+Arc} + \text{Noise Models} + \text{Estimator Design}. }\]</span></p>
+<p>The reference-epoch state, STM, covariance, measurement partial
+derivatives, and residuals form the mathematical backbone of orbit
+determination.</p>
+<p>The observation arc must be long enough to provide information, but
+not so long that model errors dominate.</p>
+<p>Measurements constrain different parts of the orbit differently, so
+diverse geometry and complementary sensor types are extremely
+valuable.</p>
+<p>Orbit determination should always produce not only an estimated state
+but also uncertainty:</p>
+<p><span class="math display">\[\boxed{ \text{OD Solution} = \{
+\hat{\mathbf x}, \mathbf P \}. }\]</span></p>
+<p>Finally, orbit determination is best viewed as a complete estimation
+architecture:</p>
+<p><span class="math display">\[\boxed{ \text{Reference State}
+\rightarrow \text{Propagation} \rightarrow \text{Measurement Prediction}
+\rightarrow \text{Residual} \rightarrow \text{State Correction}
+\rightarrow \text{Updated Orbit and Covariance}. }\]</span></p>
+<p>That architecture provides the foundation for the next topics:
+detailed orbit-determination measurement models, batch OD, and
+sequential OD.</p>
+    </section>
+    <section class="notes-section-card">
+      <h2>Next: 4.3.12 Orbit-Determination Measurement Models</h2>
+      <p>
+        Orbit-determination fundamentals establish how a reference state, force model, propagation, uncertainty,
+        tracking geometry, and residual processing are combined into an orbit solution. The next section develops
+        the measurement equations that connect the propagated spacecraft state to actual tracking observations.
+      </p>
+      <a href="batch-orbit-determination.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.12 Orbit-Determination Measurement Models</h3>
+          <p>
+            Range, range rate, Doppler, azimuth/elevation, right ascension/declination, line of sight, GNSS,
+            optical observations, and measurement partial derivatives.
+          </p>
+          <p class="sensor-link-arrow">Continue to Orbit-Determination Measurement Models &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
