@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.3.18 Estimator Design Workflow and Algorithm Selection | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .table-wrap { width:100%; overflow-x:auto; margin:1rem 0 1.4rem; }
+    .table-wrap table { width:100%; border-collapse:collapse; }
+    .table-wrap th, .table-wrap td { border:1px solid #d8dee6; padding:0.75rem 0.85rem; text-align:left; vertical-align:top; }
+    .table-wrap th { font-weight:700; background:#f7f9fb; }
+    .engineering-note { margin:1rem 0; padding:0.95rem 1.05rem; background:#f7f9fb; border-left:4px solid #9bb8d3; }
+    .equation-note { margin-top:0.35rem; color:#475569; }
+    .notes-section-card h4 { margin-top:1.25rem; margin-bottom:0.55rem; }
+    .notes-section-card .math.display { display:block; overflow-x:auto; padding:0.15rem 0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Estimator Design Workflow and Algorithm Selection</h1>
+    <p class="notes-tagline">
+      Estimation objectives, state and parameter selection, batch and sequential architectures,
+      EKF and UKF selection, smoothing, augmented states, multi-rate sensor fusion, process and measurement noise,
+      numerical robustness, constraints, timing, FDIR integration, and estimator validation.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.3.18 Estimator Design Workflow and Algorithm Selection</h2>
+
+<p>Estimator design is not simply about choosing an EKF, UKF, least-squares solver, or some advanced nonlinear filter. It is a <strong>system-level design problem</strong>. The estimator has to be selected according to the system physics, the measurements available, what must be estimated, how uncertainty evolves, computational limits, and whether the estimate is required in real time or can be produced later through post-processing.</p>
+<p>The central design question is</p>
+<p><span class="math display">\[
+\boxed{ \text{What estimation architecture best matches the available information and the decision that must be made?} }
+\]</span></p>
+<p>An estimator may therefore be static or dynamic, batch or sequential, linear or nonlinear, deterministic or probabilistic, filtering or smoothing, state-only or parameter-augmented, centralized or distributed, real-time or post-processed. There is no universally best estimator; the architecture must follow the estimation problem.</p>
+<hr />
+      <hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.1 Start with the Estimation Problem, Not the Algorithm</h3>
+<p>The first mistake to avoid is beginning with:</p>
+<blockquote><p>“I will use an EKF.”</p></blockquote>
+<p>or:</p>
+<blockquote><p>“I will use batch least squares.”</p></blockquote>
+<p>The algorithm should come later.</p>
+<p>First answer:</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{What is unknown?}\\ \text{What is measured?}\\ \text{How do the unknowns evolve?}\\ \text{When is the estimate required?} \end{array}}
+\]</span></p>
+<p>These four questions determine most of the architecture.</p>
+<p>For example, estimating a constant calibration bias from an offline dataset is fundamentally different from estimating a moving spacecraft state continuously onboard.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.2 Define the Estimation Objective</h3>
+<p>Before designing the estimator, define exactly what it must provide.</p>
+<p>Possible outputs include:</p>
+<ul>
+<li>position,</li>
+<li>velocity,</li>
+<li>attitude,</li>
+<li>angular rate,</li>
+<li>orbital state,</li>
+<li>relative state,</li>
+<li>clock bias and drift,</li>
+<li>sensor biases,</li>
+<li>aerodynamic parameters,</li>
+<li>SRP parameters,</li>
+<li>thrust magnitude,</li>
+<li>burn timing,</li>
+<li>thrust direction,</li>
+<li>actuator scale factors,</li>
+<li>alignment errors,</li>
+<li>calibration parameters.</li>
+</ul>
+<p>A general estimation vector may be written as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x= \begin{bmatrix} \mathbf x_{\rm physical}\\ \boldsymbol\theta_{\rm parameters}\\ \mathbf b_{\rm biases} \end{bmatrix}}
+\]</span></p>
+<p>when physical states, model parameters, and biases are estimated together.</p>
+<p>The purpose of explicitly writing the state is to make clear what the estimator is allowed to modify.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.3 Define the State Vector Carefully</h3>
+<div class="engineering-note"><strong>Design note:</strong> A larger state vector can make an estimator look more complete, but it also increases the number of directions that must be supported by measurement information. State augmentation should therefore follow observability and identifiability analysis, not precede it.</div>
+<p>For basic translational orbital navigation,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x= \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}}
+\]</span></p>
+<p>may be sufficient.</p>
+<p>A more complicated estimator might use</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x= \begin{bmatrix} \mathbf r\\ \mathbf v\\ C_D\\ C_R\\ \mathbf b\\ \Delta\mathbf v_{\rm maneuver} \end{bmatrix}}
+\]</span></p>
+<p>to estimate dynamic parameters and maneuver corrections simultaneously.</p>
+<p>But every additional estimated quantity creates another direction the measurements must constrain.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{More Estimated States} \neq \text{Better Estimator} }
+\]</span></p>
+<p>unless those additional states are observable or identifiable.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.4 Separate States, Parameters, and Disturbances</h3>
+<p>These quantities should not be treated as if they were the same.</p>
+<h4>Dynamic states</h4>
+<p>They evolve according to the system equations.</p>
+<p>Examples:</p>
+<p><span class="math display">\[
+\mathbf r,\quad \mathbf v,\quad \mathbf q,\quad \boldsymbol\omega.
+\]</span></p>
+<h4>Parameters</h4>
+<p>They characterize the model and may be constant or slowly varying.</p>
+<p>Examples:</p>
+<p><span class="math display">\[
+C_D,\quad C_R,\quad \text{sensor scale factor},\quad \text{alignment parameter}.
+\]</span></p>
+<h4>Disturbances</h4>
+<p>These represent forcing that is uncertain or not modeled explicitly.</p>
+<p>Examples include:</p>
+<ul>
+<li>unmodeled accelerations,</li>
+<li>uncertain environmental forces,</li>
+<li>unresolved disturbances.</li>
+</ul>
+<p>Estimator design should reflect these physical differences.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.5 Define the Dynamic Model</h3>
+<p>A dynamic estimator requires a state-evolution model:</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf x} = f(\mathbf x,\mathbf u,t)+\mathbf w }
+\]</span></p>
+<p>or in discrete form,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{k+1} = f_k(\mathbf x_k,\mathbf u_k)+\mathbf w_k. }
+\]</span></p>
+<p>Here:</p>
+<ul>
+<li><code>\mathbf x</code> = state,</li>
+<li><code>\mathbf u</code> = known input,</li>
+<li><code>f</code> = dynamic model,</li>
+<li><code>\mathbf w</code> = process uncertainty.</li>
+</ul>
+<p>A highly sophisticated filter does not compensate indefinitely for fundamentally incorrect dynamics. The estimator can only perform as well as the combined adequacy of the physics model and uncertainty model.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.6 Define the Measurement Model</h3>
+<p>The general measurement model is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k(\mathbf x_k)+\mathbf v_k. }
+\]</span></p>
+<p>The estimator must know what each sensor physically measures.</p>
+<p>Examples include:</p>
+<h4>Range</h4>
+<p><span class="math display">\[
+\rho=\|\mathbf r\|
+\]</span></p>
+<h4>Range rate</h4>
+<p><span class="math display">\[
+\dot\rho = \hat{\boldsymbol\rho}^{T}\mathbf v
+\]</span></p>
+<h4>LOS direction</h4>
+<p><span class="math display">\[
+\hat{\boldsymbol\rho} = \frac{\mathbf r} {\|\mathbf r\|}.
+\]</span></p>
+<p>The measurement equation is what connects sensor information to the estimated state.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.7 Static versus Dynamic Estimation</h3>
+<p>A <strong>static estimator</strong> assumes the unknown quantity remains fixed:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z = h(\boldsymbol\theta)+\mathbf v. }
+\]</span></p>
+<p>Typical uses include:</p>
+<ul>
+<li>fixed calibration parameters,</li>
+<li>bias estimation from a dataset,</li>
+<li>static parameter identification.</li>
+</ul>
+<p>A <strong>dynamic estimator</strong> explicitly represents time evolution:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{k+1} = f(\mathbf x_k)+\mathbf w_k. }
+\]</span></p>
+<p>Hence,</p>
+<p><span class="math display">\[
+\boxed{ \text{Static} \rightarrow \text{Fixed Unknowns} }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \text{Dynamic} \rightarrow \text{Time-Varying States}. }
+\]</span></p>
+<p>Use dynamic estimation whenever the state evolves significantly over the observation interval.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.8 Batch Estimation</h3>
+<p>Batch estimation processes an entire observation set together.</p>
+<p>A representative cost function is</p>
+<p><span class="math display">\[
+\boxed{ J(\mathbf x_0) = \sum_{k=1}^{N} \mathbf r_k^T \mathbf R_k^{-1} \mathbf r_k }
+\]</span></p>
+<p>with</p>
+<p><span class="math display">\[
+\mathbf r_k = \mathbf z_k- h_k(\mathbf x_k).
+\]</span></p>
+<p>Possible unknowns include:</p>
+<ul>
+<li>initial/reference state,</li>
+<li>biases,</li>
+<li>maneuver parameters,</li>
+<li>dynamic parameters.</li>
+</ul>
+<p>Batch processing is especially useful when the entire measurement arc is available.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.9 Advantages of Batch Estimation</h3>
+<p>Batch estimation has several strengths:</p>
+<ul>
+<li>all observations are available simultaneously,</li>
+<li>complete measurement geometry can be exploited,</li>
+<li>long-arc parameters can be estimated,</li>
+<li>residuals can be examined globally,</li>
+<li>weak parameters and correlations can be diagnosed,</li>
+<li>the same data can be reprocessed,</li>
+<li>alternative dynamic or measurement models can be compared.</li>
+</ul>
+<p>This makes batch estimation particularly useful for:</p>
+<ul>
+<li>orbit determination,</li>
+<li>trajectory reconstruction,</li>
+<li>calibration,</li>
+<li>parameter estimation,</li>
+<li>maneuver reconstruction,</li>
+<li>estimator validation.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.10 Limitations of Batch Estimation</h3>
+<p>Batch estimation is usually less suitable for immediate real-time navigation because:</p>
+<ul>
+<li>the complete dataset may need to be available,</li>
+<li>large datasets require memory and computation,</li>
+<li>repeated nonlinear optimization may be expensive,</li>
+<li>a complete historical solution may need to be recomputed.</li>
+</ul>
+<p>Thus if the current navigation state must always be available, sequential methods are usually more natural.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.11 Sequential Estimation</h3>
+<p>Sequential estimation processes information as it becomes available:</p>
+<p><span class="math display">\[
+\boxed{ \text{Previous Estimate} \rightarrow \text{Prediction} \rightarrow \text{Measurement} \rightarrow \text{Correction}. }
+\]</span></p>
+<p>The estimator maintains</p>
+<p><span class="math display">\[
+\hat{\mathbf x}_k
+\]</span></p>
+<p>and uncertainty</p>
+<p><span class="math display">\[
+\mathbf P_k.
+\]</span></p>
+<p>This architecture is suited to continuous and real-time navigation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.12 Prediction and Measurement Update</h3>
+<div class="engineering-note"><strong>Design note:</strong> In implementation, the prediction and correction steps can run at different rates. The prediction can execute every propagation step, while the correction is triggered only when a valid measurement arrives.</div>
+<p>Sequential estimation has two core stages.</p>
+<h4>Prediction</h4>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_k^{-} = f( \hat{\mathbf x}_{k-1}^{+} ) }
+\]</span></p>
+<p>The dynamic model predicts the next state.</p>
+<h4>Measurement update</h4>
+<p>The predicted measurement is compared with the observation:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf y_k = \mathbf z_k- h( \hat{\mathbf x}_k^- ) }
+\]</span></p>
+<p>where <code>\mathbf y_k</code> is the innovation.</p>
+<p>Thus sequential estimation repeatedly alternates:</p>
+<p><span class="math display">\[
+\boxed{ \text{Physics-Based Prediction} \leftrightarrow \text{Measurement-Based Correction}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.13 Batch versus Sequential Estimation</h3>
+<p>The fundamental distinction is:</p>
+<p><span class="math display">\[
+\boxed{ \text{Batch} \rightarrow \text{Process an Observation Arc Together} }
+\]</span></p>
+<p>versus</p>
+<p><span class="math display">\[
+\boxed{ \text{Sequential} \rightarrow \text{Update as Measurements Arrive}. }
+\]</span></p>
+<p>Neither is universally superior.</p>
+<p>Use batch processing when global arc information is valuable.</p>
+<p>Use sequential estimation when the current state must be available continuously.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.14 Hybrid Batch-Sequential Architecture</h3>
+<p>A very practical architecture is:</p>
+<p><span class="math display">\[
+\boxed{ \text{Batch Initialization} \rightarrow \text{Sequential Navigation} \rightarrow \text{Periodic Batch Recalibration}. }
+\]</span></p>
+<p>Batch processing can determine initial states and difficult parameters.</p>
+<p>A sequential filter can then maintain the real-time state.</p>
+<p>Later batch processing can refine calibration and diagnose model deficiencies.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.15 Linear Estimation</h3>
+<p>For a linear dynamic model:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{k+1} = \mathbf F_k\mathbf x_k+\mathbf w_k }
+\]</span></p>
+<p>and measurement model:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = \mathbf H_k\mathbf x_k+\mathbf v_k. }
+\]</span></p>
+<p>For correctly modeled Gaussian uncertainties, the Kalman filter provides the classical minimum-variance recursive estimator.</p>
+<p>Linear estimation is attractive because it is:</p>
+<ul>
+<li>computationally efficient,</li>
+<li>mathematically transparent,</li>
+<li>comparatively easy to verify.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.16 When Linear Estimation Is Appropriate</h3>
+<p>A linear method may be sufficient when:</p>
+<ul>
+<li>dynamics are naturally linear,</li>
+<li>measurement equations are linear,</li>
+<li>deviations from a reference trajectory are small,</li>
+<li>nonlinear effects are small compared with measurement and model uncertainty.</li>
+</ul>
+<p>Some spacecraft problems are nonlinear globally but approximately linear locally.</p>
+<p>That distinction is important.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.17 Nonlinear Estimation</h3>
+<p>Many navigation problems satisfy</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf x} = f(\mathbf x,t) }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z = h(\mathbf x)+\mathbf v }
+\]</span></p>
+<p>with nonlinear <code>f</code> and <code>h</code>.</p>
+<p>Examples include:</p>
+<ul>
+<li>orbital dynamics,</li>
+<li>range,</li>
+<li>bearing angles,</li>
+<li>attitude dynamics,</li>
+<li>optical measurements,</li>
+<li>nonlinear disturbance forces.</li>
+</ul>
+<p>A nonlinear or locally linearized estimator is then required.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.18 Extended Kalman Filter</h3>
+<p>The EKF propagates the nonlinear system but locally linearizes it.</p>
+<p>For the measurement:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H_k = \left. \frac{\partial h} {\partial\mathbf x} \right|_{\hat{\mathbf x}_k^-}. }
+\]</span></p>
+<p>Dynamics are similarly linearized through a Jacobian or STM.</p>
+<p>The EKF remains widely used because it provides a practical compromise between nonlinear modeling and computational cost.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.19 EKF Limitations</h3>
+<p>The EKF may perform poorly when:</p>
+<ul>
+<li>initial errors are large,</li>
+<li>system nonlinearities are severe,</li>
+<li>geometry is weak,</li>
+<li>Jacobians are incorrect,</li>
+<li>uncertainty is strongly non-Gaussian,</li>
+<li>covariance becomes inconsistent.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{EKF Performance} \text{ depends on valid local linearization.} }
+\]</span></p>
+<p>Changing to an EKF does not solve an unobservable problem.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.20 Iterated EKF</h3>
+<p>The Iterated EKF performs repeated measurement linearization during one update:</p>
+<p><span class="math display">\[
+\boxed{ \text{Predict} \rightarrow \text{Linearize} \rightarrow \text{Correct} \rightarrow \text{Relinearize} \rightarrow \text{Correct Again}. }
+\]</span></p>
+<p>It can improve nonlinear measurement updates, though at additional computational cost.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.21 Unscented Kalman Filter</h3>
+<p>The UKF does not explicitly linearize using a Jacobian.</p>
+<p>Instead it constructs sigma points around the mean and covariance:</p>
+<p><span class="math display">\[
+\boxed{ (\hat{\mathbf x},\mathbf P) \rightarrow \text{Sigma Points} \rightarrow f(\cdot),h(\cdot) \rightarrow (\hat{\mathbf x}^{+},\mathbf P^{+}). }
+\]</span></p>
+<p>The transformed sigma points are used to approximate the propagated mean and covariance.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.22 EKF versus UKF</h3>
+<div class="engineering-note"><strong>Design note:</strong> EKF and UKF are not competing labels so much as different approximations to nonlinear uncertainty propagation. Their suitability must be demonstrated using the same dynamics, sensor models, initialization, and validation cases.</div>
+<p>The fundamental difference is:</p>
+<p><span class="math display">\[
+\boxed{ \text{EKF} \rightarrow \text{Local Derivatives} }
+\]</span></p>
+<p>while</p>
+<p><span class="math display">\[
+\boxed{ \text{UKF} \rightarrow \text{Sigma-Point Propagation}. }
+\]</span></p>
+<p>The UKF can represent certain nonlinear transformations better without analytical Jacobians, but normally requires more model evaluations.</p>
+<p>Choice depends on:</p>
+<ul>
+<li>nonlinearity,</li>
+<li>state dimension,</li>
+<li>processor resources,</li>
+<li>availability and reliability of Jacobians,</li>
+<li>demonstrated performance.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.23 Particle Filtering</h3>
+<p>Particle filters represent a posterior through samples:</p>
+<p><span class="math display">\[
+\boxed{ p(\mathbf x_k|\mathbf z_{1:k}) \approx \sum_{i=1}^{N} w_k^{(i)} \delta( \mathbf x_k-\mathbf x_k^{(i)} ). }
+\]</span></p>
+<p>They are useful for:</p>
+<ul>
+<li>multimodal uncertainty,</li>
+<li>strongly non-Gaussian problems,</li>
+<li>severe nonlinearities,</li>
+<li>ambiguous observations.</li>
+</ul>
+<p>The main limitation is computational cost, especially as the state dimension increases.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.24 Gaussian versus Non-Gaussian Estimation</h3>
+<p>Kalman-family estimators primarily represent uncertainty using</p>
+<p><span class="math display">\[
+\boxed{ \text{Mean}+\text{Covariance}. }
+\]</span></p>
+<p>This works well when the distribution is approximately Gaussian.</p>
+<p>But if several different physical solutions are plausible, the posterior may be multimodal.</p>
+<p>Examples include:</p>
+<ul>
+<li>ambiguous visual features,</li>
+<li>bearing-only ambiguity,</li>
+<li>uncertain data association.</li>
+</ul>
+<p>A single mean and covariance may then hide the actual structure of the uncertainty.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.25 Deterministic versus Probabilistic Estimation</h3>
+<p>A deterministic estimator may solve:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x} = \arg\min_{\mathbf x} J(\mathbf x). }
+\]</span></p>
+<p>A probabilistic estimator represents</p>
+<p><span class="math display">\[
+\boxed{ p(\mathbf x|\mathbf z). }
+\]</span></p>
+<p>Probabilistic treatment is valuable when uncertainty itself influences decisions, such as:</p>
+<ul>
+<li>guidance,</li>
+<li>collision assessment,</li>
+<li>autonomous navigation,</li>
+<li>fault detection.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.26 Maximum Likelihood Estimation</h3>
+<p>Maximum likelihood estimates the quantity most likely to have produced the measurements:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\theta}_{ML} = \arg\max_{\boldsymbol\theta} p( \mathbf z| \boldsymbol\theta ). }
+\]</span></p>
+<p>For Gaussian independent measurement errors, this leads to weighted least squares.</p>
+<p>Thus classical least squares has a direct probabilistic interpretation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.27 Maximum A Posteriori Estimation</h3>
+<p>MAP estimation incorporates prior knowledge:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\theta}_{MAP} = \arg\max_{\boldsymbol\theta} p( \boldsymbol\theta| \mathbf z ). }
+\]</span></p>
+<p>Using Bayes:</p>
+<p><span class="math display">\[
+p( \boldsymbol\theta| \mathbf z ) \propto p( \mathbf z| \boldsymbol\theta ) p( \boldsymbol\theta ).
+\]</span></p>
+<p>Hence,</p>
+<p><span class="math display">\[
+\boxed{ \text{MAP} = \text{Measurement Information} + \text{Prior Information}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.28 Least Squares and Bayesian Estimation</h3>
+<p>Weighted least squares corresponds to Gaussian maximum likelihood.</p>
+<p>Including a Gaussian prior gives</p>
+<p><span class="math display">\[
+\boxed{ J= \mathbf r^T \mathbf R^{-1} \mathbf r + ( \mathbf x-\mathbf x_0 )^T \mathbf P_0^{-1} ( \mathbf x-\mathbf x_0 ). }
+\]</span></p>
+<p>This links classical estimation directly to Bayesian MAP estimation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.29 Filtering versus Smoothing</h3>
+<p>Filtering estimates:</p>
+<p><span class="math display">\[
+\boxed{ p( \mathbf x_k| \mathbf z_{1:k} ). }
+\]</span></p>
+<p>Only measurements up to the current time are used.</p>
+<p>Smoothing estimates:</p>
+<p><span class="math display">\[
+\boxed{ p( \mathbf x_k| \mathbf z_{1:N} ), \qquad N>k. }
+\]</span></p>
+<p>Future measurements are allowed to improve the historical state estimate.</p>
+<p>This is why smoothing can outperform filtering for trajectory reconstruction.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.30 Fixed-Interval Smoothing</h3>
+<p>A fixed-interval smoother processes a complete interval</p>
+<p><span class="math display">\[
+t_0\le t\le t_f.
+\]</span></p>
+<p>All measurements in that interval are available.</p>
+<p>Applications include:</p>
+<ul>
+<li>post-flight reconstruction,</li>
+<li>calibration,</li>
+<li>maneuver reconstruction,</li>
+<li>high-quality reference trajectories.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.31 Fixed-Lag Smoothing</h3>
+<p>Fixed-lag smoothing deliberately waits a short time before finalizing the estimate:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_{k-L|k}. }
+\]</span></p>
+<p>It gives</p>
+<p><span class="math display">\[
+\boxed{ \text{Improved State Estimate} \leftrightarrow \text{Additional Latency}. }
+\]</span></p>
+<p>This is useful when real-time output is required but a small delay is acceptable.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.32 Rauch-Tung-Striebel Smoother</h3>
+<p>The RTS smoother uses:</p>
+<p><span class="math display">\[
+\boxed{ \text{Forward Kalman Filter} \rightarrow \text{Backward Smoothing Pass} \rightarrow \text{Improved Historical Trajectory}. }
+\]</span></p>
+<p>Nonlinear versions may be based on EKF or UKF formulations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.33 State Estimation versus Parameter Estimation</h3>
+<p>Dynamic states may be written as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x= [\mathbf r,\mathbf v]. }
+\]</span></p>
+<p>Parameters may be</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\theta= [C_D,C_R,b,\ldots]. }
+\]</span></p>
+<p>States evolve dynamically.</p>
+<p>Parameters characterize the system and may change slowly or remain approximately constant.</p>
+<p>They may be estimated separately or simultaneously.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.34 Augmented-State Estimation</h3>
+<p>Parameters can be appended to the navigation state:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a= \begin{bmatrix} \mathbf x\\ \boldsymbol\theta \end{bmatrix}. }
+\]</span></p>
+<p>For a constant parameter:</p>
+<p><span class="math display">\[
+\boxed{ \dot{\boldsymbol\theta}=0. }
+\]</span></p>
+<p>For a variable parameter, a stochastic dynamic model is more appropriate.</p>
+<p>This enables a sequential estimator to estimate both physical state and unknown parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.35 Danger of Excessive State Augmentation</h3>
+<div class="engineering-note"><strong>Design note:</strong> Excessive augmentation is especially risky when parameters produce similar measurement signatures. In that case the filter may trade one parameter against another while still producing small residuals.</div>
+<p>Too many estimated parameters can produce:</p>
+<ul>
+<li>weak observability,</li>
+<li>severe correlation,</li>
+<li>numerical ill-conditioning,</li>
+<li>slow convergence,</li>
+<li>growing covariance,</li>
+<li>physically meaningless parameter compensation.</li>
+</ul>
+<p>Therefore:</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimate Only Parameters Supported by Available Information}. }
+\]</span></p>
+<p>This connects directly to the identifiability principles from 4.3.16.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.36 Constant-Parameter Model</h3>
+<p>If a parameter is assumed fixed,</p>
+<p><span class="math display">\[
+\boxed{ \theta_{k+1} = \theta_k. }
+\]</span></p>
+<p>No process uncertainty is assigned to its evolution.</p>
+<p>This is suitable only when the parameter is physically expected to remain effectively constant over the estimation interval.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.37 Random-Walk Parameter Model</h3>
+<p>For a slowly varying parameter:</p>
+<p><span class="math display">\[
+\boxed{ \theta_{k+1} = \theta_k+ w_{\theta,k}. }
+\]</span></p>
+<p>The process noise controls allowed parameter variation.</p>
+<p>Too little process noise causes the estimate to lag real changes.</p>
+<p>Too much process noise makes the parameter chase measurement noise.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.38 Gauss-Markov Parameter Model</h3>
+<p>A correlated parameter can be modeled using:</p>
+<p><span class="math display">\[
+\boxed{ \dot{\theta} = -\frac{1}{\tau} \theta+w. }
+\]</span></p>
+<p>The time constant <code>\tau</code> determines how quickly the parameter forgets its previous value.</p>
+<p>This model lies between a fixed parameter and unrestricted random walk.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.39 Process Noise Is Part of the Physical Model</h3>
+<p>Process noise represents uncertainty in state evolution.</p>
+<p>Examples include:</p>
+<ul>
+<li>unmodeled acceleration,</li>
+<li>uncertain environmental forcing,</li>
+<li>actuator uncertainty,</li>
+<li>unresolved disturbances,</li>
+<li>parameter variations.</li>
+</ul>
+<p>Therefore <code>Q</code> should not merely be changed until the estimator plot looks attractive.</p>
+<p>It should represent physical uncertainty.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.40 Measurement Noise Model</h3>
+<p>Measurement covariance</p>
+<p><span class="math display">\[
+\boxed{\mathbf R}
+\]</span></p>
+<p>may represent:</p>
+<ul>
+<li>random measurement noise,</li>
+<li>correlated channels,</li>
+<li>range-dependent uncertainty,</li>
+<li>geometry-dependent optical errors,</li>
+<li>measurement-quality variation.</li>
+</ul>
+<p>If <code>R</code> is wrong, the estimator assigns the wrong amount of trust to the sensor.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.41 Choosing <code>Q</code> and <code>R</code></h3>
+<p>Broadly,</p>
+<p><span class="math display">\[
+\boxed{ Q\uparrow \rightarrow \text{Less Trust in Dynamics} }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ R\uparrow \rightarrow \text{Less Trust in Measurements}. }
+\]</span></p>
+<p>But this interpretation should not encourage arbitrary tuning.</p>
+<p>Both matrices should reflect realistic uncertainty and be checked through statistical consistency testing.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.42 Continuous-to-Discrete Process Noise</h3>
+<p>Continuous disturbance covariance cannot always be converted simply by multiplying by <code>\Delta t</code>.</p>
+<p>In general:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf Q_d = \int_0^{\Delta t} \boldsymbol\Phi( \Delta t,\tau ) \mathbf G_w \mathbf Q_c \mathbf G_w^T \boldsymbol\Phi^T( \Delta t,\tau ) d\tau. }
+\]</span></p>
+<p>The correct result depends on dynamics and where disturbance enters the state equations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.43 Measurement Rate versus Estimator Rate</h3>
+<div class="engineering-note"><strong>Design note:</strong> This separation is important in multi-rate navigation systems: a fast propagation loop does not imply that every sensor must operate at the same frequency.</div>
+<p>A very important distinction is</p>
+<p><span class="math display">\[
+\boxed{ \text{Propagation Rate} \neq \text{Measurement Update Rate}. }
+\]</span></p>
+<p>An estimator can propagate at a high internal frequency while sensors provide measurements less frequently.</p>
+<p>The estimator then corrects the predicted state whenever a measurement is actually available.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.44 Asynchronous Measurements</h3>
+<p>Sensors do not have to update simultaneously.</p>
+<p>The sequence may be:</p>
+<p><span class="math display">\[
+\boxed{ \text{Propagate} \rightarrow \text{Sensor A Update} \rightarrow \text{Propagate} \rightarrow \text{Sensor B Update} \rightarrow \cdots }
+\]</span></p>
+<p>Each measurement should be processed at its own measurement epoch.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.45 Multi-Rate Estimation</h3>
+<p>A navigation architecture may combine:</p>
+<ul>
+<li>high-rate inertial sensors,</li>
+<li>medium-rate absolute navigation sensors,</li>
+<li>slower optical measurements,</li>
+<li>intermittent external measurements.</li>
+</ul>
+<p>High-rate sensors help short-term propagation.</p>
+<p>Lower-rate absolute sensors constrain accumulated drift.</p>
+<p>This is one of the major strengths of sensor fusion.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.46 Sensor Fusion</h3>
+<p>Sensor fusion is not simply averaging.</p>
+<p>Its real benefit is that different sensors can observe different directions in state space.</p>
+<p>Conceptually:</p>
+<p><span class="math display">\[
+\boxed{ \text{Dynamics} + \text{Sensor A} + \text{Sensor B} + \cdots \rightarrow \text{Fused State Estimate}. }
+\]</span></p>
+<p>A range sensor and an angle sensor, for example, may provide complementary information.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.47 Centralized Fusion</h3>
+<p>A centralized estimator processes all measurements using one shared state and covariance.</p>
+<p>Advantages:</p>
+<ul>
+<li>direct treatment of correlations,</li>
+<li>consistent state updates,</li>
+<li>full exploitation of complementary measurements.</li>
+</ul>
+<p>Disadvantages include:</p>
+<ul>
+<li>greater implementation complexity,</li>
+<li>central processor dependence.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.48 Decentralized and Federated Estimation</h3>
+<div class="engineering-note"><strong>Design note:</strong> When decentralized estimates share common priors, process models, or measurements, they are statistically correlated even if implemented in separate software modules. Ignoring that correlation can make fusion overconfident.</div>
+<p>Separate estimators can process different sensor groups and then fuse their results.</p>
+<p>This can improve:</p>
+<ul>
+<li>modularity,</li>
+<li>fault isolation,</li>
+<li>subsystem independence.</li>
+</ul>
+<p>But shared information creates correlations.</p>
+<p>If those correlations are ignored, covariance may become artificially small and overconfident.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.49 Relative Navigation Estimation</h3>
+<p>For general relative navigation:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{\rm rel} = \begin{bmatrix} \mathbf r_{\rm rel}\\ \mathbf v_{\rm rel} \end{bmatrix}. }
+\]</span></p>
+<p>Measurements may include:</p>
+<ul>
+<li>relative range,</li>
+<li>range rate,</li>
+<li>LOS,</li>
+<li>optical bearings,</li>
+<li>LiDAR,</li>
+<li>radar,</li>
+<li>inter-spacecraft navigation observations.</li>
+</ul>
+<p>The selection of estimator does not fundamentally depend on calling the problem “RPO.”</p>
+<p>It depends on:</p>
+<ul>
+<li>geometry,</li>
+<li>nonlinearities,</li>
+<li>uncertainty,</li>
+<li>measurement type,</li>
+<li>update frequency,</li>
+<li>operational requirements.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.50 Relative-Dynamics Model Selection</h3>
+<p>Possible relative-dynamics models include:</p>
+<ul>
+<li>linearized relative-motion equations,</li>
+<li>nonlinear relative dynamics,</li>
+<li>separate inertial propagation followed by differencing,</li>
+<li>perturbation-aware models.</li>
+</ul>
+<p>A simple model may be sufficient over a limited region.</p>
+<p>A higher-fidelity model becomes necessary when approximation errors become comparable with the required estimation accuracy.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.51 Model Fidelity versus Estimator Complexity</h3>
+<p>More fidelity is not always better.</p>
+<p>Higher-fidelity models may require:</p>
+<ul>
+<li>more computation,</li>
+<li>more uncertain parameters,</li>
+<li>more environmental data,</li>
+<li>more complex derivatives,</li>
+<li>additional calibration.</li>
+</ul>
+<p>The objective is</p>
+<p><span class="math display">\[
+\boxed{ \text{Sufficient Physical Accuracy} }
+\]</span></p>
+<p>rather than maximum possible model complexity.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.52 Error-State Estimation</h3>
+<p>Rather than estimate the complete state directly, estimate a small error:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{\rm true} = \mathbf x_{\rm nominal} + \delta\mathbf x. }
+\]</span></p>
+<p>The nonlinear nominal state is propagated separately.</p>
+<p>The filter estimates only <code>\delta\mathbf x</code>.</p>
+<p>Advantages include:</p>
+<ul>
+<li>small linearization region,</li>
+<li>better numerical scaling,</li>
+<li>natural integration with high-rate propagation.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.53 Multiplicative Attitude Error</h3>
+<p>Quaternion attitude error should normally not be treated as an unconstrained additive four-state correction.</p>
+<p>Instead:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf q_{\rm true} = \delta\mathbf q \otimes \mathbf q_{\rm nominal}. }
+\]</span></p>
+<p>A small three-component attitude-error vector can represent <code>\delta\mathbf q</code>.</p>
+<p>This respects the unit-quaternion constraint and gives a minimal local error representation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.54 Error-State Kalman Filter</h3>
+<div class="engineering-note"><strong>Design note:</strong> After error injection, the error-state representation is normally reset around the corrected nominal state. Care is required to transform covariance consistently during this reset, especially for multiplicative attitude errors.</div>
+<p>An ESKF typically:</p>
+<ol type="1">
+<li>propagates the nominal physical state,</li>
+<li>propagates small-error covariance,</li>
+<li>computes measurement residual,</li>
+<li>estimates the state error,</li>
+<li>injects the error correction,</li>
+<li>resets the error state.</li>
+</ol>
+<p>This is widely used for inertial and attitude-navigation problems.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.55 Initial State Selection</h3>
+<p>A nonlinear estimator needs a reasonable starting estimate.</p>
+<p>If</p>
+<p><span class="math display">\[
+\hat{\mathbf x}_0
+\]</span></p>
+<p>is too far from truth, a locally linearized estimator may fail.</p>
+<p>Initialization may use:</p>
+<ul>
+<li>prior orbit,</li>
+<li>direct measurements,</li>
+<li>geometric initialization,</li>
+<li>external tracking,</li>
+<li>coarse navigation,</li>
+<li>batch preprocessing.</li>
+</ul>
+<p>Initialization is therefore part of estimator design, not merely an input.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.56 Initial Covariance Selection</h3>
+<p>The initial covariance</p>
+<p><span class="math display">\[
+\boxed{\mathbf P_0}
+\]</span></p>
+<p>should represent actual initial uncertainty.</p>
+<p>If it is too small, the estimator becomes overconfident in its initial state.</p>
+<p>If too large, initial updates may become unnecessarily aggressive or numerically awkward.</p>
+<p>The covariance should reflect what is genuinely known.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.57 Observability before Filter Selection</h3>
+<div class="engineering-note"><strong>Design note:</strong> This is why observability analysis belongs before filter tuning. No choice of gain, covariance, or nonlinear filter can recover a direction that the sensor geometry does not excite or observe.</div>
+<p>This is one of the most important rules in the whole section.</p>
+<p>If</p>
+<p><span class="math display">\[
+\boxed{ \text{Measurements contain no information about a state direction}, }
+\]</span></p>
+<p>switching from an EKF to a UKF does not solve the problem.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Observability Problem} \neq \text{Filter Algorithm Problem}. }
+\]</span></p>
+<p>Geometry and estimability must be checked first.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.58 Numerical Conditioning before Solver Selection</h3>
+<p>Likewise, weak numerical conditioning should be understood before blaming the solver.</p>
+<p>The correct order is:</p>
+<p><span class="math display">\[
+\boxed{ \text{Check Geometry} \rightarrow \text{Check Scaling} \rightarrow \text{Check Conditioning} \rightarrow \text{Choose Solver}. }
+\]</span></p>
+<p>A solver cannot create physical information missing from the sensitivity matrix.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.59 Residual Monitoring</h3>
+<p>Residuals are</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k = \mathbf z_k- \hat{\mathbf z}_k. }
+\]</span></p>
+<p>They should be checked for:</p>
+<ul>
+<li>nonzero mean,</li>
+<li>trends,</li>
+<li>periodicity,</li>
+<li>outliers,</li>
+<li>wrong variance,</li>
+<li>temporal correlation.</li>
+</ul>
+<p>Residuals provide information about both sensors and model adequacy.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.60 Innovation Covariance</h3>
+<div class="engineering-note"><strong>Design note:</strong> Innovation covariance provides the scale against which an innovation should be interpreted. A numerically large innovation may still be statistically reasonable if the predicted uncertainty is also large.</div>
+<p>For Kalman filtering:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf S_k = \mathbf H_k \mathbf P_k^- \mathbf H_k^T + \mathbf R_k. }
+\]</span></p>
+<p>This tells us how large the innovation should statistically be.</p>
+<p>A residual should therefore not be judged simply by its absolute magnitude.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.61 Normalized Innovation</h3>
+<p>Normalize the innovation using</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf y}_k = \mathbf S_k^{-1/2} \mathbf y_k. }
+\]</span></p>
+<p>Persistent abnormal normalized innovations may indicate:</p>
+<ul>
+<li>wrong <code>Q</code>,</li>
+<li>wrong <code>R</code>,</li>
+<li>poor initialization,</li>
+<li>unmodeled dynamics,</li>
+<li>sensor bias,</li>
+<li>model deficiencies.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.62 Innovation Gating</h3>
+<p>Use</p>
+<p><span class="math display">\[
+\boxed{ d_k^2 = \mathbf y_k^T \mathbf S_k^{-1} \mathbf y_k. }
+\]</span></p>
+<p>This is the normalized innovation squared.</p>
+<p>A measurement with a statistically excessive value may be:</p>
+<ul>
+<li>rejected,</li>
+<li>flagged,</li>
+<li>downweighted,</li>
+<li>investigated.</li>
+</ul>
+<p>The gating threshold should depend on measurement dimension and the assumed probability model.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.63 Outlier Handling</h3>
+<p>Possible causes include:</p>
+<ul>
+<li>corrupted measurement,</li>
+<li>incorrect association,</li>
+<li>saturation,</li>
+<li>communication error,</li>
+<li>timing error,</li>
+<li>temporary environmental effects.</li>
+</ul>
+<p>Possible responses:</p>
+<ul>
+<li>reject,</li>
+<li>downweight,</li>
+<li>revalidate,</li>
+<li>classify as a fault.</li>
+</ul>
+<p>However, repeated large residuals may indicate model error rather than isolated outliers.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.64 Consistency Testing</h3>
+<div class="engineering-note"><strong>Design note:</strong> Consistency testing asks whether the estimator's uncertainty description matches its actual statistical error behavior. An estimator can be accurate in one run yet inconsistent over repeated runs.</div>
+<p>Accuracy and consistency are different.</p>
+<p>An estimate might be close to truth while its covariance is badly wrong.</p>
+<p>Consistency means actual errors statistically agree with reported uncertainty.</p>
+<p>Important diagnostics include:</p>
+<ul>
+<li>innovations,</li>
+<li>NIS,</li>
+<li>NEES,</li>
+<li>covariance envelopes,</li>
+<li>Monte Carlo consistency.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.65 Normalized Estimation Error Squared</h3>
+<p>When truth is available:</p>
+<p><span class="math display">\[
+\boxed{ \epsilon_k = ( \mathbf x_k- \hat{\mathbf x}_k )^T \mathbf P_k^{-1} ( \mathbf x_k- \hat{\mathbf x}_k ). }
+\]</span></p>
+<p>This compares actual state error with predicted covariance.</p>
+<p>It is particularly valuable during simulation and Monte Carlo testing.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.66 Covariance Is Not Actual Error</h3>
+<p>This distinction is essential:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P \neq ( \mathbf x- \hat{\mathbf x} ) ( \mathbf x- \hat{\mathbf x} )^T }
+\]</span></p>
+<p>for one individual realization.</p>
+<p>Covariance describes an expected statistical spread, not the instantaneous true error.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.67 Filter Divergence</h3>
+<p>Possible causes of divergence include:</p>
+<ul>
+<li>wrong dynamics,</li>
+<li>wrong Jacobians,</li>
+<li>poor initialization,</li>
+<li>too-small process noise,</li>
+<li>too-small measurement noise,</li>
+<li>strong nonlinearities,</li>
+<li>numerical instability,</li>
+<li>bias,</li>
+<li>wrong data association.</li>
+</ul>
+<p>Filter divergence should be diagnosed from the complete architecture rather than attributed automatically to one filter equation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.68 Covariance Collapse</h3>
+<p>If uncertainty becomes unrealistically small, the estimator becomes overconfident.</p>
+<p>Then later measurements may be given too little influence.</p>
+<p>This often indicates missing process uncertainty or repeated over-weighting of measurements.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.69 Covariance Inflation</h3>
+<p>One corrective mechanism is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P \leftarrow \alpha\mathbf P, \qquad \alpha>1. }
+\]</span></p>
+<p>This deliberately increases uncertainty.</p>
+<p>But inflation should not be used to conceal a known modeling problem.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.70 Adaptive Estimation</h3>
+<p>Adaptive methods modify quantities such as:</p>
+<ul>
+<li><code>Q</code>,</li>
+<li><code>R</code>,</li>
+<li>bias models,</li>
+<li>process parameters,</li>
+</ul>
+<p>based on estimator behavior.</p>
+<p>This may help when noise characteristics vary over time.</p>
+<p>However, adaptation itself becomes part of the estimator dynamics and needs validation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.71 Multiple-Model Estimation</h3>
+<p>If several dynamic hypotheses are possible, maintain probabilities</p>
+<p><span class="math display">\[
+\boxed{ p( M_j|\mathbf z ). }
+\]</span></p>
+<p>Examples include:</p>
+<ul>
+<li>different maneuver states,</li>
+<li>different disturbance models,</li>
+<li>different target-motion models.</li>
+</ul>
+<p>This represents uncertainty in <strong>which model is active</strong>, not only uncertainty in continuous state variables.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.72 Interacting Multiple Model Estimation</h3>
+<p>An IMM operates several filters corresponding to different models.</p>
+<p>The filters exchange mixed initial conditions and update model probabilities based on measurement likelihood.</p>
+<p>IMM is particularly useful when dynamics switch among a finite set of known modes.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.73 Maneuver Detection and Estimation</h3>
+<div class="engineering-note"><strong>Design note:</strong> Maneuver handling can therefore be organized as a hierarchy: known commands are modeled directly, uncertain executed maneuvers are estimated, and unexpected maneuvers may first need detection before estimation.</div>
+<p>Unexpected maneuvers generate residual patterns inconsistent with the nominal model.</p>
+<p>Possible estimator responses include:</p>
+<ul>
+<li>increased <code>Q</code>,</li>
+<li>change-point detection,</li>
+<li>estimation of impulsive <code>\Delta\mathbf v</code>,</li>
+<li>finite-burn parameter estimation,</li>
+<li>model switching.</li>
+</ul>
+<p>The architecture depends on how much is known about the maneuver.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.74 Known versus Unknown Maneuvers</h3>
+<p>A known command can be modeled as an input:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{k+1} = f( \mathbf x_k,\mathbf u_k ). }
+\]</span></p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Known Maneuver} \rightarrow \text{Dynamic Input} }
+\]</span></p>
+<p>whereas uncertain burn magnitude, direction, or time may give:</p>
+<p><span class="math display">\[
+\boxed{ \text{Unknown Maneuver} \rightarrow \text{Estimation Problem}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.75 Parameter Estimation Architecture</h3>
+<p>Parameters can be estimated through:</p>
+<ul>
+<li>batch differential correction,</li>
+<li>augmented-state filtering,</li>
+<li>dual estimation,</li>
+<li>smoothing,</li>
+<li>dedicated calibration.</li>
+</ul>
+<p>Selection depends on:</p>
+<ul>
+<li>parameter time variation,</li>
+<li>measurement sensitivity,</li>
+<li>real-time requirement,</li>
+<li>correlation,</li>
+<li>excitation.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.76 Dual Estimation</h3>
+<p>Instead of one large augmented filter, use separate estimators for:</p>
+<ul>
+<li>physical state,</li>
+<li>unknown parameters.</li>
+</ul>
+<p>They exchange information.</p>
+<p>This can simplify some implementations but introduces coupled estimation errors and consistency challenges.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.77 Sliding-Window Estimation</h3>
+<p>Use only the latest observations:</p>
+<p><span class="math display">\[
+\boxed{ \{ \mathbf z_{k-N+1}, \ldots, \mathbf z_k \} \rightarrow \text{Windowed Estimate}. }
+\]</span></p>
+<p>Older information is discarded or marginalized.</p>
+<p>This provides a middle ground between batch estimation and purely recursive filtering.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.78 Moving-Horizon Estimation</h3>
+<div class="engineering-note"><strong>Design note:</strong> MHE is attractive when constraints matter strongly, but the optimization must complete reliably within the available time budget. Warm starts, sparse solvers, and bounded horizon length are often important implementation considerations.</div>
+<p>MHE repeatedly solves a constrained optimization problem over a recent finite interval.</p>
+<p>It can naturally incorporate:</p>
+<ul>
+<li>nonlinear dynamics,</li>
+<li>bounds,</li>
+<li>constraints,</li>
+<li>multi-sensor measurements,</li>
+<li>prior state information.</li>
+</ul>
+<p>The main disadvantage is computational expense.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.79 Constraints in Estimation</h3>
+<p>Physical constraints may include:</p>
+<p><span class="math display">\[
+m>0,
+\]</span></p>
+<p><span class="math display">\[
+C_D\ge0,
+\]</span></p>
+<p>or:</p>
+<ul>
+<li>unit quaternion,</li>
+<li>bounded bias,</li>
+<li>geometric constraints,</li>
+<li>actuator limits.</li>
+</ul>
+<p>A constrained estimator avoids physically impossible parameter values.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.80 Hard versus Soft Constraints</h3>
+<p>A hard constraint must be exactly satisfied:</p>
+<p><span class="math display">\[
+\boxed{ g(\mathbf x)=0. }
+\]</span></p>
+<p>A soft constraint allows uncertainty:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_c = h_c(\mathbf x)+\mathbf v_c. }
+\]</span></p>
+<p>Hard constraints define the feasible space.</p>
+<p>Soft constraints behave like probabilistic knowledge.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.81 Pseudo-Measurements</h3>
+<p>A known relationship may be written as</p>
+<p><span class="math display">\[
+\boxed{ z_p = h_p(\mathbf x)+v_p. }
+\]</span></p>
+<p>The estimator then processes it similarly to an ordinary sensor measurement.</p>
+<p>The assigned covariance determines how strongly it constrains the solution.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.82 Real-Time versus Offline Estimation</h3>
+<div class="engineering-note"><strong>Design note:</strong> Real-time architecture is constrained by deadline and latency, while offline architecture is constrained mainly by total compute cost and data availability. The same mission can legitimately use both.</div>
+<h4>Real-time estimation prioritizes</h4>
+<ul>
+<li>predictable latency,</li>
+<li>bounded computation,</li>
+<li>robustness,</li>
+<li>memory efficiency,</li>
+<li>continuous output,</li>
+<li>fault response.</li>
+</ul>
+<h4>Offline estimation can use</h4>
+<ul>
+<li>long iterations,</li>
+<li>complete measurement arcs,</li>
+<li>smoothing,</li>
+<li>expensive optimization,</li>
+<li>detailed diagnostics.</li>
+</ul>
+<p>Timing requirements therefore strongly influence architecture.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.83 Onboard versus Ground Estimation</h3>
+<p>Onboard estimation often prioritizes:</p>
+<ul>
+<li>deterministic computation,</li>
+<li>bounded memory,</li>
+<li>robustness,</li>
+<li>autonomy,</li>
+<li>numerical reliability.</li>
+</ul>
+<p>Ground estimation can usually use:</p>
+<ul>
+<li>more complex force models,</li>
+<li>larger parameter sets,</li>
+<li>repeated processing,</li>
+<li>complete measurement arcs,</li>
+<li>more environmental data.</li>
+</ul>
+<p>Many missions therefore use both onboard and ground estimators for different purposes.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.84 Computational Complexity</h3>
+<p>Algorithm selection must consider:</p>
+<ul>
+<li>state dimension,</li>
+<li>measurement dimension,</li>
+<li>update frequency,</li>
+<li>number of sigma points,</li>
+<li>number of particles,</li>
+<li>factorization cost,</li>
+<li>memory,</li>
+<li>processor capability.</li>
+</ul>
+<p>A theoretically excellent estimator is unsuitable if it cannot satisfy its real-time execution requirement.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.85 Numerical Robustness</h3>
+<p>Estimator architecture must also account for:</p>
+<ul>
+<li>matrix conditioning,</li>
+<li>scaling,</li>
+<li>rank deficiency,</li>
+<li>covariance positivity,</li>
+<li>floating-point precision,</li>
+<li>roundoff accumulation,</li>
+<li>matrix factorization.</li>
+</ul>
+<p>This connects directly with Section 4.3.17.</p>
+<p>Square-root and factorized methods are useful when numerical robustness is especially important.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.86 Square-Root Estimator Selection</h3>
+<p>Instead of propagating <code>\mathbf P</code>, propagate</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P = \mathbf S \mathbf S^T. }
+\]</span></p>
+<p>The factor <code>\mathbf S</code> can provide improved numerical stability and better preservation of positive definiteness.</p>
+<p>This is particularly useful for:</p>
+<ul>
+<li>long-running filters,</li>
+<li>high-precision navigation,</li>
+<li>high-dynamic-range estimation.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.87 Robust Estimation</h3>
+<p>When measurements occasionally contain large non-Gaussian errors, replace purely quadratic loss with</p>
+<p><span class="math display">\[
+\boxed{ J = \sum_i \rho(r_i). }
+\]</span></p>
+<p>For example, Huber-type losses reduce the influence of large residuals.</p>
+<p>But robust methods should not be used to suppress systematic modeling errors.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.88 Data Association</h3>
+<p>If a sensor sees multiple possible targets or features, the estimator must determine which observation belongs to which object.</p>
+<p>Possible methods include:</p>
+<ul>
+<li>nearest neighbor,</li>
+<li>statistical gating,</li>
+<li>multiple hypotheses,</li>
+<li>probabilistic association.</li>
+</ul>
+<p>Wrong association can create catastrophic state-estimation errors even when the filter equations themselves are correct.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.89 Time Synchronization</h3>
+<div class="engineering-note"><strong>Design note:</strong> A timestamping error can appear as a state or sensor bias because the estimator compares measurements against the wrong predicted epoch. Timing therefore belongs inside the measurement model, not only the communications design.</div>
+<p>Measurements must be processed at the correct timestamp.</p>
+<p>A measurement</p>
+<p><span class="math display">\[
+\mathbf z(t_k)
+\]</span></p>
+<p>must be compared with the predicted state at <code>t_k</code>, not simply at its reception time.</p>
+<p>Important timing effects include:</p>
+<ul>
+<li>timestamps,</li>
+<li>communication latency,</li>
+<li>sensor clock offset,</li>
+<li>processing delay,</li>
+<li>asynchronous sampling.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.90 Delayed Measurements</h3>
+<p>If a measurement arrives late, possible strategies include:</p>
+<ul>
+<li>buffered-state processing,</li>
+<li>out-of-sequence update,</li>
+<li>fixed-lag smoothing,</li>
+<li>recent-window reprocessing.</li>
+</ul>
+<p>Applying an old measurement directly to the current state without time correction can produce estimation error.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.91 Estimator Reset and Reinitialization</h3>
+<p>A practical estimator needs recovery logic.</p>
+<p>Triggers may include:</p>
+<ul>
+<li>invalid covariance,</li>
+<li>persistent innovation failures,</li>
+<li>measurement loss,</li>
+<li>numerical failure,</li>
+<li>unacceptable state uncertainty.</li>
+</ul>
+<p>Responses may include:</p>
+<ul>
+<li>covariance inflation,</li>
+<li>state reset,</li>
+<li>reinitialization,</li>
+<li>sensor-mode switching,</li>
+<li>filter restart.</li>
+</ul>
+<p>Recovery is part of estimator architecture, not merely an afterthought.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.92 Measurement Dropout</h3>
+<p>During a sensor outage:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_{k+1}^{-} = f( \hat{\mathbf x}_k^{+} ) }
+\]</span></p>
+<p>can continue propagating.</p>
+<p>Covariance usually grows.</p>
+<p>When measurements return, correction resumes.</p>
+<p>The maximum tolerable dropout depends on:</p>
+<ul>
+<li>dynamic uncertainty,</li>
+<li>measurement accuracy,</li>
+<li>required navigation accuracy,</li>
+<li>elapsed time.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.93 Fault Detection and Estimator Integrity</h3>
+<div class="engineering-note"><strong>Design note:</strong> FDIR logic should combine residual magnitude, persistence, multi-sensor agreement, timing, and model context. A single innovation spike is generally insufficient evidence to isolate a sensor.</div>
+<p>Residuals may indicate:</p>
+<ul>
+<li>sensor failure,</li>
+<li>bias change,</li>
+<li>timing problem,</li>
+<li>model error,</li>
+<li>unexpected maneuver.</li>
+</ul>
+<p>However,</p>
+<p><span class="math display">\[
+\boxed{ \text{Large Residual} \neq \text{Automatically Sensor Failure}. }
+\]</span></p>
+<p>FDIR logic should distinguish among plausible causes before isolating a sensor.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.94 Validation with Truth Data</h3>
+<p>When truth is available:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf e_k = \mathbf x_k^{\rm true} - \hat{\mathbf x}_k. }
+\]</span></p>
+<p>Important performance metrics include:</p>
+<ul>
+<li>RMSE,</li>
+<li>mean error,</li>
+<li>bias,</li>
+<li>maximum error,</li>
+<li>convergence time,</li>
+<li>steady-state error,</li>
+<li>covariance consistency.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.95 Monte Carlo Validation</h3>
+<p>A single successful trajectory is insufficient to demonstrate statistical estimator performance.</p>
+<p>Monte Carlo should vary:</p>
+<ul>
+<li>initial-state error,</li>
+<li>sensor noise,</li>
+<li>biases,</li>
+<li>environmental uncertainty,</li>
+<li>timing,</li>
+<li>model parameters,</li>
+<li>geometry.</li>
+</ul>
+<p>Then compare the resulting empirical error distribution with predicted covariance.</p>
+<p>This is how estimator robustness and consistency are assessed statistically.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.96 Real-Data Validation</h3>
+<p>Simulation cannot represent all real-world effects.</p>
+<p>Real measurements may reveal:</p>
+<ul>
+<li>colored noise,</li>
+<li>unknown bias,</li>
+<li>clock/timing errors,</li>
+<li>calibration drift,</li>
+<li>environmental effects,</li>
+<li>unexpected sensor behavior.</li>
+</ul>
+<p>A good development sequence is therefore:</p>
+<p><span class="math display">\[
+\boxed{ \text{Analytical Verification} \rightarrow \text{Simulation} \rightarrow \text{Monte Carlo} \rightarrow \text{Representative Real Data}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.97 Common Estimator-Selection Mistakes</h3>
+<p>Important mistakes to avoid include:</p>
+<ol type="1">
+<li>Selecting EKF/UKF before defining the problem.</li>
+<li>Adding every uncertainty to the state vector.</li>
+<li>Ignoring observability.</li>
+<li>Assuming greater algorithm complexity guarantees accuracy.</li>
+<li>Treating <code>Q</code> and <code>R</code> purely as tuning parameters.</li>
+<li>Using unrealistic <code>\mathbf P_0</code>.</li>
+<li>Ignoring asynchronous timing.</li>
+<li>Assuming sensor and estimator rates must match.</li>
+<li>Ignoring parameter correlation.</li>
+<li>Estimating parameters without excitation.</li>
+<li>Using EKF far outside its linearization region.</li>
+<li>Believing UKF fixes poor observability.</li>
+<li>Using particle filters without computational justification.</li>
+<li>Ignoring estimator consistency.</li>
+<li>Confusing covariance with instantaneous error.</li>
+<li>Calling every large residual an outlier.</li>
+<li>Using robust weighting to hide model error.</li>
+<li>Ignoring numerical conditioning.</li>
+<li>Ignoring delayed measurements.</li>
+<li>Omitting recovery/reinitialization logic.</li>
+<li>Choosing algorithms only from nominal accuracy.</li>
+<li>Ignoring latency or processor limits.</li>
+<li>Separately estimating physically redundant parameters.</li>
+<li>Skipping Monte Carlo or representative-data validation.</li>
+<li>Reporting state estimates without uncertainty.</li>
+</ol>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.98 Practical Estimator Design Workflow</h3>
+<p>A disciplined design process is</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Define Estimation Objective}\\ \downarrow\\ \text{Define States and Parameters}\\ \downarrow\\ \text{Define Dynamics}\\ \downarrow\\ \text{Define Measurements}\\ \downarrow\\ \text{Define Noise, Bias, and Timing Models}\\ \downarrow\\ \text{Assess Observability and Identifiability}\\ \downarrow\\ \text{Assess Geometry and Correlation}\\ \downarrow\\ \text{Determine Real-Time / Offline Requirement}\\ \downarrow\\ \text{Choose Batch / Sequential / Smoothing Architecture}\\ \downarrow\\ \text{Assess Linear / Nonlinear Behavior}\\ \downarrow\\ \text{Select Candidate Algorithm}\\ \downarrow\\ \text{Scale States and Measurements}\\ \downarrow\\ \text{Choose Numerical Solver}\\ \downarrow\\ \text{Define }Q,R,P_0\\ \downarrow\\ \text{Implement Residual Monitoring}\\ \downarrow\\ \text{Test Nominal Convergence}\\ \downarrow\\ \text{Test Weak Geometry / Dropout / Outliers}\\ \downarrow\\ \text{Perform Statistical Validation}\\ \downarrow\\ \text{Validate Representative Data}\\ \downarrow\\ \text{Verify Computational Requirements} \end{array}}
+\]</span></p>
+<p>The key point is that <strong>algorithm selection is intentionally in the middle</strong>, after the physical and information structure has been understood.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.99 Practical Algorithm-Selection Guide</h3>
+<div class="engineering-note"><strong>Design note:</strong> The table is a starting point for architecture trade studies. Final selection should be verified against representative dynamics, sensor rates, processor limits, failure modes, and required accuracy.</div>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>ProblemSuitable starting approach</th>
+<th></th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Fixed parameter + complete dataset</td>
+<td>Batch least squares</td>
+</tr>
+<tr>
+<td>Nonlinear offline parameter estimation</td>
+<td>Iterative nonlinear least squares</td>
+</tr>
+<tr>
+<td>Linear dynamic real-time system</td>
+<td>Kalman filter</td>
+</tr>
+<tr>
+<td>Mild/moderate nonlinear real-time problem</td>
+<td>EKF</td>
+</tr>
+<tr>
+<td>Nonlinear system where Jacobians are undesirable</td>
+<td>UKF</td>
+</tr>
+<tr>
+<td>Multimodal / strongly non-Gaussian posterior</td>
+<td>Particle filter or multi-hypothesis method</td>
+</tr>
+<tr>
+<td>Improve historical state estimate</td>
+<td>Smoother</td>
+</tr>
+<tr>
+<td>Near-real-time with small acceptable delay</td>
+<td>Fixed-lag smoother</td>
+</tr>
+<tr>
+<td>State + slowly varying parameter</td>
+<td>Augmented-state filter</td>
+</tr>
+<tr>
+<td>Finite optimization window</td>
+<td>Sliding-window / MHE</td>
+</tr>
+<tr>
+<td>Rank-deficient batch estimation</td>
+<td>SVD / rank-revealing solver</td>
+</tr>
+<tr>
+<td>Long-running numerically sensitive filtering</td>
+<td>Square-root filter</td>
+</tr>
+<tr>
+<td>Multiple discrete dynamic modes</td>
+<td>IMM</td>
+</tr>
+<tr>
+<td>Outlier-prone data</td>
+<td>Robust estimator + appropriate fault logic</td>
+</tr>
+</tbody></table></div>
+<p>This is a starting guide, not an automatic selection rule.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.100 Core Equations</h3>
+<h4>Dynamic model</h4>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{k+1} = f_k( \mathbf x_k,\mathbf u_k ) + \mathbf w_k }
+\]</span></p>
+<h4>Measurement model</h4>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k( \mathbf x_k ) + \mathbf v_k }
+\]</span></p>
+<h4>Linearized state model</h4>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x_{k+1} = \mathbf F_k \delta\mathbf x_k + \mathbf w_k }
+\]</span></p>
+<h4>Linearized measurement</h4>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf z_k = \mathbf H_k \delta\mathbf x_k + \mathbf v_k }
+\]</span></p>
+<h4>Innovation</h4>
+<p><span class="math display">\[
+\boxed{ \mathbf y_k = \mathbf z_k - h_k( \hat{\mathbf x}_k^- ) }
+\]</span></p>
+<h4>Innovation covariance</h4>
+<p><span class="math display">\[
+\boxed{ \mathbf S_k = \mathbf H_k \mathbf P_k^- \mathbf H_k^T + \mathbf R_k }
+\]</span></p>
+<h4>Kalman gain</h4>
+<p><span class="math display">\[
+\boxed{ \mathbf K_k = \mathbf P_k^- \mathbf H_k^T \mathbf S_k^{-1} }
+\]</span></p>
+<h4>State correction</h4>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_k^+ = \hat{\mathbf x}_k^- + \mathbf K_k \mathbf y_k }
+\]</span></p>
+<h4>Weighted least squares</h4>
+<p><span class="math display">\[
+\boxed{ J = \mathbf r^T \mathbf R^{-1} \mathbf r }
+\]</span></p>
+<h4>MAP objective</h4>
+<p><span class="math display">\[
+\boxed{ J_{\rm MAP} = \mathbf r^T \mathbf R^{-1} \mathbf r + ( \mathbf x-\mathbf x_0 )^T \mathbf P_0^{-1} ( \mathbf x-\mathbf x_0 ) }
+\]</span></p>
+<h4>Augmented state</h4>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol\theta \end{bmatrix} }
+\]</span></p>
+<h4>NIS</h4>
+<p><span class="math display">\[
+\boxed{ {\rm NIS} = \mathbf y_k^T \mathbf S_k^{-1} \mathbf y_k }
+\]</span></p>
+<h4>NEES</h4>
+<p><span class="math display">\[
+\boxed{ {\rm NEES} = ( \mathbf x_k- \hat{\mathbf x}_k )^T \mathbf P_k^{-1} ( \mathbf x_k- \hat{\mathbf x}_k ) }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.101 Complete Estimator Architecture</h3>
+<p>The estimator sits inside a larger system:</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Physical System}\\ \downarrow\\ \text{Dynamics + Inputs + Disturbances}\\ \downarrow\\ \text{Sensors}\\ \downarrow\\ \text{Timing + Noise + Bias Models}\\ \downarrow\\ \text{Observability / Estimability Assessment}\\ \downarrow\\ \text{Estimator Architecture}\\ \downarrow\\ \text{Prediction}\\ \downarrow\\ \text{Measurement Update}\\ \downarrow\\ \text{State + Parameters + Covariance}\\ \downarrow\\ \text{Residual / Consistency Monitoring}\\ \downarrow\\ \text{Navigation / Guidance / Decision System} \end{array}}
+\]</span></p>
+<p>The algorithm—EKF, UKF, least squares, etc.—is therefore only one part of a much larger estimation architecture.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.18.102 Key Takeaways</h3>
+<p>Estimator design is fundamentally a <strong>system-design problem</strong>.</p>
+<p>The correct sequence is:</p>
+<p><span class="math display">\[
+\boxed{ \text{Problem Definition} \rightarrow \text{Dynamics} \rightarrow \text{Measurements} \rightarrow \text{Observability} \rightarrow \text{Uncertainty} \rightarrow \text{Algorithm} \rightarrow \text{Validation}. }
+\]</span></p>
+<p>Batch estimation is appropriate when a complete observation arc is processed together.</p>
+<p>Sequential estimation is appropriate when the current state must remain continuously available.</p>
+<p>Filtering uses measurements only through the current epoch:</p>
+<p><span class="math display">\[
+\boxed{ p( \mathbf x_k| \mathbf z_{1:k} ) }
+\]</span></p>
+<p>whereas smoothing includes later measurements:</p>
+<p><span class="math display">\[
+\boxed{ p( \mathbf x_k| \mathbf z_{1:N} ). }
+\]</span></p>
+<p>Augmented-state estimation can include unknown parameters,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ \boldsymbol\theta \end{bmatrix}, }
+\]</span></p>
+<p>but only when those parameters are sufficiently observable.</p>
+<p>One of the most important principles in estimator design is:</p>
+<p><span class="math display">\[
+\boxed{ \text{A More Sophisticated Estimator Cannot Create Information That the Measurements Do Not Contain.} }
+\]</span></p>
+<p>Therefore observability, geometry, identifiability, and conditioning should be examined before increasing estimator complexity.</p>
+<p>Uncertainty must also be modeled correctly using</p>
+<p><span class="math display">\[
+\boxed{ \mathbf Q,\qquad \mathbf R,\qquad \mathbf P_0. }
+\]</span></p>
+<p>They are physical uncertainty descriptions—not simply tuning variables.</p>
+<p>For multisensor systems,</p>
+<p><span class="math display">\[
+\boxed{ \text{Sensor Rate} \neq \text{Estimator Propagation Rate} \neq \text{Other Sensor Rates}. }
+\]</span></p>
+<p>Measurements can arrive asynchronously and be processed at their actual epochs.</p>
+<p>Estimator validation should assess not only trajectories but also:</p>
+<ul>
+<li>estimation error,</li>
+<li>residuals,</li>
+<li>innovations,</li>
+<li>covariance,</li>
+<li>NIS,</li>
+<li>NEES,</li>
+<li>parameter correlation,</li>
+<li>convergence,</li>
+<li>observability,</li>
+<li>conditioning,</li>
+<li>dropout robustness,</li>
+<li>model uncertainty.</li>
+</ul>
+<p>The final estimator must balance</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Physics}\\ +\text{Measurement Information}\\ +\text{Uncertainty}\\ +\text{Geometry}\\ +\text{Numerical Robustness}\\ +\text{Computational Constraints}\\ +\text{Operational Requirements} \end{array}}
+\]</span></p>
+<p>and the final design principle is:</p>
+<p><span class="math display">\[
+\boxed{ \text{Choose the Simplest Estimator That Correctly Represents the Physics, Information, Uncertainty, and Operational Need.} }
+\]</span></p>
+<p>That principle connects the preceding topics—measurement modelling, covariance propagation, filtering, orbit determination, parameter estimation, geometry, identifiability, and numerical conditioning—into one coherent estimator-design methodology.</p>
+    </section>
+
+    <section class="notes-section-card">
+      <h2>Continue Exploring Estimation and Navigation</h2>
+      <p>
+        This section completes the estimator-design workflow by connecting physics, measurements,
+        observability, uncertainty, numerical conditioning, algorithm selection, timing, integrity monitoring,
+        and validation. Use the Theory Notes index to continue to the next topic in the sequence.
+      </p>
+      <a href="notes.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>Theory Notes</h3>
+          <p>
+            Return to the estimation and navigation topic index to continue with the next section.
+          </p>
+          <p class="sensor-link-arrow">Continue to Theory Notes &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
