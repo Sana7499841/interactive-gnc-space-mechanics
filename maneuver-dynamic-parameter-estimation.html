@@ -1,0 +1,1961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.3.15 Maneuver and Dynamic-Parameter Estimation | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .table-wrap { width:100%; overflow-x:auto; margin:1rem 0 1.4rem; }
+    .table-wrap table { width:100%; border-collapse:collapse; }
+    .table-wrap th, .table-wrap td { border:1px solid #d8dee6; padding:0.75rem 0.85rem; text-align:left; vertical-align:top; }
+    .table-wrap th { font-weight:700; background:#f7f9fb; }
+    .engineering-note { margin:1rem 0; padding:0.95rem 1.05rem; background:#f7f9fb; border-left:4px solid #9bb8d3; }
+    .equation-note { margin-top:0.35rem; color:#475569; }
+    .notes-section-card h4 { margin-top:1.25rem; margin-bottom:0.55rem; }
+    .notes-section-card .math.display { display:block; overflow-x:auto; padding:0.15rem 0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Maneuver and Dynamic-Parameter Estimation</h1>
+    <p class="notes-tagline">
+      Impulsive and finite-burn estimation, burn timing, thrust magnitude and direction,
+      empirical accelerations, atmospheric-drag parameters, solar-radiation-pressure parameters,
+      observability, covariance, and physically meaningful maneuver reconstruction.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.3.15 Maneuver and Dynamic-Parameter Estimation</h2>
+
+<p>Maneuver and dynamic-parameter estimation extends orbit determination
+beyond estimating only position and velocity. In many
+spacecraft-navigation problems, the trajectory depends on quantities
+that are uncertain, imperfectly known, or not known at all.</p>
+<p>Examples include:</p>
+<ul>
+<li>an impulsive maneuver whose delivered <code>\Delta \mathbf v</code>
+differs from the command,</li>
+<li>a finite-duration burn with uncertain thrust magnitude,</li>
+<li>uncertain burn start or stop time,</li>
+<li>thrust-direction error,</li>
+<li>unknown empirical accelerations,</li>
+<li>atmospheric-drag parameters,</li>
+<li>solar-radiation-pressure parameters,</li>
+<li>slowly varying environmental or spacecraft parameters.</li>
+</ul>
+<p>Instead of forcing the orbit state to absorb all these effects, the
+estimator can explicitly solve for the uncertain maneuver or dynamic
+parameters.</p>
+<p>The central idea is</p>
+<p><span class="math display">\[
+\boxed{ \text{Trajectory Measurements} + \text{Dynamic Model}
+\rightarrow \text{State Estimate} + \text{Maneuver / Dynamic-Parameter
+Estimate} }
+\]</span></p>
+<p>This section focuses on six major areas:</p>
+<ul>
+<li>impulsive maneuver estimation,</li>
+<li>finite-burn estimation,</li>
+<li>burn timing estimation,</li>
+<li>thrust magnitude and direction estimation,</li>
+<li>empirical acceleration estimation,</li>
+<li>drag and solar-radiation-pressure parameter estimation.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.1 Why Maneuver Estimation Is Needed</h3>
+
+<p>Suppose a commanded impulsive maneuver is</p>
+<p><span class="math display">\[
+\Delta \mathbf v_{\rm cmd}.
+\]</span></p>
+<p>The actual maneuver may be</p>
+<p><span class="math display">\[
+\boxed{ \Delta \mathbf v_{\rm actual} = \Delta \mathbf v_{\rm cmd} +
+\delta\Delta \mathbf v }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\delta\Delta \mathbf v
+\]</span></p>
+<p>represents execution error.</p>
+<p>Possible causes include:</p>
+<ul>
+<li>thrust magnitude error,</li>
+<li>direction error,</li>
+<li>timing error,</li>
+<li>valve or actuator delay,</li>
+<li>finite burn duration,</li>
+<li>mass uncertainty,</li>
+<li>attitude error.</li>
+</ul>
+<p>If the OD system assumes the commanded maneuver was executed
+perfectly, the post-maneuver trajectory prediction may become
+biased.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.2 Maneuver Error as a Dynamic Discontinuity</h3>
+
+<p>For an ideal impulsive burn at time <code>t_m</code>,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r^+ = \mathbf r^- }
+\]</span></p>
+<p>while velocity changes instantaneously:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf v^+ = \mathbf v^- + \Delta \mathbf v. }
+\]</span></p>
+<p>The superscripts <code>-</code> and <code>+</code> denote the states
+immediately before and after the maneuver.</p>
+<p>Thus the maneuver introduces a discontinuity in velocity but not
+position.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.3 Impulsive Maneuver Model</h3>
+
+<p>For state</p>
+<p><span class="math display">\[
+\mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix},
+\]</span></p>
+<p>an impulsive maneuver can be written</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x^+ = \mathbf x^- + \mathbf B \Delta \mathbf v }
+\]</span></p>
+<p>with</p>
+<p><span class="math display">\[
+\boxed{ \mathbf B = \begin{bmatrix} \mathbf 0_{3\times3}\\ \mathbf
+I_{3\times3} \end{bmatrix}. }
+\]</span></p>
+<p>This is the simplest mathematical representation of a maneuver in
+OD.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.4 Known versus Unknown Maneuver</h3>
+
+<p>If the maneuver is perfectly known,</p>
+<p><span class="math display">\[
+\Delta \mathbf v = \Delta \mathbf v_{\rm known},
+\]</span></p>
+<p>it can simply be inserted into the propagator.</p>
+<p>If it is uncertain, write</p>
+<p><span class="math display">\[
+\boxed{ \Delta \mathbf v = \Delta \mathbf v_{\rm nominal} + \delta\Delta
+\mathbf v. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\delta\Delta \mathbf v
+\]</span></p>
+<p>can be estimated.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.5 Maneuver Correction as an Estimated Parameter</h3>
+
+<p>The augmented unknown vector may be</p>
+<p><span class="math display">\[
+\boxed{ \mathbf y = \begin{bmatrix} \mathbf x_0\\ \delta\Delta\mathbf v
+\end{bmatrix}. }
+\]</span></p>
+<p>Measurements before and after the maneuver constrain both the
+reference state and the maneuver correction.</p>
+<p>This is especially powerful in batch OD because the complete
+observation arc can be processed simultaneously.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.6 Maneuver Sensitivity</h3>
+
+<p>For a measurement after the maneuver,</p>
+<p><span class="math display">\[
+\mathbf z_k = h_k( \mathbf x_k ),
+\]</span></p>
+<p>the measurement sensitivity to the maneuver is</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf z_k} {\partial\Delta\mathbf v} = \mathbf
+H_k \boldsymbol\Phi( t_k,t_m^+ ) \mathbf B. }
+\]</span></p>
+<p>This equation shows how an impulsive velocity error propagates
+forward and changes later measurements.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.7 Measurements Before the Maneuver</h3>
+
+<p>Measurements collected before <code>t_m</code> generally have</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf z_k} {\partial\Delta\mathbf v} = \mathbf0
+\qquad t_k&lt;t_m }
+\]</span></p>
+<p>because the maneuver has not yet occurred.</p>
+<p>Measurements after the burn contain information about the
+maneuver.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.8 Why Pre- and Post-Maneuver Measurements Help</h3>
+
+<p>Measurements before the maneuver constrain the pre-burn
+trajectory.</p>
+<p>Measurements after the maneuver constrain the post-burn
+trajectory.</p>
+<p>The difference between the dynamically consistent pre- and post-burn
+trajectories provides information about the delivered maneuver.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ \text{Pre-Burn Orbit} + \text{Post-Burn Orbit} \rightarrow
+\text{Estimated Maneuver} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.9 Maneuver Covariance</h3>
+
+<p>Suppose maneuver execution error has covariance</p>
+<p><span class="math display">\[
+\mathbf P_{\Delta v}.
+\]</span></p>
+<p>Then after the maneuver,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P^+ = \mathbf M \mathbf P^- \mathbf M^T + \mathbf B
+\mathbf P_{\Delta v} \mathbf B^T }
+\]</span></p>
+<p>where <code>\mathbf M</code> represents the deterministic state-event
+mapping.</p>
+<p>For an ideal position-continuous impulsive maneuver,</p>
+<p><span class="math display">\[
+\mathbf M
+\]</span></p>
+<p>may be the identity for the basic state.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.10 Maneuver Covariance Interpretation</h3>
+
+<p>The term</p>
+<p><span class="math display">\[
+\mathbf B \mathbf P_{\Delta v} \mathbf B^T
+\]</span></p>
+<p>injects uncertainty into the velocity state.</p>
+<p>That velocity uncertainty later propagates into position
+uncertainty.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Maneuver Uncertainty} \rightarrow \text{Velocity
+Uncertainty} \rightarrow \text{Future Position Uncertainty}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.11 Components of Impulsive Maneuver Error</h3>
+
+<p>The maneuver error can be expressed in Cartesian form:</p>
+<p><span class="math display">\[
+\boxed{ \delta\Delta\mathbf v = \begin{bmatrix} \delta\Delta v_x\\
+\delta\Delta v_y\\ \delta\Delta v_z \end{bmatrix}. }
+\]</span></p>
+<p>Alternatively, it can be expressed in a physically meaningful local
+orbital frame such as radial-transverse-normal:</p>
+<p><span class="math display">\[
+\boxed{ \delta\Delta\mathbf v_{\rm RTN} = \begin{bmatrix} \delta\Delta
+v_R\\ \delta\Delta v_T\\ \delta\Delta v_N \end{bmatrix}. }
+\]</span></p>
+<p>The most suitable frame depends on the maneuver geometry.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.12 Maneuver Magnitude Error</h3>
+
+<p>Let the commanded maneuver magnitude be</p>
+<p><span class="math display">\[
+\Delta v_c.
+\]</span></p>
+<p>If the actual magnitude differs by scale factor
+<code>\epsilon_m</code>,</p>
+<p><span class="math display">\[
+\boxed{ \Delta v_{\rm actual} = (1+\epsilon_m) \Delta v_c. }
+\]</span></p>
+<p>Then <code>\epsilon_m</code> can be estimated instead of estimating
+three independent Cartesian components.</p>
+<p>This may improve conditioning when the commanded direction is known
+accurately.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.13 Maneuver Direction Error</h3>
+
+<p>Let the nominal burn direction be</p>
+<p><span class="math display">\[
+\hat{\mathbf u}.
+\]</span></p>
+<p>The commanded maneuver is</p>
+<p><span class="math display">\[
+\Delta\mathbf v_c = \Delta v_c \hat{\mathbf u}.
+\]</span></p>
+<p>A small direction error can be represented by a small rotation
+vector</p>
+<p><span class="math display">\[
+\delta\boldsymbol\theta.
+\]</span></p>
+<p>Then approximately,</p>
+<p><span class="math display">\[
+\boxed{ \delta\hat{\mathbf u} \approx - [ \hat{\mathbf u}\times ]
+\delta\boldsymbol\theta. }
+\]</span></p>
+<p>This converts small angular misalignment into a velocity-vector
+error.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.14 Combined Magnitude and Direction Error</h3>
+
+<p>A useful maneuver parameterization is</p>
+<p><span class="math display">\[
+\boxed{ \Delta\mathbf v = (1+\epsilon_m) \Delta v_c \hat{\mathbf u}_{\rm
+actual}. }
+\]</span></p>
+<p>For small directional errors,</p>
+<p><span class="math display">\[
+\hat{\mathbf u}_{\rm actual} \approx \hat{\mathbf u} - [ \hat{\mathbf
+u}\times ] \delta\boldsymbol\theta.
+\]</span></p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \delta\Delta\mathbf v \approx \epsilon_m \Delta v_c \hat{\mathbf
+u} - \Delta v_c [ \hat{\mathbf u}\times ] \delta\boldsymbol\theta. }
+\]</span></p>
+<p>This separates thrust-magnitude error from thrust-direction
+error.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.15 Why Parameterization Matters</h3>
+
+<p>Estimating</p>
+<p><span class="math display">\[
+\Delta v_x,\Delta v_y,\Delta v_z
+\]</span></p>
+<p>is very flexible.</p>
+<p>Estimating</p>
+<ul>
+<li>magnitude scale factor,</li>
+<li>two directional angles</li>
+</ul>
+<p>may be more physically meaningful.</p>
+<p>The best parameterization should:</p>
+<ul>
+<li>align with known actuator behavior,</li>
+<li>avoid redundant parameters,</li>
+<li>improve observability,</li>
+<li>simplify constraints.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Parameterization} \text{ should reflect what the
+measurements can actually identify.} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.16 Burn-Time Estimation</h3>
+
+<p>The burn epoch itself may be uncertain.</p>
+<p>Let the nominal burn time be</p>
+<p><span class="math display">\[
+t_m.
+\]</span></p>
+<p>The actual time may be</p>
+<p><span class="math display">\[
+\boxed{ t_{m,\rm actual} = t_m + \delta t_m. }
+\]</span></p>
+<p>A timing error shifts where along the trajectory the velocity change
+is applied.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.17 Why Burn Timing Matters</h3>
+
+<p>Suppose the spacecraft travels with velocity</p>
+<p><span class="math display">\[
+\mathbf v.
+\]</span></p>
+<p>A burn occurring <code>\delta t</code> early or late changes both</p>
+<ul>
+<li>the position at which the burn occurs,</li>
+<li>the gravitational and environmental state at the burn.</li>
+</ul>
+<p>Even if the delivered <code>\Delta v</code> is identical, a timing
+shift produces a different future trajectory.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Same }\Delta\mathbf v + \text{Different Burn Time}
+\rightarrow \text{Different Orbit}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.18 Burn-Time Sensitivity</h3>
+
+<p>For a small timing error,</p>
+<p><span class="math display">\[
+\delta t_m,
+\]</span></p>
+<p>the state effect may be approximated locally using the dynamics
+immediately before and after the event.</p>
+<p>A useful first-order event-time sensitivity is</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf x^+} {\partial t_m} \approx \mathbf f^- -
+\mathbf f^+ }
+\]</span></p>
+<p>for an ideal event mapping under appropriate formulation.</p>
+<p>The exact expression depends on how the maneuver event is
+modeled.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.19 Burn Timing and Position Error</h3>
+
+<p>For a simplified case with approximately constant pre-burn
+velocity,</p>
+<p><span class="math display">\[
+\delta\mathbf r \approx \mathbf v \delta t.
+\]</span></p>
+<p>Thus even modest timing uncertainty can produce a meaningful spatial
+shift at the maneuver event.</p>
+<p>This is especially important for high-speed trajectories.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.20 Burn Timing and Estimability</h3>
+
+<p>Burn timing is estimable only if the available measurements are
+sensitive to it.</p>
+<p>Timing may be difficult to separate from</p>
+<ul>
+<li>maneuver magnitude,</li>
+<li>initial state error,</li>
+<li>measurement latency,</li>
+<li>sensor clock bias.</li>
+</ul>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Burn-Time Estimation} \text{ requires sufficient geometry
+and timing information.} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.21 Burn Start and Burn Stop Time</h3>
+
+<p>For a finite-duration burn, there are two important event times:</p>
+<p><span class="math display">\[
+\boxed{ t_{\rm start} }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ t_{\rm stop}. }
+\]</span></p>
+<p>Burn duration is</p>
+<p><span class="math display">\[
+\boxed{ T_b = t_{\rm stop} - t_{\rm start}. }
+\]</span></p>
+<p>Uncertainty may exist in one or both times.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.22 Finite-Burn Dynamics</h3>
+
+<p>A finite burn cannot always be approximated as an instantaneous
+<code>\Delta v</code>.</p>
+<p>During the burn,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf r} = \mathbf v }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf v} = \mathbf a_{\rm natural} + \mathbf a_T. }
+\]</span></p>
+<p>The thrust acceleration is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_T = \frac{\mathbf F_T}{m}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.23 Variable-Mass Dynamics</h3>
+
+<p>If propellant consumption is significant,</p>
+<p><span class="math display">\[
+m=m(t).
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_T(t) = \frac{\mathbf F_T(t)} {m(t)}. }
+\]</span></p>
+<p>The mass evolution may follow</p>
+<p><span class="math display">\[
+\boxed{ \dot m = -\dot m_p. }
+\]</span></p>
+<p>Thus finite-burn orbit determination may require propagation of mass
+as an additional state.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.24 Thrust Magnitude</h3>
+
+<p>Let the commanded thrust magnitude be</p>
+<p><span class="math display">\[
+F_c(t).
+\]</span></p>
+<p>A simple scale-factor model is</p>
+<p><span class="math display">\[
+\boxed{ F_{\rm actual}(t) = (1+s_F) F_c(t). }
+\]</span></p>
+<p>The parameter</p>
+<p><span class="math display">\[
+s_F
+\]</span></p>
+<p>can be estimated.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.25 Thrust Bias</h3>
+
+<p>An additive thrust bias model may be</p>
+<p><span class="math display">\[
+\boxed{ F_{\rm actual} = F_c+b_F. }
+\]</span></p>
+<p>Whether an additive or multiplicative representation is better
+depends on the actuator physics.</p>
+<p>For many propulsion systems, percentage scale error is more
+physically intuitive than a fixed additive error.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.26 Thrust Vector</h3>
+
+<p>The thrust force is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf F_T = F_T \hat{\mathbf u}_T. }
+\]</span></p>
+<p>Therefore thrust uncertainty can arise from two separate sources:</p>
+<p><span class="math display">\[
+\boxed{ \text{Thrust Magnitude Error} }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \text{Thrust Direction Error}. }
+\]</span></p>
+<p>These should not automatically be combined into one scalar
+uncertainty.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.27 Thrust-Direction Parameterization</h3>
+
+<p>One representation uses two small angular deviations:</p>
+<p><span class="math display">\[
+\boxed{ \delta\boldsymbol\theta_T = \begin{bmatrix} \delta\theta_1\\
+\delta\theta_2 \end{bmatrix}. }
+\]</span></p>
+<p>A two-angle description is usually sufficient because a unit
+direction vector has only two independent degrees of freedom.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.28 Misalignment Matrix</h3>
+
+<p>A small thrust-direction error can be represented as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf C_{\rm actual} \approx \mathbf I - [
+\delta\boldsymbol\theta\times ]. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf F_{\rm actual} \approx ( \mathbf I - [
+\delta\boldsymbol\theta\times ] ) \mathbf F_{\rm nominal}. }
+\]</span></p>
+<p>This form is useful for estimating small propulsion misalignment.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.29 Body-to-Inertial Thrust Direction</h3>
+
+<p>If thrust direction is defined in spacecraft body coordinates,</p>
+<p><span class="math display">\[
+\mathbf F_B,
+\]</span></p>
+<p>the inertial thrust is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf F_I = \mathbf C_{IB} \mathbf F_B. }
+\]</span></p>
+<p>Therefore attitude error can also produce apparent thrust-direction
+error.</p>
+<p>This creates correlation between</p>
+<ul>
+<li>attitude knowledge,</li>
+<li>propulsion alignment,</li>
+<li>estimated maneuver direction.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.30 Attitude Error during Finite Burn</h3>
+
+<p>During a long burn, spacecraft attitude may evolve.</p>
+<p>Therefore</p>
+<p><span class="math display">\[
+\hat{\mathbf u}_T = \hat{\mathbf u}_T(t).
+\]</span></p>
+<p>The total delivered impulse is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf J = \int_{t_{\rm start}}^{t_{\rm stop}} \mathbf F_T(t)
+\,dt. }
+\]</span></p>
+<p>If attitude changes during the burn, the inertial direction of this
+impulse changes continuously.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.31 Effective Delta-V from a Finite Burn</h3>
+
+<p>Ignoring gravity losses and assuming constant mass approximately,</p>
+<p><span class="math display">\[
+\boxed{ \Delta\mathbf v_T \approx \frac{1}{m} \int_{t_s}^{t_e} \mathbf
+F_T(t)\,dt. }
+\]</span></p>
+<p>But an accurate finite-burn OD model integrates the thrust
+acceleration together with the natural dynamics.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.32 Why Finite Burn Cannot Always Be Reduced to Impulsive Burn</h3>
+
+<p>An impulsive approximation assumes all velocity change occurs at one
+instant.</p>
+<p>This may be inadequate when</p>
+<ul>
+<li>burn duration is long,</li>
+<li>gravitational acceleration changes significantly during burn,</li>
+<li>attitude rotates during burn,</li>
+<li>thrust direction changes,</li>
+<li>mass changes,</li>
+<li>precise trajectory reconstruction is required.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Long / Precision Burn} \rightarrow \text{Finite-Burn
+Modeling Preferred}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.33 Finite-Burn Parameter Vector</h3>
+
+<p>A possible estimated burn-parameter vector is</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\theta_b = \begin{bmatrix} s_F\\ \delta\theta_1\\
+\delta\theta_2\\ \delta t_{\rm start}\\ \delta t_{\rm stop}
+\end{bmatrix}. }
+\]</span></p>
+<p>More complex models may include</p>
+<ul>
+<li>thrust bias,</li>
+<li>mass-flow scale factor,</li>
+<li>actuator delay,</li>
+<li>multiple burn segments.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.34 Finite-Burn Sensitivity Equations</h3>
+
+<p>If</p>
+<p><span class="math display">\[
+\dot{\mathbf x} = f( \mathbf x, \boldsymbol\theta_b,t ),
+\]</span></p>
+<p>the sensitivity satisfies</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf S}_{\theta_b} = \mathbf A \mathbf S_{\theta_b} +
+\frac{\partial f} {\partial\boldsymbol\theta_b}. }
+\]</span></p>
+<p>This provides the state sensitivity to burn parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.35 Measurement Sensitivity to Burn Parameters</h3>
+
+<p>At measurement epoch <code>t_k</code>,</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf z_k} {\partial\boldsymbol\theta_b} =
+\mathbf H_k \mathbf S_{\theta_b,k} + \mathbf H_{\theta_b,k}. }
+\]</span></p>
+<p>Usually the burn parameters influence measurements indirectly through
+the propagated state.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.36 Maneuver Parameter Correlation</h3>
+
+<p>Burn parameters can be strongly correlated.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\boxed{ \text{Thrust Magnitude} \leftrightarrow \text{Burn Duration} }
+\]</span></p>
+<p>because both affect total impulse.</p>
+<p>Similarly,</p>
+<p><span class="math display">\[
+\boxed{ \text{Burn Timing} \leftrightarrow \text{Initial State} }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \text{Thrust Direction} \leftrightarrow \text{Attitude /
+Alignment}. }
+\]</span></p>
+<p>These correlations should be examined through the covariance
+matrix.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.37 Magnitude-Duration Ambiguity</h3>
+
+<p>For a constant thrust,</p>
+<p><span class="math display">\[
+\boxed{ J=FT_b. }
+\]</span></p>
+<p>Therefore approximately the same impulse can be produced by</p>
+<p><span class="math display">\[
+F\uparrow,\quad T_b\downarrow
+\]</span></p>
+<p>or</p>
+<p><span class="math display">\[
+F\downarrow,\quad T_b\uparrow.
+\]</span></p>
+<p>If measurements primarily observe only the total integrated effect,
+thrust magnitude and duration may be difficult to estimate
+independently.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.38 Improving Burn-Parameter Observability</h3>
+
+<p>Parameter separation improves when additional information is
+available, such as</p>
+<ul>
+<li>actuator telemetry,</li>
+<li>burn start/stop indicators,</li>
+<li>attitude telemetry,</li>
+<li>accelerometer measurements,</li>
+<li>high-rate tracking during the burn.</li>
+</ul>
+<p>Thus external telemetry can significantly improve maneuver
+estimation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.39 Telemetry-Aided Maneuver Estimation</h3>
+
+<p>Propulsion telemetry may provide</p>
+<ul>
+<li>valve-open time,</li>
+<li>thruster command,</li>
+<li>chamber pressure,</li>
+<li>burn duration,</li>
+<li>attitude,</li>
+<li>estimated mass flow.</li>
+</ul>
+<p>These can serve as</p>
+<ul>
+<li>known inputs,</li>
+<li>priors,</li>
+<li>pseudo-measurements.</li>
+</ul>
+<p>This reduces the number of completely free maneuver parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.40 Unknown Maneuver Detection</h3>
+
+<p>Sometimes the estimator does not know that a maneuver occurred.</p>
+<p>A sudden change in innovation statistics may indicate an unmodeled
+acceleration event.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ \text{Persistent Innovation Change} \rightarrow \text{Possible
+Unknown Maneuver}. }
+\]</span></p>
+<p>However, sensor faults can produce similar behavior.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.41 Distinguishing Maneuver from Measurement Fault</h3>
+
+<p>A maneuver affects the propagated physical trajectory and should
+generally influence multiple independent sensors consistently.</p>
+<p>A measurement fault may affect only one sensor.</p>
+<p>Thus multi-sensor consistency can help distinguish</p>
+<p><span class="math display">\[
+\boxed{ \text{Dynamic Event} }
+\]</span></p>
+<p>from</p>
+<p><span class="math display">\[
+\boxed{ \text{Sensor Event}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.42 Maneuver Epoch Search</h3>
+
+<p>If maneuver time is unknown, one approach is to test candidate burn
+times.</p>
+<p>For each candidate <code>t_m</code>,</p>
+<p><span class="math display">\[
+J(t_m)
+\]</span></p>
+<p>is evaluated.</p>
+<p>The selected burn time may be the one that produces the best
+statistically valid residual fit.</p>
+<p>This converts maneuver timing into a nonlinear search problem.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.43 Maneuver Detection Using Multiple Hypotheses</h3>
+
+<p>One can consider hypotheses such as</p>
+<p><span class="math display">\[
+H_0: \text{No Maneuver}
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+H_1: \text{Maneuver Occurred}.
+\]</span></p>
+<p>The measurement likelihood under each hypothesis can be compared.</p>
+<p>This is more rigorous than declaring a maneuver solely from one large
+residual.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.44 Empirical Accelerations</h3>
+
+<p>Not all unmodeled forces need to be represented through detailed
+physical parameters.</p>
+<p>Small empirical accelerations may be estimated:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{\rm emp} = \begin{bmatrix} a_R\\ a_T\\ a_N
+\end{bmatrix} }
+\]</span></p>
+<p>where the components may be expressed in</p>
+<ul>
+<li>radial,</li>
+<li>along-track,</li>
+<li>cross-track directions.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.45 Why Use Empirical Accelerations?</h3>
+
+<p>They can represent residual effects from</p>
+<ul>
+<li>imperfect drag modeling,</li>
+<li>imperfect SRP,</li>
+<li>thermal radiation forces,</li>
+<li>small thrust leakage,</li>
+<li>unmodeled environmental effects.</li>
+</ul>
+<p>They are especially useful when a precise physical model is
+unavailable.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.46 Constant Empirical Acceleration</h3>
+
+<p>Over a short arc,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf a}_{\rm emp} = \mathbf0 }
+\]</span></p>
+<p>may be assumed.</p>
+<p>The estimator then solves for a constant acceleration over that
+interval.</p>
+<p>This is simple but may become unrealistic over long arcs.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.47 Random-Walk Empirical Acceleration</h3>
+
+<p>A more flexible model is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{{\rm emp},k+1} = \mathbf a_{{\rm emp},k} + \mathbf
+w_{a,k}. }
+\]</span></p>
+<p>This allows slow changes over time.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.48 Gauss-Markov Empirical Acceleration</h3>
+
+<p>A first-order model is</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf a}_{\rm emp} = -\frac{1}{\tau_a} \mathbf a_{\rm
+emp} + \mathbf w_a. }
+\]</span></p>
+<p>Here,</p>
+<p><span class="math display">\[
+\tau_a
+\]</span></p>
+<p>controls how long acceleration errors remain correlated.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.49 Empirical Acceleration in the State Vector</h3>
+
+<p>The augmented state may be</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf
+a_{\rm emp} \end{bmatrix}. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf v} = \mathbf a_{\rm model} + \mathbf a_{\rm emp}. }
+\]</span></p>
+<p>Measurements continuously update both trajectory and empirical
+acceleration.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.50 Danger of Excessive Empirical Freedom</h3>
+
+<p>Empirical accelerations can improve residuals even when the physical
+model is wrong.</p>
+<p>For example, they may absorb</p>
+<ul>
+<li>sensor bias,</li>
+<li>timing error,</li>
+<li>maneuver mismatch,</li>
+<li>incorrect drag.</li>
+</ul>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Small Residuals with Empirical Terms} \neq \text{Correct
+Physics}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.51 Empirical Acceleration versus Process Noise</h3>
+
+<p>These approaches are related but not identical.</p>
+<p>Explicit empirical acceleration:</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimate a State Representing the Disturbance} }
+\]</span></p>
+<p>Process noise:</p>
+<p><span class="math display">\[
+\boxed{ \text{Represent Disturbance Statistically without Explicitly
+Estimating It}. }
+\]</span></p>
+<p>Explicit states are useful when the disturbance has persistent
+structure.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.52 Piecewise-Constant Acceleration</h3>
+
+<p>Another approach is to divide the trajectory into intervals and
+estimate a constant acceleration in each interval:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a(t) = \mathbf a_j, \qquad t_j\leq t&lt;t_{j+1}. }
+\]</span></p>
+<p>This provides greater flexibility but increases parameter count.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.53 Correlation of Empirical Accelerations with Orbit State</h3>
+
+<p>A constant along-track acceleration can resemble</p>
+<ul>
+<li>initial velocity error,</li>
+<li>drag-model error.</li>
+</ul>
+<p>Thus empirical acceleration states often become correlated with the
+orbital state.</p>
+<p>Longer or geometrically diverse measurement arcs can help separate
+them.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.54 Atmospheric Drag Parameter Estimation</h3>
+
+<p>Atmospheric drag is commonly modeled as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_D = -\frac12 \rho \frac{C_DA}{m} v_{\rm rel}^2
+\hat{\mathbf v}_{\rm rel}. }
+\]</span></p>
+<p>The uncertain factor may be represented as</p>
+<p><span class="math display">\[
+\boxed{ \beta = \frac{C_DA}{m} }
+\]</span></p>
+<p>or by its inverse ballistic coefficient</p>
+<p><span class="math display">\[
+\boxed{ B = \frac{m}{C_DA}. }
+\]</span></p>
+<p>The convention must always be stated.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.55 Drag Scale Factor</h3>
+
+<p>Instead of estimating the complete physical parameter, one may
+estimate a scale factor:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_D^{\rm actual} = s_D \mathbf a_D^{\rm model}. }
+\]</span></p>
+<p>Nominally,</p>
+<p><span class="math display">\[
+s_D=1.
+\]</span></p>
+<p>The estimate indicates how much the modeled drag must be scaled to
+fit the observations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.56 Drag-Coefficient Estimation</h3>
+
+<p>If area and mass are considered known,</p>
+<p><span class="math display">\[
+\boxed{ C_D }
+\]</span></p>
+<p>may be estimated directly.</p>
+<p>But the estimated value can absorb uncertainties in</p>
+<ul>
+<li>atmospheric density,</li>
+<li>projected area,</li>
+<li>mass,</li>
+<li>actual drag coefficient.</li>
+</ul>
+<p>Therefore the fitted <code>C_D</code> may be an effective
+parameter.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.57 Ballistic-Coefficient Estimation</h3>
+
+<p>If</p>
+<p><span class="math display">\[
+B = \frac{m}{C_DA},
+\]</span></p>
+<p>then drag acceleration becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_D = -\frac12 \rho \frac{1}{B} v_{\rm rel}^2
+\hat{\mathbf v}_{\rm rel}. }
+\]</span></p>
+<p>One may augment</p>
+<p><span class="math display">\[
+B
+\]</span></p>
+<p>into the navigation state.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.58 Drag Parameter Sensitivity</h3>
+
+<p>For</p>
+<p><span class="math display">\[
+\beta = \frac{C_DA}{m},
+\]</span></p>
+<p><span class="math display">\[
+\mathbf a_D = -\frac12 \rho \beta v_{\rm rel}^2 \hat{\mathbf v}_{\rm
+rel}.
+\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf a_D} {\partial\beta} = -\frac12 \rho
+v_{\rm rel}^2 \hat{\mathbf v}_{\rm rel}. }
+\]</span></p>
+<p>This sensitivity enters the variational equations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.59 Ballistic-Coefficient Sensitivity</h3>
+
+<p>If</p>
+<p><span class="math display">\[
+\mathbf a_D = -\frac12 \rho \frac{1}{B} v_{\rm rel}^2 \hat{\mathbf
+v}_{\rm rel},
+\]</span></p>
+<p>then</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf a_D} {\partial B} = +\frac12 \rho
+\frac{1}{B^2} v_{\rm rel}^2 \hat{\mathbf v}_{\rm rel}. }
+\]</span></p>
+<p>The sign is positive because increasing <code>B</code> reduces drag
+magnitude.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.60 Density-Drag Correlation</h3>
+
+<p>The drag acceleration depends on approximately</p>
+<p><span class="math display">\[
+\rho C_DA/m.
+\]</span></p>
+<p>Therefore atmospheric-density scale and ballistic parameter can be
+highly correlated.</p>
+<p>A trajectory may not be able to determine whether excess drag came
+from</p>
+<ul>
+<li>higher density,</li>
+<li>larger effective area,</li>
+<li>larger <code>C_D</code>.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Density Error} \leftrightarrow \text{Drag-Parameter
+Error}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.61 Atmospheric Density Scale Factor</h3>
+
+<p>One option is to estimate</p>
+<p><span class="math display">\[
+\boxed{ \rho_{\rm actual} = s_\rho \rho_{\rm model}. }
+\]</span></p>
+<p>Then <code>s_\rho</code> becomes an augmented parameter.</p>
+<p>This may be useful when the atmosphere model is the dominant
+uncertainty source.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.62 Drag-Parameter Dynamics</h3>
+
+<p>Over short arcs,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\beta}=0 }
+\]</span></p>
+<p>may be adequate.</p>
+<p>For longer arcs,</p>
+<p><span class="math display">\[
+\boxed{ \beta_{k+1} = \beta_k+w_{\beta,k} }
+\]</span></p>
+<p>may better represent slow variation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.63 Why Drag Parameters May Vary</h3>
+
+<p>The effective drag parameter can change because of</p>
+<ul>
+<li>spacecraft attitude,</li>
+<li>projected area,</li>
+<li>density-model error,</li>
+<li>thermal conditions,</li>
+<li>physical accommodation effects.</li>
+</ul>
+<p>Thus a slowly varying effective parameter may represent the real
+trajectory better than one fixed constant.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.64 Drag Observability</h3>
+
+<p>Drag is most observable when its trajectory effect becomes large
+enough relative to measurement noise.</p>
+<p>Observability generally improves with</p>
+<ul>
+<li>sufficiently long tracking arcs,</li>
+<li>lower orbital altitude,</li>
+<li>accurate measurements.</li>
+</ul>
+<p>However, increasing the arc length also increases exposure to
+changing atmospheric conditions.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.65 Solar Radiation Pressure</h3>
+
+<p>Solar radiation pressure may be approximated as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{\rm SRP} = P_\odot C_R \frac{A}{m} \hat{\mathbf s} }
+\]</span></p>
+<p>with additional geometry, distance scaling, and eclipse factors as
+required.</p>
+<p>Here,</p>
+<ul>
+<li><code>P_\odot</code> is solar-radiation pressure,</li>
+<li><code>C_R</code> is reflectivity coefficient,</li>
+<li><code>A/m</code> is area-to-mass ratio,</li>
+<li><code>\hat{\mathbf s}</code> gives force direction.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.66 SRP Coefficient Estimation</h3>
+
+<p>The coefficient</p>
+<p><span class="math display">\[
+\boxed{ C_R }
+\]</span></p>
+<p>can be estimated as an augmented parameter.</p>
+<p>Alternatively, estimate a scale factor</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{\rm SRP}^{\rm actual} = s_{\rm SRP} \mathbf a_{\rm
+SRP}^{\rm model}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.67 SRP Parameter Sensitivity</h3>
+
+<p>If</p>
+<p><span class="math display">\[
+\mathbf a_{\rm SRP} = C_R \mathbf a_{\rm SRP,unit},
+\]</span></p>
+<p>then</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf a_{\rm SRP}} {\partial C_R} = \mathbf
+a_{\rm SRP,unit}. }
+\]</span></p>
+<p>This sensitivity drives how measurements can identify
+<code>C_R</code>.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.68 Area-to-Mass Ratio and SRP</h3>
+
+<p>SRP depends on</p>
+<p><span class="math display">\[
+\frac{A}{m}.
+\]</span></p>
+<p>Thus uncertainty in</p>
+<ul>
+<li>projected area,</li>
+<li>mass,</li>
+<li><code>C_R</code></li>
+</ul>
+<p>may produce similar trajectory effects.</p>
+<p>As with drag,</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimated SRP Parameter} \text{ may represent an effective
+combined quantity.} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.69 Eclipse Modeling</h3>
+
+<p>SRP changes when the spacecraft enters shadow.</p>
+<p>A shadow factor</p>
+<p><span class="math display">\[
+\nu(t)
+\]</span></p>
+<p>may be introduced:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{\rm SRP} = \nu(t) P_\odot C_R \frac{A}{m}
+\hat{\mathbf s}. }
+\]</span></p>
+<p>Here,</p>
+<p><span class="math display">\[
+0\leq\nu\leq1.
+\]</span></p>
+<p>Accurate eclipse modeling can be important when estimating SRP
+parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.70 SRP Observability</h3>
+
+<p>SRP parameters become observable through accumulated trajectory
+deviations.</p>
+<p>Observability depends on</p>
+<ul>
+<li>arc duration,</li>
+<li>Sun-spacecraft geometry,</li>
+<li>eclipse intervals,</li>
+<li>measurement accuracy,</li>
+<li>correlations with other force parameters.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.71 Drag versus SRP Estimation</h3>
+
+<p>Drag and SRP act differently.</p>
+<p>Drag is approximately opposite relative atmospheric velocity.</p>
+<p>SRP is related to the Sun-spacecraft direction.</p>
+<p>Therefore changing orbital and solar geometry can help separate
+them.</p>
+<p>Still, poorly designed arcs may create significant parameter
+correlation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.72 Dynamic-Parameter State Vector</h3>
+
+<p>A general augmented OD state may be</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf r\\ \mathbf v\\ B\\ C_R\\
+\mathbf a_{\rm emp}\\ \boldsymbol\theta_{\rm maneuver} \end{bmatrix}. }
+\]</span></p>
+<p>This is mathematically possible, but not all parameters should
+automatically be estimated simultaneously.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.73 Parameter Selection</h3>
+
+<p>A dynamic parameter should generally be estimated when it is</p>
+<p><span class="math display">\[
+\boxed{ \text{Uncertain} + \text{Influential} + \text{Observable}. }
+\]</span></p>
+<p>If one of these conditions is absent, explicit estimation may not be
+useful.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.74 Dynamic Parameters versus Process Noise</h3>
+
+<p>A persistent, structured uncertainty may be a good candidate for
+explicit parameter estimation.</p>
+<p>A rapidly varying or poorly modeled disturbance may be better
+represented through process noise.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Persistent Structured Error} \rightarrow \text{Estimate
+Parameter} }
+\]</span></p>
+<p>whereas</p>
+<p><span class="math display">\[
+\boxed{ \text{Random / Unstructured Error} \rightarrow \text{Process
+Noise}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.75 Dynamic Parameters versus Empirical Acceleration</h3>
+
+<p>A physical parameter such as <code>C_D</code> or <code>C_R</code> has
+physical interpretation.</p>
+<p>An empirical acceleration does not necessarily.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Physical Parameter Model} \rightarrow
+\text{Interpretability} }
+\]</span></p>
+<p>while</p>
+<p><span class="math display">\[
+\boxed{ \text{Empirical Acceleration} \rightarrow \text{Flexibility}. }
+\]</span></p>
+<p>A good OD architecture balances both.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.76 Parameter Priors</h3>
+
+<p>Ground testing or previous orbit solutions may provide prior
+information:</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\theta \sim \mathcal N( \bar{\boldsymbol\theta},
+\mathbf P_{\theta,0} ). }
+\]</span></p>
+<p>Examples include</p>
+<ul>
+<li>propulsion calibration,</li>
+<li>estimated <code>C_D</code>,</li>
+<li>estimated <code>C_R</code>,</li>
+<li>maneuver scale factor.</li>
+</ul>
+<p>A prior can stabilize weakly observable parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.77 Parameter Covariance</h3>
+
+<p>The augmented covariance is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_a = \begin{bmatrix} \mathbf P_{xx} &amp; \mathbf
+P_{x\theta} \\ \mathbf P_{\theta x} &amp; \mathbf P_{\theta\theta}
+\end{bmatrix}. }
+\]</span></p>
+<p>The parameter covariance</p>
+<p><span class="math display">\[
+\mathbf P_{\theta\theta}
+\]</span></p>
+<p>quantifies parameter uncertainty.</p>
+<p>The cross-covariance</p>
+<p><span class="math display">\[
+\mathbf P_{x\theta}
+\]</span></p>
+<p>quantifies coupling between trajectory and parameter uncertainty.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.78 Parameter Correlation</h3>
+
+<p>For two parameters,</p>
+<p><span class="math display">\[
+\theta_i,\theta_j,
+\]</span></p>
+<p>the correlation coefficient is</p>
+<p><span class="math display">\[
+\boxed{ \rho_{ij} = \frac{ P_{\theta_i\theta_j} }{
+\sigma_{\theta_i}\sigma_{\theta_j} }. }
+\]</span></p>
+<p>If</p>
+<p><span class="math display">\[
+|\rho_{ij}|\approx1,
+\]</span></p>
+<p>the two parameters are difficult to separate.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.79 Typical Strong Correlations</h3>
+
+<p>Examples include</p>
+<p><span class="math display">\[
+\boxed{ C_D \leftrightarrow \rho_{\rm atmosphere} }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ F \leftrightarrow T_b }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ \text{Burn Time} \leftrightarrow \text{Initial State} }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ \text{Thrust Alignment} \leftrightarrow \text{Attitude Error}. }
+\]</span></p>
+<p>These should be examined before trusting parameter estimates.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.80 Identifiability</h3>
+
+<p>A parameter is identifiable only if the measurements distinguish its
+effect from other parameters.</p>
+<p>If two sensitivity columns satisfy approximately</p>
+<p><span class="math display">\[
+\boxed{ \mathbf g_i \approx c\mathbf g_j, }
+\]</span></p>
+<p>the corresponding parameters are difficult to identify
+independently.</p>
+<p>This is a central issue in maneuver and dynamic-parameter
+estimation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.81 Parameter Information Matrix</h3>
+
+<p>For parameter sensitivity matrix</p>
+<p><span class="math display">\[
+\mathbf G_\theta,
+\]</span></p>
+<p>the information matrix is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf I_\theta = \mathbf G_\theta^T \mathbf R^{-1} \mathbf
+G_\theta. }
+\]</span></p>
+<p>Small eigenvalues correspond to weakly observable parameter
+combinations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.82 Parameter Scaling</h3>
+
+<p>Dynamic parameters may have very different magnitudes.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\Delta v\sim10^{-2}\ {\rm m/s},
+\]</span></p>
+<p>while a timing correction may be</p>
+<p><span class="math display">\[
+10^{-3}\ {\rm s}.
+\]</span></p>
+<p>Poor scaling can harm numerical conditioning.</p>
+<p>Use scaled parameters where appropriate.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.83 Physical Constraints</h3>
+
+<p>Many estimated parameters have physical limits:</p>
+<p><span class="math display">\[
+\boxed{ F&gt;0 }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ T_b&gt;0 }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ C_D&gt;0 }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ C_R&gt;0. }
+\]</span></p>
+<p>These constraints may be enforced explicitly or through transformed
+parameterizations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.84 Logarithmic Parameterization</h3>
+
+<p>For a positive parameter <code>\theta</code>,</p>
+<p><span class="math display">\[
+\boxed{ \gamma = \ln\theta. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \theta = e^\gamma &gt;0. }
+\]</span></p>
+<p>This can improve numerical optimization while automatically
+satisfying positivity.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.85 Sequential Dynamic-Parameter Estimation</h3>
+
+<p>In sequential OD, uncertain parameters are included in the state.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf r\\ \mathbf v\\ B\\ C_R
+\end{bmatrix}. }
+\]</span></p>
+<p>Measurements continuously update both the orbit and the
+parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.86 Batch Dynamic-Parameter Estimation</h3>
+
+<p>In batch OD, the unknown vector might be</p>
+<p><span class="math display">\[
+\boxed{ \mathbf y = \begin{bmatrix} \mathbf x_0\\ B\\ C_R\\
+\Delta\mathbf v \end{bmatrix}. }
+\]</span></p>
+<p>The complete observation arc simultaneously constrains the state and
+the parameters.</p>
+<p>Batch estimation can be particularly effective for maneuver
+reconstruction.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.87 Batch versus Sequential Maneuver Estimation</h3>
+
+<p>Batch estimation is useful when</p>
+<ul>
+<li>the maneuver has already occurred,</li>
+<li>complete pre- and post-burn tracking is available,</li>
+<li>high-accuracy reconstruction is required.</li>
+</ul>
+<p>Sequential estimation is useful when</p>
+<ul>
+<li>maneuver monitoring is required in real time,</li>
+<li>immediate trajectory updates are needed,</li>
+<li>onboard autonomy is required.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.88 Maneuver Estimation in General Relative Navigation</h3>
+
+<p>In a general relative-navigation problem, a maneuver applied to one
+spacecraft changes the relative state.</p>
+<p>For relative state</p>
+<p><span class="math display">\[
+\mathbf x_{\rm rel} = \begin{bmatrix} \mathbf r_{\rm rel}\\ \mathbf
+v_{\rm rel} \end{bmatrix},
+\]</span></p>
+<p>an impulsive maneuver produces</p>
+<p><span class="math display">\[
+\boxed{ \mathbf v_{\rm rel}^+ = \mathbf v_{\rm rel}^- + \Delta\mathbf
+v_{\rm rel}. }
+\]</span></p>
+<p>The same estimation principles apply to formation flying and
+rendezvous/proximity operations in general.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.89 Finite Burn in Relative Navigation</h3>
+
+<p>For a finite thrust event,</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf v}_{\rm rel} = \mathbf a_{\rm rel,natural} +
+\mathbf a_{\rm control}. }
+\]</span></p>
+<p>Uncertainty in the control acceleration affects predicted relative
+motion.</p>
+<p>Range, LOS, or other relative measurements can then help estimate the
+delivered maneuver.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.90 Validation of Maneuver Estimates</h3>
+
+<p>Estimated maneuver parameters should be checked against</p>
+<ul>
+<li>propulsion telemetry,</li>
+<li>commanded burn,</li>
+<li>independent tracking,</li>
+<li>expected actuator accuracy,</li>
+<li>post-burn prediction performance.</li>
+</ul>
+<p>An estimated maneuver that fits tracking data but is physically
+impossible should not be accepted blindly.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.91 Post-Burn Prediction Check</h3>
+
+<p>After estimating the maneuver, propagate the corrected state
+forward.</p>
+<p>If future measurements are predicted substantially better, this
+supports the maneuver estimate.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Good Parameter Estimate} \rightarrow \text{Improved
+Out-of-Sample Prediction}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.92 Residual Diagnostics</h3>
+
+<p>Before estimating the maneuver, residuals may show a systematic
+discontinuity.</p>
+<p>After estimation, the residual structure should reduce.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\boxed{ \text{Step-Like Residual} \rightarrow \text{Possible Maneuver
+Magnitude Error} }
+\]</span></p>
+<p>while gradual drift may indicate</p>
+<p><span class="math display">\[
+\boxed{ \text{Force-Model Error}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.93 Dynamic-Parameter Validation</h3>
+
+<p>Estimated <code>C_D</code>, <code>C_R</code>, empirical
+accelerations, or thrust parameters should be checked for</p>
+<ul>
+<li>plausible magnitude,</li>
+<li>reasonable temporal behavior,</li>
+<li>consistency across arcs,</li>
+<li>covariance realism,</li>
+<li>sensitivity to initialization.</li>
+</ul>
+<p>A parameter that changes wildly may indicate weak observability.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.94 False Parameter Convergence</h3>
+
+<p>A parameter estimate may appear stable because</p>
+<ul>
+<li>covariance is too small,</li>
+<li>process noise is too low,</li>
+<li>measurements have little new information,</li>
+<li>prior is dominating.</li>
+</ul>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Stable Parameter Estimate} \neq \text{Well-Identified
+Parameter}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.95 Over-Parameterization</h3>
+
+<p>Estimating simultaneously</p>
+<ul>
+<li>thrust magnitude,</li>
+<li>direction,</li>
+<li>start time,</li>
+<li>stop time,</li>
+<li>mass flow,</li>
+<li>drag,</li>
+<li>SRP,</li>
+<li>empirical accelerations</li>
+</ul>
+<p>may create severe correlation.</p>
+<p>Therefore parameter sets should be introduced gradually and justified
+by observability.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.96 Common Mistakes</h3>
+
+<p>Common mistakes include:</p>
+<ol type="1">
+<li>Assuming commanded <code>\Delta v</code> equals delivered
+<code>\Delta v</code>.</li>
+<li>Ignoring maneuver execution covariance.</li>
+<li>Modeling a long finite burn as impulsive without checking
+validity.</li>
+<li>Estimating magnitude and duration separately when only total impulse
+is observable.</li>
+<li>Ignoring burn timing uncertainty.</li>
+<li>Ignoring attitude dependence of thrust direction.</li>
+<li>Estimating too many correlated parameters.</li>
+<li>Treating fitted <code>C_D</code> or <code>C_R</code> as exact
+physical constants.</li>
+<li>Allowing empirical accelerations to hide model errors.</li>
+<li>Using zero process noise for a genuinely varying parameter.</li>
+<li>Forgetting parameter-state cross-covariances.</li>
+<li>Ignoring telemetry that could improve observability.</li>
+<li>Failing to distinguish sensor faults from unknown maneuvers.</li>
+<li>Ignoring physical bounds.</li>
+<li>Declaring parameter convergence without checking covariance or
+correlation.</li>
+<li>Using overly long arcs when parameters are not constant.</li>
+<li>Using overly short arcs with insufficient parameter
+information.</li>
+<li>Ignoring density-drag correlation.</li>
+<li>Ignoring thrust-attitude coupling.</li>
+<li>Validating only against fitted residuals rather than future
+prediction.</li>
+</ol>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.97 Practical Maneuver-Estimation Workflow</h3>
+
+<p>A disciplined workflow is</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Identify Maneuver / Dynamic
+Uncertainty}\\ \downarrow\\ \text{Choose Parameterization}\\
+\downarrow\\ \text{Define Prior Values and Covariance}\\ \downarrow\\
+\text{Define Impulsive or Finite-Burn Model}\\ \downarrow\\
+\text{Include Burn Timing if Required}\\ \downarrow\\ \text{Propagate
+State + Sensitivities}\\ \downarrow\\ \text{Predict Measurements}\\
+\downarrow\\ \text{Compute Residuals}\\ \downarrow\\ \text{Estimate
+State + Parameters}\\ \downarrow\\ \text{Examine Parameter
+Correlations}\\ \downarrow\\ \text{Check Residual Structure}\\
+\downarrow\\ \text{Check Physical Plausibility}\\ \downarrow\\
+\text{Validate against Telemetry / Independent Data}\\ \downarrow\\
+\text{Assess Prediction Improvement} \end{array} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.98 General Dynamic-Parameter Architecture</h3>
+
+<p>The complete structure can be written as</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Reference State}\\ \mathbf x_0 \\ + \\
+\text{Maneuver Parameters}\\ \boldsymbol\theta_m \\ + \\ \text{Dynamic
+Parameters}\\ \boldsymbol\theta_d \\ \downarrow\\ \text{Propagate
+Dynamics} \\ \mathbf x(t) \\ \downarrow\\ \text{Predict Measurements} \\
+h(\mathbf x) \\ \downarrow\\ \text{Residuals} \\ \downarrow\\
+\text{Estimator} \\ \downarrow\\ \hat{\mathbf x},
+\hat{\boldsymbol\theta}_m, \hat{\boldsymbol\theta}_d, \mathbf P
+\end{array} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.99 Core Equations</h3>
+
+<h3 id="impulsive-maneuver">Impulsive maneuver</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf v^+ = \mathbf v^- + \Delta\mathbf v }
+\]</span></p>
+<h3 id="maneuver-correction">Maneuver correction</h3>
+<p><span class="math display">\[
+\boxed{ \Delta\mathbf v = \Delta\mathbf v_{\rm nominal} +
+\delta\Delta\mathbf v }
+\]</span></p>
+<h3 id="maneuver-covariance-injection">Maneuver covariance
+injection</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf P^+ = \mathbf M \mathbf P^- \mathbf M^T + \mathbf B
+\mathbf P_{\Delta v} \mathbf B^T }
+\]</span></p>
+<h3 id="finite-burn-dynamics">Finite-burn dynamics</h3>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf v} = \mathbf a_{\rm natural} + \frac{\mathbf
+F_T}{m} }
+\]</span></p>
+<h3 id="delivered-impulse">Delivered impulse</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf J = \int_{t_s}^{t_e} \mathbf F_T(t)\,dt }
+\]</span></p>
+<h3 id="burn-duration">Burn duration</h3>
+<p><span class="math display">\[
+\boxed{ T_b = t_{\rm stop} - t_{\rm start} }
+\]</span></p>
+<h3 id="thrust-scale-factor">Thrust scale factor</h3>
+<p><span class="math display">\[
+\boxed{ F_{\rm actual} = (1+s_F) F_{\rm nominal} }
+\]</span></p>
+<h3 id="empirical-acceleration">Empirical acceleration</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{\rm emp} = \begin{bmatrix} a_R\\ a_T\\ a_N
+\end{bmatrix} }
+\]</span></p>
+<h3 id="drag">Drag</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf a_D = -\frac12 \rho \frac{C_DA}{m} v_{\rm rel}^2
+\hat{\mathbf v}_{\rm rel} }
+\]</span></p>
+<h3 id="ballistic-coefficient">Ballistic coefficient</h3>
+<p><span class="math display">\[
+\boxed{ B = \frac{m}{C_DA} }
+\]</span></p>
+<h3 id="solar-radiation-pressure">Solar radiation pressure</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{\rm SRP} = P_\odot C_R \frac{A}{m} \hat{\mathbf s} }
+\]</span></p>
+<h3 id="parameter-sensitivity">Parameter sensitivity</h3>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf S}_\theta = \mathbf A \mathbf S_\theta +
+\frac{\partial f} {\partial\boldsymbol\theta} }
+\]</span></p>
+<h3 id="measurement-sensitivity-to-a-dynamic-parameter">Measurement
+sensitivity to a dynamic parameter</h3>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf z_k} {\partial\boldsymbol\theta} = \mathbf
+H_k \mathbf S_{\theta,k} + \mathbf H_{\theta,k} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.15.100 Key Takeaways</h3>
+
+<p>Maneuver and dynamic-parameter estimation allows orbit determination
+to solve not only for <strong>where the spacecraft is</strong>, but also
+for <strong>why its motion differs from the nominal
+prediction</strong>.</p>
+<p>For impulsive maneuvers,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf v^+ = \mathbf v^- + \Delta\mathbf v }
+\]</span></p>
+<p>provides the basic event model.</p>
+<p>When the delivered maneuver is uncertain,</p>
+<p><span class="math display">\[
+\boxed{ \Delta\mathbf v_{\rm actual} = \Delta\mathbf v_{\rm cmd} +
+\delta\Delta\mathbf v }
+\]</span></p>
+<p>and the correction can be estimated from tracking data.</p>
+<p>For finite-duration burns, the thrust must be integrated through the
+equations of motion:</p>
+<p><span class="math display">\[
+\boxed{ \dot{\mathbf v} = \mathbf a_{\rm natural} + \frac{\mathbf
+F_T(t)} {m(t)}. }
+\]</span></p>
+<p>Important burn parameters can include:</p>
+<ul>
+<li>burn start time,</li>
+<li>burn stop time,</li>
+<li>thrust magnitude,</li>
+<li>thrust direction,</li>
+<li>thrust scale factor,</li>
+<li>attitude-dependent pointing,</li>
+<li>mass or mass-flow uncertainty.</li>
+</ul>
+<p>The delivered impulse is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf J = \int \mathbf F(t)\,dt. }
+\]</span></p>
+<p>This immediately creates potential correlation between thrust
+magnitude and burn duration.</p>
+<p>Empirical accelerations provide a flexible way to capture unmodeled
+dynamics:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{\rm emp} = \begin{bmatrix} a_R\\ a_T\\ a_N
+\end{bmatrix}. }
+\]</span></p>
+<p>But they should not be allowed to hide identifiable physical modeling
+errors.</p>
+<p>Atmospheric drag estimation commonly involves</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_D = -\frac12 \rho \frac{C_DA}{m} v_{\rm rel}^2
+\hat{\mathbf v}_{\rm rel} }
+\]</span></p>
+<p>and therefore creates strong coupling between atmospheric density and
+drag-related spacecraft parameters.</p>
+<p>Solar-radiation-pressure estimation commonly involves</p>
+<p><span class="math display">\[
+\boxed{ \mathbf a_{\rm SRP} = P_\odot C_R \frac{A}{m} \hat{\mathbf s}. }
+\]</span></p>
+<p>The estimator may solve for <code>C_R</code>, a scale factor, or
+another effective SRP parameter.</p>
+<p>The most important requirement is <strong>estimability</strong>:</p>
+<p><span class="math display">\[
+\boxed{ \text{Adding a Maneuver or Dynamic Parameter} \neq \text{Making
+It Observable}. }
+\]</span></p>
+<p>A parameter should generally be estimated only when it is</p>
+<p><span class="math display">\[
+\boxed{ \text{Uncertain} + \text{Dynamically Important} +
+\text{Observable}. }
+\]</span></p>
+<p>The quality of the final maneuver or dynamic-parameter solution
+should therefore be judged using:</p>
+<ul>
+<li>residual reduction,</li>
+<li>covariance,</li>
+<li>parameter correlation,</li>
+<li>physical plausibility,</li>
+<li>consistency across observation arcs,</li>
+<li>telemetry comparison,</li>
+<li>future prediction performance.</li>
+</ul>
+<p>The overall principle is</p>
+<p><span class="math display">\[
+\boxed{ \text{Orbit Estimation} + \text{Maneuver Estimation} +
+\text{Dynamic-Parameter Estimation} \rightarrow \text{More Physically
+Complete Navigation Solution}. }
+\]</span></p>
+    </section>
+    <section class="notes-section-card">
+      <h2>Next: 4.3.16 Geometry, Identifiability and Estimability</h2>
+      <p>
+        Maneuver and dynamic-parameter estimation depends on whether the available measurements can actually
+        distinguish the parameters being solved for. The next section develops the geometry, rank, null-space,
+        correlation, and weak-direction concepts that determine whether states and parameters are estimable.
+      </p>
+      <a href="geometry-identifiability-estimability.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.16 Geometry, Identifiability and Estimability</h3>
+          <p>
+            Measurement geometry, rank, null spaces, parameter correlations, weak estimation directions,
+            and practical estimability diagnostics.
+          </p>
+          <p class="sensor-link-arrow">Continue to Geometry, Identifiability and Estimability &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
