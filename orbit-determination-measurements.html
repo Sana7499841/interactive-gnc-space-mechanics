@@ -1,0 +1,2732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.3.12 Orbit-Determination Measurement Models | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .table-wrap { width:100%; overflow-x:auto; margin:1rem 0 1.4rem; }
+    .table-wrap table { width:100%; border-collapse:collapse; }
+    .table-wrap th, .table-wrap td { border:1px solid #d8dee6; padding:0.75rem 0.85rem; text-align:left; vertical-align:top; }
+    .table-wrap th { font-weight:700; background:#f7f9fb; }
+    .engineering-note { margin:1rem 0; padding:0.95rem 1.05rem; background:#f7f9fb; border-left:4px solid #9bb8d3; }
+    .equation-note { margin-top:0.35rem; color:#475569; }
+    .notes-section-card h4 { margin-top:1.25rem; margin-bottom:0.55rem; }
+    .notes-section-card .math.display { display:block; overflow-x:auto; padding:0.15rem 0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Orbit-Determination Measurement Models</h1>
+    <p class="notes-tagline">
+      Range, range rate, Doppler, azimuth/elevation, right ascension/declination, line of sight, GNSS, optical
+      observations, measurement partial derivatives, covariance, timing, calibration, observability, and practical
+      corrections for precise orbit determination.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.3.12 Orbit-Determination Measurement Models</h2>
+
+<p>Orbit determination depends on two major ingredients:</p>
+<p><span class="math display">\[
+\boxed{ \text{Dynamic Model} + \text{Measurement Model} }
+\]</span></p>
+<p>The dynamic model predicts how the spacecraft state evolves with
+time. The measurement model predicts what a sensor should observe for a
+given spacecraft state.</p>
+<p>If the spacecraft state is</p>
+<p><span class="math display">\[
+\mathbf x_k
+\]</span></p>
+<p>and the measurement at time <code>t_k</code> is</p>
+<p><span class="math display">\[
+\mathbf z_k,
+\]</span></p>
+<p>the general measurement equation is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k(\mathbf x_k) + \mathbf v_k }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>h_k(\cdot)</code> is the measurement function,</li>
+<li><code>\mathbf v_k</code> is measurement noise.</li>
+</ul>
+<p>For many OD problems, the state may be</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v \end{bmatrix}
+}
+\]</span></p>
+<p>or an augmented state containing additional quantities such as
+biases, clock states, calibration parameters, and dynamic
+coefficients.</p>
+<p>The purpose of a measurement model is therefore:</p>
+<p><span class="math display">\[
+\boxed{ \text{Spacecraft State} \rightarrow \text{Predicted Sensor
+Observation} }
+\]</span></p>
+<p>and the difference between the actual and predicted measurement
+provides the information used by the estimator.</p>
+<p>This section covers the major measurement types used in orbit
+determination:</p>
+<ul>
+<li>range,</li>
+<li>range rate,</li>
+<li>Doppler,</li>
+<li>azimuth/elevation,</li>
+<li>right ascension/declination,</li>
+<li>line of sight,</li>
+<li>GNSS measurements,</li>
+<li>optical observations,</li>
+<li>measurement partial derivatives,</li>
+<li>measurement covariance and residual construction,</li>
+<li>practical corrections required for precise tracking.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.1 General Measurement Equation</h3>
+
+<p>The generic nonlinear measurement model is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k( \mathbf x_k, \boldsymbol\theta_k ) + \mathbf
+v_k }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\boldsymbol\theta_k
+\]</span></p>
+<p>may contain measurement-related parameters such as</p>
+<ul>
+<li>sensor biases,</li>
+<li>station coordinates,</li>
+<li>timing offsets,</li>
+<li>clock parameters,</li>
+<li>calibration coefficients.</li>
+</ul>
+<p>The noise is commonly modeled as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf v_k \sim \mathcal N( \mathbf 0, \mathbf R_k ) }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\mathbf R_k
+\]</span></p>
+<p>is the measurement-noise covariance matrix.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.2 Predicted Measurement</h3>
+
+<p>Given a predicted spacecraft state</p>
+<p><span class="math display">\[
+\hat{\mathbf x}_k^-,
+\]</span></p>
+<p>the expected measurement is</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf z}_k = h_k( \hat{\mathbf x}_k^- ) }
+\]</span></p>
+<p>The estimator then compares this predicted value with the actual
+observation.</p>
+<p>The residual or innovation is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf y_k = \mathbf z_k - \hat{\mathbf z}_k }
+\]</span></p>
+<p>The residual drives the state correction.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.3 Measurement Residual Interpretation</h3>
+
+<p>A nonzero residual may result from</p>
+<ul>
+<li>state-estimation error,</li>
+<li>sensor noise,</li>
+<li>sensor bias,</li>
+<li>timing error,</li>
+<li>calibration error,</li>
+<li>force-model error,</li>
+<li>station-coordinate error,</li>
+<li>maneuver mismatch.</li>
+</ul>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Residual} \neq \text{Pure Position or Velocity Error} }
+\]</span></p>
+<p>A physically meaningful OD solution requires correct interpretation
+of residuals.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.4 Observer and Spacecraft Geometry</h3>
+
+<p>Let</p>
+<p><span class="math display">\[
+\mathbf r_{\rm sc}
+\]</span></p>
+<p>be spacecraft position and</p>
+<p><span class="math display">\[
+\mathbf r_{\rm obs}
+\]</span></p>
+<p>be observer position.</p>
+<p>Define relative position:</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\rho = \mathbf r_{\rm sc} - \mathbf r_{\rm obs} }
+\]</span></p>
+<p>and relative velocity:</p>
+<p><span class="math display">\[
+\boxed{ \dot{\boldsymbol\rho} = \mathbf v_{\rm sc} - \mathbf v_{\rm obs}
+}
+\]</span></p>
+<p>The geometric range is</p>
+<p><span class="math display">\[
+\boxed{ \rho = \|\boldsymbol\rho\| }
+\]</span></p>
+<p>and the line-of-sight unit vector is</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\rho} = \frac{\boldsymbol\rho}{\rho} }
+\]</span></p>
+<p>These quantities form the basis of many OD measurement models.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.5 One-Way Range</h3>
+
+<p>The simplest geometric range measurement is</p>
+<p><span class="math display">\[
+\boxed{ \rho = \| \mathbf r_{\rm sc} - \mathbf r_{\rm obs} \| }
+\]</span></p>
+<p>The measurement may be modeled as</p>
+<p><span class="math display">\[
+\boxed{ z_\rho = \rho + b_\rho + v_\rho }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>b_\rho</code> is range bias,</li>
+<li><code>v_\rho</code> is random noise.</li>
+</ul>
+<p>Range directly measures distance along the line of sight.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.6 Physical Interpretation of Range</h3>
+
+<p>Range strongly constrains the spacecraft position along the
+observer-to-spacecraft direction.</p>
+<p>However, one range measurement generally does not determine the full
+3-D position.</p>
+<p>The measurement contains much weaker information about transverse
+directions.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Range} \rightarrow \text{Strong LOS Distance Information}
+}
+\]</span></p>
+<p>while changing geometry over time is needed to obtain full position
+observability.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.7 Two-Way Range</h3>
+
+<p>Ground-based tracking often uses two-way ranging.</p>
+<p>A signal is transmitted from the station, received or transponded by
+the spacecraft, and returned to the station.</p>
+<p>Approximately,</p>
+<p><span class="math display">\[
+\boxed{ \rho_{\rm 2way} \approx \frac{c\Delta t}{2} }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>c</code> is the speed of light,</li>
+<li><code>\Delta t</code> is round-trip signal time.</li>
+</ul>
+<p>For precision OD, the spacecraft and station move during signal
+propagation, so full light-time modeling is required.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.8 Range Bias</h3>
+
+<p>A practical range model may include</p>
+<p><span class="math display">\[
+\boxed{ z_\rho = \rho + b_{\rm station} + b_{\rm transponder} + b_{\rm
+media} + v_\rho }
+\]</span></p>
+<p>Bias may come from</p>
+<ul>
+<li>instrumentation,</li>
+<li>transponder delay,</li>
+<li>calibration offset,</li>
+<li>atmosphere,</li>
+<li>clock errors.</li>
+</ul>
+<p>If significant, these biases may need to be calibrated or
+estimated.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.9 Range Partial Derivative</h3>
+
+<p>For</p>
+<p><span class="math display">\[
+\rho = \|\boldsymbol\rho\|,
+\]</span></p>
+<p>the derivative with respect to spacecraft position is</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\rho} {\partial\mathbf r_{\rm sc}} =
+\hat{\boldsymbol\rho}^T }
+\]</span></p>
+<p>assuming observer position is fixed relative to the differentiation
+variable.</p>
+<p>For the basic geometric range model,</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\rho} {\partial\mathbf v_{\rm sc}} = \mathbf0^T }
+\]</span></p>
+<p>instantaneously.</p>
+<p>Therefore the local measurement Jacobian is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H_\rho = \begin{bmatrix} \hat{\boldsymbol\rho}^T &amp;
+\mathbf0^T \end{bmatrix} }
+\]</span></p>
+<p>for a position-velocity state.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.10 Range Rate</h3>
+
+<p>Range rate is the time derivative of range.</p>
+<p>Starting from</p>
+<p><span class="math display">\[
+\rho = \|\boldsymbol\rho\|,
+\]</span></p>
+<p>the derivative is</p>
+<p><span class="math display">\[
+\boxed{ \dot\rho = \frac{ \boldsymbol\rho^T \dot{\boldsymbol\rho} }
+{\rho} }
+\]</span></p>
+<p>or equivalently</p>
+<p><span class="math display">\[
+\boxed{ \dot\rho = \hat{\boldsymbol\rho}^T \dot{\boldsymbol\rho} }
+\]</span></p>
+<p>Thus range rate measures relative velocity projected along the line
+of sight.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.11 Range-Rate Measurement Model</h3>
+
+<p>A simple model is</p>
+<p><span class="math display">\[
+\boxed{ z_{\dot\rho} = \dot\rho + b_{\dot\rho} + v_{\dot\rho} }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>b_{\dot\rho}</code> is range-rate bias,</li>
+<li><code>v_{\dot\rho}</code> is noise.</li>
+</ul>
+<p>Range and range rate are complementary because range constrains
+relative position while range rate constrains relative velocity along
+the LOS.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.12 Physical Meaning of Range Rate</h3>
+
+<p>If</p>
+<p><span class="math display">\[
+\dot\rho&gt;0,
+\]</span></p>
+<p>the objects are separating along the line of sight.</p>
+<p>If</p>
+<p><span class="math display">\[
+\dot\rho&lt;0,
+\]</span></p>
+<p>they are closing.</p>
+<p>If</p>
+<p><span class="math display">\[
+\dot\rho=0,
+\]</span></p>
+<p>the instantaneous relative motion is transverse to the LOS or
+momentarily stationary in range.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.13 Range-Rate Sensitivity to Velocity</h3>
+
+<p>Because</p>
+<p><span class="math display">\[
+\dot\rho = \hat{\boldsymbol\rho}^T \mathbf v_{\rm rel},
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\mathbf v_{\rm rel} = \mathbf v_{\rm sc} - \mathbf v_{\rm obs},
+\]</span></p>
+<p>the velocity derivative is</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\dot\rho} {\partial\mathbf v_{\rm sc}} =
+\hat{\boldsymbol\rho}^T }
+\]</span></p>
+<p>for the basic geometric model.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.14 Range-Rate Sensitivity to Position</h3>
+
+<p>Range rate also depends on position because the LOS unit vector
+depends on position.</p>
+<p>Let</p>
+<p><span class="math display">\[
+\mathbf P_\perp = \mathbf I - \hat{\boldsymbol\rho}
+\hat{\boldsymbol\rho}^T.
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\dot\rho} {\partial\mathbf r_{\rm sc}} = \frac{
+\mathbf v_{\rm rel}^T \mathbf P_\perp }{\rho} }
+\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H_{\dot\rho} = \begin{bmatrix} \dfrac{ \mathbf v_{\rm
+rel}^T (\mathbf I-\hat{\boldsymbol\rho}\hat{\boldsymbol\rho}^T) }{\rho}
+&amp; \hat{\boldsymbol\rho}^T \end{bmatrix} }
+\]</span></p>
+<p>for the simplified model.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.15 Doppler Measurement</h3>
+
+<p>Doppler measures frequency shift caused by relative motion.</p>
+<p>For a one-way signal, a simplified relation is</p>
+<p><span class="math display">\[
+\boxed{ \Delta f \approx -\frac{f_0}{c}\dot\rho }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>f_0</code> is transmitted frequency,</li>
+<li><code>c</code> is the speed of light.</li>
+</ul>
+<p>Thus Doppler is fundamentally related to line-of-sight relative
+velocity.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.16 Doppler versus Range Rate</h3>
+
+<p>Doppler and range rate are closely related but are not always
+numerically identical measurement types.</p>
+<p>Range rate is expressed in</p>
+<p><span class="math display">\[
+\mathrm{m/s}
+\]</span></p>
+<p>whereas Doppler is measured in</p>
+<p><span class="math display">\[
+\mathrm{Hz}.
+\]</span></p>
+<p>Their simplified relationship is</p>
+<p><span class="math display">\[
+\boxed{ \dot\rho \approx -\frac{c}{f_0}\Delta f. }
+\]</span></p>
+<p>Real tracking systems may use coherent transponders, turnaround
+ratios, accumulated Doppler counts, and finite integration
+intervals.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.17 Integrated Doppler</h3>
+
+<p>A Doppler observable may represent accumulated phase or frequency
+over an interval.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ N_D \propto \rho(t_2)-\rho(t_1) }
+\]</span></p>
+<p>over a counting interval.</p>
+<p>This makes Doppler highly sensitive to relative radial motion.</p>
+<p>For accurate modeling, the finite measurement integration period
+should be represented.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.18 Two-Way Doppler</h3>
+
+<p>In two-way tracking, frequency shift occurs on both the uplink and
+downlink.</p>
+<p>The full model depends on</p>
+<ul>
+<li>uplink frequency,</li>
+<li>transponder turnaround ratio,</li>
+<li>spacecraft motion,</li>
+<li>station motion,</li>
+<li>light-time,</li>
+<li>relativistic effects.</li>
+</ul>
+<p>The simplified proportionality to range rate remains useful for
+understanding the geometry.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.19 Doppler Measurement Noise</h3>
+
+<p>Doppler precision depends on</p>
+<ul>
+<li>oscillator stability,</li>
+<li>signal-to-noise ratio,</li>
+<li>integration time,</li>
+<li>receiver tracking,</li>
+<li>propagation effects.</li>
+</ul>
+<p>Longer integration times can reduce random frequency noise but may
+reduce temporal resolution.</p>
+<p>Thus measurement cadence and precision are coupled.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.20 Azimuth and Elevation Measurements</h3>
+
+<p>Ground tracking systems frequently measure spacecraft direction in a
+local topocentric frame.</p>
+<p>Let the line-of-sight vector in a local East-North-Up frame be</p>
+<p><span class="math display">\[
+\boldsymbol\rho_{\rm ENU} = \begin{bmatrix} \rho_E\\ \rho_N\\ \rho_U
+\end{bmatrix}.
+\]</span></p>
+<p>Then azimuth can be defined as</p>
+<p><span class="math display">\[
+\boxed{ A = \operatorname{atan2}( \rho_E,\rho_N ) }
+\]</span></p>
+<p>and elevation as</p>
+<p><span class="math display">\[
+\boxed{ E = \arctan \left( \frac{\rho_U} {\sqrt{\rho_E^2+\rho_N^2}}
+\right) }
+\]</span></p>
+<p>subject to the chosen convention.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.21 Azimuth Convention</h3>
+
+<p>Azimuth conventions must be stated explicitly.</p>
+<p>A common convention is</p>
+<ul>
+<li><code>0^\circ</code>: North,</li>
+<li><code>90^\circ</code>: East,</li>
+<li>increasing clockwise when viewed from above.</li>
+</ul>
+<p>Other conventions may exist.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Angle Convention Must Be Defined} }
+\]</span></p>
+<p>before implementing the measurement equation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.22 Elevation</h3>
+
+<p>Elevation represents the angle above the local horizon.</p>
+<p>If</p>
+<p><span class="math display">\[
+E=0^\circ,
+\]</span></p>
+<p>the spacecraft lies on the local horizon.</p>
+<p>If</p>
+<p><span class="math display">\[
+E=90^\circ,
+\]</span></p>
+<p>it is at the local zenith.</p>
+<p>Low-elevation measurements may suffer increased atmospheric effects
+and poorer geometry.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.23 Topocentric Transformation</h3>
+
+<p>The relative vector is often initially known in an inertial or
+Earth-fixed frame.</p>
+<p>It must be transformed to the station-local frame:</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\rho_{\rm ENU} = \mathbf C_{\rm ENU/ECEF}
+\boldsymbol\rho_{\rm ECEF} }
+\]</span></p>
+<p>or the appropriate local frame.</p>
+<p>Therefore azimuth/elevation prediction requires correct</p>
+<ul>
+<li>Earth orientation,</li>
+<li>station coordinates,</li>
+<li>Earth rotation,</li>
+<li>frame transformations.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.24 Azimuth Measurement Model</h3>
+
+<p>The measured azimuth may be written</p>
+<p><span class="math display">\[
+\boxed{ z_A = A + b_A + v_A }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>b_A</code> is angular bias,</li>
+<li><code>v_A</code> is random measurement noise.</li>
+</ul>
+<p>Azimuth constrains the horizontal LOS direction.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.25 Elevation Measurement Model</h3>
+
+<p>Similarly,</p>
+<p><span class="math display">\[
+\boxed{ z_E = E + b_E + v_E }
+\]</span></p>
+<p>Elevation constrains vertical LOS geometry.</p>
+<p>Azimuth and elevation together provide a 2-D angular direction but no
+direct range.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.26 Angular Singularities</h3>
+
+<p>Azimuth becomes poorly defined near zenith because horizontal LOS
+components approach zero.</p>
+<p>This is a coordinate singularity, not a physical singularity.</p>
+<p>Alternative representations such as LOS unit vectors can avoid this
+issue.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.27 Right Ascension and Declination</h3>
+
+<p>Astronomical optical measurements are often expressed using right
+ascension and declination.</p>
+<p>Let an inertial LOS vector be</p>
+<p><span class="math display">\[
+\boldsymbol\rho = \begin{bmatrix} \rho_x\\ \rho_y\\ \rho_z
+\end{bmatrix}.
+\]</span></p>
+<p>Then right ascension is</p>
+<p><span class="math display">\[
+\boxed{ \alpha = \operatorname{atan2}( \rho_y,\rho_x ) }
+\]</span></p>
+<p>and declination is</p>
+<p><span class="math display">\[
+\boxed{ \delta = \arcsin \left( \frac{\rho_z}{\rho} \right) }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\rho=\|\boldsymbol\rho\|.
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.28 Right Ascension</h3>
+
+<p>Right ascension describes angular direction in an equatorial inertial
+coordinate system.</p>
+<p>It is analogous to longitude on the celestial sphere.</p>
+<p>Because it is periodic, care is required near the <code>0/2\pi</code>
+wrap boundary.</p>
+<p>Residuals should be wrapped consistently.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.29 Declination</h3>
+
+<p>Declination describes angular distance above or below the equatorial
+plane.</p>
+<p>Its range is typically</p>
+<p><span class="math display">\[
+-\frac{\pi}{2} \le \delta \le \frac{\pi}{2}.
+\]</span></p>
+<p>Together, RA and Dec specify LOS direction but do not directly
+provide distance.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.30 Angle-Only Orbit Determination</h3>
+
+<p>When only angular measurements are available, the range to the
+spacecraft is initially weakly constrained.</p>
+<p>The estimator relies heavily on</p>
+<ul>
+<li>changing observation geometry,</li>
+<li>dynamic propagation,</li>
+<li>multiple observation times,</li>
+<li>possibly multiple observers.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Angle Measurements} + \text{Dynamics} + \text{Geometry
+Change} \rightarrow \text{Range Information Over Time} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.31 Line-of-Sight Measurement</h3>
+
+<p>Instead of representing angular direction using two angles, one may
+directly use a unit LOS vector:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\rho} = \frac{ \mathbf r_{\rm target} - \mathbf
+r_{\rm observer} } { \| \mathbf r_{\rm target} - \mathbf r_{\rm
+observer} \| } }
+\]</span></p>
+<p>This avoids angle wrapping and some coordinate singularities.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.32 LOS Vector Measurement Model</h3>
+
+<p>A measured LOS can be modeled as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_{\rm LOS} = \hat{\boldsymbol\rho} + \mathbf v_{\rm
+LOS} }
+\]</span></p>
+<p>with appropriate normalization and covariance representation.</p>
+<p>Because a unit vector has only two independent degrees of freedom,
+its three Cartesian components are constrained:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\rho}^T \hat{\boldsymbol\rho} = 1. }
+\]</span></p>
+<p>This must be considered when defining measurement covariance.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.33 LOS Jacobian</h3>
+
+<p>For</p>
+<p><span class="math display">\[
+\hat{\boldsymbol\rho} = \frac{\boldsymbol\rho}{\rho},
+\]</span></p>
+<p>the derivative with respect to relative position is</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\hat{\boldsymbol\rho}} {\partial\boldsymbol\rho} =
+\frac{1}{\rho} \left( \mathbf I - \hat{\boldsymbol\rho}
+\hat{\boldsymbol\rho}^T \right) }
+\]</span></p>
+<p>This matrix projects perturbations into directions perpendicular to
+the LOS.</p>
+<p>Therefore LOS measurements contain almost no first-order sensitivity
+to motion directly along the LOS.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.34 Physical Meaning of LOS Sensitivity</h3>
+
+<p>The matrix</p>
+<p><span class="math display">\[
+\mathbf I - \hat{\boldsymbol\rho} \hat{\boldsymbol\rho}^T
+\]</span></p>
+<p>removes the radial component.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{LOS Measurement} \rightarrow \text{Strong Transverse
+Information} }
+\]</span></p>
+<p>whereas</p>
+<p><span class="math display">\[
+\boxed{ \text{Range Measurement} \rightarrow \text{Strong Radial
+Information} }
+\]</span></p>
+<p>This illustrates why combining range and LOS measurements can be very
+powerful.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.35 Optical Measurements</h3>
+
+<p>Optical sensors may produce measurements such as</p>
+<ul>
+<li>pixel coordinates,</li>
+<li>centroid locations,</li>
+<li>bearings,</li>
+<li>LOS vectors,</li>
+<li>angular positions,</li>
+<li>apparent object size,</li>
+<li>landmark directions,</li>
+<li>star directions.</li>
+</ul>
+<p>The raw camera image is not itself the OD measurement until it has
+been converted into a feature or geometric observable.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.36 Pinhole Camera Model</h3>
+
+<p>For a point expressed in camera coordinates</p>
+<p><span class="math display">\[
+\mathbf p_C = \begin{bmatrix} X_C\\ Y_C\\ Z_C \end{bmatrix},
+\]</span></p>
+<p>the ideal pinhole projection is</p>
+<p><span class="math display">\[
+\boxed{ u = f_x\frac{X_C}{Z_C} + c_x }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ v = f_y\frac{Y_C}{Z_C} + c_y }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>f_x,f_y</code> are effective focal lengths,</li>
+<li><code>c_x,c_y</code> are principal-point coordinates.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.37 Camera LOS from Pixel Coordinates</h3>
+
+<p>Given calibrated image coordinates,</p>
+<p><span class="math display">\[
+\tilde u = \frac{u-c_x}{f_x}, \qquad \tilde v = \frac{v-c_y}{f_y},
+\]</span></p>
+<p>the unnormalized camera-frame LOS is</p>
+<p><span class="math display">\[
+\begin{bmatrix} \tilde u\\ \tilde v\\ 1 \end{bmatrix}.
+\]</span></p>
+<p>Normalize it:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\rho}_C = \frac{ \begin{bmatrix} \tilde u\\
+\tilde v\\ 1 \end{bmatrix} }{ \left\| \begin{bmatrix} \tilde u\\ \tilde
+v\\ 1 \end{bmatrix} \right\| } }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.38 Optical Frame Transformation</h3>
+
+<p>The LOS may need transformation from camera frame to body frame and
+then to inertial or navigation frame:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\rho}_I = \mathbf C_{IB} \mathbf C_{BC}
+\hat{\boldsymbol\rho}_C }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>\mathbf C_{BC}</code>: camera-to-body rotation,</li>
+<li><code>\mathbf C_{IB}</code>: body-to-inertial rotation.</li>
+</ul>
+<p>Thus optical OD depends on both orbital and attitude knowledge.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.39 Camera Alignment Error</h3>
+
+<p>Camera alignment uncertainty introduces LOS error.</p>
+<p>A small alignment error</p>
+<p><span class="math display">\[
+\delta\boldsymbol\theta_C
+\]</span></p>
+<p>produces approximately</p>
+<p><span class="math display">\[
+\boxed{ \delta\hat{\boldsymbol\rho} \approx -
+[\hat{\boldsymbol\rho}\times] \delta\boldsymbol\theta_C. }
+\]</span></p>
+<p>Therefore optical measurement accuracy may depend strongly on
+camera-to-body calibration.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.40 Optical Centroid Error</h3>
+
+<p>An image-processing algorithm estimates target centroid:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_{\rm pix} = \begin{bmatrix} u\\ v \end{bmatrix} }
+\]</span></p>
+<p>with covariance</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R_{\rm pix} = \begin{bmatrix} \sigma_u^2 &amp;
+\sigma_{uv}\\ \sigma_{uv} &amp; \sigma_v^2 \end{bmatrix}. }
+\]</span></p>
+<p>Pixel uncertainty can be transformed into angular uncertainty using
+the camera model Jacobian.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.41 Pixel-to-Angle Uncertainty</h3>
+
+<p>For small angles,</p>
+<p><span class="math display">\[
+\theta_x \approx \frac{u-c_x}{f_x}.
+\]</span></p>
+<p>Therefore approximately,</p>
+<p><span class="math display">\[
+\boxed{ \sigma_{\theta_x} \approx \frac{\sigma_u}{f_x}. }
+\]</span></p>
+<p>Likewise,</p>
+<p><span class="math display">\[
+\boxed{ \sigma_{\theta_y} \approx \frac{\sigma_v}{f_y}. }
+\]</span></p>
+<p>This links image-processing precision directly to navigation
+performance.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.42 Apparent Angular Size</h3>
+
+<p>If an object of known physical size <code>D</code> has angular
+diameter <code>\theta</code>,</p>
+<p><span class="math display">\[
+\boxed{ \theta \approx \frac{D}{\rho} }
+\]</span></p>
+<p>for small angles.</p>
+<p>Thus apparent size can provide approximate range information if
+physical size and geometry are known.</p>
+<p>However, such range estimates may be sensitive to</p>
+<ul>
+<li>target attitude,</li>
+<li>shape,</li>
+<li>illumination,</li>
+<li>segmentation accuracy.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.43 Feature-Based Optical Navigation</h3>
+
+<p>Instead of using the object centroid, an optical system may track
+features.</p>
+<p>A feature measurement may be</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_i = \begin{bmatrix} u_i\\ v_i \end{bmatrix} }
+\]</span></p>
+<p>for feature <code>i</code>.</p>
+<p>If feature locations are known in the target/body frame, the camera
+model predicts their image positions.</p>
+<p>This can support simultaneous estimation of</p>
+<ul>
+<li>relative position,</li>
+<li>relative attitude,</li>
+<li>calibration parameters.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.44 Optical Measurement Bias Sources</h3>
+
+<p>Possible optical biases include</p>
+<ul>
+<li>focal-length error,</li>
+<li>principal-point error,</li>
+<li>lens distortion,</li>
+<li>camera alignment error,</li>
+<li>timing offset,</li>
+<li>thermal deformation,</li>
+<li>centroid bias,</li>
+<li>feature-location uncertainty.</li>
+</ul>
+<p>These may need explicit calibration or augmented-state
+estimation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.45 GNSS Measurements</h3>
+
+<p>GNSS-based orbit determination uses measurements from navigation
+satellites.</p>
+<p>Common observables include</p>
+<ul>
+<li>pseudorange,</li>
+<li>carrier phase,</li>
+<li>Doppler,</li>
+<li>navigation-message ephemerides.</li>
+</ul>
+<p>The receiver position and clock states are inferred from simultaneous
+observations to multiple GNSS satellites.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.46 GNSS Pseudorange</h3>
+
+<p>For GNSS satellite <code>i</code>, a simplified pseudorange model
+is</p>
+<p><span class="math display">\[
+\boxed{ P_i = \rho_i + c( \delta t_r-\delta t_{s,i} ) + I_i + T_i + b_i
++ \epsilon_i }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>\rho_i</code>: geometric range,</li>
+<li><code>\delta t_r</code>: receiver clock bias,</li>
+<li><code>\delta t_{s,i}</code>: satellite clock bias,</li>
+<li><code>I_i</code>: ionospheric delay,</li>
+<li><code>T_i</code>: tropospheric delay,</li>
+<li><code>b_i</code>: hardware or other bias,</li>
+<li><code>\epsilon_i</code>: noise.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.47 GNSS Geometric Range</h3>
+
+<p>The geometric range is</p>
+<p><span class="math display">\[
+\boxed{ \rho_i = \| \mathbf r_r - \mathbf r_{s,i} \| }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>\mathbf r_r</code>: receiver spacecraft position,</li>
+<li><code>\mathbf r_{s,i}</code>: GNSS satellite position.</li>
+</ul>
+<p>Because multiple GNSS satellites have different LOS directions,
+simultaneous pseudoranges provide 3-D geometry.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.48 GNSS Clock Bias</h3>
+
+<p>Receiver clock bias contributes directly to all pseudorange
+measurements.</p>
+<p>Therefore the GNSS navigation state commonly includes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ b_c\\ \dot
+b_c \end{bmatrix}. }
+\]</span></p>
+<p>The clock states are essential because GNSS receiver clocks are
+generally not synchronized perfectly with GNSS system time.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.49 GNSS Doppler</h3>
+
+<p>GNSS Doppler measures relative radial velocity between receiver and
+navigation satellite.</p>
+<p>A simplified model is</p>
+<p><span class="math display">\[
+\boxed{ \dot\rho_i = \hat{\boldsymbol\rho}_i^T ( \mathbf v_r-\mathbf
+v_{s,i} ) }
+\]</span></p>
+<p>plus clock-drift and measurement-error terms.</p>
+<p>It provides strong information about receiver velocity.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.50 GNSS Carrier Phase</h3>
+
+<p>Carrier-phase measurements provide very high precision.</p>
+<p>A simplified model is</p>
+<p><span class="math display">\[
+\boxed{ \Phi_i = \rho_i + c( \delta t_r-\delta t_{s,i} ) + \lambda N_i +
+\epsilon_{\Phi,i} +\cdots }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>\lambda</code> is carrier wavelength,</li>
+<li><code>N_i</code> is integer ambiguity.</li>
+</ul>
+<p>Carrier phase is highly precise but requires ambiguity handling.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.51 GNSS Measurement Geometry</h3>
+
+<p>GNSS navigation quality depends on satellite geometry.</p>
+<p>Poor satellite geometry can produce large position uncertainty even
+when measurement noise is small.</p>
+<p>This is related to dilution of precision.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ \text{GNSS Accuracy} = f( \text{Measurement Noise},
+\text{Satellite Geometry} ) }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.52 GNSS in Space Applications</h3>
+
+<p>For spacecraft, GNSS use depends on</p>
+<ul>
+<li>altitude,</li>
+<li>antenna orientation,</li>
+<li>receiver sensitivity,</li>
+<li>GNSS constellation visibility,</li>
+<li>side-lobe reception,</li>
+<li>signal strength.</li>
+</ul>
+<p>In LEO, GNSS can provide frequent high-quality navigation
+updates.</p>
+<p>At higher altitudes, signal geometry and availability can become more
+challenging.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.53 Inter-Satellite Range</h3>
+
+<p>For two spacecraft,</p>
+<p><span class="math display">\[
+\boxed{ \rho_{12} = \| \mathbf r_2-\mathbf r_1 \| }
+\]</span></p>
+<p>An inter-satellite range measurement can be written</p>
+<p><span class="math display">\[
+\boxed{ z_{\rho,12} = \rho_{12} + b_{\rho,12} + v_{\rho,12}. }
+\]</span></p>
+<p>This supports relative orbit determination and formation
+navigation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.54 Inter-Satellite Range Rate</h3>
+
+<p>Similarly,</p>
+<p><span class="math display">\[
+\boxed{ \dot\rho_{12} = \frac{ ( \mathbf r_2-\mathbf r_1 )^T ( \mathbf
+v_2-\mathbf v_1 ) }{ \rho_{12} } }
+\]</span></p>
+<p>This provides information about relative closing or separation
+velocity.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.55 Relative Measurements in General RPO</h3>
+
+<p>In general rendezvous and proximity operations, relative navigation
+may use</p>
+<ul>
+<li>range,</li>
+<li>range rate,</li>
+<li>bearing angles,</li>
+<li>LOS vectors,</li>
+<li>camera features,</li>
+<li>LiDAR,</li>
+<li>radar,</li>
+<li>inter-satellite GNSS.</li>
+</ul>
+<p>The relative state is commonly</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{\rm rel} = \begin{bmatrix} \mathbf r_{\rm rel}\\
+\mathbf v_{\rm rel} \end{bmatrix}. }
+\]</span></p>
+<p>The same measurement-model principles used for absolute OD apply to
+relative OD.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.56 Relative Range</h3>
+
+<p>For relative position</p>
+<p><span class="math display">\[
+\mathbf r_{\rm rel},
+\]</span></p>
+<p>the range is</p>
+<p><span class="math display">\[
+\boxed{ \rho_{\rm rel} = \| \mathbf r_{\rm rel} \| }
+\]</span></p>
+<p>and the measurement model is</p>
+<p><span class="math display">\[
+\boxed{ z_\rho = \rho_{\rm rel} + v_\rho. }
+\]</span></p>
+<p>This provides radial separation but not complete 3-D position.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.57 Relative LOS</h3>
+
+<p>The relative LOS is</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\rho}_{\rm rel} = \frac{ \mathbf r_{\rm rel} }{
+\|\mathbf r_{\rm rel}\| } }
+\]</span></p>
+<p>which provides direction to the other object.</p>
+<p>Combining relative range and LOS can reconstruct relative position
+geometrically:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_{\rm rel} = \rho_{\rm rel} \hat{\boldsymbol\rho}_{\rm
+rel}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.58 LiDAR Measurements</h3>
+
+<p>LiDAR may provide</p>
+<ul>
+<li>range,</li>
+<li>point clouds,</li>
+<li>relative pose,</li>
+<li>surface geometry.</li>
+</ul>
+<p>A basic LiDAR range model is</p>
+<p><span class="math display">\[
+\boxed{ z_L = \rho + b_L + v_L. }
+\]</span></p>
+<p>More advanced LiDAR systems may directly estimate 3-D relative
+position and orientation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.59 Radar Measurements</h3>
+
+<p>Radar tracking may provide combinations of</p>
+<ul>
+<li>range,</li>
+<li>range rate,</li>
+<li>azimuth,</li>
+<li>elevation.</li>
+</ul>
+<p>A radar measurement vector can be written</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_{\rm radar} = \begin{bmatrix} \rho\\ \dot\rho\\ A\\ E
+\end{bmatrix} + \mathbf v. }
+\]</span></p>
+<p>Radar therefore combines radial and angular information.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.60 Measurement Coordinate Transformation</h3>
+
+<p>Suppose a sensor measurement is naturally expressed in sensor frame
+<code>S</code>, while the spacecraft state is expressed in inertial
+frame <code>I</code>.</p>
+<p>The geometric prediction requires</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_S = \mathbf C_{SI} \mathbf r_I }
+\]</span></p>
+<p>or the appropriate chain of transformations.</p>
+<p>Incorrect frame transformations are a common source of systematic
+measurement residuals.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.61 Sensor Lever Arm</h3>
+
+<p>A sensor may not be located at the spacecraft center of mass.</p>
+<p>Let the sensor position relative to the spacecraft reference point
+be</p>
+<p><span class="math display">\[
+\mathbf r_{B/S}.
+\]</span></p>
+<p>Then the sensor inertial position is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_S^I = \mathbf r_B^I + \mathbf C_{IB} \mathbf r_{B/S}.
+}
+\]</span></p>
+<p>This lever arm can matter for precise angular or range
+measurements.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.62 Sensor Attitude Dependence</h3>
+
+<p>Some measurements depend explicitly on spacecraft attitude.</p>
+<p>Optical LOS measured in a body-fixed camera frame is one example.</p>
+<p>Thus the state may need to include attitude:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x = \begin{bmatrix} \mathbf r\\ \mathbf v\\ \mathbf q\\
+\boldsymbol\omega \end{bmatrix} }
+\]</span></p>
+<p>if the measurement model requires it.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.63 Time Tagging</h3>
+
+<p>A measurement should correspond to the correct state time:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h( \mathbf x(t_k) ). }
+\]</span></p>
+<p>If the time tag contains error</p>
+<p><span class="math display">\[
+\Delta t,
+\]</span></p>
+<p>the actual state used should be approximately</p>
+<p><span class="math display">\[
+\mathbf x(t_k+\Delta t).
+\]</span></p>
+<p>For a moving spacecraft, even small timing offsets can generate
+significant apparent measurement errors.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.64 Timing-Error Approximation</h3>
+
+<p>For a small timing error,</p>
+<p><span class="math display">\[
+\mathbf x(t+\Delta t) \approx \mathbf x(t) + \dot{\mathbf x}(t)\Delta t.
+\]</span></p>
+<p>Therefore measurement error due to timing is approximately</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf z \approx \mathbf H \dot{\mathbf x} \Delta t. }
+\]</span></p>
+<p>This equation shows why timing synchronization is part of the
+measurement model.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.65 Light-Time Correction</h3>
+
+<p>Signals propagate at finite speed.</p>
+<p>For a one-way signal,</p>
+<p><span class="math display">\[
+\boxed{ t_r-t_t = \frac{\rho}{c} }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>t_t</code>: transmission time,</li>
+<li><code>t_r</code>: reception time.</li>
+</ul>
+<p>Because spacecraft and observer move during this interval, the
+geometric range must be evaluated at different epochs.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.66 Iterative Light-Time Solution</h3>
+
+<p>The measurement geometry may require solving</p>
+<p><span class="math display">\[
+\boxed{ \rho = \left\| \mathbf r_{\rm sc}(t_t) - \mathbf r_{\rm
+obs}(t_r) \right\| }
+\]</span></p>
+<p>with</p>
+<p><span class="math display">\[
+t_r-t_t = \frac{\rho}{c}.
+\]</span></p>
+<p>Because <code>\rho</code> depends on <code>t_t</code>, an iterative
+solution may be required.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.67 Atmospheric Delay</h3>
+
+<p>Ground-based radio measurements may be affected by</p>
+<ul>
+<li>tropospheric delay,</li>
+<li>ionospheric delay.</li>
+</ul>
+<p>A practical range model may therefore be</p>
+<p><span class="math display">\[
+\boxed{ z_\rho = \rho + \Delta\rho_{\rm trop} + \Delta\rho_{\rm iono} +
+b + v. }
+\]</span></p>
+<p>The importance depends on tracking frequency, elevation angle, and
+required precision.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.68 Refraction in Angular Measurements</h3>
+
+<p>Atmospheric refraction can shift measured elevation.</p>
+<p>The apparent elevation may differ from the geometric elevation:</p>
+<p><span class="math display">\[
+\boxed{ E_{\rm measured} = E_{\rm geometric} + \Delta E_{\rm refr}. }
+\]</span></p>
+<p>This effect becomes stronger at low elevation angles.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.69 Relativistic Measurement Corrections</h3>
+
+<p>For precision tracking, corrections may be required for</p>
+<ul>
+<li>gravitational time delay,</li>
+<li>relativistic clock effects,</li>
+<li>frequency shifts,</li>
+<li>signal propagation near massive bodies.</li>
+</ul>
+<p>These are generally not needed for basic OD but can be important in
+high-precision GNSS and deep-space navigation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.70 Measurement Bias State</h3>
+
+<p>A sensor bias may be included as an augmented state:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_a = \begin{bmatrix} \mathbf x\\ b \end{bmatrix}. }
+\]</span></p>
+<p>The measurement becomes</p>
+<p><span class="math display">\[
+\boxed{ z = h(\mathbf x) + b + v. }
+\]</span></p>
+<p>The bias may be modeled as constant or slowly varying.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.71 Measurement Scale Factor</h3>
+
+<p>A measurement may contain multiplicative error:</p>
+<p><span class="math display">\[
+\boxed{ z_m = (1+s) h(\mathbf x) + v }
+\]</span></p>
+<p>where <code>s</code> is scale-factor error.</p>
+<p>This may need calibration or augmented-state estimation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.72 Measurement Covariance</h3>
+
+<p>For measurement vector</p>
+<p><span class="math display">\[
+\mathbf z = \begin{bmatrix} z_1\\ z_2\\ \vdots \end{bmatrix},
+\]</span></p>
+<p>the measurement covariance is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R = E[ \mathbf v \mathbf v^T ]. }
+\]</span></p>
+<p>For independent measurements,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R = \operatorname{diag} ( \sigma_1^2, \sigma_2^2, \ldots
+) }
+\]</span></p>
+<p>but correlated measurements require off-diagonal terms.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.73 Why Correlated Measurement Noise Matters</h3>
+
+<p>Suppose two measurement errors share a common clock bias or
+atmospheric error.</p>
+<p>Then</p>
+<p><span class="math display">\[
+R_{12}\neq0.
+\]</span></p>
+<p>Treating them as independent would count shared information more than
+once and make the estimator overconfident.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Measurement Correlation Must Be Modeled When Significant}
+}
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.74 Measurement Weighting</h3>
+
+<p>For batch OD,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf W = \mathbf R^{-1}. }
+\]</span></p>
+<p>Measurements with lower variance receive greater weight.</p>
+<p>However, weighting should represent realistic statistical
+uncertainty, not simply nominal sensor resolution.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.75 Resolution versus Accuracy</h3>
+
+<p>Sensor resolution is the smallest change represented by the
+instrument.</p>
+<p>Accuracy describes closeness to the true value.</p>
+<p>These are not equivalent.</p>
+<p>A measurement may have excellent digital resolution but poor absolute
+accuracy due to bias or calibration error.</p>
+<p>Thus OD measurement covariance should not be based on resolution
+alone.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.76 Measurement Precision versus Bias</h3>
+
+<p>A highly precise sensor can repeatedly produce nearly identical but
+biased measurements.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Precision} \neq \text{Accuracy} }
+\]</span></p>
+<p>Bias should be calibrated, corrected, or estimated separately.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.77 Measurement Linearization</h3>
+
+<p>For nonlinear measurement model</p>
+<p><span class="math display">\[
+\mathbf z = h(\mathbf x) + \mathbf v,
+\]</span></p>
+<p>linearize around</p>
+<p><span class="math display">\[
+\hat{\mathbf x}.
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ h( \mathbf x ) \approx h( \hat{\mathbf x} ) + \mathbf H (
+\mathbf x-\hat{\mathbf x} ) }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H = \frac{\partial h} {\partial\mathbf x}
+\bigg|_{\hat{\mathbf x}}. }
+\]</span></p>
+<p>This matrix is the measurement Jacobian.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.78 Role of the Measurement Jacobian</h3>
+
+<p>The Jacobian describes local measurement sensitivity.</p>
+<p>If</p>
+<p><span class="math display">\[
+H_{ij} = \frac{\partial h_i}{\partial x_j},
+\]</span></p>
+<p>then <code>H_{ij}</code> indicates how strongly measurement
+<code>i</code> responds to state <code>j</code>.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H \rightarrow \text{Local Measurement Information
+Geometry} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.79 Measurement Jacobian in EKF</h3>
+
+<p>In an Extended Kalman Filter,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf S_k = \mathbf H_k \mathbf P_{k|k-1} \mathbf H_k^T +
+\mathbf R_k }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \mathbf K_k = \mathbf P_{k|k-1} \mathbf H_k^T \mathbf S_k^{-1}.
+}
+\]</span></p>
+<p>Thus the measurement Jacobian determines how state uncertainty
+projects into measurement space.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.80 Measurement Jacobian in Batch OD</h3>
+
+<p>In batch OD, measurements depend on the state at each measurement
+time.</p>
+<p>But the estimated unknown may be the reference-epoch state.</p>
+<p>Using</p>
+<p><span class="math display">\[
+\delta\mathbf x_k = \boldsymbol\Phi(t_k,t_0) \delta\mathbf x_0,
+\]</span></p>
+<p>we obtain</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf z_k = \mathbf H_k \boldsymbol\Phi(t_k,t_0)
+\delta\mathbf x_0. }
+\]</span></p>
+<p>Therefore the reference-epoch sensitivity is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k = \mathbf H_k \boldsymbol\Phi(t_k,t_0). }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.81 Partial Derivatives with Respect to Parameters</h3>
+
+<p>If the measurement depends on estimated parameter
+<code>\theta</code>,</p>
+<p><span class="math display">\[
+z = h(\mathbf x,\theta),
+\]</span></p>
+<p>then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H_\theta = \frac{\partial h} {\partial\theta}. }
+\]</span></p>
+<p>If the parameter influences the state dynamically, the total
+sensitivity also includes state sensitivity:</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial z_k} {\partial\theta} = \mathbf H_{x,k} \mathbf
+S_{\theta,k} + \mathbf H_{\theta,k}. }
+\]</span></p>
+<p>This is important in augmented-state OD.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.82 Analytical Jacobians</h3>
+
+<p>Analytical derivatives are derived symbolically from measurement
+equations.</p>
+<p>Advantages include</p>
+<ul>
+<li>speed,</li>
+<li>accuracy,</li>
+<li>deterministic behavior.</li>
+</ul>
+<p>Disadvantages include</p>
+<ul>
+<li>derivation complexity,</li>
+<li>risk of implementation errors,</li>
+<li>maintenance burden.</li>
+</ul>
+<p>They are often preferred for mature high-performance flight or OD
+software.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.83 Finite-Difference Jacobians</h3>
+
+<p>A numerical derivative may be approximated as</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial h} {\partial x_i} \approx \frac{ h( \mathbf
+x+\epsilon\mathbf e_i ) - h( \mathbf x-\epsilon\mathbf e_i ) }{
+2\epsilon } }
+\]</span></p>
+<p>This is useful for</p>
+<ul>
+<li>checking analytical derivatives,</li>
+<li>prototyping,</li>
+<li>complex models.</li>
+</ul>
+<p>However, step-size selection is important.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.84 Automatic Differentiation</h3>
+
+<p>Automatic differentiation computes derivatives by propagating
+derivatives through the numerical operations used by the model.</p>
+<p>It can provide near-machine-precision derivatives without deriving
+every expression manually.</p>
+<p>It is particularly useful for complex nonlinear measurement
+models.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.85 Jacobian Verification</h3>
+
+<p>A good implementation practice is</p>
+<p><span class="math display">\[
+\boxed{ \text{Analytical Jacobian} \leftrightarrow
+\text{Finite-Difference Check} }
+\]</span></p>
+<p>Small discrepancies are expected from numerical effects, but large
+differences can indicate</p>
+<ul>
+<li>sign errors,</li>
+<li>frame mistakes,</li>
+<li>missing terms,</li>
+<li>indexing errors.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.86 Angle Residual Wrapping</h3>
+
+<p>Suppose angular residual is</p>
+<p><span class="math display">\[
+r_\theta = \theta_{\rm measured} - \theta_{\rm predicted}.
+\]</span></p>
+<p>Near <code>0</code> and <code>2\pi</code>, direct subtraction can
+give a false large residual.</p>
+<p>Therefore angle residuals should be wrapped:</p>
+<p><span class="math display">\[
+\boxed{ r_\theta = \operatorname{wrapToPi} ( \theta_m-\theta_p ) }
+\]</span></p>
+<p>or an equivalent convention.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.87 Innovation Covariance</h3>
+
+<p>The predicted residual covariance is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf S_k = \mathbf H_k \mathbf P_k^- \mathbf H_k^T + \mathbf
+R_k. }
+\]</span></p>
+<p>This contains uncertainty from both</p>
+<ul>
+<li>predicted state,</li>
+<li>measurement noise.</li>
+</ul>
+<p>It is therefore the correct scale for evaluating measurement
+consistency.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.88 Normalized Innovation</h3>
+
+<p>For scalar measurement,</p>
+<p><span class="math display">\[
+\boxed{ \nu = \frac{y} {\sqrt S} }
+\]</span></p>
+<p>provides a normalized residual.</p>
+<p>For a vector measurement,</p>
+<p><span class="math display">\[
+\boxed{ \epsilon_z = \mathbf y^T \mathbf S^{-1} \mathbf y. }
+\]</span></p>
+<p>This is the normalized innovation squared.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.89 Innovation Gating</h3>
+
+<p>Measurements may be accepted only if</p>
+<p><span class="math display">\[
+\boxed{ \mathbf y^T \mathbf S^{-1} \mathbf y &lt; \gamma }
+\]</span></p>
+<p>where <code>\gamma</code> is selected from an appropriate statistical
+threshold.</p>
+<p>This is called innovation gating.</p>
+<p>It helps reject outliers while accounting for predicted
+uncertainty.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.90 Outlier Handling</h3>
+
+<p>Potential outlier causes include</p>
+<ul>
+<li>incorrect tracking association,</li>
+<li>sensor glitches,</li>
+<li>image-processing failure,</li>
+<li>multipath,</li>
+<li>poor signal lock,</li>
+<li>bad timing,</li>
+<li>corrupted packets.</li>
+</ul>
+<p>Outlier logic should distinguish rare bad measurements from genuine
+spacecraft motion.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.91 Measurement Availability</h3>
+
+<p>Different measurement types may not be available continuously.</p>
+<p>Examples include</p>
+<ul>
+<li>ground-station visibility windows,</li>
+<li>camera lighting constraints,</li>
+<li>GNSS blockage,</li>
+<li>optical occultation,</li>
+<li>range-sensor duty cycles.</li>
+</ul>
+<p>A robust estimator should handle asynchronous measurements.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.92 Asynchronous Measurements</h3>
+
+<p>Suppose range arrives at time</p>
+<p><span class="math display">\[
+t_a
+\]</span></p>
+<p>and optical LOS arrives at</p>
+<p><span class="math display">\[
+t_b.
+\]</span></p>
+<p>The estimator should propagate the state to each actual measurement
+epoch before processing it.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Measurement Update} \text{ should occur at the measurement
+time, not merely at a common nominal rate.} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.93 Multi-Rate Sensor Fusion</h3>
+
+<p>Different sensors may operate at different rates.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+f_1\neq f_2\neq f_3.
+\]</span></p>
+<p>The estimator can propagate continuously or at a high internal rate
+while incorporating measurements whenever each sensor produces data.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Estimator Propagation Rate} \neq \text{Sensor Measurement
+Rate} }
+\]</span></p>
+<p>in general.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.94 Measurement Latency</h3>
+
+<p>A sensor measurement may arrive after the physical observation
+time.</p>
+<p>If the measurement corresponds to</p>
+<p><span class="math display">\[
+t_m
+\]</span></p>
+<p>but arrives at</p>
+<p><span class="math display">\[
+t_m+\Delta t_{\rm latency},
+\]</span></p>
+<p>the estimator should distinguish</p>
+<p><span class="math display">\[
+\boxed{ \text{Measurement Time} }
+\]</span></p>
+<p>from</p>
+<p><span class="math display">\[
+\boxed{ \text{Data Arrival Time}. }
+\]</span></p>
+<p>This is important in real-time navigation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.95 Delayed Measurement Processing</h3>
+
+<p>A delayed measurement can sometimes be handled through</p>
+<ul>
+<li>state buffering,</li>
+<li>out-of-sequence measurement processing,</li>
+<li>retrodiction,</li>
+<li>smoothing,</li>
+<li>state transition mapping.</li>
+</ul>
+<p>The correct method depends on the estimator architecture.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.96 Measurement Observability</h3>
+
+<p>A measurement is useful only if it is sensitive to the desired state
+direction.</p>
+<p>The local sensitivity is given by</p>
+<p><span class="math display">\[
+\mathbf H.
+\]</span></p>
+<p>Across time, the combination of</p>
+<p><span class="math display">\[
+\mathbf H_k
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boldsymbol\Phi(t_k,t_0)
+\]</span></p>
+<p>determines accumulated observability.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Measurement Value} + \text{Measurement Geometry} +
+\text{Dynamics} \rightarrow \text{State Information} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.97 Complementary Measurements</h3>
+
+<p>Different sensors can constrain different state directions.</p>
+<p>Examples:</p>
+<p><span class="math display">\[
+\boxed{ \text{Range} \rightarrow \text{Radial Position} }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ \text{Range Rate} \rightarrow \text{Radial Velocity} }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ \text{LOS Angles} \rightarrow \text{Transverse Direction} }
+\]</span></p>
+<p>Therefore combining complementary measurements can greatly improve OD
+performance.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.98 Range plus LOS</h3>
+
+<p>If both range and LOS are measured,</p>
+<p><span class="math display">\[
+\rho
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\hat{\boldsymbol\rho}
+\]</span></p>
+<p>give</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\rho = \rho \hat{\boldsymbol\rho}. }
+\]</span></p>
+<p>This provides direct geometric 3-D relative-position information,
+subject to measurement uncertainty.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.99 Range plus Range Rate</h3>
+
+<p>Range plus range rate gives</p>
+<p><span class="math display">\[
+\boxed{ \rho,\qquad\dot\rho }
+\]</span></p>
+<p>which constrain radial position and radial velocity.</p>
+<p>Transverse state components still rely on changing geometry,
+dynamics, or angular measurements.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.100 Range plus Angles</h3>
+
+<p>A measurement set</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z = \begin{bmatrix} \rho\\ A\\ E \end{bmatrix} }
+\]</span></p>
+<p>or</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z = \begin{bmatrix} \rho\\ \alpha\\ \delta \end{bmatrix}
+}
+\]</span></p>
+<p>contains sufficient instantaneous geometric information to
+reconstruct a 3-D relative position under the chosen coordinate
+model.</p>
+<p>Velocity still generally requires multiple measurements or
+velocity-sensitive observables.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.101 Full Radar-Type Measurement</h3>
+
+<p>A common complete measurement vector is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z = \begin{bmatrix} \rho\\ \dot\rho\\ A\\ E
+\end{bmatrix} }
+\]</span></p>
+<p>with covariance</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R = E[ \mathbf v\mathbf v^T ]. }
+\]</span></p>
+<p>Such a sensor provides both radial and angular information.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.102 Camera Measurement Geometry</h3>
+
+<p>For a monocular camera, a single image typically provides angular
+direction but not absolute range directly.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Monocular Image} \rightarrow \text{Strong Bearing
+Information} + \text{Weak Instantaneous Range Information} }
+\]</span></p>
+<p>Range may become observable through</p>
+<ul>
+<li>target size,</li>
+<li>known geometry,</li>
+<li>multiple features,</li>
+<li>spacecraft motion,</li>
+<li>multiple observations.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.103 Stereo Optical Measurement</h3>
+
+<p>With two spatially separated cameras, depth may be obtained through
+triangulation.</p>
+<p>If baseline is <code>B</code> and disparity is <code>d</code>,</p>
+<p><span class="math display">\[
+\boxed{ Z \approx \frac{fB}{d} }
+\]</span></p>
+<p>for the simplified stereo model.</p>
+<p>Stereo therefore provides direct geometric depth information but
+depends strongly on calibration and feature matching.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.104 Optical Feature Uncertainty</h3>
+
+<p>The covariance of the image feature can propagate into LOS
+covariance:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_{\rm LOS} \approx \mathbf J_{\rm pix\rightarrow LOS}
+\mathbf R_{\rm pix} \mathbf J_{\rm pix\rightarrow LOS}^T. }
+\]</span></p>
+<p>Thus image processing and navigation estimation should not be treated
+as completely separate uncertainty problems.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.105 GNSS Pseudorange Jacobian</h3>
+
+<p>For satellite <code>i</code>,</p>
+<p><span class="math display">\[
+\rho_i = \| \mathbf r-\mathbf r_i \|.
+\]</span></p>
+<p>Therefore</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial \rho_i} {\partial\mathbf r} =
+\hat{\boldsymbol\rho}_i^T }
+\]</span></p>
+<p>and with clock bias expressed as range-equivalent state
+<code>b_c</code>,</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial P_i} {\partial b_c} = 1. }
+\]</span></p>
+<p>Hence a simplified pseudorange row is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H_i = \begin{bmatrix} \hat{\boldsymbol\rho}_i^T &amp; 0\
+0\ 0 &amp; 1 &amp; 0 \end{bmatrix}. }
+\]</span></p>
+<p>The exact sign depends on how the LOS vector is defined, so the
+convention must remain consistent.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.106 GNSS Doppler Jacobian</h3>
+
+<p>GNSS Doppler depends strongly on receiver velocity and clock
+drift.</p>
+<p>A simplified state sensitivity has the form</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H_{\dot\rho,i} = \begin{bmatrix} \mathbf H_{r,i} &amp;
+\hat{\boldsymbol\rho}_i^T &amp; 0 &amp; 1 \end{bmatrix} }
+\]</span></p>
+<p>where <code>\mathbf H_{r,i}</code> contains position-dependent LOS
+terms.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.107 Measurement Design Matrix</h3>
+
+<p>For measurements</p>
+<p><span class="math display">\[
+\mathbf z_1,\ldots,\mathbf z_N,
+\]</span></p>
+<p>the local sensitivities can be stacked:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H = \begin{bmatrix} \mathbf H_1\\ \mathbf H_2\\ \vdots\\
+\mathbf H_N \end{bmatrix}. }
+\]</span></p>
+<p>For reference-epoch OD,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G = \begin{bmatrix} \mathbf H_1\boldsymbol\Phi_1\\
+\mathbf H_2\boldsymbol\Phi_2\\ \vdots\\ \mathbf H_N\boldsymbol\Phi_N
+\end{bmatrix}. }
+\]</span></p>
+<p>This matrix is fundamental in batch orbit determination.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.108 Information from Measurements</h3>
+
+<p>For linearized Gaussian measurements,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf I = \mathbf H^T \mathbf R^{-1} \mathbf H }
+\]</span></p>
+<p>is a local information matrix.</p>
+<p>Large information corresponds to smaller uncertainty.</p>
+<p>If <code>\mathbf H</code> is poorly conditioned or rank deficient,
+some state directions are weakly observed.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.109 Measurement Geometry and Information</h3>
+
+<p>Two sensors with identical measurement noise may provide very
+different information depending on geometry.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Measurement Quality} = \text{Precision} + \text{Geometry}
++ \text{Sensitivity} }
+\]</span></p>
+<p>not precision alone.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.110 Measurement Calibration</h3>
+
+<p>Before use in OD, a measurement system should ideally be
+characterized for</p>
+<ul>
+<li>bias,</li>
+<li>scale factor,</li>
+<li>alignment,</li>
+<li>nonlinearity,</li>
+<li>timing,</li>
+<li>latency,</li>
+<li>noise,</li>
+<li>environmental sensitivity.</li>
+</ul>
+<p>These quantities determine how the raw sensor observation should be
+represented mathematically.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.111 Ground Calibration versus In-Flight Calibration</h3>
+
+<p>Some calibration parameters can be determined before flight.</p>
+<p>Others may change because of</p>
+<ul>
+<li>launch loads,</li>
+<li>thermal deformation,</li>
+<li>aging,</li>
+<li>deployment,</li>
+<li>radiation,</li>
+<li>mechanical shift.</li>
+</ul>
+<p>A general strategy is</p>
+<p><span class="math display">\[
+\boxed{ \text{Ground Calibration} \rightarrow \text{Prior Calibration}
+\rightarrow \text{In-Flight Refinement} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.112 Measurement Model Fidelity</h3>
+
+<p>Increasing estimator complexity cannot compensate indefinitely for an
+incorrect measurement model.</p>
+<p>For example, a sophisticated EKF using the wrong frame transformation
+can still produce biased estimates.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Good Estimator} + \text{Bad Measurement Model} \rightarrow
+\text{Bad Navigation} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.113 Measurement Model Validation</h3>
+
+<p>Measurement models should be tested through</p>
+<ul>
+<li>analytical checks,</li>
+<li>limiting cases,</li>
+<li>simulation,</li>
+<li>finite differences,</li>
+<li>synthetic truth data,</li>
+<li>hardware data when available.</li>
+</ul>
+<p>For example, if spacecraft and observer positions are identical,</p>
+<p><span class="math display">\[
+\rho\rightarrow0
+\]</span></p>
+<p>and range-angle models may become singular.</p>
+<p>Such cases should be handled explicitly.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.114 Limiting-Case Checks</h3>
+
+<p>Useful model checks include:</p>
+<ul>
+<li>zero relative velocity <code>\rightarrow \dot\rho=0</code>,</li>
+<li>pure radial motion <code>\rightarrow</code> LOS direction
+unchanged,</li>
+<li>pure transverse motion <code>\rightarrow</code> first-order range
+rate may be zero,</li>
+<li>increasing range <code>\rightarrow \dot\rho&gt;0</code>,</li>
+<li>identical position <code>\rightarrow</code> LOS undefined.</li>
+</ul>
+<p>These tests catch many implementation errors.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.115 Sign-Conventions Check</h3>
+
+<p>Range-rate and Doppler sign conventions frequently differ between
+systems.</p>
+<p>For one implementation,</p>
+<p><span class="math display">\[
+\dot\rho&gt;0
+\]</span></p>
+<p>may mean receding.</p>
+<p>Another instrument may report positive Doppler for approaching
+motion.</p>
+<p>Therefore the measurement-model sign must match the sensor-interface
+definition.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.116 Units</h3>
+
+<p>Measurement-model units must remain explicit.</p>
+<p>Typical units include</p>
+<ul>
+<li>range: m,</li>
+<li>range rate: m/s,</li>
+<li>Doppler: Hz,</li>
+<li>azimuth/elevation: rad or deg,</li>
+<li>RA/Dec: rad or deg,</li>
+<li>pixel coordinates: pixels,</li>
+<li>pseudorange: m,</li>
+<li>carrier phase: cycles or m.</li>
+</ul>
+<p>Mixed angular units are a common source of errors.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.117 Degrees versus Radians</h3>
+
+<p>Estimation software generally uses radians internally.</p>
+<p>If a sensor reports degrees,</p>
+<p><span class="math display">\[
+\boxed{ \theta_{\rm rad} = \theta_{\rm deg} \frac{\pi}{180}. }
+\]</span></p>
+<p>Jacobians must be consistent with the units of the state and
+measurement.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.118 Measurement Frame Metadata</h3>
+
+<p>A measurement is incomplete unless its frame is known.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\hat{\boldsymbol\rho} = \begin{bmatrix} 0.2\\0.4\\0.894 \end{bmatrix}
+\]</span></p>
+<p>has no useful navigation meaning unless one knows whether it is
+expressed in</p>
+<ul>
+<li>camera frame,</li>
+<li>body frame,</li>
+<li>inertial frame,</li>
+<li>local orbital frame.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Measurement Value} + \text{Frame} + \text{Time} +
+\text{Uncertainty} }
+\]</span></p>
+<p>should be considered together.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.119 Measurement Packet Concept</h3>
+
+<p>A useful navigation measurement record includes</p>
+<p><span class="math display">\[
+\boxed{ \{ t_k,\; \mathbf z_k,\; \mathbf R_k,\; \text{frame},\;
+\text{sensor ID},\; \text{quality flags} \}. }
+\]</span></p>
+<p>This allows the estimator to interpret the measurement correctly.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.120 Measurement Quality Flags</h3>
+
+<p>A sensor may provide flags indicating</p>
+<ul>
+<li>valid/invalid,</li>
+<li>degraded mode,</li>
+<li>low signal strength,</li>
+<li>poor feature tracking,</li>
+<li>saturation,</li>
+<li>insufficient satellites,</li>
+<li>calibration warning.</li>
+</ul>
+<p>These flags can be used before measurement incorporation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.121 Raw Measurement versus Processed Measurement</h3>
+
+<p>An estimator may receive</p>
+<ul>
+<li>raw sensor measurements,</li>
+<li>preprocessed measurements,</li>
+<li>already estimated intermediate quantities.</li>
+</ul>
+<p>For example,</p>
+<p><span class="math display">\[
+\text{Camera Image} \rightarrow \text{Pixel Features} \rightarrow
+\text{LOS} \rightarrow \text{Navigation Estimator}.
+\]</span></p>
+<p>Each stage introduces uncertainty.</p>
+<p>The covariance passed downstream should represent the uncertainty
+after that processing stage.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.122 Avoiding Double Counting</h3>
+
+<p>Suppose a relative position estimate is generated from camera and
+range measurements.</p>
+<p>If the main estimator then ingests both</p>
+<ul>
+<li>the raw camera/range measurements,</li>
+<li>the derived relative-position estimate,</li>
+</ul>
+<p>without accounting for correlation, information may be double
+counted.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Derived Measurement Correlation Must Be Considered} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.123 Measurement Whitening</h3>
+
+<p>If measurement covariance is</p>
+<p><span class="math display">\[
+\mathbf R,
+\]</span></p>
+<p>a whitened residual may be defined using a factor</p>
+<p><span class="math display">\[
+\mathbf R = \mathbf L\mathbf L^T.
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_w = \mathbf L^{-1}\mathbf r. }
+\]</span></p>
+<p>Whitened residuals are useful for diagnostics and least-squares
+implementations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.124 Pre-Fit Measurement Residual</h3>
+
+<p>Before state correction,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k^{\rm pre} = \mathbf z_k - h( \hat{\mathbf x}_k^- ).
+}
+\]</span></p>
+<p>This indicates how well the propagated state predicts the
+measurement.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.125 Post-Fit Measurement Residual</h3>
+
+<p>After correction,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k^{\rm post} = \mathbf z_k - h( \hat{\mathbf x}_k^+ ).
+}
+\]</span></p>
+<p>Comparison of pre-fit and post-fit residuals can help evaluate
+estimator effectiveness.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.126 Persistent Residual Bias</h3>
+
+<p>If residual mean is significantly nonzero,</p>
+<p><span class="math display">\[
+E[\mathbf r]\neq0,
+\]</span></p>
+<p>possible causes include</p>
+<ul>
+<li>missing measurement bias,</li>
+<li>incorrect calibration,</li>
+<li>wrong force model,</li>
+<li>timing offset,</li>
+<li>frame error.</li>
+</ul>
+<p>Persistent bias should not automatically be removed by increasing
+process noise.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.127 Temporal Correlation in Residuals</h3>
+
+<p>Residuals should often be approximately white after correct
+modeling.</p>
+<p>If</p>
+<p><span class="math display">\[
+E[ r_k r_{k+\ell} ] \neq0
+\]</span></p>
+<p>for significant lag <code>\ell</code>, the system may contain
+unmodeled temporal structure.</p>
+<p>Possible causes include</p>
+<ul>
+<li>slowly varying bias,</li>
+<li>environmental error,</li>
+<li>correlated sensor noise,</li>
+<li>unmodeled dynamics.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.128 Measurement Model in Batch OD</h3>
+
+<p>In batch OD,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k[ \phi( t_k,t_0,\mathbf x_0 )] + \mathbf v_k. }
+\]</span></p>
+<p>The unknown is the reference-epoch state</p>
+<p><span class="math display">\[
+\mathbf x_0.
+\]</span></p>
+<p>Thus every measurement is related back to the same state through
+orbit propagation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.129 Measurement Model in Sequential OD</h3>
+
+<p>In sequential OD,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k( \mathbf x_k ) + \mathbf v_k. }
+\]</span></p>
+<p>The estimator propagates the state from the previous epoch and then
+processes the new measurement.</p>
+<p>The physical measurement equations are the same as in batch OD; only
+the estimation architecture differs.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.130 Measurement Models and UKF</h3>
+
+<p>In an Unscented Kalman Filter, explicit measurement Jacobians are not
+required for the basic UKF update.</p>
+<p>Instead, sigma points are passed through</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z^{(i)} = h( \mathbf x^{(i)} ). }
+\]</span></p>
+<p>However, the measurement model itself must still be accurate.</p>
+<p>Avoiding Jacobians does not remove the need for correct sensor
+geometry.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.131 Measurement Models and Particle Filters</h3>
+
+<p>For particle <code>i</code>,</p>
+<p><span class="math display">\[
+\mathbf x_k^{(i)},
+\]</span></p>
+<p>the predicted measurement is</p>
+<p><span class="math display">\[
+\hat{\mathbf z}_k^{(i)} = h( \mathbf x_k^{(i)} ).
+\]</span></p>
+<p>The measurement likelihood determines particle weight:</p>
+<p><span class="math display">\[
+\boxed{ w_k^{(i)} \propto p( \mathbf z_k | \mathbf x_k^{(i)} ). }
+\]</span></p>
+<p>Thus the same measurement models are fundamental to nonlinear
+Bayesian estimators.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.132 Measurement Likelihood</h3>
+
+<p>For Gaussian measurement noise,</p>
+<p><span class="math display">\[
+\boxed{ p( \mathbf z | \mathbf x ) \propto \exp \left[ -\frac12 (
+\mathbf z-h(\mathbf x) )^T \mathbf R^{-1} ( \mathbf z-h(\mathbf x) )
+\right]. }
+\]</span></p>
+<p>This provides the probabilistic interpretation of the residual.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.133 Measurement Model and Observability</h3>
+
+<p>Measurement equations determine what state combinations are directly
+visible.</p>
+<p>The dynamics determine how information propagates from those
+observable combinations to other states.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{OD Observability} = \text{Measurement Sensitivity} +
+\text{Dynamic Coupling} + \text{Geometry Evolution}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.134 Measurement Model and Error Budget</h3>
+
+<p>Measurement uncertainty contributes to overall navigation uncertainty
+through</p>
+<p><span class="math display">\[
+\mathbf R.
+\]</span></p>
+<p>But the final state error depends on the measurement sensitivity.</p>
+<p>A sensor with small <code>\sigma</code> may still provide little
+benefit if it is insensitive to the dominant uncertain state
+direction.</p>
+<p>Thus</p>
+<p><span class="math display">\[
+\boxed{ \text{Sensor Precision} \neq \text{Final Navigation Precision} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.135 Common Mistakes in OD Measurement Modeling</h3>
+
+<p>Common errors include:</p>
+<ol type="1">
+<li>Using incorrect frame transformations.</li>
+<li>Mixing inertial and Earth-fixed quantities.</li>
+<li>Ignoring observer motion.</li>
+<li>Using the wrong range-rate sign convention.</li>
+<li>Mixing degrees and radians.</li>
+<li>Ignoring time-tag offsets.</li>
+<li>Ignoring sensor latency.</li>
+<li>Neglecting light-time where required.</li>
+<li>Using sensor resolution as measurement covariance.</li>
+<li>Ignoring measurement bias.</li>
+<li>Treating correlated measurements as independent.</li>
+<li>Using angle subtraction without wrapping.</li>
+<li>Ignoring camera alignment.</li>
+<li>Ignoring sensor lever arm.</li>
+<li>Using an incorrect GNSS clock model.</li>
+<li>Confusing Doppler frequency with geometric range rate.</li>
+<li>Failing to validate analytical Jacobians.</li>
+<li>Double counting derived measurements.</li>
+<li>Using an inappropriate noise distribution.</li>
+<li>Assuming more measurement rate always means more independent
+information.</li>
+</ol>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.136 Practical Measurement-Model Development Workflow</h3>
+
+<p>A disciplined workflow is</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Identify Physical Observable}\\
+\downarrow\\ \text{Define Measurement Frame}\\ \downarrow\\ \text{Define
+Measurement Epoch}\\ \downarrow\\ \text{Define Observer/Sensor
+Geometry}\\ \downarrow\\ \text{Write Ideal Measurement Equation}\\
+\downarrow\\ \text{Add Calibration Terms}\\ \downarrow\\ \text{Add Bias
+Terms}\\ \downarrow\\ \text{Define Noise Covariance}\\ \downarrow\\
+\text{Derive Measurement Jacobian}\\ \downarrow\\ \text{Verify
+Jacobian}\\ \downarrow\\ \text{Implement Frame/Time Corrections}\\
+\downarrow\\ \text{Generate Predicted Measurement}\\ \downarrow\\
+\text{Compute Residual}\\ \downarrow\\ \text{Check Residual
+Statistics}\\ \downarrow\\ \text{Validate with Simulated or Real Data}
+\end{array} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.137 General Measurement Information Flow</h3>
+
+<p>The measurement-processing chain can be summarized as</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Spacecraft State}\\ \mathbf x \\ + \\
+\text{Observer/Sensor Geometry} \\ + \\ \text{Frame and Time
+Information} \\ \downarrow\\ \text{Measurement Model} \\ h(\mathbf x) \\
+\downarrow\\ \text{Predicted Measurement} \\ \hat{\mathbf z} \\
+\downarrow\\ \text{Actual Measurement} - \text{Prediction} \\
+\downarrow\\ \text{Residual} \\ \mathbf y \\ \downarrow\\
+\text{Estimator Correction} \end{array} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.138 Major Measurement Types Summary</h3>
+
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 39%" />
+<col style="width: 60%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>MeasurementPrincipal information</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Range</td>
+<td>LOS distance</td>
+</tr>
+<tr class="even">
+<td>Range rate</td>
+<td>LOS relative velocity</td>
+</tr>
+<tr class="odd">
+<td>Doppler</td>
+<td>Frequency shift / radial velocity information</td>
+</tr>
+<tr class="even">
+<td>Azimuth/elevation</td>
+<td>Topocentric LOS direction</td>
+</tr>
+<tr class="odd">
+<td>RA/Dec</td>
+<td>Inertial angular direction</td>
+</tr>
+<tr class="even">
+<td>LOS vector</td>
+<td>Direct unit-vector direction</td>
+</tr>
+<tr class="odd">
+<td>GNSS pseudorange</td>
+<td>Range + receiver/satellite clock effects</td>
+</tr>
+<tr class="even">
+<td>GNSS Doppler</td>
+<td>Relative velocity + clock drift</td>
+</tr>
+<tr class="odd">
+<td>Carrier phase</td>
+<td>Very precise range-like information with ambiguity</td>
+</tr>
+<tr class="even">
+<td>Optical pixels</td>
+<td>Camera-frame bearing / feature geometry</td>
+</tr>
+<tr class="odd">
+<td>LiDAR</td>
+<td>Range / 3-D surface geometry</td>
+</tr>
+<tr class="even">
+<td>Radar</td>
+<td>Range, rate, and angular information</td>
+</tr>
+<tr class="odd">
+<td>Inter-satellite measurements</td>
+<td>Relative state information</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.139 Key Equations</h3>
+
+<h3 id="general-measurement-equation-1">General measurement
+equation</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k( \mathbf x_k ) + \mathbf v_k }
+\]</span></p>
+<h3 id="predicted-measurement-1">Predicted measurement</h3>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf z}_k = h_k( \hat{\mathbf x}_k^- ) }
+\]</span></p>
+<h3 id="innovation">Innovation</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf y_k = \mathbf z_k - \hat{\mathbf z}_k }
+\]</span></p>
+<h3 id="relative-position">Relative position</h3>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\rho = \mathbf r_{\rm sc} - \mathbf r_{\rm obs} }
+\]</span></p>
+<h3 id="range">Range</h3>
+<p><span class="math display">\[
+\boxed{ \rho = \|\boldsymbol\rho\| }
+\]</span></p>
+<h3 id="range-rate-1">Range rate</h3>
+<p><span class="math display">\[
+\boxed{ \dot\rho = \frac{ \boldsymbol\rho^T \dot{\boldsymbol\rho} }{
+\rho } }
+\]</span></p>
+<h3 id="los-vector">LOS vector</h3>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\rho} = \frac{\boldsymbol\rho}{\rho} }
+\]</span></p>
+<h3 id="doppler-approximation">Doppler approximation</h3>
+<p><span class="math display">\[
+\boxed{ \Delta f \approx -\frac{f_0}{c} \dot\rho }
+\]</span></p>
+<h3 id="azimuth">Azimuth</h3>
+<p><span class="math display">\[
+\boxed{ A = \operatorname{atan2}( \rho_E,\rho_N ) }
+\]</span></p>
+<h3 id="elevation-1">Elevation</h3>
+<p><span class="math display">\[
+\boxed{ E = \arctan \left( \frac{\rho_U} {\sqrt{\rho_E^2+\rho_N^2}}
+\right) }
+\]</span></p>
+<h3 id="right-ascension-1">Right ascension</h3>
+<p><span class="math display">\[
+\boxed{ \alpha = \operatorname{atan2}( \rho_y,\rho_x ) }
+\]</span></p>
+<h3 id="declination-1">Declination</h3>
+<p><span class="math display">\[
+\boxed{ \delta = \arcsin \left( \frac{\rho_z}{\rho} \right) }
+\]</span></p>
+<h3 id="measurement-jacobian">Measurement Jacobian</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf H_k = \frac{\partial h_k} {\partial\mathbf x_k} }
+\]</span></p>
+<h3 id="reference-epoch-sensitivity">Reference-epoch sensitivity</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k = \mathbf H_k \boldsymbol\Phi(t_k,t_0) }
+\]</span></p>
+<h3 id="innovation-covariance-1">Innovation covariance</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf S_k = \mathbf H_k \mathbf P_k^- \mathbf H_k^T + \mathbf
+R_k }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.12.140 Key Takeaways</h3>
+
+<p>Orbit-determination measurement models mathematically connect the
+spacecraft state to what a sensor actually observes.</p>
+<p>The fundamental relationship is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k( \mathbf x_k ) + \mathbf v_k. }
+\]</span></p>
+<p>Different sensors observe different aspects of the state.</p>
+<p>Range measures LOS distance:</p>
+<p><span class="math display">\[
+\boxed{ \rho = \| \mathbf r_{\rm sc} - \mathbf r_{\rm obs} \| }
+\]</span></p>
+<p>Range rate measures LOS-relative velocity:</p>
+<p><span class="math display">\[
+\boxed{ \dot\rho = \hat{\boldsymbol\rho}^T \mathbf v_{\rm rel}. }
+\]</span></p>
+<p>Doppler converts radial motion into frequency shift:</p>
+<p><span class="math display">\[
+\boxed{ \Delta f \approx -\frac{f_0}{c}\dot\rho. }
+\]</span></p>
+<p>Angular measurements such as azimuth/elevation and RA/Dec provide LOS
+direction.</p>
+<p>A direct LOS representation is</p>
+<p><span class="math display">\[
+\boxed{ \hat{\boldsymbol\rho} =
+\frac{\boldsymbol\rho}{\|\boldsymbol\rho\|}. }
+\]</span></p>
+<p>GNSS measurements combine geometric range with clock and propagation
+effects, while optical measurements convert image geometry into bearing
+or LOS information.</p>
+<p>The measurement Jacobian</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H = \frac{\partial h}{\partial\mathbf x} }
+\]</span></p>
+<p>describes how the measurement responds to changes in the state.</p>
+<p>For reference-epoch orbit determination, the measurement sensitivity
+becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k = \mathbf H_k \boldsymbol\Phi(t_k,t_0). }
+\]</span></p>
+<p>A complete measurement model must include not only geometry but
+also</p>
+<ul>
+<li>frame definitions,</li>
+<li>time tagging,</li>
+<li>sensor location,</li>
+<li>sensor alignment,</li>
+<li>light-time when required,</li>
+<li>bias,</li>
+<li>calibration,</li>
+<li>measurement covariance,</li>
+<li>latency,</li>
+<li>relevant propagation corrections.</li>
+</ul>
+<p>The central engineering principle is</p>
+<p><span class="math display">\[
+\boxed{ \text{Accurate Orbit Determination Requires} \quad
+\text{Accurate Dynamics} + \text{Accurate Measurement Models}. }
+\]</span></p>
+<p>Even the most sophisticated estimator cannot compensate reliably for
+a systematically incorrect measurement model.</p>
+    </section>
+    <section class="notes-section-card">
+      <h2>Next: 4.3.13 Batch Orbit Determination</h2>
+      <p>
+        Measurement models define how each tracking observation depends on spacecraft state, sensor geometry,
+        timing, calibration, and uncertainty. The next section combines an observation arc into a single
+        differential-correction problem using STM-based design matrices, weighted residuals, iteration,
+        convergence, covariance, and post-fit residual analysis.
+      </p>
+      <a href="batch-orbit-determination.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.13 Batch Orbit Determination</h3>
+          <p>
+            Differential correction, STM-based design matrices, residual stacking, weighted solutions, iteration,
+            convergence, and post-fit residuals.
+          </p>
+          <p class="sensor-link-arrow">Continue to Batch Orbit Determination &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
