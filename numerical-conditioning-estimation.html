@@ -3,15 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>4.3.17
-Numerical Conditioning and Robust Solution Methods | Interactive GNC &amp; Space Mechanics</title>
+  <title>4.3.17 Numerical Conditioning and Robust Solution Methods | Interactive GNC &amp; Space Mechanics</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" type="image/png" href="favicon1.png">
   <!-- MathJax -->
   <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
-.sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
     .sensor-link-arrow { font-weight:700; margin-bottom:0; }
     blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
     .table-wrap { width:100%; overflow-x:auto; margin:1rem 0 1.4rem; }
@@ -22,14 +21,16 @@ Numerical Conditioning and Robust Solution Methods | Interactive GNC &amp; Space
     .equation-note { margin-top:0.35rem; color:#475569; }
     .notes-section-card h4 { margin-top:1.25rem; margin-bottom:0.55rem; }
     .notes-section-card .math.display { display:block; overflow-x:auto; padding:0.15rem 0; }
-    .notes-section-card pre { overflow-x:auto; background:#f7f9fb; border:1px solid #d8dee6; border-radius:8px; padding:1rem; line-height:1.5; }
-    .notes-section-card code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
   </style>
 </head>
 <body>
   <header class="notes-hero">
     <h1>Numerical Conditioning and Robust Solution Methods</h1>
-    <p class="notes-tagline">Normal equations, QR, Cholesky, SVD, square-root least squares, condition number, scaling, regularization, rank deficiency, covariance stability, robust factorization, and practical solver selection.</p>
+    <p class="notes-tagline">
+      Normal equations, QR, Cholesky, SVD, square-root least squares, condition number, scaling,
+      regularization, rank deficiency, covariance stability, robust factorization choices,
+      numerical diagnostics, and practical solver selection.
+    </p>
     <nav class="pill-nav">
       <a href="index.html" class="pill">Home</a>
       <a href="tools.html" class="pill">Tools</a>
@@ -39,17 +40,20 @@ Numerical Conditioning and Robust Solution Methods | Interactive GNC &amp; Space
       <a href="about.html" class="pill">About</a>
     </nav>
   </header>
+
   <main class="page-main">
     <section class="notes-section-card">
-      <h2>4.3.17
-Numerical Conditioning and Robust Solution Methods</h2>
-<p>Numerical conditioning and robust solution methods deal with an
-important practical question in estimation:</p><blockquote>
-<p>Even if the estimation problem is theoretically solvable, can it be
-solved <strong>reliably and accurately on a computer</strong>?</p>
-</blockquote><p>A mathematically valid estimator can still produce poor results if
-the underlying matrices are badly scaled, nearly singular, rank
-deficient, or solved using numerically fragile methods.</p><p>The central idea is</p><pre class="math"><code>\boxed{ \text{Good Estimation} = \text{Good Mathematical Model} + \text{Good Numerical Conditioning} + \text{Robust Linear Algebra} }</code></pre><p>This section focuses on:</p><ul>
+      <h2>4.3.17 Numerical Conditioning and Robust Solution Methods</h2>
+
+<p>Numerical conditioning and robust solution methods deal with an important practical question in estimation:</p>
+<blockquote><p>Even if the estimation problem is theoretically solvable, can it be solved <strong>reliably and accurately on a computer</strong>?</p></blockquote>
+<p>A mathematically valid estimator can still produce poor results if the underlying matrices are badly scaled, nearly singular, rank deficient, or solved using numerically fragile methods.</p>
+<p>The central idea is</p>
+<p><span class="math display">\[
+\boxed{ \text{Good Estimation} = \text{Good Mathematical Model} + \text{Good Numerical Conditioning} + \text{Robust Linear Algebra} }
+\]</span></p>
+<p>This section focuses on:</p>
+<ul>
 <li>normal equations,</li>
 <li>QR decomposition,</li>
 <li>Cholesky factorization,</li>
@@ -64,7 +68,9 @@ deficient, or solved using numerically fragile methods.</p><p>The central idea i
 <li>robust factorization choices,</li>
 <li>numerical diagnostics,</li>
 <li>practical solver selection.</li>
-</ul><p>These ideas apply to:</p><ul>
+</ul>
+<p>These ideas apply to:</p>
+<ul>
 <li>batch least squares,</li>
 <li>orbit determination,</li>
 <li>Kalman filtering,</li>
@@ -73,743 +79,1259 @@ deficient, or solved using numerically fragile methods.</p><p>The central idea i
 <li>calibration,</li>
 <li>maneuver estimation,</li>
 <li>general relative-navigation estimation.</li>
-</ul><hr/>
-
+</ul>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.1 Why Numerical
-Conditioning Matters</h3>
-<p>Consider the linearized estimation problem</p><pre class="math"><code>\boxed{ \mathbf r = \mathbf G \delta\mathbf x + \mathbf v }</code></pre><p>where</p><ul>
+      <hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.1 Why Numerical Conditioning Matters</h3>
+<p>Consider the linearized estimation problem</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r = \mathbf G \delta\mathbf x + \mathbf v }
+\]</span></p>
+<p>where</p>
+<ul>
 <li><code>\mathbf r</code> is the residual vector,</li>
 <li><code>\mathbf G</code> is the design or sensitivity matrix,</li>
 <li><code>\delta\mathbf x</code> is the correction,</li>
 <li><code>\mathbf v</code> is measurement noise.</li>
-</ul><p>Even if <code>\mathbf G</code> has full rank, the solution can be
-very sensitive if its columns are nearly linearly dependent.</p><p>Then small errors in</p><ul>
+</ul>
+<p>Even if <code>\mathbf G</code> has full rank, the solution can be very sensitive if its columns are nearly linearly dependent.</p>
+<p>Then small errors in</p>
+<ul>
 <li>measurements,</li>
 <li>floating-point arithmetic,</li>
 <li>Jacobians,</li>
 <li>scaling</li>
-</ul><p>can produce large changes in the estimated correction.</p><p>Thus,</p><pre class="math"><code>\boxed{ \text{Full Rank} \neq \text{Numerically Reliable} }</code></pre><hr/>
-
+</ul>
+<p>can produce large changes in the estimated correction.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Full Rank} \neq \text{Numerically Reliable} }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.2
-Well-Conditioned versus Ill-Conditioned Problems</h3>
-<p>A problem is <strong>well conditioned</strong> if small perturbations
-in the input produce small perturbations in the solution.</p><p>It is <strong>ill conditioned</strong> if small input perturbations
-can produce large changes in the solution.</p><p>Conceptually,</p><pre class="math"><code>\boxed{ \text{Small Measurement Error} \rightarrow \text{Small State Error} }</code></pre><p>for a well-conditioned system,</p><p>whereas</p><pre class="math"><code>\boxed{ \text{Small Measurement Error} \rightarrow \text{Potentially Large State Error} }</code></pre><p>for an ill-conditioned one.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.2 Well-Conditioned versus Ill-Conditioned Problems</h3>
+<p>A problem is <strong>well conditioned</strong> if small perturbations in the input produce small perturbations in the solution.</p>
+<p>It is <strong>ill conditioned</strong> if small input perturbations can produce large changes in the solution.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ \text{Small Measurement Error} \rightarrow \text{Small State Error} }
+\]</span></p>
+<p>for a well-conditioned system,</p>
+<p>whereas</p>
+<p><span class="math display">\[
+\boxed{ \text{Small Measurement Error} \rightarrow \text{Potentially Large State Error} }
+\]</span></p>
+<p>for an ill-conditioned one.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.3
-Numerical Conditioning versus Physical Observability</h3>
-<p>These are related but not identical.</p><p>Poor physical geometry often produces poor numerical
-conditioning.</p><p>However, numerical problems can also arise from poor variable scaling
-even when the physical information content is adequate.</p><p>Therefore,</p><pre class="math"><code>\boxed{ \text{Poor Conditioning} = \text{Possible Geometry Problem} + \text{Possible Scaling Problem} + \text{Possible Solver Problem} }</code></pre><p>The cause should be diagnosed rather than assumed.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.3 Numerical Conditioning versus Physical Observability</h3>
+<p>These are related but not identical.</p>
+<p>Poor physical geometry often produces poor numerical conditioning.</p>
+<p>However, numerical problems can also arise from poor variable scaling even when the physical information content is adequate.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\boxed{ \text{Poor Conditioning} = \text{Possible Geometry Problem} + \text{Possible Scaling Problem} + \text{Possible Solver Problem} }
+\]</span></p>
+<p>The cause should be diagnosed rather than assumed.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.4 Linear Least-Squares
-Problem</h3>
-<p>The basic weighted least-squares problem is</p><pre class="math"><code>\boxed{ \min_{\delta\mathbf x} \; J = ( \mathbf r-\mathbf G\delta\mathbf x )^T \mathbf W ( \mathbf r-\mathbf G\delta\mathbf x ) }</code></pre><p>where</p><pre class="math"><code>\mathbf W=\mathbf R^{-1}.</code></pre><p>If measurements are whitened, this becomes</p><pre class="math"><code>\boxed{ \min_{\delta\mathbf x} \| \tilde{\mathbf r} - \tilde{\mathbf G} \delta\mathbf x \|^2. }</code></pre><p>The choice of how this system is solved matters greatly for numerical
-robustness.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.4 Linear Least-Squares Problem</h3>
+<p>The basic weighted least-squares problem is</p>
+<p><span class="math display">\[
+\boxed{ \min_{\delta\mathbf x} \; J = ( \mathbf r-\mathbf G\delta\mathbf x )^T \mathbf W ( \mathbf r-\mathbf G\delta\mathbf x ) }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\mathbf W=\mathbf R^{-1}.
+\]</span></p>
+<p>If measurements are whitened, this becomes</p>
+<p><span class="math display">\[
+\boxed{ \min_{\delta\mathbf x} \| \tilde{\mathbf r} - \tilde{\mathbf G} \delta\mathbf x \|^2. }
+\]</span></p>
+<p>The choice of how this system is solved matters greatly for numerical robustness.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.5 Normal Equations</h3>
-<p>The classical normal equations are</p><pre class="math"><code>\boxed{ \mathbf G^T \mathbf W \mathbf G \, \delta\mathbf x = \mathbf G^T \mathbf W \mathbf r. }</code></pre><p>Define</p><pre class="math"><code>\boxed{ \mathbf N = \mathbf G^T \mathbf W \mathbf G }</code></pre><p>and</p><pre class="math"><code>\boxed{ \mathbf b = \mathbf G^T \mathbf W \mathbf r. }</code></pre><p>Then</p><pre class="math"><code>\boxed{ \mathbf N \delta\mathbf x = \mathbf b. }</code></pre><hr/>
-
+<p>The classical normal equations are</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf W \mathbf G \, \delta\mathbf x = \mathbf G^T \mathbf W \mathbf r. }
+\]</span></p>
+<p>Define</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N = \mathbf G^T \mathbf W \mathbf G }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \mathbf b = \mathbf G^T \mathbf W \mathbf r. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N \delta\mathbf x = \mathbf b. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.6 Why Normal
-Equations Are Attractive</h3>
-<p>Normal equations are popular because they</p><ul>
-<li>reduce an <code>m\times n</code> least-squares problem to an
-<code>n\times n</code> system,</li>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.6 Why Normal Equations Are Attractive</h3>
+<p>Normal equations are popular because they</p>
+<ul>
+<li>reduce an <code>m\times n</code> least-squares problem to an <code>n\times n</code> system,</li>
 <li>are easy to derive,</li>
 <li>connect directly to covariance,</li>
 <li>work efficiently when the system is well conditioned.</li>
-</ul><p>For many moderate-size estimation problems, they can work well.</p><hr/>
-
+</ul>
+<p>For many moderate-size estimation problems, they can work well.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.7 Main
-Numerical Weakness of Normal Equations</h3>
-<p>If</p><pre class="math"><code>\kappa(\mathbf G)</code></pre><p>is the condition number of the design matrix, then approximately</p><pre class="math"><code>\boxed{ \kappa( \mathbf G^T\mathbf G ) \approx \kappa(\mathbf G)^2. }</code></pre><p>Thus the normal equations <strong>square the conditioning
-problem</strong>.</p><p>For example,</p><pre class="math"><code>\kappa(\mathbf G) = 10^6</code></pre><p>can produce</p><pre class="math"><code>\kappa( \mathbf G^T\mathbf G ) \sim 10^{12}.</code></pre><p>This can severely amplify floating-point error.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.7 Main Numerical Weakness of Normal Equations</h3>
+<p>If</p>
+<p><span class="math display">\[
+\kappa(\mathbf G)
+\]</span></p>
+<p>is the condition number of the design matrix, then approximately</p>
+<p><span class="math display">\[
+\boxed{ \kappa( \mathbf G^T\mathbf G ) \approx \kappa(\mathbf G)^2. }
+\]</span></p>
+<p>Thus the normal equations <strong>square the conditioning problem</strong>.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\kappa(\mathbf G) = 10^6
+\]</span></p>
+<p>can produce</p>
+<p><span class="math display">\[
+\kappa( \mathbf G^T\mathbf G ) \sim 10^{12}.
+\]</span></p>
+<p>This can severely amplify floating-point error.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.8 Avoid Explicit Matrix
-Inversion</h3>
-<p>The formal expression</p><pre class="math"><code>\delta\mathbf x = ( \mathbf G^T \mathbf W \mathbf G )^{-1} \mathbf G^T \mathbf W \mathbf r</code></pre><p>is useful mathematically.</p><p>However, in computation it is usually preferable to solve</p><pre class="math"><code>\boxed{ \mathbf N\delta\mathbf x = \mathbf b }</code></pre><p>directly.</p><p>Thus,</p><pre class="math"><code>\boxed{ \text{Solve the Linear System} \quad\text{instead of explicitly computing}\quad \mathbf N^{-1}. }</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.8 Avoid Explicit Matrix Inversion</h3>
+<p>The formal expression</p>
+<p><span class="math display">\[
+\delta\mathbf x = ( \mathbf G^T \mathbf W \mathbf G )^{-1} \mathbf G^T \mathbf W \mathbf r
+\]</span></p>
+<p>is useful mathematically.</p>
+<p>However, in computation it is usually preferable to solve</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N\delta\mathbf x = \mathbf b }
+\]</span></p>
+<p>directly.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Solve the Linear System} \quad\text{instead of explicitly computing}\quad \mathbf N^{-1}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.9 Why Explicit
-Inversion Is Discouraged</h3>
-<p>Explicit matrix inversion can</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.9 Why Explicit Inversion Is Discouraged</h3>
+<p>Explicit matrix inversion can</p>
+<ul>
 <li>increase numerical error,</li>
 <li>increase computation,</li>
 <li>hide rank problems,</li>
 <li>produce unnecessary intermediate quantities.</li>
-</ul><p>Most numerical libraries provide stable linear solvers.</p><p>Therefore code such as</p><pre class="math"><code>\texttt{x = inv(A)*b}</code></pre><p>is generally inferior to solving</p><pre class="math"><code>\texttt{A\textbackslash b}</code></pre><p>in MATLAB.</p><hr/>
-
+</ul>
+<p>Most numerical libraries provide stable linear solvers.</p>
+<p>Therefore code such as</p>
+<p><span class="math display">\[
+\texttt{x = inv(A)*b}
+\]</span></p>
+<p>is generally inferior to solving</p>
+<p><span class="math display">\[
+\texttt{A\textbackslash b}
+\]</span></p>
+<p>in MATLAB.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.10 MATLAB Backslash
-Operator</h3>
-<p>In MATLAB,</p><div class="sourceCode" id="cb23"><pre class="sourceCode matlab"><code class="sourceCode matlab"><span id="cb23-1"><a aria-hidden="true" href="#cb23-1" tabindex="-1"></a><span class="va">x</span> <span class="op">=</span> <span class="va">A</span><span class="op">\</span><span class="va">b</span><span class="op">;</span></span></code></pre></div><p>selects an appropriate linear solver based on the matrix
-structure.</p><p>For a least-squares problem,</p><div class="sourceCode" id="cb24"><pre class="sourceCode matlab"><code class="sourceCode matlab"><span id="cb24-1"><a aria-hidden="true" href="#cb24-1" tabindex="-1"></a><span class="va">x</span> <span class="op">=</span> <span class="va">G</span><span class="op">\</span><span class="va">r</span><span class="op">;</span></span></code></pre></div><p>can be preferable to manually forming</p><div class="sourceCode" id="cb25"><pre class="sourceCode matlab"><code class="sourceCode matlab"><span id="cb25-1"><a aria-hidden="true" href="#cb25-1" tabindex="-1"></a><span class="va">inv</span>(<span class="va">G</span><span class="op">'*</span><span class="va">G</span>)<span class="op">*</span><span class="va">G</span><span class="op">'*</span><span class="va">r</span></span></code></pre></div><p>because MATLAB can use numerically stable factorization
-internally.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.10 MATLAB Backslash Operator</h3>
+<p>In MATLAB,</p>
+<pre><code class="language-matlab">x = A\b;</code></pre>
+<p>selects an appropriate linear solver based on the matrix structure.</p>
+<p>For a least-squares problem,</p>
+<pre><code class="language-matlab">x = G\r;</code></pre>
+<p>can be preferable to manually forming</p>
+<pre><code class="language-matlab">inv(G&#x27;*G)*G&#x27;*r</code></pre>
+<p>because MATLAB can use numerically stable factorization internally.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.11 Weighted Whitening</h3>
-<p>Given</p><pre class="math"><code>\mathbf W = \mathbf R^{-1},</code></pre><p>suppose</p><pre class="math"><code>\mathbf R = \mathbf L \mathbf L^T.</code></pre><p>Define whitened quantities:</p><pre class="math"><code>\boxed{ \tilde{\mathbf G} = \mathbf L^{-1} \mathbf G }</code></pre><p>and</p><pre class="math"><code>\boxed{ \tilde{\mathbf r} = \mathbf L^{-1} \mathbf r. }</code></pre><p>Then</p><pre class="math"><code>\boxed{ \min \| \tilde{\mathbf r} - \tilde{\mathbf G} \delta\mathbf x \|^2 }</code></pre><p>is equivalent to weighted least squares.</p><hr/>
-
+<p>Given</p>
+<p><span class="math display">\[
+\mathbf W = \mathbf R^{-1},
+\]</span></p>
+<p>suppose</p>
+<p><span class="math display">\[
+\mathbf R = \mathbf L \mathbf L^T.
+\]</span></p>
+<p>Define whitened quantities:</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf G} = \mathbf L^{-1} \mathbf G }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf r} = \mathbf L^{-1} \mathbf r. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \min \| \tilde{\mathbf r} - \tilde{\mathbf G} \delta\mathbf x \|^2 }
+\]</span></p>
+<p>is equivalent to weighted least squares.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.12 Why Whitening Helps</h3>
-<p>Whitening</p><ul>
+<p>Whitening</p>
+<ul>
 <li>incorporates measurement covariance correctly,</li>
 <li>places residuals on a common statistical scale,</li>
 <li>allows standard least-squares factorization,</li>
 <li>improves interpretation of residuals.</li>
-</ul><p>For independent measurements with standard deviations
-<code>\sigma_i</code>,</p><pre class="math"><code>\boxed{ \tilde r_i = \frac{r_i}{\sigma_i}. }</code></pre><hr/>
-
+</ul>
+<p>For independent measurements with standard deviations <code>\sigma_i</code>,</p>
+<p><span class="math display">\[
+\boxed{ \tilde r_i = \frac{r_i}{\sigma_i}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.13 QR Decomposition</h3>
-<p>For the whitened design matrix,</p><pre class="math"><code>\tilde{\mathbf G},</code></pre><p>QR decomposition gives</p><pre class="math"><code>\boxed{ \tilde{\mathbf G} = \mathbf Q \mathbf R }</code></pre><p>where</p><pre class="math"><code>\mathbf Q^T\mathbf Q = \mathbf I</code></pre><p>and <code>\mathbf R</code> is upper triangular.</p><hr/>
-
+<p>For the whitened design matrix,</p>
+<p><span class="math display">\[
+\tilde{\mathbf G},
+\]</span></p>
+<p>QR decomposition gives</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf G} = \mathbf Q \mathbf R }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\mathbf Q^T\mathbf Q = \mathbf I
+\]</span></p>
+<p>and <code>\mathbf R</code> is upper triangular.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.14 QR Least-Squares
-Solution</h3>
-<p>The problem</p><pre class="math"><code>\min \| \tilde{\mathbf r} - \tilde{\mathbf G} \delta\mathbf x \|^2</code></pre><p>becomes</p><pre class="math"><code>\min \| \mathbf Q^T \tilde{\mathbf r} - \mathbf R \delta\mathbf x \|^2.</code></pre><p>For full column rank,</p><pre class="math"><code>\boxed{ \mathbf R \delta\mathbf x = \mathbf Q^T \tilde{\mathbf r}. }</code></pre><p>This triangular system can be solved efficiently by back
-substitution.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.14 QR Least-Squares Solution</h3>
+<p>The problem</p>
+<p><span class="math display">\[
+\min \| \tilde{\mathbf r} - \tilde{\mathbf G} \delta\mathbf x \|^2
+\]</span></p>
+<p>becomes</p>
+<p><span class="math display">\[
+\min \| \mathbf Q^T \tilde{\mathbf r} - \mathbf R \delta\mathbf x \|^2.
+\]</span></p>
+<p>For full column rank,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R \delta\mathbf x = \mathbf Q^T \tilde{\mathbf r}. }
+\]</span></p>
+<p>This triangular system can be solved efficiently by back substitution.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.15 Why QR Is
-More Stable than Normal Equations</h3>
-<p>QR avoids forming</p><pre class="math"><code>\mathbf G^T\mathbf G.</code></pre><p>Therefore it avoids squaring the condition number.</p><p>Conceptually,</p><pre class="math"><code>\boxed{ \text{QR} \rightarrow \text{Better Numerical Stability} }</code></pre><p>than</p><pre class="math"><code>\boxed{ \text{Normal Equations} }</code></pre><p>for moderately ill-conditioned problems.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.15 Why QR Is More Stable than Normal Equations</h3>
+<p>QR avoids forming</p>
+<p><span class="math display">\[
+\mathbf G^T\mathbf G.
+\]</span></p>
+<p>Therefore it avoids squaring the condition number.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ \text{QR} \rightarrow \text{Better Numerical Stability} }
+\]</span></p>
+<p>than</p>
+<p><span class="math display">\[
+\boxed{ \text{Normal Equations} }
+\]</span></p>
+<p>for moderately ill-conditioned problems.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.16 Householder QR</h3>
-<p>One common implementation uses Householder transformations.</p><p>A Householder reflector has the form</p><pre class="math"><code>\boxed{ \mathbf H = \mathbf I - 2 \frac{ \mathbf v\mathbf v^T }{ \mathbf v^T\mathbf v }. }</code></pre><p>It transforms a vector while preserving norm.</p><p>Householder QR is widely used because it is robust and numerically
-stable.</p><hr/>
-
+<p>One common implementation uses Householder transformations.</p>
+<p>A Householder reflector has the form</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H = \mathbf I - 2 \frac{ \mathbf v\mathbf v^T }{ \mathbf v^T\mathbf v }. }
+\]</span></p>
+<p>It transforms a vector while preserving norm.</p>
+<p>Householder QR is widely used because it is robust and numerically stable.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.17 Givens Rotations</h3>
-<p>Another QR implementation uses Givens rotations.</p><p>For selected coordinates <code>i,j</code>,</p><pre class="math"><code>\boxed{ \mathbf G_{ij} = \begin{bmatrix} c &amp; s\\ -s &amp; c \end{bmatrix} }</code></pre><p>with</p><pre class="math"><code>c^2+s^2=1.</code></pre><p>Givens rotations are especially useful when measurements are
-processed incrementally or when sparse structure is important.</p><hr/>
-
+<p>Another QR implementation uses Givens rotations.</p>
+<p>For selected coordinates <code>i,j</code>,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G_{ij} = \begin{bmatrix} c & s\\ -s & c \end{bmatrix} }
+\]</span></p>
+<p>with</p>
+<p><span class="math display">\[
+c^2+s^2=1.
+\]</span></p>
+<p>Givens rotations are especially useful when measurements are processed incrementally or when sparse structure is important.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.18 QR with Column Pivoting</h3>
-<p>If rank deficiency is possible, use column-pivoted QR:</p><pre class="math"><code>\boxed{ \mathbf G \mathbf P = \mathbf Q \mathbf R. }</code></pre><p>The permutation matrix <code>\mathbf P</code> reorders columns so
-that the strongest independent directions are processed first.</p><p>This helps reveal numerical rank.</p><hr/>
-
+<p>If rank deficiency is possible, use column-pivoted QR:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G \mathbf P = \mathbf Q \mathbf R. }
+\]</span></p>
+<p>The permutation matrix <code>\mathbf P</code> reorders columns so that the strongest independent directions are processed first.</p>
+<p>This helps reveal numerical rank.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.19 Rank-Revealing QR</h3>
-<p>In rank-revealing QR, the diagonal elements of <code>\mathbf R</code>
-provide information about independent versus weak columns.</p><p>If some diagonal values become extremely small, the system may be
-rank deficient or nearly so.</p><p>This is a useful alternative to SVD when computation is more
-constrained.</p><hr/>
-
+<p>In rank-revealing QR, the diagonal elements of <code>\mathbf R</code> provide information about independent versus weak columns.</p>
+<p>If some diagonal values become extremely small, the system may be rank deficient or nearly so.</p>
+<p>This is a useful alternative to SVD when computation is more constrained.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.20 Cholesky Factorization</h3>
-<p>If the normal matrix</p><pre class="math"><code>\mathbf N = \mathbf G^T\mathbf W\mathbf G</code></pre><p>is symmetric positive definite, then</p><pre class="math"><code>\boxed{ \mathbf N = \mathbf L \mathbf L^T }</code></pre><p>or</p><pre class="math"><code>\boxed{ \mathbf N = \mathbf R^T \mathbf R. }</code></pre><p>This is the Cholesky factorization.</p><hr/>
-
+<p>If the normal matrix</p>
+<p><span class="math display">\[
+\mathbf N = \mathbf G^T\mathbf W\mathbf G
+\]</span></p>
+<p>is symmetric positive definite, then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N = \mathbf L \mathbf L^T }
+\]</span></p>
+<p>or</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N = \mathbf R^T \mathbf R. }
+\]</span></p>
+<p>This is the Cholesky factorization.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.21 Cholesky Solution</h3>
-<p>Solve</p><pre class="math"><code>\mathbf L\mathbf y = \mathbf b</code></pre><p>first, then</p><pre class="math"><code>\mathbf L^T \delta\mathbf x = \mathbf y.</code></pre><p>Cholesky is efficient because it exploits symmetry and positive
-definiteness.</p><hr/>
-
+<p>Solve</p>
+<p><span class="math display">\[
+\mathbf L\mathbf y = \mathbf b
+\]</span></p>
+<p>first, then</p>
+<p><span class="math display">\[
+\mathbf L^T \delta\mathbf x = \mathbf y.
+\]</span></p>
+<p>Cholesky is efficient because it exploits symmetry and positive definiteness.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.22 Advantages of Cholesky</h3>
-<p>Cholesky provides</p><ul>
+<p>Cholesky provides</p>
+<ul>
 <li>low computational cost,</li>
 <li>efficient storage,</li>
 <li>fast solution of symmetric positive-definite systems.</li>
-</ul><p>It is often useful for well-conditioned information or covariance
-matrices.</p><hr/>
-
+</ul>
+<p>It is often useful for well-conditioned information or covariance matrices.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.23 Limitation of Cholesky</h3>
-<p>Cholesky does <strong>not</strong> fix the conditioning problem
-created by forming the normal matrix.</p><p>If</p><pre class="math"><code>\mathbf N = \mathbf G^T\mathbf G,</code></pre><p>the squared condition number remains.</p><p>Also, if <code>\mathbf N</code> is singular or not positive definite
-because of rank deficiency or numerical error, standard Cholesky can
-fail.</p><hr/>
-
+<p>Cholesky does <strong>not</strong> fix the conditioning problem created by forming the normal matrix.</p>
+<p>If</p>
+<p><span class="math display">\[
+\mathbf N = \mathbf G^T\mathbf G,
+\]</span></p>
+<p>the squared condition number remains.</p>
+<p>Also, if <code>\mathbf N</code> is singular or not positive definite because of rank deficiency or numerical error, standard Cholesky can fail.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.24 Cholesky Failure as
-a Diagnostic</h3>
-<p>If Cholesky unexpectedly fails, possible causes include</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.24 Cholesky Failure as a Diagnostic</h3>
+<p>If Cholesky unexpectedly fails, possible causes include</p>
+<ul>
 <li>rank deficiency,</li>
 <li>loss of positive definiteness,</li>
 <li>severe roundoff,</li>
 <li>incorrect covariance,</li>
 <li>modeling or coding errors.</li>
-</ul><p>The failure should be investigated rather than merely bypassed.</p><hr/>
-
+</ul>
+<p>The failure should be investigated rather than merely bypassed.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.25 Singular Value
-Decomposition</h3>
-<p>The singular value decomposition is</p><pre class="math"><code>\boxed{ \mathbf G = \mathbf U \boldsymbol\Sigma \mathbf V^T. }</code></pre><p>The singular values satisfy</p><pre class="math"><code>\boxed{ \sigma_1 \ge \sigma_2 \ge \cdots \ge \sigma_n \ge 0. }</code></pre><p>SVD is one of the strongest tools for diagnosing numerical
-conditioning.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.25 Singular Value Decomposition</h3>
+<p>The singular value decomposition is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G = \mathbf U \boldsymbol\Sigma \mathbf V^T. }
+\]</span></p>
+<p>The singular values satisfy</p>
+<p><span class="math display">\[
+\boxed{ \sigma_1 \ge \sigma_2 \ge \cdots \ge \sigma_n \ge 0. }
+\]</span></p>
+<p>SVD is one of the strongest tools for diagnosing numerical conditioning.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.26 SVD Least-Squares
-Solution</h3>
-<p>For full rank,</p><pre class="math"><code>\boxed{ \delta\mathbf x = \mathbf V \boldsymbol\Sigma^{-1} \mathbf U^T \mathbf r. }</code></pre><p>This makes the role of singular values explicit.</p><p>A measurement-space component associated with a small
-<code>\sigma_i</code> is amplified by</p><pre class="math"><code>\frac{1}{\sigma_i}.</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.26 SVD Least-Squares Solution</h3>
+<p>For full rank,</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x = \mathbf V \boldsymbol\Sigma^{-1} \mathbf U^T \mathbf r. }
+\]</span></p>
+<p>This makes the role of singular values explicit.</p>
+<p>A measurement-space component associated with a small <code>\sigma_i</code> is amplified by</p>
+<p><span class="math display">\[
+\frac{1}{\sigma_i}.
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.27 Why Small
-Singular Values Are Dangerous</h3>
-<p>If</p><pre class="math"><code>\sigma_i \ll1,</code></pre><p>then</p><pre class="math"><code>\frac{1}{\sigma_i} \gg1.</code></pre><p>Measurement noise in that direction can therefore produce a very
-large parameter correction.</p><p>Thus,</p><pre class="math"><code>\boxed{ \text{Small Singular Value} \rightarrow \text{Noise Amplification}. }</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.27 Why Small Singular Values Are Dangerous</h3>
+<p>If</p>
+<p><span class="math display">\[
+\sigma_i \ll1,
+\]</span></p>
+<p>then</p>
+<p><span class="math display">\[
+\frac{1}{\sigma_i} \gg1.
+\]</span></p>
+<p>Measurement noise in that direction can therefore produce a very large parameter correction.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Small Singular Value} \rightarrow \text{Noise Amplification}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.28 SVD and Rank Deficiency</h3>
-<p>If</p><pre class="math"><code>\sigma_i=0,</code></pre><p>the corresponding state direction is unobservable in the linearized
-system.</p><p>If</p><pre class="math"><code>\sigma_i \approx0,</code></pre><p>it is weakly observable.</p><p>Therefore SVD simultaneously provides information about</p><ul>
+<p>If</p>
+<p><span class="math display">\[
+\sigma_i=0,
+\]</span></p>
+<p>the corresponding state direction is unobservable in the linearized system.</p>
+<p>If</p>
+<p><span class="math display">\[
+\sigma_i \approx0,
+\]</span></p>
+<p>it is weakly observable.</p>
+<p>Therefore SVD simultaneously provides information about</p>
+<ul>
 <li>rank,</li>
 <li>conditioning,</li>
 <li>weak directions,</li>
 <li>parameter combinations.</li>
-</ul><hr/>
-
+</ul>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.29 Pseudoinverse</h3>
-<p>For a rank-deficient matrix,</p><pre class="math"><code>\mathbf G^+</code></pre><p>denotes the Moore-Penrose pseudoinverse.</p><p>Using the SVD,</p><pre class="math"><code>\boxed{ \mathbf G^+ = \mathbf V \boldsymbol\Sigma^+ \mathbf U^T }</code></pre><p>where nonzero singular values are inverted.</p><p>Then</p><pre class="math"><code>\boxed{ \delta\mathbf x = \mathbf G^+ \mathbf r. }</code></pre><hr/>
-
+<p>For a rank-deficient matrix,</p>
+<p><span class="math display">\[
+\mathbf G^+
+\]</span></p>
+<p>denotes the Moore-Penrose pseudoinverse.</p>
+<p>Using the SVD,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^+ = \mathbf V \boldsymbol\Sigma^+ \mathbf U^T }
+\]</span></p>
+<p>where nonzero singular values are inverted.</p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x = \mathbf G^+ \mathbf r. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.30 Meaning of the
-Pseudoinverse Solution</h3>
-<p>For an underdetermined or rank-deficient system, the pseudoinverse
-gives the minimum-norm solution among possible solutions.</p><p>However,</p><pre class="math"><code>\boxed{ \text{Pseudoinverse} \neq \text{Recovered Lost Information}. }</code></pre><p>It provides a mathematically defined solution but cannot create
-observability that the measurements do not contain.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.30 Meaning of the Pseudoinverse Solution</h3>
+<p>For an underdetermined or rank-deficient system, the pseudoinverse gives the minimum-norm solution among possible solutions.</p>
+<p>However,</p>
+<p><span class="math display">\[
+\boxed{ \text{Pseudoinverse} \neq \text{Recovered Lost Information}. }
+\]</span></p>
+<p>It provides a mathematically defined solution but cannot create observability that the measurements do not contain.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.31 Truncated SVD</h3>
-<p>One robust approach is to discard very small singular values.</p><p>If</p><pre class="math"><code>\sigma_i&lt;\tau,</code></pre><p>set its inverse contribution to zero.</p><p>Then</p><pre class="math"><code>\boxed{ \delta\mathbf x_{\rm TSVD} = \sum_{\sigma_i\ge\tau} \frac{ \mathbf v_i \mathbf u_i^T \mathbf r }{ \sigma_i }. }</code></pre><p>This is truncated SVD.</p><hr/>
-
+<p>One robust approach is to discard very small singular values.</p>
+<p>If</p>
+<p><span class="math display">\[
+\sigma_i<\tau,
+\]</span></p>
+<p>set its inverse contribution to zero.</p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x_{\rm TSVD} = \sum_{\sigma_i\ge\tau} \frac{ \mathbf v_i \mathbf u_i^T \mathbf r }{ \sigma_i }. }
+\]</span></p>
+<p>This is truncated SVD.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.32 Interpretation of
-Truncated SVD</h3>
-<p>TSVD says:</p><blockquote>
-<p>Do not attempt to estimate state combinations that the data constrain
-too weakly.</p>
-</blockquote><p>This reduces noise amplification but sacrifices resolution in weak
-directions.</p><p>Thus,</p><pre class="math"><code>\boxed{ \text{Robustness} \leftrightarrow \text{Information Retention}. }</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.32 Interpretation of Truncated SVD</h3>
+<p>TSVD says:</p>
+<blockquote><p>Do not attempt to estimate state combinations that the data constrain too weakly.</p></blockquote>
+<p>This reduces noise amplification but sacrifices resolution in weak directions.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Robustness} \leftrightarrow \text{Information Retention}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.33 Choosing the SVD
-Threshold</h3>
-<p>A numerical tolerance may depend on</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.33 Choosing the SVD Threshold</h3>
+<p>A numerical tolerance may depend on</p>
+<ul>
 <li>machine precision,</li>
 <li>largest singular value,</li>
 <li>matrix dimensions,</li>
 <li>physical scaling.</li>
-</ul><p>A common numerical form is related to</p><pre class="math"><code>\boxed{ \tau \sim \epsilon_{\rm mach} \, \max(m,n) \, \sigma_{\max}. }</code></pre><p>But an engineering threshold may need to be stricter than the purely
-numerical threshold.</p><hr/>
-
+</ul>
+<p>A common numerical form is related to</p>
+<p><span class="math display">\[
+\boxed{ \tau \sim \epsilon_{\rm mach} \, \max(m,n) \, \sigma_{\max}. }
+\]</span></p>
+<p>But an engineering threshold may need to be stricter than the purely numerical threshold.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.34 Numerical Rank
-versus Physical Rank</h3>
-<p>A matrix may be mathematically full rank yet physically useless in
-one direction.</p><p>Therefore distinguish:</p><pre class="math"><code>\boxed{ \text{Mathematical Rank} }</code></pre><p>from</p><pre class="math"><code>\boxed{ \text{Practical Numerical Rank}. }</code></pre><p>Practical rank depends on how small a singular value can become
-before noise dominates its information.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.34 Numerical Rank versus Physical Rank</h3>
+<p>A matrix may be mathematically full rank yet physically useless in one direction.</p>
+<p>Therefore distinguish:</p>
+<p><span class="math display">\[
+\boxed{ \text{Mathematical Rank} }
+\]</span></p>
+<p>from</p>
+<p><span class="math display">\[
+\boxed{ \text{Practical Numerical Rank}. }
+\]</span></p>
+<p>Practical rank depends on how small a singular value can become before noise dominates its information.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.35 Condition Number</h3>
-<p>For a nonsingular matrix,</p><pre class="math"><code>\boxed{ \kappa(\mathbf G) = \|\mathbf G\| \, \|\mathbf G^{-1}\|. }</code></pre><p>Using the 2-norm,</p><pre class="math"><code>\boxed{ \kappa_2(\mathbf G) = \frac{ \sigma_{\max} }{ \sigma_{\min} }. }</code></pre><hr/>
-
+<p>For a nonsingular matrix,</p>
+<p><span class="math display">\[
+\boxed{ \kappa(\mathbf G) = \|\mathbf G\| \, \|\mathbf G^{-1}\|. }
+\]</span></p>
+<p>Using the 2-norm,</p>
+<p><span class="math display">\[
+\boxed{ \kappa_2(\mathbf G) = \frac{ \sigma_{\max} }{ \sigma_{\min} }. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.36 Interpretation
-of the Condition Number</h3>
-<p>Approximately,</p><pre class="math"><code>\boxed{ \frac{ \|\delta\mathbf x_{\rm error}\| }{ \|\mathbf x\| } \lesssim \kappa(\mathbf G) \, \frac{ \|\delta\mathbf b\| }{ \|\mathbf b\| } }</code></pre><p>for small perturbations in a linear solve.</p><p>Thus the condition number estimates how much input error may be
-amplified.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.36 Interpretation of the Condition Number</h3>
+<p>Approximately,</p>
+<p><span class="math display">\[
+\boxed{ \frac{ \|\delta\mathbf x_{\rm error}\| }{ \|\mathbf x\| } \lesssim \kappa(\mathbf G) \, \frac{ \|\delta\mathbf b\| }{ \|\mathbf b\| } }
+\]</span></p>
+<p>for small perturbations in a linear solve.</p>
+<p>Thus the condition number estimates how much input error may be amplified.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.37 Condition
-Number and Significant Digits</h3>
-<p>If</p><pre class="math"><code>\kappa \sim10^p,</code></pre><p>one may lose roughly <code>p</code> decimal digits of numerical
-accuracy in the worst case.</p><p>For example,</p><pre class="math"><code>\kappa\sim10^{10}</code></pre><p>can be extremely problematic in double precision.</p><p>This is only a rough interpretation, but useful diagnostically.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.37 Condition Number and Significant Digits</h3>
+<p>If</p>
+<p><span class="math display">\[
+\kappa \sim10^p,
+\]</span></p>
+<p>one may lose roughly <code>p</code> decimal digits of numerical accuracy in the worst case.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\kappa\sim10^{10}
+\]</span></p>
+<p>can be extremely problematic in double precision.</p>
+<p>This is only a rough interpretation, but useful diagnostically.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.38 Condition Number
-Is Unit Sensitive</h3>
-<p>If the state vector contains variables with very different units, the
-raw condition number may reflect scaling rather than physical
-observability.</p><p>For example:</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.38 Condition Number Is Unit Sensitive</h3>
+<p>If the state vector contains variables with very different units, the raw condition number may reflect scaling rather than physical observability.</p>
+<p>For example:</p>
+<ul>
 <li>position in meters,</li>
 <li>velocity in m/s,</li>
 <li>clock bias in seconds,</li>
 <li>scale factor dimensionless.</li>
-</ul><p>Therefore scaling is essential before interpreting conditioning
-physically.</p><hr/>
-
+</ul>
+<p>Therefore scaling is essential before interpreting conditioning physically.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.39 State Scaling</h3>
-<p>Define</p><pre class="math"><code>\boxed{ \delta\mathbf x = \mathbf S_x \delta\tilde{\mathbf x} }</code></pre><p>where <code>\mathbf S_x</code> contains characteristic state
-scales.</p><p>Then</p><pre class="math"><code>\mathbf G \delta\mathbf x = \mathbf G \mathbf S_x \delta\tilde{\mathbf x}.</code></pre><p>The scaled design matrix is</p><pre class="math"><code>\boxed{ \tilde{\mathbf G} = \mathbf G \mathbf S_x. }</code></pre><hr/>
-
+<p>Define</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x = \mathbf S_x \delta\tilde{\mathbf x} }
+\]</span></p>
+<p>where <code>\mathbf S_x</code> contains characteristic state scales.</p>
+<p>Then</p>
+<p><span class="math display">\[
+\mathbf G \delta\mathbf x = \mathbf G \mathbf S_x \delta\tilde{\mathbf x}.
+\]</span></p>
+<p>The scaled design matrix is</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf G} = \mathbf G \mathbf S_x. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.40 Example of State
-Scaling</h3>
-<p>Suppose</p><pre class="math"><code>r \sim10^7\ {\rm m},</code></pre><pre class="math"><code>v \sim10^3\ {\rm m/s},</code></pre><p>and a calibration parameter is</p><pre class="math"><code>\theta \sim10^{-4}.</code></pre><p>Solving directly can produce very differently scaled columns.</p><p>Instead choose scales such as</p><pre class="math"><code>\boxed{ \mathbf S_x = \operatorname{diag} ( 10^7, 10^7, 10^7, 10^3, 10^3, 10^3, 10^{-4} ). }</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.40 Example of State Scaling</h3>
+<p>Suppose</p>
+<p><span class="math display">\[
+r \sim10^7\ {\rm m},
+\]</span></p>
+<p><span class="math display">\[
+v \sim10^3\ {\rm m/s},
+\]</span></p>
+<p>and a calibration parameter is</p>
+<p><span class="math display">\[
+\theta \sim10^{-4}.
+\]</span></p>
+<p>Solving directly can produce very differently scaled columns.</p>
+<p>Instead choose scales such as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf S_x = \operatorname{diag} ( 10^7, 10^7, 10^7, 10^3, 10^3, 10^3, 10^{-4} ). }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.41 Measurement Scaling</h3>
-<p>Measurements can also have very different units.</p><p>Examples include</p><ul>
+<p>Measurements can also have very different units.</p>
+<p>Examples include</p>
+<ul>
 <li>range in meters,</li>
 <li>angle in radians,</li>
 <li>Doppler in hertz.</li>
-</ul><p>Whitening by measurement covariance naturally provides statistically
-meaningful scaling.</p><p>Thus measurement whitening and state scaling solve different
-problems:</p><pre class="math"><code>\boxed{ \text{Whitening} \rightarrow \text{Measurement Scaling} }</code></pre><pre class="math"><code>\boxed{ \text{State Scaling} \rightarrow \text{Unknown-Variable Scaling}. }</code></pre><hr/>
-
+</ul>
+<p>Whitening by measurement covariance naturally provides statistically meaningful scaling.</p>
+<p>Thus measurement whitening and state scaling solve different problems:</p>
+<p><span class="math display">\[
+\boxed{ \text{Whitening} \rightarrow \text{Measurement Scaling} }
+\]</span></p>
+<p><span class="math display">\[
+\boxed{ \text{State Scaling} \rightarrow \text{Unknown-Variable Scaling}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.42 Column Normalization</h3>
-<p>A simple diagnostic is to normalize design-matrix columns:</p><pre class="math"><code>\boxed{ \tilde{\mathbf g}_j = \frac{ \mathbf g_j }{ \|\mathbf g_j\| }. }</code></pre><p>This helps assess whether poor conditioning comes from different
-column magnitudes or from near-collinearity.</p><p>However, physical state scaling is generally more meaningful than
-arbitrary normalization for the final estimator.</p><hr/>
-
+<p>A simple diagnostic is to normalize design-matrix columns:</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf g}_j = \frac{ \mathbf g_j }{ \|\mathbf g_j\| }. }
+\]</span></p>
+<p>This helps assess whether poor conditioning comes from different column magnitudes or from near-collinearity.</p>
+<p>However, physical state scaling is generally more meaningful than arbitrary normalization for the final estimator.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.43 Scaling Does Not
-Create Information</h3>
-<p>Scaling may greatly improve numerical conditioning.</p><p>But it does not change the actual measurement information.</p><p>If two columns are physically parallel,</p><pre class="math"><code>\mathbf g_1 = c\mathbf g_2,</code></pre><p>scaling cannot make them independent.</p><p>Thus,</p><pre class="math"><code>\boxed{ \text{Scaling Fixes Numerical Problems} \quad\text{not}\quad \text{Observability Problems}. }</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.43 Scaling Does Not Create Information</h3>
+<p>Scaling may greatly improve numerical conditioning.</p>
+<p>But it does not change the actual measurement information.</p>
+<p>If two columns are physically parallel,</p>
+<p><span class="math display">\[
+\mathbf g_1 = c\mathbf g_2,
+\]</span></p>
+<p>scaling cannot make them independent.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Scaling Fixes Numerical Problems} \quad\text{not}\quad \text{Observability Problems}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.44 Square-Root Least
-Squares</h3>
-<p>Instead of working with the information matrix</p><pre class="math"><code>\mathbf G^T \mathbf W \mathbf G,</code></pre><p>square-root least-squares methods work with a factor such as</p><pre class="math"><code>\boxed{ \mathbf R_s }</code></pre><p>satisfying</p><pre class="math"><code>\boxed{ \mathbf R_s^T \mathbf R_s = \mathbf G^T \mathbf W \mathbf G. }</code></pre><p>These methods avoid explicitly squaring conditioning where
-possible.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.44 Square-Root Least Squares</h3>
+<p>Instead of working with the information matrix</p>
+<p><span class="math display">\[
+\mathbf G^T \mathbf W \mathbf G,
+\]</span></p>
+<p>square-root least-squares methods work with a factor such as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R_s }
+\]</span></p>
+<p>satisfying</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R_s^T \mathbf R_s = \mathbf G^T \mathbf W \mathbf G. }
+\]</span></p>
+<p>These methods avoid explicitly squaring conditioning where possible.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.45 Square-Root Information
-Form</h3>
-<p>The information matrix is</p><pre class="math"><code>\boxed{ \boldsymbol\Lambda = \mathbf P^{-1}. }</code></pre><p>Instead of storing <code>\boldsymbol\Lambda</code>, store a
-triangular factor</p><pre class="math"><code>\boxed{ \boldsymbol\Lambda = \mathbf R^T \mathbf R. }</code></pre><p>This can improve numerical stability and preserve positive
-definiteness.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.45 Square-Root Information Form</h3>
+<p>The information matrix is</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\Lambda = \mathbf P^{-1}. }
+\]</span></p>
+<p>Instead of storing <code>\boldsymbol\Lambda</code>, store a triangular factor</p>
+<p><span class="math display">\[
+\boxed{ \boldsymbol\Lambda = \mathbf R^T \mathbf R. }
+\]</span></p>
+<p>This can improve numerical stability and preserve positive definiteness.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.46 Square-Root Covariance
-Form</h3>
-<p>Alternatively,</p><pre class="math"><code>\boxed{ \mathbf P = \mathbf S \mathbf S^T }</code></pre><p>is maintained directly through its factor <code>\mathbf S</code>.</p><p>This is common in square-root Kalman filters.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.46 Square-Root Covariance Form</h3>
+<p>Alternatively,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P = \mathbf S \mathbf S^T }
+\]</span></p>
+<p>is maintained directly through its factor <code>\mathbf S</code>.</p>
+<p>This is common in square-root Kalman filters.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.47 Why Square-Root
-Methods Are Robust</h3>
-<p>Square-root methods generally provide better control over</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.47 Why Square-Root Methods Are Robust</h3>
+<p>Square-root methods generally provide better control over</p>
+<ul>
 <li>symmetry,</li>
 <li>positive definiteness,</li>
 <li>roundoff accumulation,</li>
 <li>dynamic range.</li>
-</ul><p>They are especially useful for high-precision estimation and long
-recursive filtering.</p><hr/>
-
+</ul>
+<p>They are especially useful for high-precision estimation and long recursive filtering.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.48 Square-Root Filtering</h3>
-<p>In a conventional Kalman filter,</p><pre class="math"><code>\mathbf P</code></pre><p>is propagated and updated directly.</p><p>In a square-root filter, a matrix factor is propagated instead.</p><p>Conceptually,</p><pre class="math"><code>\boxed{ \mathbf P = \mathbf S\mathbf S^T }</code></pre><p>is maintained without repeatedly reconstructing and subtracting large
-nearly equal covariance terms.</p><hr/>
-
+<p>In a conventional Kalman filter,</p>
+<p><span class="math display">\[
+\mathbf P
+\]</span></p>
+<p>is propagated and updated directly.</p>
+<p>In a square-root filter, a matrix factor is propagated instead.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P = \mathbf S\mathbf S^T }
+\]</span></p>
+<p>is maintained without repeatedly reconstructing and subtracting large nearly equal covariance terms.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.49 Covariance Symmetry</h3>
-<p>A theoretical covariance satisfies</p><pre class="math"><code>\boxed{ \mathbf P = \mathbf P^T. }</code></pre><p>Roundoff may cause</p><pre class="math"><code>\mathbf P \neq \mathbf P^T</code></pre><p>numerically.</p><p>A common cleanup is</p><pre class="math"><code>\boxed{ \mathbf P \leftarrow \frac12 ( \mathbf P+\mathbf P^T ). }</code></pre><p>However, repeated large asymmetry indicates a deeper numerical
-problem.</p><hr/>
-
+<p>A theoretical covariance satisfies</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P = \mathbf P^T. }
+\]</span></p>
+<p>Roundoff may cause</p>
+<p><span class="math display">\[
+\mathbf P \neq \mathbf P^T
+\]</span></p>
+<p>numerically.</p>
+<p>A common cleanup is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P \leftarrow \frac12 ( \mathbf P+\mathbf P^T ). }
+\]</span></p>
+<p>However, repeated large asymmetry indicates a deeper numerical problem.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.50 Positive
-Semidefinite Covariance</h3>
-<p>A covariance matrix should satisfy</p><pre class="math"><code>\boxed{ \mathbf x^T \mathbf P \mathbf x \ge0 }</code></pre><p>for every <code>\mathbf x</code>.</p><p>If negative eigenvalues appear because of numerical error, the
-covariance is no longer physically meaningful.</p><p>Square-root and Joseph-form implementations help reduce this
-risk.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.50 Positive Semidefinite Covariance</h3>
+<p>A covariance matrix should satisfy</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x^T \mathbf P \mathbf x \ge0 }
+\]</span></p>
+<p>for every <code>\mathbf x</code>.</p>
+<p>If negative eigenvalues appear because of numerical error, the covariance is no longer physically meaningful.</p>
+<p>Square-root and Joseph-form implementations help reduce this risk.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.51 Joseph Covariance
-Update</h3>
-<p>The Joseph form is</p><pre class="math"><code>\boxed{ \mathbf P^+ = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^- ( \mathbf I-\mathbf K\mathbf H )^T + \mathbf K \mathbf R \mathbf K^T. }</code></pre><p>This form is more numerically robust than the simplified update</p><pre class="math"><code>\mathbf P^+ = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^-.</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.51 Joseph Covariance Update</h3>
+<p>The Joseph form is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P^+ = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^- ( \mathbf I-\mathbf K\mathbf H )^T + \mathbf K \mathbf R \mathbf K^T. }
+\]</span></p>
+<p>This form is more numerically robust than the simplified update</p>
+<p><span class="math display">\[
+\mathbf P^+ = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^-.
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.52 Why the Joseph Form
-Helps</h3>
-<p>The Joseph form explicitly contains two positive-semidefinite
-contributions.</p><p>Therefore it better preserves covariance</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.52 Why the Joseph Form Helps</h3>
+<p>The Joseph form explicitly contains two positive-semidefinite contributions.</p>
+<p>Therefore it better preserves covariance</p>
+<ul>
 <li>symmetry,</li>
 <li>positive semidefiniteness</li>
-</ul><p>under finite-precision arithmetic.</p><hr/>
-
+</ul>
+<p>under finite-precision arithmetic.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.53 Rank Deficiency</h3>
-<p>A matrix is rank deficient when</p><pre class="math"><code>\boxed{ \operatorname{rank}(\mathbf G) &lt; n. }</code></pre><p>Then the least-squares solution is not unique.</p><p>Physically, some state or parameter combination is not determined by
-the data.</p><hr/>
-
+<p>A matrix is rank deficient when</p>
+<p><span class="math display">\[
+\boxed{ \operatorname{rank}(\mathbf G) < n. }
+\]</span></p>
+<p>Then the least-squares solution is not unique.</p>
+<p>Physically, some state or parameter combination is not determined by the data.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.54 Exact Rank Deficiency</h3>
-<p>If a nonzero vector <code>\mathbf q</code> satisfies</p><pre class="math"><code>\boxed{ \mathbf G\mathbf q = \mathbf0, }</code></pre><p>then moving the estimate along <code>\mathbf q</code> does not change
-the predicted measurements to first order.</p><p>No numerical method can uniquely recover that component from the
-measurements alone.</p><hr/>
-
+<p>If a nonzero vector <code>\mathbf q</code> satisfies</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G\mathbf q = \mathbf0, }
+\]</span></p>
+<p>then moving the estimate along <code>\mathbf q</code> does not change the predicted measurements to first order.</p>
+<p>No numerical method can uniquely recover that component from the measurements alone.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.55 Near Rank Deficiency</h3>
-<p>More commonly,</p><pre class="math"><code>\boxed{ \mathbf G\mathbf q \approx \mathbf0. }</code></pre><p>Then the state direction is only weakly constrained.</p><p>The solution may exist uniquely but be highly sensitive to noise.</p><p>This is often more dangerous than exact rank deficiency because a
-numerical solver may return a plausible-looking but unreliable
-number.</p><hr/>
-
+<p>More commonly,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G\mathbf q \approx \mathbf0. }
+\]</span></p>
+<p>Then the state direction is only weakly constrained.</p>
+<p>The solution may exist uniquely but be highly sensitive to noise.</p>
+<p>This is often more dangerous than exact rank deficiency because a numerical solver may return a plausible-looking but unreliable number.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.56 Detecting Rank
-Deficiency</h3>
-<p>Useful diagnostics include</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.56 Detecting Rank Deficiency</h3>
+<p>Useful diagnostics include</p>
+<ul>
 <li>SVD singular values,</li>
 <li>rank-revealing QR,</li>
 <li>condition number,</li>
 <li>covariance eigenvalues,</li>
 <li>parameter correlations.</li>
-</ul><p>Do not rely only on a solver returning successfully.</p><hr/>
-
+</ul>
+<p>Do not rely only on a solver returning successfully.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.57 MATLAB Rank Diagnostics</h3>
-<p>Useful MATLAB commands include:</p><div class="sourceCode" id="cb104"><pre class="sourceCode matlab"><code class="sourceCode matlab"><span id="cb104-1"><a aria-hidden="true" href="#cb104-1" tabindex="-1"></a><span class="va">rank</span>(<span class="va">G</span>)</span>
-<span id="cb104-2"><a aria-hidden="true" href="#cb104-2" tabindex="-1"></a><span class="va">cond</span>(<span class="va">G</span>)</span>
-<span id="cb104-3"><a aria-hidden="true" href="#cb104-3" tabindex="-1"></a><span class="va">svd</span>(<span class="va">G</span>)</span>
-<span id="cb104-4"><a aria-hidden="true" href="#cb104-4" tabindex="-1"></a><span class="va">rcond</span>(<span class="va">N</span>)</span></code></pre></div><p>and for column-pivoted QR:</p><div class="sourceCode" id="cb105"><pre class="sourceCode matlab"><code class="sourceCode matlab"><span id="cb105-1"><a aria-hidden="true" href="#cb105-1" tabindex="-1"></a>[<span class="va">Q</span><span class="op">,</span><span class="va">R</span><span class="op">,</span><span class="va">E</span>] <span class="op">=</span> <span class="va">qr</span>(<span class="va">G</span><span class="op">,</span><span class="fl">0</span>)<span class="op">;</span></span></code></pre></div><p>These should be interpreted after sensible scaling.</p><hr/>
-
+<p>Useful MATLAB commands include:</p>
+<pre><code class="language-matlab">rank(G)
+cond(G)
+svd(G)
+rcond(N)</code></pre>
+<p>and for column-pivoted QR:</p>
+<pre><code class="language-matlab">[Q,R,E] = qr(G,0);</code></pre>
+<p>These should be interpreted after sensible scaling.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.58 Reciprocal Condition
-Number</h3>
-<p>MATLAB’s</p><div class="sourceCode" id="cb106"><pre class="sourceCode matlab"><code class="sourceCode matlab"><span id="cb106-1"><a aria-hidden="true" href="#cb106-1" tabindex="-1"></a><span class="va">rcond</span>(<span class="va">A</span>)</span></code></pre></div><p>estimates approximately</p><pre class="math"><code>\boxed{ \frac{1}{\kappa(A)}. }</code></pre><p>A very small <code>rcond</code> indicates a nearly singular
-matrix.</p><p>For example,</p><pre class="math"><code>\texttt{rcond} \rightarrow0</code></pre><p>means the solve may be unreliable.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.58 Reciprocal Condition Number</h3>
+<p>MATLAB's</p>
+<pre><code class="language-matlab">rcond(A)</code></pre>
+<p>estimates approximately</p>
+<p><span class="math display">\[
+\boxed{ \frac{1}{\kappa(A)}. }
+\]</span></p>
+<p>A very small <code>rcond</code> indicates a nearly singular matrix.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\texttt{rcond} \rightarrow0
+\]</span></p>
+<p>means the solve may be unreliable.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.59 Regularization</h3>
-<p>When the problem is weakly conditioned, one may introduce additional
-information or penalties.</p><p>A common regularized least-squares problem is</p><pre class="math"><code>\boxed{ \min_{\delta\mathbf x} \left[ \| \mathbf G\delta\mathbf x-\mathbf r \|^2 + \lambda \| \mathbf L\delta\mathbf x \|^2 \right]. }</code></pre><p>This is Tikhonov regularization.</p><hr/>
-
+<p>When the problem is weakly conditioned, one may introduce additional information or penalties.</p>
+<p>A common regularized least-squares problem is</p>
+<p><span class="math display">\[
+\boxed{ \min_{\delta\mathbf x} \left[ \| \mathbf G\delta\mathbf x-\mathbf r \|^2 + \lambda \| \mathbf L\delta\mathbf x \|^2 \right]. }
+\]</span></p>
+<p>This is Tikhonov regularization.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.60 Tikhonov Normal
-Equations</h3>
-<p>The regularized system becomes</p><pre class="math"><code>\boxed{ ( \mathbf G^T\mathbf G + \lambda \mathbf L^T\mathbf L ) \delta\mathbf x = \mathbf G^T\mathbf r. }</code></pre><p>For</p><pre class="math"><code>\mathbf L=\mathbf I,</code></pre><p>this becomes ridge-type regularization.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.60 Tikhonov Normal Equations</h3>
+<p>The regularized system becomes</p>
+<p><span class="math display">\[
+\boxed{ ( \mathbf G^T\mathbf G + \lambda \mathbf L^T\mathbf L ) \delta\mathbf x = \mathbf G^T\mathbf r. }
+\]</span></p>
+<p>For</p>
+<p><span class="math display">\[
+\mathbf L=\mathbf I,
+\]</span></p>
+<p>this becomes ridge-type regularization.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.61 Interpretation of
-Regularization</h3>
-<p>Regularization penalizes large or undesirable corrections.</p><p>It reduces noise amplification in weak directions.</p><p>But the solution becomes biased toward the imposed regularization
-model.</p><p>Thus,</p><pre class="math"><code>\boxed{ \text{Lower Variance} \leftrightarrow \text{Higher Bias}. }</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.61 Interpretation of Regularization</h3>
+<p>Regularization penalizes large or undesirable corrections.</p>
+<p>It reduces noise amplification in weak directions.</p>
+<p>But the solution becomes biased toward the imposed regularization model.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Lower Variance} \leftrightarrow \text{Higher Bias}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.62
-Regularization Is Additional Information</h3>
-<p>Regularization should not be viewed as a purely numerical trick.</p><p>It imposes assumptions about the solution.</p><p>For example,</p><pre class="math"><code>\lambda \|\delta\mathbf x\|^2</code></pre><p>expresses a preference for small corrections.</p><p>Therefore its physical meaning should be understood and reported.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.62 Regularization Is Additional Information</h3>
+<p>Regularization should not be viewed as a purely numerical trick.</p>
+<p>It imposes assumptions about the solution.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\lambda \|\delta\mathbf x\|^2
+\]</span></p>
+<p>expresses a preference for small corrections.</p>
+<p>Therefore its physical meaning should be understood and reported.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.63 Prior Information
-as Regularization</h3>
-<p>Suppose</p><pre class="math"><code>\delta\mathbf x \sim \mathcal N( \delta\mathbf x_0, \mathbf P_0 ).</code></pre><p>Then the prior contribution is</p><pre class="math"><code>\boxed{ ( \delta\mathbf x-\delta\mathbf x_0 )^T \mathbf P_0^{-1} ( \delta\mathbf x-\delta\mathbf x_0 ). }</code></pre><p>This is statistically meaningful regularization.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.63 Prior Information as Regularization</h3>
+<p>Suppose</p>
+<p><span class="math display">\[
+\delta\mathbf x \sim \mathcal N( \delta\mathbf x_0, \mathbf P_0 ).
+\]</span></p>
+<p>Then the prior contribution is</p>
+<p><span class="math display">\[
+\boxed{ ( \delta\mathbf x-\delta\mathbf x_0 )^T \mathbf P_0^{-1} ( \delta\mathbf x-\delta\mathbf x_0 ). }
+\]</span></p>
+<p>This is statistically meaningful regularization.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.64 Prior-Augmented Normal
-Matrix</h3>
-<p>With a prior,</p><pre class="math"><code>\boxed{ \mathbf N = \mathbf G^T \mathbf R^{-1} \mathbf G + \mathbf P_0^{-1}. }</code></pre><p>The prior can stabilize weak measurement directions.</p><p>However, those directions remain weakly observed by the measurement
-data themselves.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.64 Prior-Augmented Normal Matrix</h3>
+<p>With a prior,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N = \mathbf G^T \mathbf R^{-1} \mathbf G + \mathbf P_0^{-1}. }
+\]</span></p>
+<p>The prior can stabilize weak measurement directions.</p>
+<p>However, those directions remain weakly observed by the measurement data themselves.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.65
-Levenberg-Marquardt Regularization</h3>
-<p>For nonlinear least squares,</p><pre class="math"><code>\boxed{ ( \mathbf G^T \mathbf W \mathbf G + \lambda\mathbf I ) \delta\mathbf x = \mathbf G^T \mathbf W \mathbf r. }</code></pre><p>This is closely related to Levenberg-Marquardt damping.</p><p>It improves robustness when the current linearization is poor.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.65 Levenberg-Marquardt Regularization</h3>
+<p>For nonlinear least squares,</p>
+<p><span class="math display">\[
+\boxed{ ( \mathbf G^T \mathbf W \mathbf G + \lambda\mathbf I ) \delta\mathbf x = \mathbf G^T \mathbf W \mathbf r. }
+\]</span></p>
+<p>This is closely related to Levenberg-Marquardt damping.</p>
+<p>It improves robustness when the current linearization is poor.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.66 Gauss-Newton
-versus Levenberg-Marquardt</h3>
-<p>Gauss-Newton uses</p><pre class="math"><code>\boxed{ \mathbf G^T \mathbf W \mathbf G. }</code></pre><p>Levenberg-Marquardt adds</p><pre class="math"><code>\boxed{ \lambda\mathbf I. }</code></pre><p>For small <code>\lambda</code>, behavior approaches Gauss-Newton.</p><p>For large <code>\lambda</code>, the step becomes more
-conservative.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.66 Gauss-Newton versus Levenberg-Marquardt</h3>
+<p>Gauss-Newton uses</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf W \mathbf G. }
+\]</span></p>
+<p>Levenberg-Marquardt adds</p>
+<p><span class="math display">\[
+\boxed{ \lambda\mathbf I. }
+\]</span></p>
+<p>For small <code>\lambda</code>, behavior approaches Gauss-Newton.</p>
+<p>For large <code>\lambda</code>, the step becomes more conservative.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.67 Damping</h3>
-<p>Another simple strategy is</p><pre class="math"><code>\boxed{ \mathbf x_{k+1} = \mathbf x_k + \alpha \delta\mathbf x }</code></pre><p>with</p><pre class="math"><code>0&lt;\alpha\le1.</code></pre><p>Damping controls nonlinear iteration size but does not by itself fix
-fundamental rank deficiency.</p><hr/>
-
+<p>Another simple strategy is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{k+1} = \mathbf x_k + \alpha \delta\mathbf x }
+\]</span></p>
+<p>with</p>
+<p><span class="math display">\[
+0<\alpha\le1.
+\]</span></p>
+<p>Damping controls nonlinear iteration size but does not by itself fix fundamental rank deficiency.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.68 Line Search</h3>
-<p>A line search chooses <code>\alpha</code> to reduce the objective
-function:</p><pre class="math"><code>\boxed{ J( \mathbf x+\alpha\delta\mathbf x ) &lt; J(\mathbf x). }</code></pre><p>This can improve convergence when a full Newton or Gauss-Newton step
-is too large.</p><hr/>
-
+<p>A line search chooses <code>\alpha</code> to reduce the objective function:</p>
+<p><span class="math display">\[
+\boxed{ J( \mathbf x+\alpha\delta\mathbf x ) < J(\mathbf x). }
+\]</span></p>
+<p>This can improve convergence when a full Newton or Gauss-Newton step is too large.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.69 Trust-Region Methods</h3>
-<p>Instead of accepting an arbitrarily large correction, trust-region
-methods constrain</p><pre class="math"><code>\boxed{ \| \delta\mathbf x \| \le \Delta. }</code></pre><p>The local linear or quadratic model is trusted only within a
-neighborhood.</p><p>This can provide strong nonlinear robustness.</p><hr/>
-
+<p>Instead of accepting an arbitrarily large correction, trust-region methods constrain</p>
+<p><span class="math display">\[
+\boxed{ \| \delta\mathbf x \| \le \Delta. }
+\]</span></p>
+<p>The local linear or quadratic model is trusted only within a neighborhood.</p>
+<p>This can provide strong nonlinear robustness.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.70 Scaling in Nonlinear
-Estimation</h3>
-<p>If parameter scales are very different, nonlinear solvers may take
-inappropriate steps.</p><p>Scaled variables</p><pre class="math"><code>\boxed{ \mathbf x = \mathbf S_x \tilde{\mathbf x} }</code></pre><p>allow the optimization algorithm to treat comparable dimensionless
-corrections.</p><p>Scaling is often as important for nonlinear convergence as for matrix
-conditioning.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.70 Scaling in Nonlinear Estimation</h3>
+<p>If parameter scales are very different, nonlinear solvers may take inappropriate steps.</p>
+<p>Scaled variables</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x = \mathbf S_x \tilde{\mathbf x} }
+\]</span></p>
+<p>allow the optimization algorithm to treat comparable dimensionless corrections.</p>
+<p>Scaling is often as important for nonlinear convergence as for matrix conditioning.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.71 Residual Scaling</h3>
-<p>Likewise, residuals should be statistically scaled:</p><pre class="math"><code>\boxed{ \tilde{\mathbf r} = \mathbf R^{-1/2} \mathbf r. }</code></pre><p>Then one unit of residual represents approximately one standard
-deviation regardless of measurement type.</p><hr/>
-
+<p>Likewise, residuals should be statistically scaled:</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf r} = \mathbf R^{-1/2} \mathbf r. }
+\]</span></p>
+<p>Then one unit of residual represents approximately one standard deviation regardless of measurement type.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.72 Robust Least Squares</h3>
-<p>Classical least squares uses</p><pre class="math"><code>J = \sum_i r_i^2.</code></pre><p>This gives large residuals very strong influence.</p><p>Robust least squares replaces the quadratic penalty by</p><pre class="math"><code>\boxed{ J = \sum_i \rho(r_i). }</code></pre><hr/>
-
+<p>Classical least squares uses</p>
+<p><span class="math display">\[
+J = \sum_i r_i^2.
+\]</span></p>
+<p>This gives large residuals very strong influence.</p>
+<p>Robust least squares replaces the quadratic penalty by</p>
+<p><span class="math display">\[
+\boxed{ J = \sum_i \rho(r_i). }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.73 Huber Loss</h3>
-<p>A common robust function is the Huber loss:</p><pre class="math"><code>\boxed{ \rho(r) = \begin{cases} \frac12r^2, &amp; |r|\le\delta\\ \delta( |r|-\frac12\delta ), &amp; |r|&gt;\delta. \end{cases} }</code></pre><p>Small residuals remain quadratic.</p><p>Large residuals grow approximately linearly.</p><hr/>
-
+<p>A common robust function is the Huber loss:</p>
+<p><span class="math display">\[
+\boxed{ \rho(r) = \begin{cases} \frac12r^2, & |r|\le\delta\\ \delta( |r|-\frac12\delta ), & |r|>\delta. \end{cases} }
+\]</span></p>
+<p>Small residuals remain quadratic.</p>
+<p>Large residuals grow approximately linearly.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.74 Why Robust Loss Helps</h3>
-<p>Robust losses reduce the influence of</p><ul>
+<p>Robust losses reduce the influence of</p>
+<ul>
 <li>outliers,</li>
 <li>occasional bad measurements,</li>
 <li>non-Gaussian tails.</li>
-</ul><p>They can improve solution stability when a small number of residuals
-are abnormal.</p><hr/>
-
+</ul>
+<p>They can improve solution stability when a small number of residuals are abnormal.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.75 Robust Methods
-Do Not Fix Model Error</h3>
-<p>A systematic residual caused by</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.75 Robust Methods Do Not Fix Model Error</h3>
+<p>A systematic residual caused by</p>
+<ul>
 <li>wrong frame,</li>
 <li>wrong force model,</li>
 <li>timing error</li>
-</ul><p>should not simply be downweighted.</p><p>Otherwise a robust solver may hide an important modeling problem.</p><p>Thus,</p><pre class="math"><code>\boxed{ \text{Robust Loss} \neq \text{Substitute for Correct Modeling}. }</code></pre><hr/>
-
+</ul>
+<p>should not simply be downweighted.</p>
+<p>Otherwise a robust solver may hide an important modeling problem.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Robust Loss} \neq \text{Substitute for Correct Modeling}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.76 Iteratively
-Reweighted Least Squares</h3>
-<p>Many robust estimators can be implemented through IRLS.</p><p>At iteration <code>j</code>,</p><pre class="math"><code>\boxed{ \mathbf W^{(j)} = \operatorname{diag} ( w_1^{(j)}, \ldots, w_m^{(j)} ) }</code></pre><p>is constructed from current residuals.</p><p>Then solve a weighted least-squares problem.</p><p>The process repeats until weights and state stabilize.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.76 Iteratively Reweighted Least Squares</h3>
+<p>Many robust estimators can be implemented through IRLS.</p>
+<p>At iteration <code>j</code>,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf W^{(j)} = \operatorname{diag} ( w_1^{(j)}, \ldots, w_m^{(j)} ) }
+\]</span></p>
+<p>is constructed from current residuals.</p>
+<p>Then solve a weighted least-squares problem.</p>
+<p>The process repeats until weights and state stabilize.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.77 Outlier
-Rejection versus Robust Weighting</h3>
-<p>Outlier rejection removes a measurement completely.</p><p>Robust weighting retains it but reduces its influence.</p><p>Both methods require care.</p><p>Aggressive rejection can bias the solution.</p><p>Weak weighting may allow bad data to contaminate it.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.77 Outlier Rejection versus Robust Weighting</h3>
+<p>Outlier rejection removes a measurement completely.</p>
+<p>Robust weighting retains it but reduces its influence.</p>
+<p>Both methods require care.</p>
+<p>Aggressive rejection can bias the solution.</p>
+<p>Weak weighting may allow bad data to contaminate it.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.78 Sparse Systems</h3>
-<p>Large estimation problems often produce sparse matrices.</p><p>Examples include</p><ul>
+<p>Large estimation problems often produce sparse matrices.</p>
+<p>Examples include</p>
+<ul>
 <li>multi-arc OD,</li>
 <li>smoothing,</li>
 <li>factor-graph navigation,</li>
 <li>large calibration problems.</li>
-</ul><p>Exploiting sparsity can dramatically reduce memory and
-computation.</p><hr/>
-
+</ul>
+<p>Exploiting sparsity can dramatically reduce memory and computation.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.79 Sparse QR</h3>
-<p>Sparse QR preserves sparsity better than dense factorization and
-avoids forming dense normal matrices.</p><p>It is useful for large least-squares systems with sparse measurement
-structure.</p><hr/>
-
+<p>Sparse QR preserves sparsity better than dense factorization and avoids forming dense normal matrices.</p>
+<p>It is useful for large least-squares systems with sparse measurement structure.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.80 Sparse Cholesky</h3>
-<p>For sparse symmetric positive-definite information matrices,</p><pre class="math"><code>\mathbf N = \mathbf L\mathbf L^T</code></pre><p>can be solved efficiently using sparse Cholesky.</p><p>Ordering strategies reduce fill-in.</p><hr/>
-
+<p>For sparse symmetric positive-definite information matrices,</p>
+<p><span class="math display">\[
+\mathbf N = \mathbf L\mathbf L^T
+\]</span></p>
+<p>can be solved efficiently using sparse Cholesky.</p>
+<p>Ordering strategies reduce fill-in.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.81 Fill-In</h3>
-<p>During sparse factorization, originally zero matrix elements may
-become nonzero.</p><p>This is called <strong>fill-in</strong>.</p><p>Good variable ordering can substantially reduce fill-in and therefore
-computation.</p><hr/>
-
+<p>During sparse factorization, originally zero matrix elements may become nonzero.</p>
+<p>This is called <strong>fill-in</strong>.</p>
+<p>Good variable ordering can substantially reduce fill-in and therefore computation.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.82 Factor Graph
-Interpretation</h3>
-<p>Large estimation problems may be represented as a graph
-containing</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.82 Factor Graph Interpretation</h3>
+<p>Large estimation problems may be represented as a graph containing</p>
+<ul>
 <li>state nodes,</li>
 <li>parameter nodes,</li>
 <li>measurement factors,</li>
 <li>dynamic factors.</li>
-</ul><p>The resulting least-squares system is often sparse.</p><p>Robust sparse linear algebra is therefore central to modern smoothing
-and factor-graph estimation.</p><hr/>
-
+</ul>
+<p>The resulting least-squares system is often sparse.</p>
+<p>Robust sparse linear algebra is therefore central to modern smoothing and factor-graph estimation.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.83 Solver Choice by
-Problem Type</h3>
-<p>A practical guideline is:</p><ul>
-<li>well-conditioned small system → Cholesky or normal equations may be
-adequate,</li>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.83 Solver Choice by Problem Type</h3>
+<p>A practical guideline is:</p>
+<ul>
+<li>well-conditioned small system → Cholesky or normal equations may be adequate,</li>
 <li>moderate least-squares problem → QR is often safer,</li>
 <li>weak/rank-deficient problem → SVD or rank-revealing QR,</li>
 <li>recursive high-precision estimation → square-root methods,</li>
 <li>large sparse problem → sparse QR/Cholesky.</li>
-</ul><p>No one solver is universally best.</p><hr/>
-
+</ul>
+<p>No one solver is universally best.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.84 Computational Cost</h3>
-<p>For an <code>m\times n</code> matrix with <code>m\gg n</code>,</p><p>normal-equation formation costs approximately</p><pre class="math"><code>O(mn^2),</code></pre><p>while QR has similar asymptotic order but larger constants.</p><p>SVD is generally more expensive.</p><p>Therefore solver choice involves a tradeoff:</p><pre class="math"><code>\boxed{ \text{Robustness} \leftrightarrow \text{Computational Cost}. }</code></pre><hr/>
-
+<p>For an <code>m\times n</code> matrix with <code>m\gg n</code>,</p>
+<p>normal-equation formation costs approximately</p>
+<p><span class="math display">\[
+O(mn^2),
+\]</span></p>
+<p>while QR has similar asymptotic order but larger constants.</p>
+<p>SVD is generally more expensive.</p>
+<p>Therefore solver choice involves a tradeoff:</p>
+<p><span class="math display">\[
+\boxed{ \text{Robustness} \leftrightarrow \text{Computational Cost}. }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.85 Do Not Optimize Too
-Early</h3>
-<p>A common mistake is choosing the fastest solver before understanding
-the conditioning.</p><p>During development, QR or SVD may provide valuable diagnostics.</p><p>After conditioning and rank are understood, a more efficient solver
-can be adopted if justified.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.85 Do Not Optimize Too Early</h3>
+<p>A common mistake is choosing the fastest solver before understanding the conditioning.</p>
+<p>During development, QR or SVD may provide valuable diagnostics.</p>
+<p>After conditioning and rank are understood, a more efficient solver can be adopted if justified.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.86 Floating-Point
-Precision</h3>
-<p>Double-precision arithmetic typically provides machine precision
-around</p><pre class="math"><code>\boxed{ \epsilon_{\rm mach} \approx 2.2\times10^{-16}. }</code></pre><p>This does not mean solutions are accurate to 16 digits.</p><p>Conditioning determines how much precision is retained.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.86 Floating-Point Precision</h3>
+<p>Double-precision arithmetic typically provides machine precision around</p>
+<p><span class="math display">\[
+\boxed{ \epsilon_{\rm mach} \approx 2.2\times10^{-16}. }
+\]</span></p>
+<p>This does not mean solutions are accurate to 16 digits.</p>
+<p>Conditioning determines how much precision is retained.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.87 Single versus Double
-Precision</h3>
-<p>Single precision has much less numerical range and precision than
-double precision.</p><p>For poorly conditioned estimation problems, switching to single
-precision can cause significant degradation.</p><p>Onboard systems using reduced precision should therefore assess
-conditioning carefully.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.87 Single versus Double Precision</h3>
+<p>Single precision has much less numerical range and precision than double precision.</p>
+<p>For poorly conditioned estimation problems, switching to single precision can cause significant degradation.</p>
+<p>Onboard systems using reduced precision should therefore assess conditioning carefully.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.88 Numerical Range</h3>
-<p>Large differences in variable magnitude can cause loss of numerical
-resolution even before formal singularity occurs.</p><p>Scaling helps keep variables within comparable numerical ranges.</p><hr/>
-
+<p>Large differences in variable magnitude can cause loss of numerical resolution even before formal singularity occurs.</p>
+<p>Scaling helps keep variables within comparable numerical ranges.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.89 Residual Cancellation</h3>
-<p>When predicted and measured quantities are both very large but their
-difference is small, subtractive cancellation can reduce numerical
-precision.</p><p>This can occur in some high-precision orbit or timing
-calculations.</p><p>Careful formulation and state centering can help.</p><hr/>
-
+<p>When predicted and measured quantities are both very large but their difference is small, subtractive cancellation can reduce numerical precision.</p>
+<p>This can occur in some high-precision orbit or timing calculations.</p>
+<p>Careful formulation and state centering can help.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.90 Centered Variables</h3>
-<p>Instead of estimating absolute quantities of large magnitude,
-estimate perturbations around a reference:</p><pre class="math"><code>\boxed{ \mathbf x = \mathbf x_{\rm ref} + \delta\mathbf x. }</code></pre><p>This often improves numerical precision and is standard in
-differential correction and error-state filtering.</p><hr/>
-
+<p>Instead of estimating absolute quantities of large magnitude, estimate perturbations around a reference:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x = \mathbf x_{\rm ref} + \delta\mathbf x. }
+\]</span></p>
+<p>This often improves numerical precision and is standard in differential correction and error-state filtering.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.91 Error-State Formulation</h3>
-<p>An error-state estimator propagates a nominal state separately from
-the small correction:</p><pre class="math"><code>\boxed{ \mathbf x_{\rm true} = \mathbf x_{\rm nominal} + \delta\mathbf x }</code></pre><p>for additive states.</p><p>This keeps estimated corrections small and can improve
-conditioning.</p><p>For attitude, multiplicative error representations are typically used
-instead.</p><hr/>
-
+<p>An error-state estimator propagates a nominal state separately from the small correction:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{\rm true} = \mathbf x_{\rm nominal} + \delta\mathbf x }
+\]</span></p>
+<p>for additive states.</p>
+<p>This keeps estimated corrections small and can improve conditioning.</p>
+<p>For attitude, multiplicative error representations are typically used instead.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.92
-Regularization versus Parameter Removal</h3>
-<p>If a parameter is fundamentally unobservable, regularizing it may
-produce a finite number but not genuine information.</p><p>Sometimes the better approach is to remove or combine parameters.</p><p>Thus,</p><pre class="math"><code>\boxed{ \text{Unobservable Parameter} \rightarrow \text{Reparameterize or Remove} }</code></pre><p>rather than automatically regularize.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.92 Regularization versus Parameter Removal</h3>
+<p>If a parameter is fundamentally unobservable, regularizing it may produce a finite number but not genuine information.</p>
+<p>Sometimes the better approach is to remove or combine parameters.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Unobservable Parameter} \rightarrow \text{Reparameterize or Remove} }
+\]</span></p>
+<p>rather than automatically regularize.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.93 Composite Parameters</h3>
-<p>If measurements depend only on</p><pre class="math"><code>\gamma = \theta_1\theta_2,</code></pre><p>estimating <code>\theta_1</code> and <code>\theta_2</code> separately
-may be ill conditioned.</p><p>Estimating</p><pre class="math"><code>\boxed{ \gamma }</code></pre><p>directly can greatly improve numerical and physical
-identifiability.</p><hr/>
-
+<p>If measurements depend only on</p>
+<p><span class="math display">\[
+\gamma = \theta_1\theta_2,
+\]</span></p>
+<p>estimating <code>\theta_1</code> and <code>\theta_2</code> separately may be ill conditioned.</p>
+<p>Estimating</p>
+<p><span class="math display">\[
+\boxed{ \gamma }
+\]</span></p>
+<p>directly can greatly improve numerical and physical identifiability.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.94
-Physical Priors versus Artificial Regularization</h3>
-<p>A physical prior is supported by independent knowledge.</p><p>Artificial regularization is introduced mainly for numerical
-stability.</p><p>They should not be confused.</p><p>A well-documented estimator should state whether the result is</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.94 Physical Priors versus Artificial Regularization</h3>
+<p>A physical prior is supported by independent knowledge.</p>
+<p>Artificial regularization is introduced mainly for numerical stability.</p>
+<p>They should not be confused.</p>
+<p>A well-documented estimator should state whether the result is</p>
+<ul>
 <li>data driven,</li>
 <li>prior assisted,</li>
 <li>numerically regularized.</li>
-</ul><hr/>
-
+</ul>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.95 Covariance under
-Regularization</h3>
-<p>Once regularization or priors are added, covariance interpretation
-changes.</p><p>For a Bayesian prior,</p><pre class="math"><code>\boxed{ \mathbf P_{\rm post} = ( \mathbf G^T \mathbf R^{-1} \mathbf G + \mathbf P_0^{-1} )^{-1}. }</code></pre><p>For arbitrary regularization, interpreting the inverse Hessian as a
-physical covariance may not always be valid.</p><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.95 Covariance under Regularization</h3>
+<p>Once regularization or priors are added, covariance interpretation changes.</p>
+<p>For a Bayesian prior,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_{\rm post} = ( \mathbf G^T \mathbf R^{-1} \mathbf G + \mathbf P_0^{-1} )^{-1}. }
+\]</span></p>
+<p>For arbitrary regularization, interpreting the inverse Hessian as a physical covariance may not always be valid.</p>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.96 Numerical Diagnostics
-to Report</h3>
-<p>A robust estimation analysis should consider reporting:</p><ul>
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.96 Numerical Diagnostics to Report</h3>
+<p>A robust estimation analysis should consider reporting:</p>
+<ul>
 <li>matrix rank,</li>
 <li>minimum singular value,</li>
 <li>maximum singular value,</li>
@@ -820,62 +1342,139 @@ to Report</h3>
 <li>solver used,</li>
 <li>scaling applied,</li>
 <li>regularization applied.</li>
-</ul><p>These diagnostics make numerical quality transparent.</p><hr/>
-
+</ul>
+<p>These diagnostics make numerical quality transparent.</p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.97 Common Mistakes</h3>
-<p>Common numerical mistakes include:</p><ol type="1">
+<p>Common numerical mistakes include:</p>
+<ol type="1">
 <li>Explicitly computing matrix inverses.</li>
 <li>Using normal equations without checking conditioning.</li>
-<li>Ignoring that <code>\mathbf G^T\mathbf G</code> squares the
-condition number.</li>
+<li>Ignoring that <code>\mathbf G^T\mathbf G</code> squares the condition number.</li>
 <li>Using Cholesky on a rank-deficient system.</li>
 <li>Ignoring scaling.</li>
-<li>Computing condition number before scaling physically different
-parameters.</li>
+<li>Computing condition number before scaling physically different parameters.</li>
 <li>Treating solver success as proof of a trustworthy solution.</li>
 <li>Ignoring very small singular values.</li>
-<li>Regularizing an unobservable parameter without acknowledging the
-prior information introduced.</li>
+<li>Regularizing an unobservable parameter without acknowledging the prior information introduced.</li>
 <li>Confusing numerical rank with physical estimability.</li>
 <li>Using single precision without evaluating conditioning.</li>
 <li>Allowing covariance to lose symmetry.</li>
 <li>Ignoring negative covariance eigenvalues.</li>
-<li>Using the simplified covariance update when numerical robustness is
-important.</li>
+<li>Using the simplified covariance update when numerical robustness is important.</li>
 <li>Downweighting systematic model error as if it were an outlier.</li>
 <li>Using pseudoinverse without interpreting the null space.</li>
 <li>Using SVD threshold blindly.</li>
 <li>Failing to distinguish scaling problems from geometry problems.</li>
 <li>Using excessive regularization to force apparent stability.</li>
-<li>Optimizing computational speed before establishing numerical
-correctness.</li>
-</ol><hr/>
-
+<li>Optimizing computational speed before establishing numerical correctness.</li>
+</ol>
 <hr />
-    </section>    <section class="notes-section-card">
-      <h3>4.3.17.98 Practical
-Robust-Solution Workflow</h3>
-<p>A disciplined numerical workflow is</p><pre class="math"><code>\boxed{ \begin{array}{c} \text{Form Residuals and Jacobians}\\ \downarrow\\ \text{Apply Measurement Whitening}\\ \downarrow\\ \text{Scale States / Parameters}\\ \downarrow\\ \text{Inspect Rank and Singular Values}\\ \downarrow\\ \text{Compute Condition Number}\\ \downarrow\\ \text{Identify Weak Directions}\\ \downarrow\\ \text{Choose Solver}\\ \downarrow\\ \text{QR / Cholesky / SVD / Square-Root}\\ \downarrow\\ \text{Apply Regularization Only if Justified}\\ \downarrow\\ \text{Solve Without Explicit Inversion}\\ \downarrow\\ \text{Check Residual Reduction}\\ \downarrow\\ \text{Check Covariance Symmetry / PSD}\\ \downarrow\\ \text{Check Sensitivity to Scaling / Solver Choice}\\ \downarrow\\ \text{Validate Numerical and Physical Consistency} \end{array} }</code></pre><hr/>
-
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.17.98 Practical Robust-Solution Workflow</h3>
+<p>A disciplined numerical workflow is</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Form Residuals and Jacobians}\\ \downarrow\\ \text{Apply Measurement Whitening}\\ \downarrow\\ \text{Scale States / Parameters}\\ \downarrow\\ \text{Inspect Rank and Singular Values}\\ \downarrow\\ \text{Compute Condition Number}\\ \downarrow\\ \text{Identify Weak Directions}\\ \downarrow\\ \text{Choose Solver}\\ \downarrow\\ \text{QR / Cholesky / SVD / Square-Root}\\ \downarrow\\ \text{Apply Regularization Only if Justified}\\ \downarrow\\ \text{Solve Without Explicit Inversion}\\ \downarrow\\ \text{Check Residual Reduction}\\ \downarrow\\ \text{Check Covariance Symmetry / PSD}\\ \downarrow\\ \text{Check Sensitivity to Scaling / Solver Choice}\\ \downarrow\\ \text{Validate Numerical and Physical Consistency} \end{array} }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.99 Core Equations</h3>
-<h4 id="weighted-least-squares">Weighted least squares</h4><pre class="math"><code>\boxed{ \min_{\delta\mathbf x} ( \mathbf r-\mathbf G\delta\mathbf x )^T \mathbf R^{-1} ( \mathbf r-\mathbf G\delta\mathbf x ) }</code></pre><h4 id="normal-equations-1">Normal equations</h4><pre class="math"><code>\boxed{ \mathbf G^T \mathbf R^{-1} \mathbf G \, \delta\mathbf x = \mathbf G^T \mathbf R^{-1} \mathbf r }</code></pre><h4 id="qr-factorization">QR factorization</h4><pre class="math"><code>\boxed{ \tilde{\mathbf G} = \mathbf Q \mathbf R }</code></pre><h4 id="cholesky-factorization-1">Cholesky factorization</h4><pre class="math"><code>\boxed{ \mathbf N = \mathbf L \mathbf L^T }</code></pre><h4 id="singular-value-decomposition-1">Singular value
-decomposition</h4><pre class="math"><code>\boxed{ \mathbf G = \mathbf U \boldsymbol\Sigma \mathbf V^T }</code></pre><h4 id="condition-number-1">Condition number</h4><pre class="math"><code>\boxed{ \kappa_2(\mathbf G) = \frac{ \sigma_{\max} }{ \sigma_{\min} } }</code></pre><h4 id="tikhonov-regularization">Tikhonov regularization</h4><pre class="math"><code>\boxed{ ( \mathbf G^T \mathbf G + \lambda \mathbf L^T \mathbf L ) \delta\mathbf x = \mathbf G^T \mathbf r }</code></pre><h4 id="state-scaling-1">State scaling</h4><pre class="math"><code>\boxed{ \delta\mathbf x = \mathbf S_x \delta\tilde{\mathbf x} }</code></pre><h4 id="covariance-factorization">Covariance factorization</h4><pre class="math"><code>\boxed{ \mathbf P = \mathbf S \mathbf S^T }</code></pre><h4 id="joseph-covariance-update-1">Joseph covariance update</h4><pre class="math"><code>\boxed{ \mathbf P^+ = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^- ( \mathbf I-\mathbf K\mathbf H )^T + \mathbf K \mathbf R \mathbf K^T }</code></pre><hr/>
-
+<h3>Weighted least squares</h3>
+<p><span class="math display">\[
+\boxed{ \min_{\delta\mathbf x} ( \mathbf r-\mathbf G\delta\mathbf x )^T \mathbf R^{-1} ( \mathbf r-\mathbf G\delta\mathbf x ) }
+\]</span></p>
+<h3>Normal equations</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf R^{-1} \mathbf G \, \delta\mathbf x = \mathbf G^T \mathbf R^{-1} \mathbf r }
+\]</span></p>
+<h3>QR factorization</h3>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf G} = \mathbf Q \mathbf R }
+\]</span></p>
+<h3>Cholesky factorization</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf N = \mathbf L \mathbf L^T }
+\]</span></p>
+<h3>Singular value decomposition</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf G = \mathbf U \boldsymbol\Sigma \mathbf V^T }
+\]</span></p>
+<h3>Condition number</h3>
+<p><span class="math display">\[
+\boxed{ \kappa_2(\mathbf G) = \frac{ \sigma_{\max} }{ \sigma_{\min} } }
+\]</span></p>
+<h3>Tikhonov regularization</h3>
+<p><span class="math display">\[
+\boxed{ ( \mathbf G^T \mathbf G + \lambda \mathbf L^T \mathbf L ) \delta\mathbf x = \mathbf G^T \mathbf r }
+\]</span></p>
+<h3>State scaling</h3>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x = \mathbf S_x \delta\tilde{\mathbf x} }
+\]</span></p>
+<h3>Covariance factorization</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf P = \mathbf S \mathbf S^T }
+\]</span></p>
+<h3>Joseph covariance update</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf P^+ = ( \mathbf I-\mathbf K\mathbf H ) \mathbf P^- ( \mathbf I-\mathbf K\mathbf H )^T + \mathbf K \mathbf R \mathbf K^T }
+\]</span></p>
 <hr />
-    </section>    <section class="notes-section-card">
+    </section>
+    <section class="notes-section-card">
       <h3>4.3.17.100 Key Takeaways</h3>
-<p>Numerical conditioning determines whether an estimation problem can
-be solved reliably in finite-precision arithmetic.</p><p>A theoretically observable system may still be numerically
-fragile.</p><p>The classical normal equations</p><pre class="math"><code>\boxed{ \mathbf G^T \mathbf W \mathbf G \, \delta\mathbf x = \mathbf G^T \mathbf W \mathbf r }</code></pre><p>are convenient but can worsen conditioning because</p><pre class="math"><code>\boxed{ \kappa( \mathbf G^T\mathbf G ) \approx \kappa(\mathbf G)^2. }</code></pre><p>QR decomposition avoids explicitly forming the normal matrix and is
-usually more robust:</p><pre class="math"><code>\boxed{ \mathbf G = \mathbf Q\mathbf R. }</code></pre><p>Cholesky is efficient when the system is symmetric positive definite
-and reasonably conditioned:</p><pre class="math"><code>\boxed{ \mathbf N = \mathbf L\mathbf L^T. }</code></pre><p>SVD provides the strongest diagnostic view:</p><pre class="math"><code>\boxed{ \mathbf G = \mathbf U \boldsymbol\Sigma \mathbf V^T. }</code></pre><p>Small singular values reveal weak or nearly unobservable estimation
-directions.</p><p>The condition number</p><pre class="math"><code>\boxed{ \kappa = \frac{ \sigma_{\max} }{ \sigma_{\min} } }</code></pre><p>quantifies sensitivity to perturbations.</p><p>Scaling is essential because poorly chosen units can create apparent
-numerical problems:</p><pre class="math"><code>\boxed{ \delta\mathbf x = \mathbf S_x \delta\tilde{\mathbf x}. }</code></pre><p>But</p><pre class="math"><code>\boxed{ \text{Scaling Improves Numerical Representation} \neq \text{Creating New Information}. }</code></pre><p>Regularization can stabilize weak problems:</p><pre class="math"><code>\boxed{ \mathbf G^T\mathbf G + \lambda\mathbf L^T\mathbf L }</code></pre><p>but it introduces additional assumptions or prior information.</p><p>Square-root methods are especially valuable when numerical stability,
-covariance positivity, and long recursive operation matter.</p><p>The most important practical principle is:</p><pre class="math"><code>\boxed{ \text{Do Not Judge an Estimator Only by Whether the Solver Returns a Number.} }</code></pre><p>A trustworthy solution should also be checked for:</p><ul>
+<p>Numerical conditioning determines whether an estimation problem can be solved reliably in finite-precision arithmetic.</p>
+<p>A theoretically observable system may still be numerically fragile.</p>
+<p>The classical normal equations</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf W \mathbf G \, \delta\mathbf x = \mathbf G^T \mathbf W \mathbf r }
+\]</span></p>
+<p>are convenient but can worsen conditioning because</p>
+<p><span class="math display">\[
+\boxed{ \kappa( \mathbf G^T\mathbf G ) \approx \kappa(\mathbf G)^2. }
+\]</span></p>
+<p>QR decomposition avoids explicitly forming the normal matrix and is usually more robust:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G = \mathbf Q\mathbf R. }
+\]</span></p>
+<p>Cholesky is efficient when the system is symmetric positive definite and reasonably conditioned:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N = \mathbf L\mathbf L^T. }
+\]</span></p>
+<p>SVD provides the strongest diagnostic view:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G = \mathbf U \boldsymbol\Sigma \mathbf V^T. }
+\]</span></p>
+<p>Small singular values reveal weak or nearly unobservable estimation directions.</p>
+<p>The condition number</p>
+<p><span class="math display">\[
+\boxed{ \kappa = \frac{ \sigma_{\max} }{ \sigma_{\min} } }
+\]</span></p>
+<p>quantifies sensitivity to perturbations.</p>
+<p>Scaling is essential because poorly chosen units can create apparent numerical problems:</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x = \mathbf S_x \delta\tilde{\mathbf x}. }
+\]</span></p>
+<p>But</p>
+<p><span class="math display">\[
+\boxed{ \text{Scaling Improves Numerical Representation} \neq \text{Creating New Information}. }
+\]</span></p>
+<p>Regularization can stabilize weak problems:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T\mathbf G + \lambda\mathbf L^T\mathbf L }
+\]</span></p>
+<p>but it introduces additional assumptions or prior information.</p>
+<p>Square-root methods are especially valuable when numerical stability, covariance positivity, and long recursive operation matter.</p>
+<p>The most important practical principle is:</p>
+<p><span class="math display">\[
+\boxed{ \text{Do Not Judge an Estimator Only by Whether the Solver Returns a Number.} }
+\]</span></p>
+<p>A trustworthy solution should also be checked for:</p>
+<ul>
 <li>rank,</li>
 <li>conditioning,</li>
 <li>singular values,</li>
@@ -884,16 +1483,28 @@ covariance positivity, and long recursive operation matter.</p><p>The most impor
 <li>parameter correlation,</li>
 <li>solver sensitivity,</li>
 <li>residual consistency.</li>
-</ul><p>The overall engineering strategy is therefore</p><pre class="math"><code>\boxed{ \text{Scale Properly} \rightarrow \text{Diagnose Rank and Conditioning} \rightarrow \text{Choose a Robust Solver} \rightarrow \text{Regularize Only When Justified} \rightarrow \text{Validate Numerically and Physically}. }</code></pre><p>That is the foundation of robust numerical estimation.</p>
+</ul>
+<p>The overall engineering strategy is therefore</p>
+<p><span class="math display">\[
+\boxed{ \text{Scale Properly} \rightarrow \text{Diagnose Rank and Conditioning} \rightarrow \text{Choose a Robust Solver} \rightarrow \text{Regularize Only When Justified} \rightarrow \text{Validate Numerically and Physically}. }
+\]</span></p>
+<p>That is the foundation of robust numerical estimation.</p>
     </section>
 
     <section class="notes-section-card">
       <h2>Next: 4.3.18 Estimator Design Workflow and Algorithm Selection</h2>
-      <p>Choosing among static, dynamic, batch, sequential, linear, nonlinear, probabilistic, smoothing, and parameter-estimation approaches.</p>
+      <p>
+        Numerical conditioning determines whether a mathematically valid estimator can be solved reliably in finite precision.
+        The next section brings the complete estimation framework together and explains how to choose among static, dynamic,
+        batch, sequential, linear, nonlinear, probabilistic, smoothing, and parameter-estimation approaches.
+      </p>
       <a href="estimator-design-workflow.html" class="sensor-link-card">
         <div class="sensor-link-content">
           <h3>4.3.18 Estimator Design Workflow and Algorithm Selection</h3>
-          <p>Choosing among static, dynamic, batch, sequential, linear, nonlinear, probabilistic, smoothing, and parameter-estimation approaches.</p>
+          <p>
+            Choosing among static, dynamic, batch, sequential, linear, nonlinear, probabilistic,
+            smoothing, and parameter-estimation approaches.
+          </p>
           <p class="sensor-link-arrow">Continue to Estimator Design Workflow and Algorithm Selection &rarr;</p>
         </div>
       </a>
