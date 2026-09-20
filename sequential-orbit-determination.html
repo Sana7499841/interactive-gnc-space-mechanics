@@ -1,0 +1,1702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.3.14 Sequential Orbit Determination | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .table-wrap { width:100%; overflow-x:auto; margin:1rem 0 1.4rem; }
+    .table-wrap table { width:100%; border-collapse:collapse; }
+    .table-wrap th, .table-wrap td { border:1px solid #d8dee6; padding:0.75rem 0.85rem; text-align:left; vertical-align:top; }
+    .table-wrap th { font-weight:700; background:#f7f9fb; }
+    .engineering-note { margin:1rem 0; padding:0.95rem 1.05rem; background:#f7f9fb; border-left:4px solid #9bb8d3; }
+    .equation-note { margin-top:0.35rem; color:#475569; }
+    .notes-section-card h4 { margin-top:1.25rem; margin-bottom:0.55rem; }
+    .notes-section-card .math.display { display:block; overflow-x:auto; padding:0.15rem 0; }
+  </style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Sequential Orbit Determination</h1>
+    <p class="notes-tagline">
+      Real-time recursive orbit updates, process noise, maneuver handling, state augmentation,
+      onboard orbit determination, asynchronous multi-rate measurements, continuous tracking,
+      and estimator consistency monitoring.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.3.14 Sequential Orbit Determination</h2>
+
+<p>Sequential orbit determination estimates a spacecraft trajectory
+<strong>recursively</strong>, updating the state whenever new
+measurements become available.</p>
+<p>Unlike batch orbit determination, which processes an entire
+observation arc together, sequential OD propagates the current state
+estimate forward in time and then corrects it using each new observation
+or measurement packet.</p>
+<p>The central idea is</p>
+<p><span class="math display">\[\boxed{ \text{Previous Estimate}
+\rightarrow \text{Propagation} \rightarrow \text{New Measurement}
+\rightarrow \text{Correction} \rightarrow \text{Updated Estimate}
+}\]</span></p>
+<p>Sequential OD is particularly important for</p>
+<ul>
+<li>real-time navigation,</li>
+<li>onboard orbit determination,</li>
+<li>autonomous spacecraft,</li>
+<li>continuous tracking,</li>
+<li>multi-sensor fusion,</li>
+<li>maneuver monitoring,</li>
+<li>formation flying,</li>
+<li>general rendezvous and proximity operations,</li>
+<li>missions where the navigation solution must remain continuously
+available.</li>
+</ul>
+<p>A sequential estimator therefore combines</p>
+<ul>
+<li>dynamic propagation,</li>
+<li>covariance propagation,</li>
+<li>measurement prediction,</li>
+<li>innovation computation,</li>
+<li>Kalman-type measurement updates,</li>
+<li>process noise,</li>
+<li>maneuver handling,</li>
+<li>state augmentation,</li>
+<li>asynchronous measurements,</li>
+<li>continuous health and consistency monitoring.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.1 Basic Sequential Estimation Problem</h3>
+
+<p>Let the estimated state after processing measurements through time
+<code>t_{k-1}</code> be</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k-1|k-1}
+}\]</span></p>
+<p>with covariance</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k-1|k-1}.
+}\]</span></p>
+<p>The estimator propagates this solution to the next measurement epoch
+<code>t_k</code>:</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k-1} = \phi(
+t_k,t_{k-1}, \hat{\mathbf x}_{k-1|k-1} ) }\]</span></p>
+<p>The covariance is also propagated:</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k-1} = \mathbf
+F_{k-1} \mathbf P_{k-1|k-1} \mathbf F_{k-1}^{T} + \mathbf Q_{k-1}.
+}\]</span></p>
+<p>A new measurement is then processed to form an updated state</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k}
+}\]</span></p>
+<p>and covariance</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k}. }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.2 Meaning of the Sequential Notation</h3>
+
+<p>The notation</p>
+<p><span class="math display">\[\hat{\mathbf x}_{k|k-1}\]</span></p>
+<p>means:</p>
+<blockquote>
+<p>estimate of the state at time <code>k</code>, using measurements only
+through time <code>k-1</code>.</p>
+</blockquote>
+<p>This is the <strong>predicted</strong> or <strong>a priori</strong>
+estimate.</p>
+<p>The notation</p>
+<p><span class="math display">\[\hat{\mathbf x}_{k|k}\]</span></p>
+<p>means:</p>
+<blockquote>
+<p>estimate of the state at time <code>k</code>, after incorporating the
+measurement at time <code>k</code>.</p>
+</blockquote>
+<p>This is the <strong>updated</strong> or <strong>a posteriori</strong>
+estimate.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k-1}
+\rightarrow \hat{\mathbf x}_{k|k} }\]</span></p>
+<p>is the fundamental measurement-correction step.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.3 Sequential OD as a Recursive Process</h3>
+
+<p>The complete recursive sequence is</p>
+<p><span class="math display">\[\boxed{ \begin{array}{c} \hat{\mathbf
+x}_{k-1|k-1}, \mathbf P_{k-1|k-1} \\ \downarrow\\ \text{Propagate} \\
+\downarrow\\ \hat{\mathbf x}_{k|k-1}, \mathbf P_{k|k-1} \\ \downarrow\\
+\text{Receive Measurement} \\ \downarrow\\ \text{Compute Innovation} \\
+\downarrow\\ \text{Measurement Update} \\ \downarrow\\ \hat{\mathbf
+x}_{k|k}, \mathbf P_{k|k} \end{array} }\]</span></p>
+<p>Then the process repeats for the next measurement.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.4 Dynamic Propagation</h3>
+
+<p>The spacecraft state is propagated according to</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf x} = f( \mathbf
+x,t,\boldsymbol\theta ) }\]</span></p>
+<p>where <code>\boldsymbol\theta</code> may contain dynamic
+parameters.</p>
+<p>For a translational orbit state,</p>
+<p><span class="math display">\[\mathbf x = \begin{bmatrix} \mathbf r\\
+\mathbf v \end{bmatrix},\]</span></p>
+<p>the propagation satisfies</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf r} = \mathbf v
+}\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf v} = \mathbf a(
+\mathbf r, \mathbf v, t, \boldsymbol\theta ). }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.5 Predicted State</h3>
+
+<p>For nonlinear dynamics,</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k-1} = \phi(
+t_k,t_{k-1}, \hat{\mathbf x}_{k-1|k-1} ) }\]</span></p>
+<p>where <code>\phi</code> denotes numerical integration of the orbit
+dynamics.</p>
+<p>No measurement has yet been processed at <code>t_k</code>.</p>
+<p>Therefore this estimate depends entirely on</p>
+<ul>
+<li>previous state,</li>
+<li>dynamic model,</li>
+<li>maneuver model,</li>
+<li>estimated parameters.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.6 Predicted Covariance</h3>
+
+<p>For a discrete linearized system,</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k-1} = \mathbf
+F_{k-1} \mathbf P_{k-1|k-1} \mathbf F_{k-1}^{T} + \mathbf Q_{k-1}.
+}\]</span></p>
+<p>Here,</p>
+<ul>
+<li><code>\mathbf F_{k-1}</code> maps existing uncertainty forward,</li>
+<li><code>\mathbf Q_{k-1}</code> introduces new process
+uncertainty.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Predicted Uncertainty} =
+\text{Propagated Previous Uncertainty} + \text{New Dynamic Uncertainty}.
+}\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.7 STM Form of Covariance Propagation</h3>
+
+<p>For orbit dynamics,</p>
+<p><span class="math display">\[\mathbf F_{k-1}\]</span></p>
+<p>is often obtained from the state transition matrix</p>
+<p><span
+class="math display">\[\boldsymbol\Phi(t_k,t_{k-1}).\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k-1} =
+\boldsymbol\Phi_k \mathbf P_{k-1|k-1} \boldsymbol\Phi_k^{T} + \mathbf
+Q_k. }\]</span></p>
+<p>This connects sequential OD directly with the STM and
+covariance-analysis concepts developed earlier.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.8 Measurement Model</h3>
+
+<p>At time <code>t_k</code>, a measurement is modeled as</p>
+<p><span class="math display">\[\boxed{ \mathbf z_k = h_k( \mathbf x_k )
++ \mathbf v_k }\]</span></p>
+<p>where</p>
+<p><span class="math display">\[\mathbf v_k \sim \mathcal N( \mathbf0,
+\mathbf R_k ).\]</span></p>
+<p>Possible measurements include</p>
+<ul>
+<li>range,</li>
+<li>range rate,</li>
+<li>Doppler,</li>
+<li>GNSS,</li>
+<li>line-of-sight,</li>
+<li>optical angles,</li>
+<li>LiDAR,</li>
+<li>radar,</li>
+<li>inter-satellite measurements.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.9 Predicted Measurement</h3>
+
+<p>Given the propagated state,</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf z}_{k|k-1} = h_k(
+\hat{\mathbf x}_{k|k-1} ) }\]</span></p>
+<p>is the expected measurement.</p>
+<p>This must use the same</p>
+<ul>
+<li>geometry,</li>
+<li>frame,</li>
+<li>timing,</li>
+<li>calibration,</li>
+<li>bias convention</li>
+</ul>
+<p>as the actual sensor observation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.10 Innovation</h3>
+
+<p>The measurement innovation is</p>
+<p><span class="math display">\[\boxed{ \mathbf y_k = \mathbf z_k -
+\hat{\mathbf z}_{k|k-1}. }\]</span></p>
+<p>It represents the discrepancy between what the sensor observed and
+what the propagated state predicted.</p>
+<p>A nonzero innovation may result from</p>
+<ul>
+<li>state error,</li>
+<li>measurement noise,</li>
+<li>dynamic-model error,</li>
+<li>sensor bias,</li>
+<li>maneuver error,</li>
+<li>timing mismatch.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.11 Measurement Jacobian</h3>
+
+<p>For an Extended Kalman Filter,</p>
+<p><span class="math display">\[\boxed{ \mathbf H_k = \frac{\partial
+h_k} {\partial\mathbf x} \bigg|_{\hat{\mathbf x}_{k|k-1}} }\]</span></p>
+<p>describes local measurement sensitivity.</p>
+<p>Unlike batch OD, the measurement Jacobian acts directly on the
+current state because the sequential filter estimates the state at the
+current epoch.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.12 Innovation Covariance</h3>
+
+<p>The predicted innovation covariance is</p>
+<p><span class="math display">\[\boxed{ \mathbf S_k = \mathbf H_k
+\mathbf P_{k|k-1} \mathbf H_k^T + \mathbf R_k. }\]</span></p>
+<p>This combines</p>
+<ul>
+<li>predicted navigation uncertainty,</li>
+<li>measurement uncertainty.</li>
+</ul>
+<p>Thus <code>\mathbf S_k</code> provides the natural statistical scale
+for judging whether a measurement is consistent with the propagated
+orbit.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.13 Kalman Gain</h3>
+
+<p>The Kalman gain is</p>
+<p><span class="math display">\[\boxed{ \mathbf K_k = \mathbf P_{k|k-1}
+\mathbf H_k^T \mathbf S_k^{-1}. }\]</span></p>
+<p>It determines how strongly the measurement innovation modifies the
+state.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \text{Large Predicted
+Uncertainty} + \text{Accurate Measurement} \rightarrow \text{Large
+Correction} }\]</span></p>
+<p>whereas</p>
+<p><span class="math display">\[\boxed{ \text{High State Confidence} +
+\text{Noisy Measurement} \rightarrow \text{Small Correction}.
+}\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.14 State Update</h3>
+
+<p>The updated state is</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k} =
+\hat{\mathbf x}_{k|k-1} + \mathbf K_k \mathbf y_k. }\]</span></p>
+<p>Thus the innovation is converted into a state correction through the
+Kalman gain.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.15 Covariance Update</h3>
+
+<p>The simplified covariance update is</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k} = ( \mathbf I -
+\mathbf K_k \mathbf H_k ) \mathbf P_{k|k-1}. }\]</span></p>
+<p>A numerically safer form is the Joseph form:</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k} = ( \mathbf
+I-\mathbf K_k\mathbf H_k ) \mathbf P_{k|k-1} ( \mathbf I-\mathbf
+K_k\mathbf H_k )^T + \mathbf K_k \mathbf R_k \mathbf K_k^T.
+}\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.16 Why the Measurement Usually Reduces Covariance</h3>
+
+<p>A valid measurement adds information.</p>
+<p>Therefore the posterior covariance should generally satisfy</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k} \preceq \mathbf
+P_{k|k-1} }\]</span></p>
+<p>under the assumed linear-Gaussian model.</p>
+<p>The measurement therefore reduces uncertainty in state combinations
+that it observes.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.17 Extended Kalman Filter for Orbit Determination</h3>
+
+<p>Orbit dynamics and many measurement equations are nonlinear.</p>
+<p>Therefore sequential OD commonly uses an Extended Kalman Filter.</p>
+<p>The EKF cycle is</p>
+<p><span class="math display">\[\boxed{ \text{Nonlinear State
+Propagation} \rightarrow \text{Linearized Covariance Propagation}
+\rightarrow \text{Nonlinear Measurement Prediction} \rightarrow
+\text{Linearized Measurement Update}. }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.18 EKF Linearization Point</h3>
+
+<p>The Jacobians are evaluated about the current estimated
+trajectory.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\mathbf F_k\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\mathbf H_k\]</span></p>
+<p>change with time.</p>
+<p>This distinguishes the EKF from a linear time-invariant Kalman
+filter.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.19 EKF Limitations</h3>
+
+<p>The EKF relies on first-order linearization.</p>
+<p>Problems can arise when</p>
+<ul>
+<li>uncertainty is large,</li>
+<li>measurement model is highly nonlinear,</li>
+<li>initial estimate is poor,</li>
+<li>geometry is strongly nonlinear.</li>
+</ul>
+<p>In such cases, alternatives may include</p>
+<ul>
+<li>iterated EKF,</li>
+<li>UKF,</li>
+<li>cubature filters,</li>
+<li>particle filters.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.20 Iterated EKF</h3>
+
+<p>For a highly nonlinear measurement, the measurement update may be
+re-linearized iteratively.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \text{Predict} \rightarrow
+\text{Update} \rightarrow \text{Re-linearize} \rightarrow \text{Update
+Again} }\]</span></p>
+<p>until the correction stabilizes.</p>
+<p>This can improve nonlinear measurement processing without changing
+the propagation architecture.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.21 Unscented Kalman Filter in Sequential OD</h3>
+
+<p>The UKF avoids explicit first-order Jacobians for the nonlinear state
+and measurement mappings.</p>
+<p>Sigma points are generated around</p>
+<p><span class="math display">\[\hat{\mathbf x}\]</span></p>
+<p>and propagated through</p>
+<p><span class="math display">\[f(\cdot)\]</span></p>
+<p>and</p>
+<p><span class="math display">\[h(\cdot).\]</span></p>
+<p>The mean and covariance are reconstructed from the propagated sigma
+points.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.22 UKF Advantages and Limitations</h3>
+
+<p>Potential advantages include</p>
+<ul>
+<li>improved nonlinear transformation accuracy,</li>
+<li>no explicit Jacobian derivation.</li>
+</ul>
+<p>Limitations include</p>
+<ul>
+<li>increased computational cost,</li>
+<li>tuning of sigma-point parameters,</li>
+<li>still requires correct process and measurement models.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{No Jacobian} \neq \text{No
+Modeling Requirement}. }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.23 Process Noise</h3>
+
+<p>The process-noise covariance</p>
+<p><span class="math display">\[\boxed{ \mathbf Q_k }\]</span></p>
+<p>represents uncertainty in the propagated dynamics.</p>
+<p>Possible sources include</p>
+<ul>
+<li>atmospheric drag error,</li>
+<li>SRP uncertainty,</li>
+<li>small unmodeled accelerations,</li>
+<li>maneuver execution error,</li>
+<li>environmental disturbances.</li>
+</ul>
+<p>Process noise prevents the estimator from becoming unrealistically
+confident in an imperfect dynamic model.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.24 Why Process Noise Is Essential in Sequential OD</h3>
+
+<p>Without process noise,</p>
+<p><span class="math display">\[\mathbf Q=0,\]</span></p>
+<p>the filter assumes the dynamic model is exact.</p>
+<p>If the real spacecraft experiences unmodeled disturbances, the true
+error can grow while the filter covariance remains too small.</p>
+<p>This leads to filter inconsistency.</p>
+<p>Thus,</p>
+<p><span class="math display">\[\boxed{ \text{Imperfect Dynamics}
+\rightarrow \text{Need for Appropriate Process Noise}. }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.25 Process Noise versus Measurement Noise</h3>
+
+<p>These matrices describe different uncertainty sources:</p>
+<p><span class="math display">\[\boxed{ \mathbf Q \rightarrow
+\text{Dynamic / Model Uncertainty} }\]</span></p>
+<p><span class="math display">\[\boxed{ \mathbf R \rightarrow
+\text{Measurement Uncertainty}. }\]</span></p>
+<p>Increasing <code>\mathbf Q</code> makes the filter more willing to
+deviate from the propagated model.</p>
+<p>Increasing <code>\mathbf R</code> makes the filter trust measurements
+less.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.26 Continuous Process Noise</h3>
+
+<p>For</p>
+<p><span class="math display">\[\dot{\delta\mathbf x} = \mathbf A
+\delta\mathbf x + \mathbf G \mathbf w,\]</span></p>
+<p>where</p>
+<p><span class="math display">\[E[ \mathbf w(t) \mathbf w^T(\tau) ] =
+\mathbf Q_c \delta(t-\tau),\]</span></p>
+<p>the corresponding discrete process covariance is</p>
+<p><span class="math display">\[\boxed{ \mathbf Q_d =
+\int_{t_k}^{t_{k+1}} \boldsymbol\Phi(t_{k+1},\tau) \mathbf G \mathbf Q_c
+\mathbf G^T \boldsymbol\Phi^T(t_{k+1},\tau) \,d\tau. }\]</span></p>
+<p>Continuous noise density should therefore not be inserted directly as
+a discrete covariance without appropriate conversion.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.27 White-Noise Acceleration Model</h3>
+
+<p>A common simple OD process model assumes random acceleration
+uncertainty.</p>
+<p>For one Cartesian axis, the corresponding position-velocity
+covariance over interval <code>\Delta t</code> may have the form</p>
+<p><span class="math display">\[\boxed{ \mathbf Q = q_a \begin{bmatrix}
+\frac{\Delta t^3}{3} &amp; \frac{\Delta t^2}{2} \\[1mm] \frac{\Delta
+t^2}{2} &amp; \Delta t \end{bmatrix} }\]</span></p>
+<p>for continuous white acceleration spectral density
+<code>q_a</code>.</p>
+<p>This structure can be extended to three dimensions.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.28 Process Noise Tuning</h3>
+
+<p>If <code>\mathbf Q</code> is too small,</p>
+<ul>
+<li>filter may become overconfident,</li>
+<li>innovations may become unexpectedly large,</li>
+<li>maneuver or environmental errors may not be tracked.</li>
+</ul>
+<p>If <code>\mathbf Q</code> is too large,</p>
+<ul>
+<li>solution may become noisy,</li>
+<li>measurements may dominate excessively,</li>
+<li>state prediction quality may degrade.</li>
+</ul>
+<p>Process noise should therefore represent expected dynamic-model
+uncertainty, not be chosen merely to make residuals look small.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.29 Covariance Growth Between Measurements</h3>
+
+<p>When no measurement is available,</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k-1} =
+\boldsymbol\Phi \mathbf P \boldsymbol\Phi^T + \mathbf Q. }\]</span></p>
+<p>Therefore uncertainty generally grows with propagation time.</p>
+<p>Long tracking gaps cause the navigation solution to rely increasingly
+on the dynamic model.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.30 Measurement Update after a Tracking Gap</h3>
+
+<p>When observations resume after a long gap, innovations may be larger
+because covariance and actual trajectory uncertainty have grown.</p>
+<p>If the covariance has been modeled correctly, the innovation
+covariance</p>
+<p><span class="math display">\[\mathbf S\]</span></p>
+<p>should also reflect this larger uncertainty.</p>
+<p>Thus the filter can still process a large absolute residual without
+necessarily declaring it an outlier.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.31 Continuous Tracking</h3>
+
+<p>Sequential OD is naturally suited to continuous or near-continuous
+measurements.</p>
+<p>For example,</p>
+<p><span class="math display">\[\boxed{ \text{Propagate} \rightarrow
+\text{Receive Measurement} \rightarrow \text{Update} \rightarrow
+\text{Repeat} }\]</span></p>
+<p>may operate continuously during tracking visibility.</p>
+<p>This allows navigation uncertainty to remain bounded through repeated
+measurement corrections.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.32 Continuous Tracking Does Not Mean Continuous Measurement</h3>
+
+<p>Sensors still produce discrete samples.</p>
+<p>Continuous tracking means measurements are regularly available over
+time.</p>
+<p>The estimator itself may propagate continuously or at a chosen
+internal integration step while processing measurements at discrete
+epochs.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.33 Measurement Rate versus Filter Propagation Rate</h3>
+
+<p>These rates need not be equal.</p>
+<p>For example,</p>
+<p><span class="math display">\[f_{\rm propagation} &gt; f_{\rm
+measurement}\]</span></p>
+<p>is common.</p>
+<p>The estimator may propagate the dynamic model at a high internal rate
+and apply measurement updates whenever observations arrive.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[\boxed{ \text{Estimator Propagation
+Rate} \neq \text{Sensor Update Rate}. }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.34 Asynchronous Measurements</h3>
+
+<p>Different sensors may produce observations at different times.</p>
+<p>For example,</p>
+<ul>
+<li>GNSS at <code>t_1</code>,</li>
+<li>optical LOS at <code>t_2</code>,</li>
+<li>range at <code>t_3</code>.</li>
+</ul>
+<p>The estimator should propagate to each measurement epoch and process
+the measurement using the corresponding model.</p>
+<p>No common fixed sensor rate is mathematically required.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.35 Multi-Rate Sequential OD</h3>
+
+<p>Suppose sensors operate at</p>
+<p><span class="math display">\[f_1,\quad f_2,\quad f_3.\]</span></p>
+<p>Sequential OD can process them as</p>
+<p><span class="math display">\[\boxed{ \text{High-Rate Propagation} +
+\text{Event-Driven Measurement Updates}. }\]</span></p>
+<p>This is especially useful for multisensor navigation systems.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.36 Measurement Latency</h3>
+
+<p>A measurement may correspond to observation time</p>
+<p><span class="math display">\[t_m\]</span></p>
+<p>but arrive at the estimator later.</p>
+<p>The estimator must distinguish</p>
+<p><span class="math display">\[\boxed{ \text{Measurement Epoch}
+}\]</span></p>
+<p>from</p>
+<p><span class="math display">\[\boxed{ \text{Reception / Processing
+Epoch}. }\]</span></p>
+<p>Ignoring latency can produce systematic state errors.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.37 Delayed Measurements</h3>
+
+<p>Possible approaches include</p>
+<ul>
+<li>buffering past states,</li>
+<li>out-of-sequence measurement processing,</li>
+<li>retrodiction,</li>
+<li>smoothing,</li>
+<li>covariance/state transition mapping.</li>
+</ul>
+<p>The best method depends on</p>
+<ul>
+<li>latency magnitude,</li>
+<li>estimator architecture,</li>
+<li>processing resources.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.38 Innovation Gating</h3>
+
+<p>Before accepting a measurement, the normalized innovation may be
+checked.</p>
+<p>For vector observations,</p>
+<p><span class="math display">\[\boxed{ \epsilon_k = \mathbf y_k^T
+\mathbf S_k^{-1} \mathbf y_k. }\]</span></p>
+<p>A measurement may be rejected or flagged if</p>
+<p><span class="math display">\[\boxed{ \epsilon_k &gt; \gamma.
+}\]</span></p>
+<p>The threshold <code>\gamma</code> is chosen from an appropriate
+statistical confidence level.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.39 Why Raw Residual Magnitude Is Not Enough</h3>
+
+<p>A residual of 100 m may be acceptable if predicted uncertainty is
+kilometers.</p>
+<p>A residual of 1 m may be highly inconsistent if the filter predicts
+millimeter-level uncertainty.</p>
+<p>Therefore measurement consistency should be evaluated relative to</p>
+<p><span class="math display">\[\mathbf S_k,\]</span></p>
+<p>not by residual magnitude alone.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.40 Normalized Innovation Squared</h3>
+
+<p>For a measurement dimension <code>m</code>,</p>
+<p><span class="math display">\[\boxed{ \epsilon_k = \mathbf y_k^T
+\mathbf S_k^{-1} \mathbf y_k }\]</span></p>
+<p>should approximately follow</p>
+<p><span class="math display">\[\chi_m^2\]</span></p>
+<p>under a consistent Gaussian model.</p>
+<p>This provides an important filter-health diagnostic.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.41 Innovation Mean</h3>
+
+<p>Ideally,</p>
+<p><span class="math display">\[\boxed{ E[\mathbf y_k] \approx \mathbf0.
+}\]</span></p>
+<p>Persistent nonzero innovation mean may indicate</p>
+<ul>
+<li>measurement bias,</li>
+<li>timing error,</li>
+<li>calibration error,</li>
+<li>force-model error,</li>
+<li>incorrect maneuver modeling.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.42 Innovation Whiteness</h3>
+
+<p>Innovations should also be approximately temporally white under the
+classical Kalman assumptions.</p>
+<p>Persistent correlation may reveal</p>
+<ul>
+<li>colored sensor noise,</li>
+<li>unmodeled dynamics,</li>
+<li>slowly varying bias,</li>
+<li>insufficient state augmentation.</li>
+</ul>
+<p>Thus innovation history provides information about both the filter
+and its models.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.43 Sequential OD and Maneuvers</h3>
+
+<p>A spacecraft maneuver changes the predicted trajectory.</p>
+<p>If the maneuver is known, the state propagation should explicitly
+include it.</p>
+<p>For an impulsive maneuver,</p>
+<p><span class="math display">\[\boxed{ \mathbf v^+ = \mathbf v^- +
+\Delta\mathbf v. }\]</span></p>
+<p>For a finite burn,</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf v} = \mathbf a_{\rm
+natural} + \frac{\mathbf F(t)}{m(t)}. }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.44 Known Impulsive Maneuver</h3>
+
+<p>If <code>\Delta\mathbf v</code> is considered known exactly,</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf v}^{+} =
+\hat{\mathbf v}^{-} + \Delta\mathbf v_{\rm cmd}. }\]</span></p>
+<p>The covariance may still need modification if execution error is
+nonzero.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.45 Maneuver Execution Uncertainty</h3>
+
+<p>Let</p>
+<p><span class="math display">\[\Delta\mathbf v_{\rm actual} =
+\Delta\mathbf v_{\rm cmd} + \delta\Delta\mathbf v.\]</span></p>
+<p>If</p>
+<p><span class="math display">\[E[ \delta\Delta\mathbf v
+\delta\Delta\mathbf v^T ] = \mathbf P_{\Delta v},\]</span></p>
+<p>then the maneuver injects additional velocity covariance.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{vv}^{+} = \mathbf
+P_{vv}^{-} + \mathbf P_{\Delta v} }\]</span></p>
+<p>when the maneuver error is independent of previous state error.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.46 Maneuver Covariance Mapping</h3>
+
+<p>More generally,</p>
+<p><span class="math display">\[\boxed{ \mathbf P^{+} = \mathbf M
+\mathbf P^{-} \mathbf M^T + \mathbf B \mathbf P_{\Delta v} \mathbf B^T.
+}\]</span></p>
+<p>Here,</p>
+<ul>
+<li><code>\mathbf M</code> maps the pre-event state uncertainty,</li>
+<li><code>\mathbf B</code> maps maneuver uncertainty into the
+state.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.47 Unknown Maneuver</h3>
+
+<p>If a maneuver occurs unexpectedly, measurements after the event may
+produce large innovations.</p>
+<p>The estimator may handle this through</p>
+<ul>
+<li>maneuver detection,</li>
+<li>covariance inflation,</li>
+<li>process-noise increase,</li>
+<li>explicit maneuver-state estimation,</li>
+<li>filter reinitialization.</li>
+</ul>
+<p>The appropriate response depends on the mission architecture.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.48 Maneuver Detection</h3>
+
+<p>A persistent sequence of unexpectedly large innovations can indicate
+an unmodeled maneuver.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[\boxed{ \text{Innovation Change}
+\rightarrow \text{Possible Dynamic Event} }\]</span></p>
+<p>but innovation changes can also result from sensor problems.</p>
+<p>Therefore maneuver detection should distinguish</p>
+<ul>
+<li>dynamics anomaly,</li>
+<li>measurement anomaly.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.49 Finite-Burn Sequential Estimation</h3>
+
+<p>During a finite maneuver, thrust acceleration may be modeled
+directly:</p>
+<p><span class="math display">\[\boxed{ \mathbf a_T = \frac{\mathbf
+F}{m}. }\]</span></p>
+<p>Possible uncertain burn parameters include</p>
+<ul>
+<li>thrust magnitude,</li>
+<li>direction,</li>
+<li>start time,</li>
+<li>stop time,</li>
+<li>scale factor.</li>
+</ul>
+<p>These may be represented through process noise or explicit augmented
+states.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.50 State Augmentation</h3>
+
+<p>Sequential OD is not limited to</p>
+<p><span class="math display">\[\mathbf r,\mathbf v.\]</span></p>
+<p>The state may be expanded as</p>
+<p><span class="math display">\[\boxed{ \mathbf x_a = \begin{bmatrix}
+\mathbf r\\ \mathbf v\\ \boldsymbol\theta \end{bmatrix} }\]</span></p>
+<p>where <code>\boldsymbol\theta</code> contains uncertain
+parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.51 Common Augmented States in Sequential OD</h3>
+
+<p>Possible states include</p>
+<ul>
+<li>clock bias,</li>
+<li>clock drift,</li>
+<li>drag or ballistic parameter,</li>
+<li>sensor bias,</li>
+<li>measurement bias,</li>
+<li>empirical acceleration,</li>
+<li>maneuver correction,</li>
+<li>calibration parameters.</li>
+</ul>
+<p>These states can be updated continuously as measurements arrive.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.52 Augmented Dynamics</h3>
+
+<p>For augmented state</p>
+<p><span class="math display">\[\mathbf x_a = \begin{bmatrix} \mathbf
+x\\ \boldsymbol\theta \end{bmatrix},\]</span></p>
+<p>the dynamics are</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf x}_a =
+\begin{bmatrix} f( \mathbf x,\boldsymbol\theta,t )\\ g(
+\boldsymbol\theta,t ) \end{bmatrix}. }\]</span></p>
+<p>Static parameters may use</p>
+<p><span class="math display">\[\dot{\boldsymbol\theta}=0,\]</span></p>
+<p>while slowly varying parameters may use random-walk or Gauss-Markov
+models.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.53 Augmented Covariance</h3>
+
+<p>The covariance becomes</p>
+<p><span class="math display">\[\boxed{ \mathbf P_a = \begin{bmatrix}
+\mathbf P_{xx} &amp; \mathbf P_{x\theta} \\ \mathbf P_{\theta x} &amp;
+\mathbf P_{\theta\theta} \end{bmatrix}. }\]</span></p>
+<p>The cross-covariance blocks are essential because the physical state
+and parameter uncertainties become coupled.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.54 Parameter Correction through Measurements</h3>
+
+<p>If the Kalman gain is partitioned as</p>
+<p><span class="math display">\[\mathbf K = \begin{bmatrix} \mathbf
+K_x\\ \mathbf K_\theta \end{bmatrix},\]</span></p>
+<p>the parameter correction is</p>
+<p><span class="math display">\[\boxed{ \hat{\boldsymbol\theta}_{k|k} =
+\hat{\boldsymbol\theta}_{k|k-1} + \mathbf K_\theta \mathbf y_k.
+}\]</span></p>
+<p>Thus measurements can update both the orbit and the uncertain model
+parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.55 Sequential Estimation of Ballistic Coefficient</h3>
+
+<p>A drag-related parameter may be modeled as</p>
+<p><span class="math display">\[\boxed{ B_{k+1} = B_k + w_{B,k}.
+}\]</span></p>
+<p>As tracking measurements arrive, the filter can adjust the parameter
+so that the propagated trajectory better matches observations.</p>
+<p>However, estimated ballistic parameters may correlate strongly with
+atmospheric density errors.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.56 Sequential Bias Estimation</h3>
+
+<p>Suppose a range measurement contains unknown bias:</p>
+<p><span class="math display">\[z_\rho = \rho + b_\rho + v.\]</span></p>
+<p>Augment</p>
+<p><span class="math display">\[b_\rho\]</span></p>
+<p>into the state.</p>
+<p>A random-walk model may be</p>
+<p><span class="math display">\[\boxed{ b_{\rho,k+1} = b_{\rho,k} +
+w_{b,k}. }\]</span></p>
+<p>The estimator then separates orbit error from persistent measurement
+bias as the measurement geometry evolves.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.57 Empirical Acceleration States</h3>
+
+<p>Unmodeled dynamic effects may be represented using estimated
+accelerations:</p>
+<p><span class="math display">\[\boxed{ \mathbf a_{\rm emp} =
+\begin{bmatrix} a_R\\ a_T\\ a_N \end{bmatrix}. }\]</span></p>
+<p>These can be modeled as constant over short intervals, random walks,
+or Gauss-Markov processes.</p>
+<p>They provide flexibility but can absorb genuine modeling errors if
+overused.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.58 State Augmentation and Observability</h3>
+
+<p>Adding a state does not make it observable.</p>
+<p>If two parameters affect the measurements in nearly identical ways,
+they may become strongly correlated.</p>
+<p>Therefore,</p>
+<p><span class="math display">\[\boxed{ \text{Augmentation} \neq
+\text{Guaranteed Estimability}. }\]</span></p>
+<p>Observability should be assessed before adding large numbers of
+parameters.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.59 Filter Divergence</h3>
+
+<p>Filter divergence occurs when the state estimate and covariance no
+longer represent the true estimation error.</p>
+<p>Symptoms may include</p>
+<ul>
+<li>growing innovations,</li>
+<li>repeated gating failures,</li>
+<li>unrealistic covariance collapse,</li>
+<li>state estimates leaving physically plausible regions.</li>
+</ul>
+<p>Divergence can result from</p>
+<ul>
+<li>poor initialization,</li>
+<li>underestimated <code>\mathbf Q</code>,</li>
+<li>incorrect <code>\mathbf R</code>,</li>
+<li>unmodeled maneuvers,</li>
+<li>incorrect Jacobians,</li>
+<li>numerical problems.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.60 Covariance Consistency</h3>
+
+<p>When truth is available, use</p>
+<p><span class="math display">\[\boxed{ \epsilon_x = \tilde{\mathbf x}^T
+\mathbf P^{-1} \tilde{\mathbf x} }\]</span></p>
+<p>to compare actual state error with predicted covariance.</p>
+<p>For an <code>n</code>-state consistent Gaussian filter,</p>
+<p><span class="math display">\[\epsilon_x \sim \chi_n^2.\]</span></p>
+<p>This is the NEES consistency test.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.61 NIS for Operational Monitoring</h3>
+
+<p>When truth is not available, NIS uses the innovation:</p>
+<p><span class="math display">\[\boxed{ \epsilon_z = \mathbf y^T \mathbf
+S^{-1} \mathbf y. }\]</span></p>
+<p>This can be monitored continuously during mission operations.</p>
+<p>Persistent NIS outside expected bounds may indicate incorrect filter
+tuning or modeling.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.62 Covariance Inflation</h3>
+
+<p>If the filter is believed to be overconfident, covariance may be
+inflated:</p>
+<p><span class="math display">\[\boxed{ \mathbf P \leftarrow
+\alpha\mathbf P, \qquad \alpha&gt;1. }\]</span></p>
+<p>This gives subsequent measurements more ability to correct the
+state.</p>
+<p>However, inflation should not replace correction of a known modeling
+problem.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.63 Adaptive Process Noise</h3>
+
+<p>Some filters adjust process noise according to observed innovation
+statistics.</p>
+<p>For example,</p>
+<p><span class="math display">\[\mathbf Q\]</span></p>
+<p>may be increased when residual behavior indicates
+larger-than-expected dynamic uncertainty.</p>
+<p>Adaptive filtering can improve robustness but should be designed
+carefully to avoid instability or arbitrary tuning.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.64 Filter Reinitialization</h3>
+
+<p>If navigation is severely lost, the estimator may require
+reinitialization from</p>
+<ul>
+<li>GNSS solution,</li>
+<li>ground OD,</li>
+<li>optical navigation solution,</li>
+<li>external reference state.</li>
+</ul>
+<p>A robust system should define criteria for when normal recursive
+correction is no longer sufficient.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.65 Initialization</h3>
+
+<p>Sequential filters require</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{0|0}
+}\]</span></p>
+<p>and</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{0|0}. }\]</span></p>
+<p>The initial covariance should realistically represent uncertainty in
+the initial state.</p>
+<p>Too-small initial covariance can cause the filter to reject valid
+measurements.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.66 Initial Transient</h3>
+
+<p>During early operation, the filter may undergo a convergence
+period.</p>
+<p>State corrections and covariance reductions may initially be
+larger.</p>
+<p>Performance should therefore distinguish</p>
+<ul>
+<li>initialization transient,</li>
+<li>steady-state navigation behavior.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.67 Sequential OD and GNSS</h3>
+
+<p>GNSS is particularly suitable for sequential OD.</p>
+<p>At each epoch, pseudorange and Doppler measurements can update</p>
+<p><span class="math display">\[\boxed{ \mathbf x = \begin{bmatrix}
+\mathbf r\\ \mathbf v\\ b_c\\ \dot b_c \end{bmatrix}. }\]</span></p>
+<p>Dynamic propagation between GNSS updates improves continuity and
+allows integration with other sensors.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.68 Sequential Optical OD</h3>
+
+<p>Optical LOS or pixel measurements can be incorporated whenever
+available.</p>
+<p>Because monocular measurements often contain weak instantaneous range
+information, dynamic propagation across multiple observations provides
+information accumulation over time.</p>
+<p>Thus sequential optical OD gradually improves state observability as
+geometry evolves.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.69 General Sequential Relative Navigation</h3>
+
+<p>For a general relative-navigation problem,</p>
+<p><span class="math display">\[\boxed{ \mathbf x_{\rm rel} =
+\begin{bmatrix} \mathbf r_{\rm rel}\\ \mathbf v_{\rm rel} \end{bmatrix}.
+}\]</span></p>
+<p>The relative state is propagated using an appropriate
+relative-dynamics model and corrected using measurements such as</p>
+<ul>
+<li>range,</li>
+<li>range rate,</li>
+<li>LOS,</li>
+<li>optical features,</li>
+<li>LiDAR,</li>
+<li>inter-satellite GNSS.</li>
+</ul>
+<p>This applies generally to formation flying and rendezvous/proximity
+operations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.70 Relative-State Propagation</h3>
+
+<p>A generic relative state evolves as</p>
+<p><span class="math display">\[\boxed{ \dot{\mathbf x}_{\rm rel} =
+f_{\rm rel}( \mathbf x_{\rm rel},t ). }\]</span></p>
+<p>The specific model may be</p>
+<ul>
+<li>nonlinear relative two-body dynamics,</li>
+<li>Hill/Clohessy-Wiltshire,</li>
+<li>Tschauner-Hempel,</li>
+<li>higher-fidelity numerical dynamics.</li>
+</ul>
+<p>The sequential estimation architecture is unchanged.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.71 Relative Measurement Update</h3>
+
+<p>For relative observation</p>
+<p><span class="math display">\[\mathbf z_k = h_{\rm rel}( \mathbf
+x_{{\rm rel},k} ) + \mathbf v_k,\]</span></p>
+<p>the innovation is</p>
+<p><span class="math display">\[\boxed{ \mathbf y_k = \mathbf z_k -
+h_{\rm rel}( \hat{\mathbf x}_{{\rm rel},k|k-1} ). }\]</span></p>
+<p>The relative-state filter then updates using the same Kalman
+logic.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.72 Onboard Orbit Determination</h3>
+
+<p>Sequential OD is well suited to onboard operation because it
+processes measurements recursively and does not require storing a
+complete observation arc.</p>
+<p>An onboard OD system may combine</p>
+<ul>
+<li>GNSS,</li>
+<li>star tracker,</li>
+<li>optical navigation,</li>
+<li>inter-satellite range,</li>
+<li>IMU,</li>
+<li>ground updates.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.73 Advantages of Onboard OD</h3>
+
+<p>Onboard orbit determination can provide</p>
+<ul>
+<li>low-latency navigation,</li>
+<li>autonomy,</li>
+<li>reduced dependence on ground communication,</li>
+<li>continuous state availability,</li>
+<li>rapid response to maneuvers or disturbances.</li>
+</ul>
+<p>It is particularly important for autonomous missions.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.74 Constraints of Onboard OD</h3>
+
+<p>Onboard navigation must operate within limits on</p>
+<ul>
+<li>processor speed,</li>
+<li>memory,</li>
+<li>power,</li>
+<li>numerical precision,</li>
+<li>software complexity,</li>
+<li>fault tolerance.</li>
+</ul>
+<p>Therefore estimator architecture may differ from high-fidelity ground
+OD.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.75 Ground versus Onboard Sequential OD</h3>
+
+<p>Ground systems may use</p>
+<ul>
+<li>more detailed force models,</li>
+<li>larger state vectors,</li>
+<li>more computationally intensive filters.</li>
+</ul>
+<p>Onboard systems may use simplified models while prioritizing</p>
+<ul>
+<li>robustness,</li>
+<li>deterministic execution,</li>
+<li>low latency,</li>
+<li>bounded computation.</li>
+</ul>
+<p>The two systems can complement each other.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.76 Continuous Ground Tracking</h3>
+
+<p>Sequential OD can also run on the ground during continuous
+tracking.</p>
+<p>New measurements are incorporated as they are received, producing an
+updated orbit solution in real time.</p>
+<p>This is useful for</p>
+<ul>
+<li>mission operations,</li>
+<li>maneuver monitoring,</li>
+<li>navigation support,</li>
+<li>anomaly response.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.77 Sequential OD with Tracking Gaps</h3>
+
+<p>If no measurement is available, the filter continues propagation:</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k-1} = \phi(
+\hat{\mathbf x} ) }\]</span></p>
+<p>while covariance grows.</p>
+<p>When measurements return, the larger covariance naturally gives them
+increased corrective influence.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.78 Tracking Pass Transitions</h3>
+
+<p>Ground-based tracking may occur in separate visibility passes.</p>
+<p>At the end of one pass, the sequential estimate is propagated until
+the next pass.</p>
+<p>The navigation state and covariance therefore provide continuity
+between tracking opportunities.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.79 Multi-Sensor Sequential Fusion</h3>
+
+<p>Measurements from multiple sensors can be processed one after
+another.</p>
+<p>Suppose sensor A and sensor B provide observations at the same
+nominal epoch.</p>
+<p>One may process</p>
+<p><span class="math display">\[\boxed{ A \rightarrow B }\]</span></p>
+<p>or combine them into a single stacked measurement update.</p>
+<p>The approaches are equivalent under appropriate linear-Gaussian
+assumptions if correlations are treated consistently.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.80 Correlated Sensors</h3>
+
+<p>If two measurements share common error,</p>
+<p><span class="math display">\[\operatorname{Cov}( \mathbf v_A, \mathbf
+v_B ) \neq0,\]</span></p>
+<p>they should not be treated as independent updates without accounting
+for correlation.</p>
+<p>Otherwise, the same information may effectively be counted twice.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.81 Sequential Processing of Derived Measurements</h3>
+
+<p>If one measurement is mathematically derived from another
+already-used measurement, correlation may be extremely strong.</p>
+<p>For example, feeding both</p>
+<ul>
+<li>raw range data,</li>
+<li>a position estimate computed from that same range</li>
+</ul>
+<p>can double-count information unless correlation is modeled.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.82 Sensor Dropout</h3>
+
+<p>If one sensor becomes unavailable, the estimator can continue
+using</p>
+<ul>
+<li>dynamics,</li>
+<li>remaining sensors.</li>
+</ul>
+<p>The covariance will reflect the reduced information.</p>
+<p>This is a major advantage of multisensor sequential
+architectures.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.83 Sensor Recovery</h3>
+
+<p>When a failed or unavailable sensor returns, its measurements can be
+reincorporated.</p>
+<p>Innovation gating is particularly useful during recovery because the
+navigation state may have drifted while the sensor was unavailable.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.84 State Constraints in Sequential OD</h3>
+
+<p>Physical constraints can sometimes be included through</p>
+<ul>
+<li>constrained filtering,</li>
+<li>pseudo-measurements,</li>
+<li>state projection.</li>
+</ul>
+<p>For example,</p>
+<p><span class="math display">\[\boxed{ \mathbf z_p = h_p( \mathbf x ) +
+\mathbf v_p }\]</span></p>
+<p>can represent an approximate known relation.</p>
+<p>The assigned covariance determines the strength of the
+constraint.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.85 Numerical Conditioning</h3>
+
+<p>Sequential covariance matrices may become poorly conditioned due
+to</p>
+<ul>
+<li>very different state scales,</li>
+<li>weakly observable parameters,</li>
+<li>long propagation intervals.</li>
+</ul>
+<p>Useful techniques include</p>
+<ul>
+<li>state scaling,</li>
+<li>Joseph update,</li>
+<li>square-root filters,</li>
+<li>robust matrix factorizations.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.86 Square-Root Sequential Filters</h3>
+
+<p>Instead of propagating <code>\mathbf P</code>, propagate a factor</p>
+<p><span class="math display">\[\boxed{ \mathbf P = \mathbf S\mathbf
+S^T. }\]</span></p>
+<p>Square-root methods can improve numerical stability and preserve
+positive definiteness more reliably.</p>
+<p>They are useful in high-precision onboard or ground navigation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.87 Information Filter</h3>
+
+<p>Instead of covariance, define information matrix</p>
+<p><span class="math display">\[\boxed{ \boldsymbol\Lambda = \mathbf
+P^{-1} }\]</span></p>
+<p>and information vector</p>
+<p><span class="math display">\[\boxed{ \boldsymbol\eta = \mathbf P^{-1}
+\hat{\mathbf x}. }\]</span></p>
+<p>Measurement information is then accumulated additively.</p>
+<p>Information filters can be advantageous in some distributed or
+multisensor estimation architectures.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.88 Sequential OD versus Batch OD</h3>
+
+<p>Batch OD uses an entire observation arc:</p>
+<p><span class="math display">\[\boxed{ \{ \mathbf z_1,\ldots,\mathbf
+z_N \} \rightarrow \hat{\mathbf x}_0. }\]</span></p>
+<p>Sequential OD processes measurements recursively:</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k-1|k-1}
+\rightarrow \hat{\mathbf x}_{k|k}. }\]</span></p>
+<p>They use the same</p>
+<ul>
+<li>dynamics,</li>
+<li>measurement equations,</li>
+<li>covariance concepts.</li>
+</ul>
+<p>The principal difference is how measurement information is
+accumulated.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.89 Advantages of Sequential OD</h3>
+
+<p>Sequential orbit determination provides</p>
+<ul>
+<li>real-time updates,</li>
+<li>low memory requirements,</li>
+<li>immediate processing,</li>
+<li>continuous state availability,</li>
+<li>natural onboard implementation,</li>
+<li>easy asynchronous sensor integration,</li>
+<li>suitability for autonomous navigation.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.90 Limitations of Sequential OD</h3>
+
+<p>Limitations include</p>
+<ul>
+<li>sensitivity to incorrect initialization,</li>
+<li>sensitivity to covariance tuning,</li>
+<li>potential filter divergence,</li>
+<li>possible loss of information compared with smoothing,</li>
+<li>linearization errors in EKF implementations.</li>
+</ul>
+<p>The estimator therefore requires continuous health monitoring.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.91 Sequential Filter versus Smoother</h3>
+
+<p>A filter estimates</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k}
+}\]</span></p>
+<p>using only measurements through time <code>k</code>.</p>
+<p>A smoother estimates</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|N}, \qquad
+N&gt;k }\]</span></p>
+<p>using future measurements as well.</p>
+<p>Therefore smoothing generally improves historical state estimates but
+cannot provide strictly real-time estimates for future measurements that
+have not yet occurred.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.92 Prediction Mode</h3>
+
+<p>Sequential OD can operate temporarily without measurements.</p>
+<p>Then the estimator performs only</p>
+<p><span class="math display">\[\boxed{ \text{State Propagation} +
+\text{Covariance Propagation}. }\]</span></p>
+<p>This is called prediction or coast mode.</p>
+<p>Uncertainty typically grows until another measurement becomes
+available.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.93 Update Mode</h3>
+
+<p>When a valid measurement becomes available,</p>
+<p><span class="math display">\[\boxed{ \text{Innovation} \rightarrow
+\text{Gain} \rightarrow \text{State Correction} \rightarrow
+\text{Covariance Reduction}. }\]</span></p>
+<p>The estimator alternates naturally between prediction and update
+modes.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.94 Real-Time Recursive Orbit Updates</h3>
+
+<p>The operational navigation state can therefore be continuously
+maintained as</p>
+<p><span class="math display">\[\boxed{ \{ \hat{\mathbf x}_{k|k},
+\mathbf P_{k|k} \}. }\]</span></p>
+<p>Every new observation refreshes the solution.</p>
+<p>This is the defining feature of real-time sequential orbit
+determination.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.95 Sequential OD Health Monitoring</h3>
+
+<p>A practical system should monitor</p>
+<ul>
+<li>innovation magnitude,</li>
+<li>normalized innovation,</li>
+<li>covariance,</li>
+<li>measurement rejection rate,</li>
+<li>state validity,</li>
+<li>numerical conditioning,</li>
+<li>sensor availability.</li>
+</ul>
+<p>This allows early detection of estimator problems.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.96 Common Mistakes in Sequential Orbit Determination</h3>
+
+<p>Common errors include:</p>
+<ol type="1">
+<li>Assuming sensor update rate and estimator propagation rate must be
+identical.</li>
+<li>Using incorrect process-noise scaling.</li>
+<li>Setting <code>\mathbf Q=0</code> for imperfect dynamics.</li>
+<li>Using unrealistic measurement covariance.</li>
+<li>Ignoring maneuver uncertainty.</li>
+<li>Processing delayed measurements at arrival time instead of
+measurement time.</li>
+<li>Ignoring sensor bias.</li>
+<li>Adding unobservable augmented states.</li>
+<li>Treating correlated sensors as independent.</li>
+<li>Using raw residual thresholds instead of normalized innovation.</li>
+<li>Ignoring covariance consistency.</li>
+<li>Using an incorrect measurement Jacobian.</li>
+<li>Allowing covariance to lose symmetry or positive definiteness.</li>
+<li>Failing to detect unexpected maneuvers.</li>
+<li>Overusing covariance inflation instead of correcting model
+deficiencies.</li>
+<li>Confusing estimator rate with measurement rate.</li>
+<li>Ignoring tracking gaps.</li>
+<li>Double counting derived measurements.</li>
+<li>Declaring filter convergence based only on a stable-looking
+state.</li>
+<li>Failing to monitor innovation whiteness and bias.</li>
+</ol>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.97 Practical Sequential OD Workflow</h3>
+
+<p>A disciplined sequential OD architecture follows</p>
+<p><span class="math display">\[\boxed{ \begin{array}{c}
+\text{Initialize State and Covariance}\\ \downarrow\\ \text{Propagate
+Dynamics}\\ \downarrow\\ \text{Propagate Covariance}\\ \downarrow\\
+\text{Check for Maneuver / Dynamic Event}\\ \downarrow\\ \text{Receive
+Measurement}\\ \downarrow\\ \text{Associate Correct Measurement Time}\\
+\downarrow\\ \text{Predict Measurement}\\ \downarrow\\ \text{Compute
+Innovation}\\ \downarrow\\ \text{Compute Innovation Covariance}\\
+\downarrow\\ \text{Apply Gating / Quality Checks}\\ \downarrow\\
+\text{Compute Kalman Gain}\\ \downarrow\\ \text{Update State}\\
+\downarrow\\ \text{Update Covariance}\\ \downarrow\\ \text{Monitor
+Consistency}\\ \downarrow\\ \text{Repeat for Next Measurement}
+\end{array} }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.98 General Sequential OD Architecture</h3>
+
+<p>The full information flow can be summarized as</p>
+<p><span class="math display">\[\boxed{ \begin{array}{c} \text{Previous
+Navigation Solution}\\ \hat{\mathbf x}_{k-1|k-1}, \mathbf P_{k-1|k-1} \\
+\downarrow\\ \text{Dynamics + Maneuver Model}\\ \downarrow\\
+\hat{\mathbf x}_{k|k-1}, \mathbf P_{k|k-1} \\ \downarrow\\ \text{New
+Sensor Measurement}\\ \mathbf z_k \\ \downarrow\\ \text{Measurement
+Prediction}\\ \hat{\mathbf z}_k \\ \downarrow\\ \text{Innovation} \\
+\mathbf y_k \\ \downarrow\\ \text{Estimator Update} \\ \downarrow\\
+\hat{\mathbf x}_{k|k}, \mathbf P_{k|k} \\ \downarrow\\ \text{Repeat
+Continuously} \end{array} }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.99 Core Sequential-OD Equations</h3>
+
+<h3 id="state-propagation">State propagation</h3>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k-1} = \phi(
+t_k,t_{k-1}, \hat{\mathbf x}_{k-1|k-1} ) }\]</span></p>
+<h3 id="covariance-propagation">Covariance propagation</h3>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k-1} = \mathbf
+F_{k-1} \mathbf P_{k-1|k-1} \mathbf F_{k-1}^T + \mathbf Q_{k-1}
+}\]</span></p>
+<h3 id="measurement-prediction">Measurement prediction</h3>
+<p><span class="math display">\[\boxed{ \hat{\mathbf z}_k = h_k(
+\hat{\mathbf x}_{k|k-1} ) }\]</span></p>
+<h3 id="innovation">Innovation</h3>
+<p><span class="math display">\[\boxed{ \mathbf y_k = \mathbf z_k -
+\hat{\mathbf z}_k }\]</span></p>
+<h3 id="innovation-covariance">Innovation covariance</h3>
+<p><span class="math display">\[\boxed{ \mathbf S_k = \mathbf H_k
+\mathbf P_{k|k-1} \mathbf H_k^T + \mathbf R_k }\]</span></p>
+<h3 id="kalman-gain">Kalman gain</h3>
+<p><span class="math display">\[\boxed{ \mathbf K_k = \mathbf P_{k|k-1}
+\mathbf H_k^T \mathbf S_k^{-1} }\]</span></p>
+<h3 id="state-update">State update</h3>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k} =
+\hat{\mathbf x}_{k|k-1} + \mathbf K_k \mathbf y_k }\]</span></p>
+<h3 id="joseph-covariance-update">Joseph covariance update</h3>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k} = ( \mathbf
+I-\mathbf K_k\mathbf H_k ) \mathbf P_{k|k-1} ( \mathbf I-\mathbf
+K_k\mathbf H_k )^T + \mathbf K_k \mathbf R_k \mathbf K_k^T
+}\]</span></p>
+<h3 id="normalized-innovation-squared">Normalized innovation
+squared</h3>
+<p><span class="math display">\[\boxed{ \epsilon_k = \mathbf y_k^T
+\mathbf S_k^{-1} \mathbf y_k }\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.14.100 Key Takeaways</h3>
+
+<p>Sequential orbit determination maintains an orbit solution
+continuously by alternating between <strong>dynamic prediction</strong>
+and <strong>measurement correction</strong>.</p>
+<p>The basic propagation step is</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k-1} = \phi(
+\hat{\mathbf x}_{k-1|k-1} ). }\]</span></p>
+<p>The corresponding uncertainty is propagated through</p>
+<p><span class="math display">\[\boxed{ \mathbf P_{k|k-1} = \mathbf F
+\mathbf P_{k-1|k-1} \mathbf F^T + \mathbf Q. }\]</span></p>
+<p>A new measurement is predicted:</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf z}_k = h(
+\hat{\mathbf x}_{k|k-1} ) }\]</span></p>
+<p>and compared with the actual observation:</p>
+<p><span class="math display">\[\boxed{ \mathbf y_k = \mathbf
+z_k-\hat{\mathbf z}_k. }\]</span></p>
+<p>The innovation is then mapped into a state correction using the
+Kalman gain:</p>
+<p><span class="math display">\[\boxed{ \hat{\mathbf x}_{k|k} =
+\hat{\mathbf x}_{k|k-1} + \mathbf K_k\mathbf y_k. }\]</span></p>
+<p>The most important distinguishing feature is that sequential OD does
+<strong>not</strong> wait for a complete observation arc.</p>
+<p>Instead,</p>
+<p><span class="math display">\[\boxed{ \text{Measurement Arrives}
+\rightarrow \text{Navigation Solution Updates Immediately}.
+}\]</span></p>
+<p>Process noise is essential because real spacecraft dynamics are never
+modeled perfectly:</p>
+<p><span class="math display">\[\boxed{ \mathbf Q \rightarrow
+\text{Representation of Dynamic Uncertainty}. }\]</span></p>
+<p>Maneuvers must be explicitly incorporated because they alter both the
+nominal trajectory and the covariance.</p>
+<p>State augmentation allows the estimator to track quantities such
+as</p>
+<ul>
+<li>biases,</li>
+<li>clock states,</li>
+<li>drag parameters,</li>
+<li>empirical accelerations,</li>
+<li>maneuver corrections.</li>
+</ul>
+<p>Sequential OD naturally supports</p>
+<ul>
+<li>asynchronous sensors,</li>
+<li>multi-rate navigation,</li>
+<li>continuous tracking,</li>
+<li>onboard implementation,</li>
+<li>autonomous operations.</li>
+</ul>
+<p>The key engineering distinction is:</p>
+<p><span class="math display">\[\boxed{ \text{Propagation Rate} \neq
+\text{Measurement Rate}. }\]</span></p>
+<p>A navigation system may propagate at a high internal rate while
+incorporating measurements at slower or asynchronous rates.</p>
+<p>Finally, a good sequential OD system must maintain not only an
+estimated orbit but also a <strong>statistically consistent uncertainty
+estimate</strong>:</p>
+<p><span class="math display">\[\boxed{ \text{Sequential OD Solution} =
+\{ \hat{\mathbf x}_{k|k}, \mathbf P_{k|k} \}. }\]</span></p>
+<p>Its performance must therefore be assessed through the state history,
+covariance, innovation statistics, maneuver handling, sensor
+availability, and consistency over time.</p>
+    </section>
+    <section class="notes-section-card">
+      <h2>Next: 4.3.15 Maneuver and Dynamic-Parameter Estimation</h2>
+      <p>
+        Sequential orbit determination propagates and updates the orbit recursively as measurements arrive.
+        The next section focuses specifically on estimating impulsive and finite-burn maneuvers, burn timing,
+        thrust magnitude and direction, empirical accelerations, drag-related parameters, and solar-radiation-pressure parameters.
+      </p>
+      <a href="maneuver-dynamic-parameter-estimation.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.15 Maneuver and Dynamic-Parameter Estimation</h3>
+          <p>
+            Impulsive and finite-burn estimation, burn timing, thrust magnitude and direction, empirical accelerations,
+            drag, and SRP parameter estimation.
+          </p>
+          <p class="sensor-link-arrow">Continue to Maneuver and Dynamic-Parameter Estimation &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
