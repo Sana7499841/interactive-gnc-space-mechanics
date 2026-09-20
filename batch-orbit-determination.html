@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>4.3.13 Batch Orbit Determination | Interactive GNC &amp; Space Mechanics</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/png" href="favicon1.png">
+  <!-- MathJax -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    .sensor-link-card { display:block; margin-top:1.25rem; text-decoration:none; }
+    .sensor-link-arrow { font-weight:700; margin-bottom:0; }
+    blockquote { margin:1rem 0 1.4rem; padding:0.9rem 1.1rem; border-left:4px solid #9bb8d3; background:#f7f9fb; font-style:italic; }
+    .table-wrap { width:100%; overflow-x:auto; margin:1rem 0 1.4rem; }
+    .table-wrap table { width:100%; border-collapse:collapse; }
+    .table-wrap th, .table-wrap td { border:1px solid #d8dee6; padding:0.75rem 0.85rem; text-align:left; vertical-align:top; }
+    .table-wrap th { font-weight:700; background:#f7f9fb; }
+    .engineering-note { margin:1rem 0; padding:0.95rem 1.05rem; background:#f7f9fb; border-left:4px solid #9bb8d3; }
+    .equation-note { margin-top:0.35rem; color:#475569; }
+    .notes-section-card h4 { margin-top:1.25rem; margin-bottom:0.55rem; }
+    .notes-section-card .math.display { display:block; overflow-x:auto; padding:0.15rem 0; }
+</style>
+</head>
+<body>
+  <header class="notes-hero">
+    <h1>Batch Orbit Determination</h1>
+    <p class="notes-tagline">
+      Differential correction, STM-based design matrices, residual stacking, weighted least squares, priors,
+      parameter estimation, numerical conditioning, iteration, convergence, covariance, and post-fit residual analysis.
+    </p>
+    <nav class="pill-nav">
+      <a href="index.html" class="pill">Home</a>
+      <a href="tools.html" class="pill">Tools</a>
+      <a href="notes.html" class="pill active">Theory Notes</a>
+      <a href="references.html" class="pill">References</a>
+      <a href="problems.html" class="pill">Problem Bank</a>
+      <a href="about.html" class="pill">About</a>
+    </nav>
+  </header>
+  <main class="page-main">
+    <section class="notes-section-card">
+      <h2>4.3.13 Batch Orbit Determination</h2>
+
+<p>Batch orbit determination estimates a spacecraft state, and
+optionally additional dynamic or measurement parameters, by processing
+an entire set of observations over a finite observation arc
+<strong>together</strong>.</p>
+<p>Instead of updating the state one measurement at a time, batch OD
+seeks the single reference-epoch state that best explains all available
+measurements simultaneously.</p>
+<p>The central idea is</p>
+<p><span class="math display">\[
+\boxed{ \text{Reference-Epoch State Guess} + \text{Complete Observation
+Arc} \rightarrow \text{Best-Fit State and Parameters} }
+\]</span></p>
+<p>A batch estimator therefore combines:</p>
+<ul>
+<li>orbit propagation,</li>
+<li>measurement prediction,</li>
+<li>STM-based sensitivity mapping,</li>
+<li>residual stacking,</li>
+<li>weighting,</li>
+<li>differential correction,</li>
+<li>iteration,</li>
+<li>convergence testing,</li>
+<li>covariance calculation,</li>
+<li>post-fit residual analysis.</li>
+</ul>
+<p>Batch OD is widely used for:</p>
+<ul>
+<li>precise orbit reconstruction,</li>
+<li>post-processing,</li>
+<li>trajectory refinement,</li>
+<li>calibration,</li>
+<li>maneuver estimation,</li>
+<li>parameter estimation,</li>
+<li>generating accurate initial conditions for sequential filters.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.1 Basic Batch Estimation Problem</h3>
+
+<p>Suppose measurements are available at times</p>
+<p><span class="math display">\[
+t_1,t_2,\ldots,t_N.
+\]</span></p>
+<p>Let the unknown reference state be</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_0 = \mathbf x(t_0) }
+\]</span></p>
+<p>at reference epoch <code>t_0</code>.</p>
+<p>Each measurement is modeled as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k[ \phi( t_k,t_0,\mathbf x_0 )] + \mathbf v_k }
+\]</span></p>
+<p>where</p>
+<ul>
+<li><code>\phi(\cdot)</code> propagates the state from <code>t_0</code>
+to <code>t_k</code>,</li>
+<li><code>h_k(\cdot)</code> predicts the measurement,</li>
+<li><code>\mathbf v_k</code> is measurement noise.</li>
+</ul>
+<p>The objective is to estimate the value of <code>\mathbf x_0</code>
+that makes the predicted measurements best match the complete
+measurement set.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.2 Why Batch OD Uses a Reference Epoch</h3>
+
+<p>The measurements occur at many different times, but a single common
+state is estimated.</p>
+<p>For each observation time,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_k = \phi( t_k,t_0,\mathbf x_0 ) }
+\]</span></p>
+<p>Therefore all measurements are dynamically linked to the same
+reference state.</p>
+<p>This is one of the defining features of orbit determination.</p>
+<p>It ensures that the estimated trajectory is consistent with the
+equations of motion instead of fitting an unrelated position
+independently at every time.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.3 Initial Reference-State Guess</h3>
+
+<p>The batch process begins with an initial guess</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_0^{(0)} }
+\]</span></p>
+<p>where the superscript indicates the iteration number.</p>
+<p>This initial guess may come from</p>
+<ul>
+<li>an initial orbit determination solution,</li>
+<li>GNSS,</li>
+<li>previous OD,</li>
+<li>propagated ephemeris,</li>
+<li>another navigation source.</li>
+</ul>
+<p>The closer the initial guess is to the true state, the more reliable
+the linearized iterative solution generally becomes.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.4 Propagation to Measurement Epochs</h3>
+
+<p>At iteration <code>j</code>, propagate</p>
+<p><span class="math display">\[
+\hat{\mathbf x}_0^{(j)}
+\]</span></p>
+<p>to every observation epoch:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_k^{(j)} = \phi( t_k,t_0, \hat{\mathbf x}_0^{(j)}
+) }
+\]</span></p>
+<p>This propagation uses the selected force model.</p>
+<p>For precise OD, the STM and any required parameter sensitivities are
+usually propagated at the same time.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.5 Measurement Prediction</h3>
+
+<p>At every observation time, predict the measurement:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf z}_k^{(j)} = h_k( \hat{\mathbf x}_k^{(j)} ) }
+\]</span></p>
+<p>The predicted quantity must use the same physical definition as the
+actual measurement, including, when required,</p>
+<ul>
+<li>correct coordinate frame,</li>
+<li>sensor geometry,</li>
+<li>station location,</li>
+<li>timing,</li>
+<li>bias corrections,</li>
+<li>light-time,</li>
+<li>calibration.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.6 Pre-Fit Residual</h3>
+
+<p>The difference between observed and predicted measurement is the
+pre-fit residual:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k^{(j)} = \mathbf z_k - \hat{\mathbf z}_k^{(j)} }
+\]</span></p>
+<p>If the reference-state guess were exact and the models perfect, the
+residual would contain only measurement noise.</p>
+<p>In practice it also contains the effects of</p>
+<ul>
+<li>state error,</li>
+<li>parameter error,</li>
+<li>force-model mismatch,</li>
+<li>sensor bias,</li>
+<li>timing error.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.7 Linearization of the Batch Problem</h3>
+
+<p>The nonlinear measurement equation is linearized around the current
+reference-state estimate.</p>
+<p>Let</p>
+<p><span class="math display">\[
+\delta\mathbf x_0 = \mathbf x_0 - \hat{\mathbf x}_0.
+\]</span></p>
+<p>Then approximately,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k \approx \mathbf G_k \delta\mathbf x_0 + \mathbf v_k
+}
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+\mathbf G_k
+\]</span></p>
+<p>is the measurement sensitivity with respect to the reference-epoch
+state.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.8 Measurement Jacobian at the Observation Epoch</h3>
+
+<p>At measurement time <code>t_k</code>,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf H_k = \frac{\partial h_k} {\partial\mathbf x_k} }
+\]</span></p>
+<p>describes how the measurement changes with the state at that same
+epoch.</p>
+<p>However, batch OD usually estimates <code>\mathbf x_0</code>, not
+<code>\mathbf x_k</code>.</p>
+<p>Therefore the STM is required.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.9 STM-Based Design Matrix</h3>
+
+<p>The state perturbation at measurement epoch <code>t_k</code> is</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x_k = \boldsymbol\Phi( t_k,t_0 ) \delta\mathbf x_0
+}
+\]</span></p>
+<p>Therefore,</p>
+<p><span class="math display">\[
+\delta\mathbf z_k \approx \mathbf H_k \boldsymbol\Phi( t_k,t_0 )
+\delta\mathbf x_0.
+\]</span></p>
+<p>Define</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k = \mathbf H_k \boldsymbol\Phi( t_k,t_0 ) }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k \approx \mathbf G_k \delta\mathbf x_0 + \mathbf v_k.
+}
+\]</span></p>
+<p>This is the central STM-based relationship used in batch orbit
+determination.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.10 Physical Meaning of `\mathbf G_k`</h3>
+
+<p>The matrix</p>
+<p><span class="math display">\[
+\mathbf G_k
+\]</span></p>
+<p>answers:</p>
+<blockquote>
+<p>If I perturb the reference-epoch state slightly, how will the
+measurement at time <code>t_k</code> change?</p>
+</blockquote>
+<p>It combines two sensitivities:</p>
+<p><span class="math display">\[
+\boxed{ \text{Reference-State Change} \xrightarrow{\boldsymbol\Phi}
+\text{State Change at }t_k \xrightarrow{\mathbf H_k} \text{Measurement
+Change} }
+\]</span></p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k = \mathbf H_k\boldsymbol\Phi_k }
+\]</span></p>
+<p>connects orbital dynamics directly to measurement information.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.11 Residual Stacking</h3>
+
+<p>Instead of treating the residuals individually, batch OD stacks them
+into one large vector:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r = \begin{bmatrix} \mathbf r_1\\ \mathbf r_2\\ \vdots\\
+\mathbf r_N \end{bmatrix} }
+\]</span></p>
+<p>Similarly, stack the design matrices:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G = \begin{bmatrix} \mathbf G_1\\ \mathbf G_2\\ \vdots\\
+\mathbf G_N \end{bmatrix} }
+\]</span></p>
+<p>Then the entire linearized batch problem becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r \approx \mathbf G \delta\mathbf x_0 + \mathbf v. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.12 Dimensions of the Batch System</h3>
+
+<p>Suppose the unknown state contains <code>n</code> elements and there
+are <code>m</code> total scalar measurements.</p>
+<p>Then</p>
+<p><span class="math display">\[
+\mathbf G \in \mathbb R^{m\times n}
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\delta\mathbf x_0 \in \mathbb R^n.
+\]</span></p>
+<p>Usually,</p>
+<p><span class="math display">\[
+m&gt;n,
+\]</span></p>
+<p>so the system is overdetermined.</p>
+<p>The estimator therefore seeks the correction that best fits all
+measurements in a least-squares sense.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.13 Unweighted Least Squares</h3>
+
+<p>The simplest objective is</p>
+<p><span class="math display">\[
+\boxed{ J = \mathbf r^T\mathbf r }
+\]</span></p>
+<p>or equivalently</p>
+<p><span class="math display">\[
+\boxed{ J = \sum_{k=1}^{N} \mathbf r_k^T \mathbf r_k. }
+\]</span></p>
+<p>The estimate minimizes the sum of squared residuals.</p>
+<p>The corresponding normal equations are</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf G \, \delta\mathbf x_0 = \mathbf G^T \mathbf
+r. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.14 Unweighted Least-Squares Solution</h3>
+
+<p>If the required inverse exists,</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x_0 = ( \mathbf G^T\mathbf G )^{-1} \mathbf G^T
+\mathbf r }
+\]</span></p>
+<p>This is the classical least-squares correction.</p>
+<p>However, orbit-determination measurements rarely all have identical
+uncertainty.</p>
+<p>Therefore weighted least squares is usually more appropriate.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.15 Weighted Least Squares</h3>
+
+<p>If the stacked measurement-noise covariance is</p>
+<p><span class="math display">\[
+\mathbf R,
+\]</span></p>
+<p>define the weight matrix</p>
+<p><span class="math display">\[
+\boxed{ \mathbf W = \mathbf R^{-1}. }
+\]</span></p>
+<p>Then the weighted cost function is</p>
+<p><span class="math display">\[
+\boxed{ J = \mathbf r^T \mathbf W \mathbf r. }
+\]</span></p>
+<p>Measurements with lower uncertainty receive greater statistical
+influence.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.16 Weighted Normal Equations</h3>
+
+<p>Minimizing the weighted cost gives</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf W \mathbf G \, \delta\mathbf x_0 = \mathbf
+G^T \mathbf W \mathbf r. }
+\]</span></p>
+<p>The formal solution is</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x_0 = ( \mathbf G^T \mathbf W \mathbf G )^{-1}
+\mathbf G^T \mathbf W \mathbf r. }
+\]</span></p>
+<p>This is the standard weighted batch least-squares correction.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.17 Normal Matrix</h3>
+
+<p>Define the normal matrix</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N = \mathbf G^T \mathbf W \mathbf G. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N \delta\mathbf x_0 = \mathbf b }
+\]</span></p>
+<p>with</p>
+<p><span class="math display">\[
+\boxed{ \mathbf b = \mathbf G^T \mathbf W \mathbf r. }
+\]</span></p>
+<p>The matrix <code>\mathbf N</code> contains accumulated information
+from the complete observation arc.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.18 Information Interpretation</h3>
+
+<p>Because</p>
+<p><span class="math display">\[
+\mathbf N = \mathbf G^T \mathbf R^{-1} \mathbf G,
+\]</span></p>
+<p>it has the form of an information matrix.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{More Informative Measurements} \rightarrow \text{Larger
+Information} \rightarrow \text{Smaller State Uncertainty} }
+\]</span></p>
+<p>in an appropriate matrix sense.</p>
+<p>Weakly observed directions appear as poorly conditioned or nearly
+singular directions of <code>\mathbf N</code>.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.19 Why Weighting Matters</h3>
+
+<p>Suppose one range sensor has</p>
+<p><span class="math display">\[
+\sigma_\rho=1\ \text{m}
+\]</span></p>
+<p>while another has</p>
+<p><span class="math display">\[
+\sigma_\rho=100\ \text{m}.
+\]</span></p>
+<p>Treating both equally would ignore a large difference in measurement
+quality.</p>
+<p>Using</p>
+<p><span class="math display">\[
+W_i=\frac{1}{\sigma_i^2}
+\]</span></p>
+<p>naturally gives greater influence to the more precise
+measurement.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.20 Measurement Covariance in Batch OD</h3>
+
+<p>If measurements are independent,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R = \operatorname{blockdiag} ( \mathbf R_1, \mathbf R_2,
+\ldots, \mathbf R_N ) }
+\]</span></p>
+<p>If measurement errors are correlated,</p>
+<p><span class="math display">\[
+\mathbf R
+\]</span></p>
+<p>must contain the appropriate off-diagonal terms.</p>
+<p>Ignoring correlation can cause the batch solution to become
+overconfident.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.21 A Priori State Information</h3>
+
+<p>Batch OD may also include prior knowledge of the reference state.</p>
+<p>Let</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_0 \sim \mathcal N( \bar{\mathbf x}_0, \mathbf P_0 ) }
+\]</span></p>
+<p>Then the batch objective can include both measurement residuals and a
+prior penalty.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.22 Batch Cost Function with Prior</h3>
+
+<p>A common objective is</p>
+<p><span class="math display">\[
+\boxed{ J = ( \mathbf x_0-\bar{\mathbf x}_0 )^T \mathbf P_0^{-1} (
+\mathbf x_0-\bar{\mathbf x}_0 ) + \mathbf r^T \mathbf R^{-1} \mathbf r.
+}
+\]</span></p>
+<p>Thus the solution balances</p>
+<ul>
+<li>prior orbit knowledge,</li>
+<li>new measurement information.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.23 Prior-Weighted Normal Equations</h3>
+
+<p>If the correction is defined around current estimate
+<code>\hat{\mathbf x}_0</code>, prior information contributes an
+additional term.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N_{\rm total} = \mathbf P_0^{-1} + \mathbf G^T \mathbf
+R^{-1} \mathbf G. }
+\]</span></p>
+<p>The corresponding posterior covariance is approximately</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P_{\rm post} = \mathbf N_{\rm total}^{-1}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.24 Differential Correction</h3>
+
+<p>Because spacecraft dynamics and measurement functions are nonlinear,
+one least-squares solution is generally not sufficient.</p>
+<p>The procedure is iterative.</p>
+<p>At iteration <code>j</code>:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_0^{(j+1)} = \hat{\mathbf x}_0^{(j)} +
+\delta\mathbf x_0^{(j)}. }
+\]</span></p>
+<p>This process is called <strong>differential correction</strong>.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.25 Why Differential Correction Is Required</h3>
+
+<p>The equation</p>
+<p><span class="math display">\[
+\mathbf r \approx \mathbf G\delta\mathbf x_0
+\]</span></p>
+<p>is only a local linear approximation.</p>
+<p>If the initial state error is large, the first linearization may be
+inaccurate.</p>
+<p>After correcting the state, the trajectory and measurement
+sensitivities must therefore be recomputed.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Propagate} \rightarrow \text{Linearize} \rightarrow
+\text{Solve} \rightarrow \text{Correct} \rightarrow \text{Repeat} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.26 Iterative Batch OD Cycle</h3>
+
+<p>A typical iteration follows:</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Current Reference State}\\ \hat{\mathbf
+x}_0^{(j)} \\ \downarrow\\ \text{Propagate State + STM}\\ \downarrow\\
+\text{Predict Measurements}\\ \downarrow\\ \text{Compute Residuals}\\
+\downarrow\\ \text{Form }\mathbf G\\ \downarrow\\ \text{Solve Weighted
+Least Squares}\\ \downarrow\\ \delta\mathbf x_0^{(j)} \\ \downarrow\\
+\hat{\mathbf x}_0^{(j+1)} = \hat{\mathbf x}_0^{(j)} + \delta\mathbf
+x_0^{(j)} \\ \downarrow\\ \text{Repeat Until Converged} \end{array} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.27 Gauss-Newton Interpretation</h3>
+
+<p>Differential correction is closely related to the Gauss-Newton method
+for nonlinear least squares.</p>
+<p>Given</p>
+<p><span class="math display">\[
+J(\mathbf x) = \mathbf r(\mathbf x)^T \mathbf W \mathbf r(\mathbf x),
+\]</span></p>
+<p>the local quadratic approximation leads to</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x = ( \mathbf G^T \mathbf W \mathbf G )^{-1}
+\mathbf G^T \mathbf W \mathbf r. }
+\]</span></p>
+<p>Thus batch OD can be understood as a nonlinear optimization
+problem.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.28 Sign Convention in Differential Correction</h3>
+
+<p>Care must be taken with residual definition.</p>
+<p>If</p>
+<p><span class="math display">\[
+\mathbf r = \mathbf z_{\rm obs} - \mathbf z_{\rm calc},
+\]</span></p>
+<p>the correction sign differs from the convention obtained if</p>
+<p><span class="math display">\[
+\mathbf r = \mathbf z_{\rm calc} - \mathbf z_{\rm obs}.
+\]</span></p>
+<p>Therefore the residual convention, Jacobian sign, and update equation
+must be internally consistent.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.29 Parameter Augmentation in Batch OD</h3>
+
+<p>The unknown vector can include both the reference state and model
+parameters:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf y = \begin{bmatrix} \mathbf x_0\\ \boldsymbol\theta
+\end{bmatrix}. }
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf y = \begin{bmatrix} \delta\mathbf x_0\\
+\delta\boldsymbol\theta \end{bmatrix} }
+\]</span></p>
+<p>is solved simultaneously.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.30 Augmented Batch Design Matrix</h3>
+
+<p>For parameters <code>\boldsymbol\theta</code>, the measurement
+sensitivity becomes</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k^{\rm aug} = \begin{bmatrix} \frac{\partial\mathbf
+z_k} {\partial\mathbf x_0} &amp; \frac{\partial\mathbf z_k}
+{\partial\boldsymbol\theta} \end{bmatrix}. }
+\]</span></p>
+<p>The state term is</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf z_k} {\partial\mathbf x_0} = \mathbf
+H_k\boldsymbol\Phi_k. }
+\]</span></p>
+<p>Parameter sensitivities may contain both direct measurement
+dependence and dynamic dependence.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.31 Dynamic Parameter Sensitivity</h3>
+
+<p>If parameter <code>\theta</code> affects the dynamics,</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial\mathbf z_k} {\partial\theta} = \mathbf H_k
+\mathbf S_{\theta,k} + \mathbf H_{\theta,k}. }
+\]</span></p>
+<p>Here,</p>
+<p><span class="math display">\[
+\mathbf S_{\theta,k} = \frac{\partial\mathbf x_k}{\partial\theta}.
+\]</span></p>
+<p>This is how parameters such as drag coefficients or force-model terms
+enter the batch design matrix.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.32 Batch Estimation of Biases</h3>
+
+<p>Suppose a range bias <code>b_\rho</code> is estimated.</p>
+<p>The model is</p>
+<p><span class="math display">\[
+z_\rho = h_\rho(\mathbf x) + b_\rho + v.
+\]</span></p>
+<p>Then</p>
+<p><span class="math display">\[
+\boxed{ \frac{\partial z_\rho} {\partial b_\rho} = 1. }
+\]</span></p>
+<p>A column of ones may therefore appear in the design matrix for that
+measurement bias.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.33 Batch Estimation of Ballistic or Dynamic Parameters</h3>
+
+<p>A drag-related parameter may influence the trajectory over the full
+arc.</p>
+<p>Its sensitivity can accumulate with time.</p>
+<p>Therefore long observation arcs may improve parameter estimation.</p>
+<p>However, long arcs also increase sensitivity to unmodeled
+dynamics.</p>
+<p>The same arc-length tradeoff discussed previously remains
+important.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.34 Maneuver Estimation in Batch OD</h3>
+
+<p>If a maneuver occurs during the observation arc, its correction may
+be estimated.</p>
+<p>For an impulsive event,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf v^+ = \mathbf v^- + \Delta\mathbf v. }
+\]</span></p>
+<p>An uncertain</p>
+<p><span class="math display">\[
+\Delta\mathbf v
+\]</span></p>
+<p>may be included as an estimated parameter.</p>
+<p>Measurements before and after the maneuver then constrain the
+maneuver correction.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.35 State Discontinuity at a Maneuver</h3>
+
+<p>A maneuver creates a state discontinuity in velocity.</p>
+<p>Therefore the STM and sensitivity propagation must account for the
+event.</p>
+<p>Conceptually,</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x^+ = \mathbf M \delta\mathbf x^- + \mathbf
+B_{\Delta v} \delta\Delta\mathbf v }
+\]</span></p>
+<p>where <code>\mathbf M</code> is the event transition mapping.</p>
+<p>The details depend on the maneuver model.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.36 Multiple-Shooting or Multi-Arc Batch Estimation</h3>
+
+<p>For long arcs or maneuver-rich trajectories, a single reference state
+may become inconvenient.</p>
+<p>The arc can be divided into segments with separate local states.</p>
+<p>Continuity constraints then connect the segments.</p>
+<p>This leads to</p>
+<ul>
+<li>multiple-shooting methods,</li>
+<li>multi-arc estimation.</li>
+</ul>
+<p>These approaches can improve numerical robustness for complex
+trajectories.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.37 Multi-Arc Orbit Determination</h3>
+
+<p>Suppose separate arcs have states</p>
+<p><span class="math display">\[
+\mathbf x_0^{(1)}, \mathbf x_0^{(2)},\ldots.
+\]</span></p>
+<p>Each arc may have its own measurements while selected global
+parameters are shared.</p>
+<p>This allows simultaneous estimation of</p>
+<ul>
+<li>local states,</li>
+<li>common physical parameters,</li>
+<li>measurement biases.</li>
+</ul>
+<p>Multi-arc estimation is useful when continuity is imperfect or model
+behavior changes with time.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.38 Residual Weighting by Measurement Type</h3>
+
+<p>Different measurement types may have different uncertainties.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\sigma_\rho,\quad \sigma_{\dot\rho},\quad \sigma_A,\quad \sigma_E
+\]</span></p>
+<p>may differ substantially.</p>
+<p>Each residual should therefore be weighted according to its
+covariance.</p>
+<p>Otherwise one measurement type may dominate the solution simply
+because of its numerical units.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.39 Unit Scaling in Batch OD</h3>
+
+<p>Suppose the measurement vector contains</p>
+<ul>
+<li>meters,</li>
+<li>radians,</li>
+<li>hertz.</li>
+</ul>
+<p>Directly minimizing unweighted numerical residuals would be
+meaningless because the units differ.</p>
+<p>Weighting with <code>\mathbf R^{-1}</code> converts each residual
+into a statistically appropriate scale.</p>
+<p>Thus weighted least squares also provides a natural solution to mixed
+measurement units.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.40 Whitening the Batch Problem</h3>
+
+<p>If</p>
+<p><span class="math display">\[
+\mathbf R = \mathbf L\mathbf L^T,
+\]</span></p>
+<p>define</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf r} = \mathbf L^{-1}\mathbf r }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf G} = \mathbf L^{-1}\mathbf G. }
+\]</span></p>
+<p>Then the weighted problem becomes an ordinary least-squares
+problem:</p>
+<p><span class="math display">\[
+\boxed{ \min \| \tilde{\mathbf r} - \tilde{\mathbf G} \delta\mathbf x
+\|^2. }
+\]</span></p>
+<p>This is often numerically useful.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.41 Solving Normal Equations Directly</h3>
+
+<p>Although</p>
+<p><span class="math display">\[
+\delta\mathbf x = ( \mathbf G^T\mathbf W\mathbf G )^{-1} \mathbf
+G^T\mathbf W\mathbf r
+\]</span></p>
+<p>is useful mathematically, explicitly computing the matrix inverse is
+generally discouraged.</p>
+<p>Instead solve</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N\delta\mathbf x = \mathbf b }
+\]</span></p>
+<p>using an appropriate linear solver.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.42 Why Explicit Matrix Inversion Is Usually Avoided</h3>
+
+<p>Explicit inversion can</p>
+<ul>
+<li>increase numerical error,</li>
+<li>waste computation,</li>
+<li>hide conditioning problems.</li>
+</ul>
+<p>Prefer</p>
+<ul>
+<li>Cholesky decomposition,</li>
+<li>QR decomposition,</li>
+<li>SVD,</li>
+<li>other stable factorization methods.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Solve Linear System} \quad\text{rather than}\quad
+\text{Explicitly Form } \mathbf N^{-1}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.43 QR Solution</h3>
+
+<p>For the whitened problem,</p>
+<p><span class="math display">\[
+\tilde{\mathbf G} \delta\mathbf x \approx \tilde{\mathbf r},
+\]</span></p>
+<p>perform</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf G} = \mathbf Q\mathbf R. }
+\]</span></p>
+<p>Then solve the triangular system</p>
+<p><span class="math display">\[
+\boxed{ \mathbf R \delta\mathbf x = \mathbf Q^T \tilde{\mathbf r}. }
+\]</span></p>
+<p>QR avoids explicitly forming <code>\mathbf G^T\mathbf G</code>, which
+can improve numerical conditioning.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.44 SVD Solution</h3>
+
+<p>For a poorly conditioned design matrix,</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf G} = \mathbf U \boldsymbol\Sigma \mathbf V^T. }
+\]</span></p>
+<p>Then the least-squares correction can be computed using the singular
+values.</p>
+<p>SVD reveals directly</p>
+<ul>
+<li>rank deficiency,</li>
+<li>weak estimation directions,</li>
+<li>parameter correlations.</li>
+</ul>
+<p>It is especially useful for diagnostic analysis.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.45 Condition Number</h3>
+
+<p>The condition number provides a measure of numerical sensitivity:</p>
+<p><span class="math display">\[
+\boxed{ \kappa(\mathbf G) = \frac{\sigma_{\max}} {\sigma_{\min}} }
+\]</span></p>
+<p>for a full-rank design matrix.</p>
+<p>A very large condition number indicates that small changes in
+measurements may produce large changes in some estimated state
+combinations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.46 Rank Deficiency</h3>
+
+<p>If</p>
+<p><span class="math display">\[
+\operatorname{rank}(\mathbf G)&lt;n,
+\]</span></p>
+<p>then some state or parameter combination cannot be uniquely
+determined from the available measurements.</p>
+<p>In that case,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf W \mathbf G }
+\]</span></p>
+<p>is singular or nearly singular.</p>
+<p>This is an observability or identifiability problem, not merely a
+numerical inconvenience.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.47 Weak Estimation Directions</h3>
+
+<p>Even if the design matrix is technically full rank, one singular
+value may be very small.</p>
+<p>Then the corresponding direction in parameter space is weakly
+constrained.</p>
+<p>This may result in</p>
+<ul>
+<li>large covariance,</li>
+<li>strong parameter correlation,</li>
+<li>unstable corrections.</li>
+</ul>
+<p>Such directions should be identified rather than hidden by aggressive
+numerical regularization.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.48 State Scaling</h3>
+
+<p>Batch variables may have very different numerical magnitudes.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+r\sim10^6\,{\rm m}
+\]</span></p>
+<p>and a calibration parameter might be</p>
+<p><span class="math display">\[
+10^{-5}.
+\]</span></p>
+<p>Define scaled variables:</p>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf y = \mathbf S \delta\tilde{\mathbf y}. }
+\]</span></p>
+<p>Proper scaling can substantially improve conditioning.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.49 Convergence Criteria</h3>
+
+<p>A batch iteration may be stopped when one or more conditions are
+satisfied.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\boxed{ \| \delta\mathbf x_0 \| &lt; \epsilon_x }
+\]</span></p>
+<p>or</p>
+<p><span class="math display">\[
+\boxed{ |J^{(j+1)}-J^{(j)}| &lt; \epsilon_J. }
+\]</span></p>
+<p>Other criteria may examine</p>
+<ul>
+<li>residual RMS,</li>
+<li>normalized correction,</li>
+<li>parameter change.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.50 Component-Wise Convergence</h3>
+
+<p>Because position and velocity have different units, using one raw
+Euclidean norm can be misleading.</p>
+<p>One may use normalized corrections:</p>
+<p><span class="math display">\[
+\boxed{ \eta_i = \frac{ |\delta x_i| }{ s_i } }
+\]</span></p>
+<p>where <code>s_i</code> is a characteristic scale or requirement.</p>
+<p>Then require all relevant components to fall below prescribed
+tolerances.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.51 Residual RMS Convergence</h3>
+
+<p>Another metric is residual root-mean-square:</p>
+<p><span class="math display">\[
+\boxed{ {\rm RMS} = \sqrt{ \frac{1}{m} \mathbf r^T\mathbf r } }
+\]</span></p>
+<p>or weighted RMS,</p>
+<p><span class="math display">\[
+\boxed{ {\rm WRMS} = \sqrt{ \frac{1}{m} \mathbf r^T \mathbf W \mathbf r
+}. }
+\]</span></p>
+<p>Convergence may be indicated when WRMS changes negligibly between
+iterations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.52 Cost Function Reduction</h3>
+
+<p>For a well-behaved differential-correction process,</p>
+<p><span class="math display">\[
+J^{(j+1)} &lt; J^{(j)}
+\]</span></p>
+<p>is generally expected.</p>
+<p>If the cost repeatedly increases, possible causes include</p>
+<ul>
+<li>poor linearization,</li>
+<li>incorrect Jacobian,</li>
+<li>bad initial state,</li>
+<li>wrong sign convention,</li>
+<li>model inconsistency.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.53 Damping the Correction</h3>
+
+<p>When the full Gauss-Newton correction is too aggressive, apply</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x^{(j+1)} = \mathbf x^{(j)} + \lambda \delta\mathbf
+x^{(j)} }
+\]</span></p>
+<p>where</p>
+<p><span class="math display">\[
+0&lt;\lambda\le1.
+\]</span></p>
+<p>This can improve robustness when the initial guess is not close
+enough for the local linearization.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.54 Levenberg-Marquardt Idea</h3>
+
+<p>A damped least-squares approach modifies the normal matrix:</p>
+<p><span class="math display">\[
+\boxed{ ( \mathbf G^T\mathbf W\mathbf G + \lambda\mathbf I )
+\delta\mathbf x = \mathbf G^T\mathbf W\mathbf r. }
+\]</span></p>
+<p>This blends Gauss-Newton behavior with additional regularization.</p>
+<p>It can improve convergence for nonlinear or ill-conditioned
+problems.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.55 Convergence Is Not Correctness</h3>
+
+<p>A differential-correction algorithm may converge numerically to an
+incorrect solution.</p>
+<p>Possible causes include</p>
+<ul>
+<li>wrong measurement model,</li>
+<li>wrong force model,</li>
+<li>biased measurements,</li>
+<li>local minimum,</li>
+<li>poor observability.</li>
+</ul>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Converged Batch Solution} \neq \text{Verified Physical
+Solution} }
+\]</span></p>
+<p>Validation remains essential.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.56 Post-Fit Residuals</h3>
+
+<p>After convergence, propagate the final estimated state and recompute
+the measurement residuals:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k^{\rm post} = \mathbf z_k - h_k( \hat{\mathbf x}_k ).
+}
+\]</span></p>
+<p>These are the post-fit residuals.</p>
+<p>They are among the most important diagnostics of a batch OD
+solution.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.57 Desired Properties of Post-Fit Residuals</h3>
+
+<p>Ideally, post-fit residuals should be</p>
+<ul>
+<li>approximately zero mean,</li>
+<li>consistent with expected measurement noise,</li>
+<li>free of obvious trends,</li>
+<li>free of unmodeled periodic structure,</li>
+<li>approximately white when the measurement model assumes white
+noise.</li>
+</ul>
+<p>This does not mean every residual must be small.</p>
+<p>Individual noise realizations can naturally be several standard
+deviations away from zero.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.58 Residual Bias</h3>
+
+<p>If</p>
+<p><span class="math display">\[
+\boxed{ E[\mathbf r^{\rm post}] \neq0, }
+\]</span></p>
+<p>the solution may contain systematic mismatch.</p>
+<p>Possible causes include</p>
+<ul>
+<li>measurement bias,</li>
+<li>incorrect station geometry,</li>
+<li>force-model error,</li>
+<li>timing error,</li>
+<li>calibration error.</li>
+</ul>
+<p>A biased residual sequence should be investigated physically.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.59 Residual Trends</h3>
+
+<p>A residual that steadily increases or decreases with time may
+indicate</p>
+<ul>
+<li>incorrect velocity,</li>
+<li>unmodeled acceleration,</li>
+<li>incorrect dynamic parameter,</li>
+<li>maneuver mismatch.</li>
+</ul>
+<p>Thus residual shape contains diagnostic information beyond residual
+RMS.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.60 Periodic Residual Structure</h3>
+
+<p>Periodic signatures may arise from</p>
+<ul>
+<li>orbital force-model error,</li>
+<li>station geometry,</li>
+<li>attitude-dependent calibration,</li>
+<li>periodic environmental disturbances.</li>
+</ul>
+<p>Frequency-domain or time-series analysis can help identify these
+patterns.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.61 Residual Whitening</h3>
+
+<p>For correlated measurement covariance,</p>
+<p><span class="math display">\[
+\mathbf R = \mathbf L\mathbf L^T,
+\]</span></p>
+<p>the whitened residual is</p>
+<p><span class="math display">\[
+\boxed{ \tilde{\mathbf r} = \mathbf L^{-1} \mathbf r. }
+\]</span></p>
+<p>A correctly modeled solution should produce whitened residuals with
+approximately unit covariance.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.62 Normalized Residuals</h3>
+
+<p>For scalar measurement variance <code>\sigma_i^2</code>,</p>
+<p><span class="math display">\[
+\boxed{ r_{n,i} = \frac{r_i}{\sigma_i}. }
+\]</span></p>
+<p>Normalized residuals allow different measurement types to be compared
+on a common statistical scale.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.63 Chi-Square Cost</h3>
+
+<p>The weighted residual cost</p>
+<p><span class="math display">\[
+\boxed{ J = \mathbf r^T \mathbf R^{-1} \mathbf r }
+\]</span></p>
+<p>has a chi-square interpretation under Gaussian assumptions.</p>
+<p>This enables statistical consistency checks on the overall residual
+set.</p>
+<p>Care is required to use the appropriate degrees of freedom.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.64 Degrees of Freedom</h3>
+
+<p>If there are <code>m</code> independent scalar measurements and
+<code>n</code> estimated independent parameters, a common approximate
+number of residual degrees of freedom is</p>
+<p><span class="math display">\[
+\boxed{ \nu = m-n. }
+\]</span></p>
+<p>Then the weighted post-fit cost can be compared with expected
+chi-square behavior.</p>
+<p>This relation should be interpreted carefully when priors,
+constraints, correlations, or rank deficiencies are present.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.65 Post-Fit Covariance</h3>
+
+<p>Near the converged solution, the estimated parameter covariance is
+approximately</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P = ( \mathbf G^T \mathbf R^{-1} \mathbf G )^{-1} }
+\]</span></p>
+<p>for the measurement-only full-rank linearized case.</p>
+<p>With prior information,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P = ( \mathbf P_0^{-1} + \mathbf G^T \mathbf R^{-1}
+\mathbf G )^{-1}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.66 Interpretation of Formal Covariance</h3>
+
+<p>The covariance is based on the assumed</p>
+<ul>
+<li>measurement statistics,</li>
+<li>force model,</li>
+<li>measurement model,</li>
+<li>local linearization.</li>
+</ul>
+<p>Therefore it is sometimes called a <strong>formal
+covariance</strong>.</p>
+<p>A mathematically small formal covariance does not guarantee small
+true error if the model assumptions are incorrect.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.67 Correlation Matrix</h3>
+
+<p>Parameter correlations may be summarized using</p>
+<p><span class="math display">\[
+\boxed{ \rho_{ij} = \frac{P_{ij}} {\sqrt{P_{ii}P_{jj}}}. }
+\]</span></p>
+<p>Large</p>
+<p><span class="math display">\[
+|\rho_{ij}|
+\]</span></p>
+<p>indicates strong coupling.</p>
+<p>Strong correlation may reveal that two estimated quantities are
+difficult to separate using the available observation geometry.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.68 Error Ellipsoid from Batch Covariance</h3>
+
+<p>The position block</p>
+<p><span class="math display">\[
+\mathbf P_{rr}
+\]</span></p>
+<p>can be used to form an uncertainty ellipsoid.</p>
+<p>Eigenvalues and eigenvectors identify principal uncertainty
+magnitudes and directions.</p>
+<p>Therefore batch OD produces both</p>
+<p><span class="math display">\[
+\boxed{ \text{Best-Fit State} }
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+\boxed{ \text{Best-Fit Uncertainty Geometry}. }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.69 Pre-Fit versus Post-Fit Residuals</h3>
+
+<p>Pre-fit residuals use the state before differential correction.</p>
+<p>Post-fit residuals use the final fitted state.</p>
+<p>Typically,</p>
+<p><span class="math display">\[
+\boxed{ \|\mathbf r^{\rm post}\| &lt; \|\mathbf r^{\rm pre}\| }
+\]</span></p>
+<p>in an overall least-squares sense.</p>
+<p>However, every individual residual does not have to decrease.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.70 Measurement Editing Before Batch Solution</h3>
+
+<p>Measurements may first be filtered using</p>
+<ul>
+<li>quality flags,</li>
+<li>physical bounds,</li>
+<li>known sensor-health information.</li>
+</ul>
+<p>Clearly invalid observations should not be allowed to dominate the
+least-squares fit.</p>
+<p>However, aggressive editing can bias the resulting solution.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.71 Iterative Outlier Rejection</h3>
+
+<p>One approach is:</p>
+<ol type="1">
+<li>solve initial batch,</li>
+<li>examine normalized residuals,</li>
+<li>identify statistically inconsistent observations,</li>
+<li>investigate or reject them,</li>
+<li>rerun the batch solution.</li>
+</ol>
+<p>This process should use consistent statistical criteria.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.72 Robust Least Squares</h3>
+
+<p>Instead of completely rejecting large residuals, robust estimation
+can reduce their influence.</p>
+<p>A robust cost may replace</p>
+<p><span class="math display">\[
+r^2
+\]</span></p>
+<p>with a function</p>
+<p><span class="math display">\[
+\rho(r)
+\]</span></p>
+<p>that grows more slowly for large residuals.</p>
+<p>Examples include</p>
+<ul>
+<li>Huber loss,</li>
+<li>Tukey-type weighting.</li>
+</ul>
+<p>This is useful when occasional outliers are expected.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.73 Effective Measurement Weights</h3>
+
+<p>In robust estimation, the effective weight of a measurement becomes
+residual dependent.</p>
+<p>Large residuals can be downweighted rather than fully discarded.</p>
+<p>However, robust estimation should not be used to hide systematic
+model errors.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.74 Observation Arc Selection</h3>
+
+<p>The observation arc strongly affects batch OD.</p>
+<p>A short arc may provide insufficient dynamic information.</p>
+<p>A long arc can improve observability but becomes more sensitive to
+force-model error.</p>
+<p>Thus,</p>
+<p><span class="math display">\[
+\boxed{ \text{Arc Length} = \text{Information Gain} \leftrightarrow
+\text{Model Fidelity} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.75 Reference Epoch Placement</h3>
+
+<p>The reference epoch can be placed</p>
+<ul>
+<li>at the beginning of the arc,</li>
+<li>midpoint,</li>
+<li>end.</li>
+</ul>
+<p>Placing it near the middle can sometimes reduce state correlation and
+numerical propagation distances in batch problems.</p>
+<p>The best choice depends on the objective.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.76 Epoch Transformation of the Final Solution</h3>
+
+<p>If the estimated state is required at another epoch
+<code>t_a</code>,</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}(t_a) = \phi( t_a,t_0,\hat{\mathbf x}_0 ) }
+\]</span></p>
+<p>and covariance may be mapped as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf P(t_a) = \boldsymbol\Phi(t_a,t_0) \mathbf P_0
+\boldsymbol\Phi^T(t_a,t_0) }
+\]</span></p>
+<p>with appropriate process-noise terms when applicable.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.77 Measurement Geometry Across the Arc</h3>
+
+<p>Measurements obtained from a single unchanging geometry may produce a
+poorly conditioned design matrix.</p>
+<p>Changing geometry can improve the rank and singular-value
+distribution of</p>
+<p><span class="math display">\[
+\mathbf G.
+\]</span></p>
+<p>Therefore diverse observation geometry is often more valuable than
+simply increasing measurement count.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.78 Repeated Similar Measurements</h3>
+
+<p>If many observations have nearly identical sensitivity rows,</p>
+<p><span class="math display">\[
+\mathbf G_i \approx \mathbf G_j,
+\]</span></p>
+<p>they provide partly redundant information.</p>
+<p>Increasing measurement count does not always create proportionally
+more independent information.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.79 Batch OD and Observability</h3>
+
+<p>The batch design matrix provides a practical observability view.</p>
+<p>If</p>
+<p><span class="math display">\[
+\mathbf G
+\]</span></p>
+<p>has full column rank, the locally linearized unknowns are
+identifiable from the measurement set.</p>
+<p>If not, some state combination lies in its null space.</p>
+<p>This connects batch OD directly to geometry and estimability
+analysis.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.80 Batch Information Matrix Eigenstructure</h3>
+
+<p>The eigenvectors of</p>
+<p><span class="math display">\[
+\boxed{ \mathbf N = \mathbf G^T \mathbf W \mathbf G }
+\]</span></p>
+<p>identify combinations of parameters.</p>
+<p>Large eigenvalues correspond to strongly constrained directions.</p>
+<p>Small eigenvalues correspond to weakly constrained directions.</p>
+<p>This is useful for diagnosing parameter-estimation quality.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.81 Measurement-Type Combination</h3>
+
+<p>Batch OD naturally combines heterogeneous measurements.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\boxed{ \begin{bmatrix} \text{Range Residuals}\\ \text{Doppler
+Residuals}\\ \text{Angle Residuals}\\ \text{GNSS Residuals}
+\end{bmatrix} }
+\]</span></p>
+<p>may all appear in one stacked residual vector.</p>
+<p>Their covariance and Jacobians determine their relative information
+contribution.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.82 Multi-Sensor Bias Estimation</h3>
+
+<p>Separate bias parameters may be added for different sensors.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf y = \begin{bmatrix} \mathbf x_0\\ b_1\\ b_2\\ b_3
+\end{bmatrix}. }
+\]</span></p>
+<p>But each added bias must be observable.</p>
+<p>Otherwise the design matrix can become poorly conditioned.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.83 Correlated Measurement Sources</h3>
+
+<p>If measurements from different sensors share a common error source,
+their covariance should contain cross terms.</p>
+<p>For example,</p>
+<ul>
+<li>common clock error,</li>
+<li>common atmospheric model error,</li>
+<li>shared preprocessing.</li>
+</ul>
+<p>Ignoring those correlations can make the solution too confident.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.84 Parameter Priors</h3>
+
+<p>Weak parameters may be stabilized using prior information:</p>
+<p><span class="math display">\[
+\boxed{ \theta \sim \mathcal N( \bar\theta, \sigma_\theta^2 ). }
+\]</span></p>
+<p>This adds information to the normal matrix.</p>
+<p>However, a prior-constrained parameter should not be described as
+strongly observed by the measurements if the measurements themselves
+contain little information.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.85 Constraint Equations</h3>
+
+<p>Some parameters may satisfy physical constraints.</p>
+<p>A linear constraint can be written</p>
+<p><span class="math display">\[
+\boxed{ \mathbf C \delta\mathbf x = \mathbf d. }
+\]</span></p>
+<p>Constrained least squares can incorporate such relationships.</p>
+<p>Constraints should represent real physical or mathematical
+knowledge.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.86 Equality Constraints</h3>
+
+<p>An exact equality constraint can be introduced through</p>
+<ul>
+<li>Lagrange multipliers,</li>
+<li>state reduction,</li>
+<li>constrained optimization.</li>
+</ul>
+<p>This is different from a probabilistic prior, which allows
+uncertainty.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.87 Soft Constraints</h3>
+
+<p>A soft constraint treats the relationship as uncertain.</p>
+<p>For example,</p>
+<p><span class="math display">\[
+\boxed{ \mathbf c(\mathbf x) \approx \mathbf d }
+\]</span></p>
+<p>with assigned covariance.</p>
+<p>It can be included as a pseudo-measurement.</p>
+<p>This preserves a statistical interpretation.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.88 Pseudo-Measurements</h3>
+
+<p>A known approximate relationship can be represented as</p>
+<p><span class="math display">\[
+\boxed{ \mathbf z_p = h_p(\mathbf x) + \mathbf v_p. }
+\]</span></p>
+<p>The pseudo-measurement is then included in the same weighted
+least-squares framework.</p>
+<p>Its covariance determines how strongly it constrains the
+solution.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.89 Batch OD for Relative Navigation</h3>
+
+<p>The same mathematics applies to a general relative-navigation
+state:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_{\rm rel,0} = \begin{bmatrix} \mathbf r_{\rm rel,0}\\
+\mathbf v_{\rm rel,0} \end{bmatrix}. }
+\]</span></p>
+<p>Measurements over an arc may include</p>
+<ul>
+<li>range,</li>
+<li>range rate,</li>
+<li>LOS,</li>
+<li>bearing angles,</li>
+<li>optical features.</li>
+</ul>
+<p>The complete observation set can be used to estimate a best-fit
+reference relative state.</p>
+<p>This is a general application to relative orbit determination,
+including formation flying and rendezvous/proximity operations.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.90 Relative-State Design Matrix</h3>
+
+<p>For relative measurement</p>
+<p><span class="math display">\[
+\mathbf z_k = h_k( \mathbf x_{{\rm rel},k} ),
+\]</span></p>
+<p>the reference-state sensitivity is</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k = \mathbf H_{{\rm rel},k} \boldsymbol\Phi_{\rm
+rel}(t_k,t_0). }
+\]</span></p>
+<p>The same residual stacking and weighted least-squares equations
+apply.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.91 Batch OD for Optical Navigation</h3>
+
+<p>For optical measurements,</p>
+<p><span class="math display">\[
+\mathbf z_k
+\]</span></p>
+<p>may contain</p>
+<ul>
+<li>pixels,</li>
+<li>angles,</li>
+<li>LOS vectors.</li>
+</ul>
+<p>Batch estimation can improve range observability because measurements
+collected at different geometries are processed together.</p>
+<p>Thus a weak instantaneous range direction may become well constrained
+over the full observation arc.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.92 Batch Calibration</h3>
+
+<p>Because the complete observation arc is available, batch estimation
+is especially useful for calibration.</p>
+<p>Possible calibration states include</p>
+<ul>
+<li>camera alignment,</li>
+<li>range bias,</li>
+<li>clock offset,</li>
+<li>sensor scale factor,</li>
+<li>station bias.</li>
+</ul>
+<p>The accumulated geometry may provide better parameter separation than
+a short real-time filter interval.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.93 Batch Reconstruction after Flight</h3>
+
+<p>Post-flight analysis can use all collected observations, detailed
+force models, and relaxed computational constraints.</p>
+<p>Batch OD can therefore produce highly accurate trajectory
+reconstruction.</p>
+<p>This may be valuable for</p>
+<ul>
+<li>performance assessment,</li>
+<li>anomaly investigation,</li>
+<li>scientific data processing,</li>
+<li>system validation.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.94 Batch OD versus Sequential OD</h3>
+
+<p>Batch OD uses the entire arc together:</p>
+<p><span class="math display">\[
+\boxed{ \{\mathbf z_1,\ldots,\mathbf z_N\} \rightarrow \hat{\mathbf
+x}_0. }
+\]</span></p>
+<p>Sequential OD updates recursively:</p>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_{k-1} \rightarrow \hat{\mathbf x}_k. }
+\]</span></p>
+<p>Both use the same</p>
+<ul>
+<li>dynamics,</li>
+<li>measurement equations,</li>
+<li>uncertainty concepts.</li>
+</ul>
+<p>The difference is primarily how information is accumulated and
+processed.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.95 Advantages of Batch OD</h3>
+
+<p>Batch estimation provides several advantages:</p>
+<ul>
+<li>uses all observations simultaneously,</li>
+<li>naturally supports post-fit residual analysis,</li>
+<li>useful for high-accuracy reconstruction,</li>
+<li>convenient for parameter estimation,</li>
+<li>can exploit future measurements relative to earlier states,</li>
+<li>useful for calibration,</li>
+<li>provides strong diagnostic capability.</li>
+</ul>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.96 Limitations of Batch OD</h3>
+
+<p>Limitations include:</p>
+<ul>
+<li>measurements must typically be available before final
+processing,</li>
+<li>repeated propagation may be computationally expensive,</li>
+<li>poor initial guesses can cause convergence difficulty,</li>
+<li>long arcs increase model sensitivity,</li>
+<li>large parameter sets can create conditioning problems.</li>
+</ul>
+<p>Thus batch OD is especially suitable for offline or ground-based
+estimation, although batch-like optimization can also be used onboard
+when resources permit.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.97 Common Mistakes in Batch Orbit Determination</h3>
+
+<p>Common errors include:</p>
+<ol type="1">
+<li>Forming the design matrix without the STM.</li>
+<li>Using <code>\mathbf H_k</code> directly when the unknown is the
+reference-epoch state.</li>
+<li>Mixing residual sign conventions.</li>
+<li>Using unweighted least squares for measurements with different
+uncertainties.</li>
+<li>Explicitly inverting poorly conditioned normal matrices.</li>
+<li>Ignoring measurement correlations.</li>
+<li>Failing to scale states and parameters.</li>
+<li>Adding unobservable parameters.</li>
+<li>Using an overly long observation arc with inadequate force
+modeling.</li>
+<li>Declaring convergence based only on a small correction.</li>
+<li>Ignoring post-fit residual structure.</li>
+<li>Treating formal covariance as guaranteed truth error.</li>
+<li>Failing to verify Jacobians.</li>
+<li>Using sensor resolution instead of realistic covariance.</li>
+<li>Rejecting outliers without statistical justification.</li>
+<li>Ignoring maneuver discontinuities.</li>
+<li>Estimating too many correlated biases simultaneously.</li>
+<li>Forgetting to recompute the STM and measurement Jacobians after each
+nonlinear iteration.</li>
+<li>Reporting low residual RMS without checking bias or temporal
+correlation.</li>
+<li>Interpreting prior-constrained parameters as strongly identified
+from data.</li>
+</ol>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.98 Practical Batch OD Workflow</h3>
+
+<p>A disciplined batch process is</p>
+<p><span class="math display">\[
+\boxed{ \begin{array}{c} \text{Choose Reference Epoch}\\ \downarrow\\
+\text{Define Initial State / Parameter Guess}\\ \downarrow\\
+\text{Define Prior Covariance if Available}\\ \downarrow\\ \text{Define
+Dynamics and Measurement Models}\\ \downarrow\\ \text{Propagate State +
+STM + Sensitivities}\\ \downarrow\\ \text{Predict All Measurements}\\
+\downarrow\\ \text{Compute Pre-Fit Residuals}\\ \downarrow\\ \text{Build
+}\mathbf G_k=\mathbf H_k\boldsymbol\Phi_k\\ \downarrow\\ \text{Stack
+Residuals and Design Matrix}\\ \downarrow\\ \text{Apply Measurement
+Weighting}\\ \downarrow\\ \text{Solve for Differential Correction}\\
+\downarrow\\ \text{Update State and Parameters}\\ \downarrow\\
+\text{Repeat Until Converged}\\ \downarrow\\ \text{Compute Post-Fit
+Residuals}\\ \downarrow\\ \text{Compute Covariance and Correlations}\\
+\downarrow\\ \text{Check Residual Statistics / Conditioning}\\
+\downarrow\\ \text{Validate Against Independent Data} \end{array} }
+\]</span></p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.99 Core Batch-OD Equations</h3>
+
+<h3 id="measurement-model">Measurement model</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf z_k = h_k[ \phi( t_k,t_0,\mathbf x_0 )] + \mathbf v_k }
+\]</span></p>
+<h3 id="pre-fit-residual">Pre-fit residual</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k = \mathbf z_k - \hat{\mathbf z}_k }
+\]</span></p>
+<h3 id="stm-mapping">STM mapping</h3>
+<p><span class="math display">\[
+\boxed{ \delta\mathbf x_k = \boldsymbol\Phi_k \delta\mathbf x_0 }
+\]</span></p>
+<h3 id="reference-state-measurement-sensitivity">Reference-state
+measurement sensitivity</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k = \mathbf H_k \boldsymbol\Phi_k }
+\]</span></p>
+<h3 id="stacked-batch-model">Stacked batch model</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf r = \mathbf G \delta\mathbf x_0 + \mathbf v }
+\]</span></p>
+<h3 id="weighted-cost">Weighted cost</h3>
+<p><span class="math display">\[
+\boxed{ J = \mathbf r^T \mathbf R^{-1} \mathbf r }
+\]</span></p>
+<h3 id="normal-equations">Normal equations</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf R^{-1} \mathbf G \, \delta\mathbf x_0 =
+\mathbf G^T \mathbf R^{-1} \mathbf r }
+\]</span></p>
+<h3 id="differential-correction">Differential correction</h3>
+<p><span class="math display">\[
+\boxed{ \hat{\mathbf x}_0^{(j+1)} = \hat{\mathbf x}_0^{(j)} +
+\delta\mathbf x_0^{(j)} }
+\]</span></p>
+<h3 id="formal-covariance">Formal covariance</h3>
+<p><span class="math display">\[
+\boxed{ \mathbf P = ( \mathbf G^T \mathbf R^{-1} \mathbf G )^{-1} }
+\]</span></p>
+<p>for the full-rank, measurement-only linearized case.</p>
+<hr />
+    </section>
+    <section class="notes-section-card">
+      <h3>4.3.13.100 Key Takeaways</h3>
+
+<p>Batch orbit determination estimates a single reference-epoch state
+that best explains an entire observation arc.</p>
+<p>The measurements are linked to the reference state through the
+spacecraft dynamics:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf x_k = \phi( t_k,t_0,\mathbf x_0 ). }
+\]</span></p>
+<p>The predicted measurements are compared with observations to form
+residuals:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r_k = \mathbf z_k - h_k( \hat{\mathbf x}_k ). }
+\]</span></p>
+<p>Because the unknown is the reference state, the correct measurement
+sensitivity is not simply <code>\mathbf H_k</code>, but</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G_k = \mathbf H_k \boldsymbol\Phi(t_k,t_0). }
+\]</span></p>
+<p>All measurement residuals are stacked:</p>
+<p><span class="math display">\[
+\boxed{ \mathbf r = \begin{bmatrix} \mathbf r_1\\ \vdots\\ \mathbf r_N
+\end{bmatrix} }
+\]</span></p>
+<p>and all sensitivities are stacked into</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G. }
+\]</span></p>
+<p>The weighted correction is obtained from</p>
+<p><span class="math display">\[
+\boxed{ \mathbf G^T \mathbf R^{-1} \mathbf G \, \delta\mathbf x_0 =
+\mathbf G^T \mathbf R^{-1} \mathbf r. }
+\]</span></p>
+<p>Because the orbit and measurement models are nonlinear, this
+correction is applied iteratively:</p>
+<p><span class="math display">\[
+\boxed{ \text{Propagate} \rightarrow \text{Predict} \rightarrow
+\text{Residual} \rightarrow \text{Linearize} \rightarrow \text{Correct}
+\rightarrow \text{Repeat}. }
+\]</span></p>
+<p>After convergence, the most important outputs are not only the
+best-fit state but also</p>
+<ul>
+<li>post-fit residuals,</li>
+<li>covariance,</li>
+<li>parameter correlations,</li>
+<li>conditioning,</li>
+<li>prediction performance.</li>
+</ul>
+<p>The central engineering principle is:</p>
+<p><span class="math display">\[
+\boxed{ \text{A Good Batch OD Solution Must} \quad \text{Fit the Data,
+Be Numerically Well Conditioned,} \quad \text{and Remain Physically
+Consistent.} }
+\]</span></p>
+<p>A very small residual norm alone is not sufficient. The residual
+statistics, estimated covariance, observability, parameter correlations,
+and independent validation must all support the final solution.</p>
+    </section>
+    <section class="notes-section-card">
+      <h2>Next: 4.3.14 Sequential Orbit Determination</h2>
+      <p>
+        Batch orbit determination processes an observation arc together to obtain a best-fit reference state and
+        associated parameters. The next section moves to recursive processing, where the orbit state and covariance
+        are propagated and updated as measurements arrive in real time.
+      </p>
+      <a href="sequential-orbit-determination.html" class="sensor-link-card">
+        <div class="sensor-link-content">
+          <h3>4.3.14 Sequential Orbit Determination</h3>
+          <p>
+            Real-time recursive orbit updates, process noise, maneuvers, state augmentation, onboard OD, and
+            continuous tracking.
+          </p>
+          <p class="sensor-link-arrow">Continue to Sequential Orbit Determination &rarr;</p>
+        </div>
+      </a>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <p>
+      © 2026 Upasana Panigrahi — Interactive GNC &amp; Space Mechanics.
+      Educational resource for spacecraft dynamics, orbital mechanics,
+      guidance–navigation–control systems, sensor modelling, state estimation,
+      sensor fusion, orbit determination, and spacecraft navigation.
+    </p>
+  </footer>
+</body>
+</html>
